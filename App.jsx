@@ -3516,7 +3516,7 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
   const pct = exercises.length>0 ? (totalExDone/exercises.length)*100 : 0;
 
   // Funcion finalizar (igual que antes)
-  const finalizarSesion = () => {
+  const finalizarSesion = async () => {
     const r = activeR;
     const dayKey = session.rId+"-"+session.dIdx+"-w"+currentWeek;
     const newCompleted = completedDays.includes(dayKey)?completedDays:[...completedDays,dayKey];
