@@ -782,7 +782,14 @@ function GymApp() {
           if(decoded?.alumnoId) {
             const ruts = await sbFetch("rutinas?alumno_id=eq."+decoded.alumnoId+"&select=*&order=created_at.desc&limit=1");
             if(ruts && ruts[0] && ruts[0].datos) {
-              setRoutines([{...ruts[0].datos, alumnoId: decoded.alumnoId, id: ruts[0].id}]);
+              setRoutines([{
+                ...ruts[0].datos,
+                id: ruts[0].id,
+                name: ruts[0].nombre || ruts[0].datos?.name || 'Mi Rutina',
+                created: ruts[0].created_at ? new Date(ruts[0].created_at).toLocaleDateString('es-AR') : '',
+                alumnoId: decoded.alumnoId,
+                days: ruts[0].datos?.days || [],
+              }]);
               setSharedLoaded(true);
               return;
             }
@@ -834,7 +841,14 @@ function GymApp() {
         try {
           const ruts = await sbFetch("rutinas?alumno_id=eq."+sessionData.alumnoId+"&select=*&order=created_at.desc&limit=1");
           if(ruts && ruts[0] && ruts[0].datos) {
-            setRoutines([{...ruts[0].datos, alumnoId: sessionData.alumnoId}]);
+            setRoutines([{
+              ...ruts[0].datos,
+              id: ruts[0].id,
+              name: ruts[0].nombre || ruts[0].datos?.name || 'Mi Rutina',
+              created: ruts[0].created_at ? new Date(ruts[0].created_at).toLocaleDateString('es-AR') : '',
+              alumnoId: sessionData.alumnoId,
+              days: ruts[0].datos?.days || [],
+            }]);
           }
         
       // Cargar nota del día
@@ -1703,7 +1717,7 @@ function GymApp() {
               </div>
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
-              const diasJSX = r.days.map((d,di)=>{ return (
+              const diasJSX = (r.days||[]).map((d,di)=>{ return (
                 <div key={di} style={{marginBottom:24}}>
                   <div style={{fontSize:18,fontWeight:700,letterSpacing:1,color:textMuted,marginBottom:8,paddingBottom:8,borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057")}}>
                     {es?"Dia ":"Day "}{di+1}
@@ -1827,7 +1841,7 @@ function GymApp() {
                     const isDayDone=completedDays.includes(dayKey);
                     // Calcular nextDayIdx localmente para esta rutina r
                     const daysCompletedR=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length;
-                    const localNextDayIdx=daysCompletedR < r.days.length ? daysCompletedR : null;
+                    const localNextDayIdx=daysCompletedR < (r.days||[]).length ? daysCompletedR : null;
                     const isNextDay=di===localNextDayIdx;
                     const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
                     if(isDayDone) return(
@@ -1854,9 +1868,9 @@ function GymApp() {
               );
               });
               return (<div key={r.id} style={{marginBottom:16}}>
-                  <div style={{fontSize:28,fontWeight:800,letterSpacing:1,marginBottom:4}}>{r.name}</div>
+                  <div style={{fontSize:28,fontWeight:800,letterSpacing:1,marginBottom:4}}>{r?.name||'Rutina'}</div>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                    <div style={{fontSize:15,color:textMuted}}>{r.created} · {r.days.length} {es?es?"dias":"days":"days"}{r.note?" · "+r.note:""}</div>
+                    <div style={{fontSize:15,color:textMuted}}>{r.created} · {(r.days||[]).length} {es?"dias":"days"}{r.note?" · "+r.note:""}</div>
                     <div style={{display:"flex",gap:8}}>
                       <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",border:"1px solid "+border,color:textMain,borderRadius:8,padding:"8px 12px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onClick={()=>generatePDF(r)}>
                         <Ic name="file-text" size={14}/> PDF
@@ -1877,7 +1891,7 @@ function GymApp() {
                       <div style={{fontSize:15,fontWeight:700,color:textMain,marginBottom:8}}>
                         {es?"Semana":"Week"} <span style={{color:"#2563EB",fontWeight:800}}>{currentWeek+1}</span>
                         <span style={{fontSize:11,color:textMuted,fontWeight:400,marginLeft:8}}>
-                          {completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length}/{r.days.length} {es?"días":"days"}
+                          {completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length}/{(r.days||[]).length} {es?"días":"days"}
                         </span>
                       </div>
                       <div style={{display:"flex",gap:4,justifyContent:"center"}}>
@@ -2156,7 +2170,7 @@ function GymApp() {
                     setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,alumno_id:v,alumno:alumnos.find(a=>a.id===v)?.nombre||""}:rr));
                   }}>
                     <option value="">👤 Sin asignar</option>
-                    {alumnos.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}
+                    {alumnos.map(alumno=><option key={alumno.id} value={alumno.id}>{alumno.nombre}</option>)}
                   </select>
                   <button className="hov" style={{...btn(),padding:"8px 14px",fontSize:15,fontWeight:700}} onClick={async()=>{
                     try{
@@ -2577,7 +2591,7 @@ function GymApp() {
                 // Solo PR si habia registro previo Y supero el maximo
                 return maxAntes>0 && maxHoy>maxAntes;
               }).length;
-              setResumenSesion({durMin,ejercicios:exsCompleted.length,totalSets:exsCompleted.reduce((a,e)=>a+(parseInt(e.sets)||3),0),volTotal:Math.round(volTotal),prsNuevos,diaLabel:activeDay.label||("Dia "+(session.dIdx+1)),rutinaName:r?.name||"Entrenamiento",fecha:new Date().toLocaleDateString("es-AR")});
+              setResumenSesion({durMin,ejercicios:exsCompleted.length,totalSets:exsCompleted.reduce((acc2,e)=>acc2+(parseInt(e.sets)||3),0),volTotal:Math.round(volTotal),prsNuevos,diaLabel:activeDay.label||("Dia "+(session.dIdx+1)),rutinaName:r?.name||"Entrenamiento",fecha:new Date().toLocaleDateString("es-AR")});
               setSession(null);
               if(readOnly&&sharedParam){try{const rutData=JSON.parse(atob(sharedParam));const alumnoId=rutData.alumnoId;if(alumnoId){sb.addSesion({alumno_id:alumnoId,rutina_nombre:r?.name||"",dia_label:activeDay.label||("Dia "+(session.dIdx+1)),dia_idx:session.dIdx,semana:currentWeek+1,ejercicios:exsCompleted.map(e=>e.id).join(","),fecha:new Date().toLocaleDateString("es-AR"),hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})});}}catch(e){}}
               // Avanzar SIEMPRE a la semana siguiente al terminar cada sesión
@@ -3443,7 +3457,7 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
       return maxHoy > (preSessionPRs[ex2.id]||0);
     }).length;
     setResumenSesion({durMin,ejercicios:exsCompleted.length,
-      totalSets:exsCompleted.reduce((a,e)=>a+(parseInt(e.sets)||3),0),
+      totalSets:exsCompleted.reduce((acc2,e)=>acc2+(parseInt(e.sets)||3),0),
       volTotal:Math.round(volTotal),prsNuevos,
       diaLabel:activeDay.label||("Dia "+(session.dIdx+1)),
       rutinaName:r?.name||"Entrenamiento",fecha:hoyFin});
