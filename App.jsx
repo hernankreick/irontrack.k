@@ -839,10 +839,24 @@ function GymApp() {
 
   // Función reutilizable — se llama al montar, al hacer VER y cada 60s
   const cargarSesionesGlobales = React.useCallback(async (alumnosActuales) => {
-    const lista = alumnosActuales || alumnos;
+    // Si no se pasan alumnos y el estado local está vacío,
+    // los busca en Supabase antes de continuar.
+    // Esto es necesario cuando la llama el alumno (onSesionGuardada)
+    // porque en ese contexto alumnos=[] en el estado de GymApp.
+    let lista = alumnosActuales || alumnos;
     if(!lista || lista.length === 0) {
-      console.warn('[cargarSesionesGlobales] sin alumnos, cancelando fetch');
-      return;
+      try {
+        const sbAlumnos = await sb.getAlumnos('entrenador_principal');
+        if(sbAlumnos && sbAlumnos.length > 0) {
+          setAlumnos(sbAlumnos);
+          lista = sbAlumnos;
+        } else {
+          return; // Sin alumnos en Supabase tampoco — nada que cargar
+        }
+      } catch(fetchErr) {
+        console.error('[cargarSesionesGlobales] no pudo obtener alumnos:', fetchErr);
+        return;
+      }
     }
     try {
       const ids = lista.map(alumno => alumno.id).filter(id => id && typeof id === 'string' && id.length > 0);
