@@ -640,6 +640,7 @@ function GymApp() {
   } = useAlumnos({ sb });
   const [rutinasSB, setRutinasSB] = useState([]);
   const [registrosSubTab, setRegistrosSubTab] = useState(0);
+  const [sesionesGlobales, setSesionesGlobales] = useState([]);
 
   const es = lang==="es";
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
@@ -828,9 +829,40 @@ function GymApp() {
   }, [timer, es]);
   useEffect(() => { localStorage.setItem("it_week",String(currentWeek)); },[currentWeek]);
 
+  // Función reutilizable — se llama al montar, al hacer VER y cada 60s
+  const cargarSesionesGlobales = React.useCallback(async (alumnosActuales) => {
+    const lista = alumnosActuales || alumnos;
+    if(!lista || lista.length === 0) return;
+    try {
+      // Filtrar por alumno_id IN (...) para traer solo sesiones de MIS alumnos
+      const ids = lista.map(a => a.id).filter(Boolean);
+      if(ids.length === 0) return;
+      // Supabase PostgREST: alumno_id=in.(id1,id2,...)
+      const query = 'sesiones?alumno_id=in.(' + ids.join(',') + ')'
+        + '&select=*&order=created_at.desc&limit=500';
+      const resultado = await sbFetch(query);
+      if(resultado && Array.isArray(resultado)) {
+        setSesionesGlobales(resultado);
+      }
+    } catch(e) { console.error('[cargarSesionesGlobales]', e); }
+  }, [alumnos]);
+
   useEffect(() => {
     if(!readOnly && sessionData?.role==="entrenador") {
-      cargarAlumnos();
+      // Carga inicial: primero alumnos, luego sesiones con los ids reales
+      const init = async () => {
+        const sbAlumnos = await sb.getAlumnos('entrenador_principal') || [];
+        setAlumnos(sbAlumnos);
+        if(sbAlumnos.length > 0) {
+          await cargarSesionesGlobales(sbAlumnos);
+        }
+      };
+      init();
+      // Polling cada 60s — el entrenador ve datos frescos sin recargar
+      const intervalo = setInterval(() => {
+        cargarSesionesGlobales();
+      }, 60000);
+      return () => clearInterval(intervalo);
     }
   }, [sessionData?.role]);
 
@@ -1557,7 +1589,7 @@ function GymApp() {
 
             {!esAlumno&&(
               <DashboardEntrenador sb={sb} routines={routines} alumnos={alumnos}
-                sesiones={alumnoSesiones}
+                sesiones={sesionesGlobales}
                 es={es}
                 darkMode={darkMode}
                 progress={progress}
@@ -2305,7 +2337,13 @@ function GymApp() {
               <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:textMain}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
               <div style={{display:"flex",gap:8}}>
                 <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)}>💰</button>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos}>↺</button>
+                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={async()=>{
+                  toast2(es?"Actualizando...":"Refreshing...");
+                  const sbAlumnos = await sb.getAlumnos("entrenador_principal") || [];
+                  setAlumnos(sbAlumnos);
+                  if(sbAlumnos.length > 0) await cargarSesionesGlobales(sbAlumnos);
+                  toast2(es?"Datos actualizados ✓":"Data refreshed ✓");
+                }}>↺</button>
                 <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {es?"Nuevo":"New"}</button>
               </div>
             </div>
@@ -2399,9 +2437,17 @@ function GymApp() {
                     <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={async()=>{
                       if(alumnoActivo?.id===a.id){setAlumnoActivo(null);return;}
                       setAlumnoActivo(a);setRegistrosSubTab(0);setLoadingSB(true);
-                      const ruts=await sb.getRutinas(a.id);setRutinasSB(ruts||[]);
-                      const prog=await sb.getProgreso(a.id);setAlumnoProgreso(prog||[]);
-                      const ses=await sb.getSesiones(a.id);setAlumnoSesiones(ses||[]);
+                      // Cargar datos del alumno individual
+                      const [ruts, prog, ses] = await Promise.all([
+                        sb.getRutinas(a.id),
+                        sb.getProgreso(a.id),
+                        sb.getSesiones(a.id),
+                      ]);
+                      setRutinasSB(ruts||[]);
+                      setAlumnoProgreso(prog||[]);
+                      setAlumnoSesiones(ses||[]);
+                      // Refrescar sesiones globales para actualizar el dashboard
+                      await cargarSesionesGlobales();
                       setLoadingSB(false);
                     }}>{alumnoActivo?.id===a.id?"CERRAR":"VER"}</button>
                     <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={async()=>{
@@ -3490,6 +3536,21 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
         semana:currentWeek+1,ejercicios:exercises.map(e=>e.id).join(","),
         fecha:hoyFin,hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})});
     }catch(e){}}
+    // ── Modo alumno LOGUEADO: guardar sesión en Supabase ─────────────
+    if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
+      try {
+        sb.addSesion({
+          alumno_id: sessionData.alumnoId,
+          rutina_nombre: r?.name||"",
+          dia_label: activeDay.label||("Dia "+(session.dIdx+1)),
+          dia_idx: session.dIdx,
+          semana: currentWeek+1,
+          ejercicios: exercises.map(e=>e.id).join(","),
+          fecha: hoyFin,
+          hora: new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})
+        });
+      } catch(e) { console.error('[addSesion alumno logueado]', e); }
+    }
     // Avanzar semana solo cuando se completan TODOS los días de la semana
     if(daysThisWeek >= totalDays && currentWeek < 3){
       setCompletedDays(prev=>prev.filter(k=>!k.endsWith("-w"+currentWeek)));
