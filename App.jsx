@@ -2161,7 +2161,28 @@ function GymApp() {
                       onClick={()=>setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,collapsed:!rr.collapsed}:rr))}>
                       {r.collapsed?("▼ "+(es?"VER":"VIEW")):("▲ "+(es?"CERRAR":"CLOSE"))}
                     </button>
-                    <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setRoutines(p=>p.filter(x=>x.id!==r.id));toast2((es?"Rutina eliminada":"Routine deleted")+" ✓");}}><Ic name="trash-2" size={15}/></button>
+                    <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 10px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{
+                      const copia = {
+                        ...r,
+                        id: uid(),
+                        name: (r.name||"Rutina")+" (copia)",
+                        saved: false,
+                        alumno_id: null,
+                        alumno: "",
+                        created: new Date().toLocaleDateString("es-AR"),
+                        collapsed: false,
+                        days: (r.days||[]).map(d=>({
+                          ...d,
+                          exercises: (d.exercises||[]).map(ex=>({...ex})),
+                          warmup: (d.warmup||[]).map(ex=>({...ex}))
+                        }))
+                      };
+                      setRoutines(prev=>[copia,...prev]);
+                      toast2(es?"Rutina duplicada ✓":"Routine duplicated ✓");
+                    }}>
+                      <Ic name="copy" size={15}/>
+                    </button>
+                    <button className="hov" style={{background:"#EF444422",color:"#EF4444",border:"none",borderRadius:8,padding:"8px 10px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setRoutines(p=>p.filter(x=>x.id!==r.id));toast2((es?"Rutina eliminada":"Routine deleted")+" ✓");}}><Ic name="trash-2" size={15}/></button>
                   </div>
                 </div>
                 <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
@@ -5722,6 +5743,61 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                       <polyline points="9 18 15 12 9 6"/>
                     </svg>
                   </div>
+                  {(()=>{
+                    // ── Sparkline tendencia 30d ────────────────────────
+                    const progDataSpark = a.progress||{};
+                    const setsSpark = Object.values(progDataSpark)
+                      .flatMap(pg=>(pg.sets||[]))
+                      .filter(s=>parseFloat(s.kg)>0);
+                    if(setsSpark.length < 3) return null;
+                    // Agrupar en 8 buckets semanales
+                    const nowSpark = Date.now();
+                    const bkts = {};
+                    setsSpark.forEach(s=>{
+                      const dObj = new Date(s.date||nowSpark);
+                      const wAgo = Math.min(7, Math.floor((nowSpark - dObj.getTime())/(7*24*60*60*1000)));
+                      if(!bkts[wAgo]) bkts[wAgo]=[];
+                      bkts[wAgo].push(parseFloat(s.kg)||0);
+                    });
+                    const sparkData = [7,6,5,4,3,2,1,0]
+                      .map(w=>bkts[w]?bkts[w].reduce((acc2,v)=>acc2+v,0)/bkts[w].length:null)
+                      .filter(v=>v!==null);
+                    if(sparkData.length < 2) return null;
+                    const sMin=Math.min(...sparkData), sMax=Math.max(...sparkData), sRange=sMax-sMin||1;
+                    const W=80, H=20, pad=2;
+                    const pts = sparkData.map((v,idx)=>({
+                      x: pad+(idx/(sparkData.length-1))*(W-pad*2),
+                      y: H-pad-((v-sMin)/sRange)*(H-pad*2)
+                    }));
+                    const pathD = pts.map((p,idx)=>idx===0?`M${p.x.toFixed(1)},${p.y.toFixed(1)}`:`L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                    const first=sparkData[0], last=sparkData[sparkData.length-1];
+                    const trendPct = first>0?Math.round((last-first)/first*100):0;
+                    const trendColor = trendPct>2?"#22C55E":trendPct<-2?"#F59E0B":"#8B9AB2";
+                    return (
+                      <div style={{
+                        display:"flex",alignItems:"center",gap:8,
+                        marginLeft:46,marginTop:4,marginBottom:narrativa?4:0,
+                        padding:"4px 8px",borderRadius:6,
+                        background:"rgba(0,0,0,.15)"
+                      }}>
+                        <span style={{fontSize:9,color:"#8B9AB2",fontWeight:600,whiteSpace:"nowrap",minWidth:28}}>
+                          30d
+                        </span>
+                        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{flex:1,overflow:"visible"}}>
+                          <path d={pathD} stroke={trendColor} strokeWidth="1.5" fill="none"
+                            strokeLinejoin="round" strokeLinecap="round"/>
+                          <circle cx={pts[pts.length-1].x} cy={pts[pts.length-1].y}
+                            r="2.5" fill={trendColor}/>
+                        </svg>
+                        <span style={{
+                          fontSize:10,fontWeight:800,color:trendColor,
+                          whiteSpace:"nowrap",minWidth:28,textAlign:"right"
+                        }}>
+                          {trendPct>0?"+":""}{trendPct}%
+                        </span>
+                      </div>
+                    );
+                  })()}
                   {narrativa&&(
                     <div style={{
                       background:narrativa.bg,
