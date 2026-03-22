@@ -259,7 +259,7 @@ const sbFetch = async (path, method="GET", body=null) => {
 const sb = {
   getAlumnos: (entId) => sbFetch("alumnos?entrenador_id=eq."+entId+"&select=*"),
   createAlumno: (data) => sbFetch("alumnos", "POST", data),
-  getRutinas: (alumnoId) => sbFetch("rutinas?alumno_id=eq."+alumnoId+"&select=*"),
+  getRutinas: (alumnoId) => sbFetch("rutinas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=10"),
   getRutinasByEntrenador: () => sbFetch("rutinas?entrenador_id=eq.entrenador_principal&select=*"),
   createRutina: (data) => sbFetch("rutinas", "POST", data),
   updateRutina: (id, data) => sbFetch("rutinas?id=eq."+id, "PATCH", data),
@@ -638,6 +638,8 @@ function GymApp() {
     cargarAlumnos,
     notifyAlumno,
   } = useAlumnos({ sb });
+  const [rutinasSB, setRutinasSB] = useState([]);
+  const [registrosSubTab, setRegistrosSubTab] = useState(0);
 
   const es = lang==="es";
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
