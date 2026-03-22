@@ -3468,7 +3468,7 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
         <div style={{background:"#22C55E18",borderBottom:"1px solid #22c55e33",padding:"8px 16px",
           display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
           <div style={{width:36,height:36,borderRadius:"50%",border:"3px solid #22c55e",
-            display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:"#22C55E",
             background:timer.remaining<10?"#2D4057":"transparent",borderColor:timer.remaining<10?"#2563EB":"#22C55E",
             color:timer.remaining<10?"#2563EB":"#22C55E"}}>
             {timer.remaining}
@@ -6229,4 +6229,3 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
     </div>
   );
 }
-export default App;
