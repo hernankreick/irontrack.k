@@ -2166,7 +2166,13 @@ function GymApp() {
                       if(rActual.saved){
                         await sb.updateRutina(rActual.id,payload);
                       } else {
-                        await sb.createRutina({...payload,id:rActual.id});
+                        // Sin id — Supabase genera el UUID automáticamente
+                        const resNew=await sb.createRutina(payload);
+                        if(resNew&&resNew[0]){
+                          setRoutines(p=>p.map(rr=>rr.id===rActual.id?{...rr,saved:true,id:resNew[0].id}:rr));
+                        } else {
+                          console.error('[createRutina] Supabase rechazó:',{payload,res:resNew});
+                        }
                         setRoutines(p=>p.map(rr=>rr.id===rActual.id?{...rr,saved:true}:rr));
                       }
                       toast2(es?"Rutina guardada ✓":"Routine saved ✓");
@@ -2408,7 +2414,21 @@ function GymApp() {
                       if(ex&&!confirm((es?"Ya tiene: ":"Has: ")+ex.nombre+(es?"\n¿Reemplazar?":"\nReplace?"))) return;
                       if(ex){await sb.deleteRutina(ex.id);setRutinasSB(prev=>prev.filter(x=>x.id!==ex.id));}
                       setLoadingSB(true);
-                      const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:rutinaLocal.days,alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
+                      // Payload limpio — solo columnas que existen en Supabase
+                       const payload2 = {
+                         alumno_id: a.id,
+                         entrenador_id: ENTRENADOR_ID,
+                         nombre: rutinaLocal.name||'Rutina',
+                         datos: {days:rutinaLocal.days,alumno:rutinaLocal.alumno||'',note:rutinaLocal.note||''}
+                       };
+                       const res=await sb.createRutina(payload2);
+                       if(res&&res[0]){
+                         setRutinasSB(prev=>[...prev,res[0]]);
+                         toast2('Rutina asignada ✓');
+                       } else {
+                         console.error('[asignar rutina] Error Supabase:',{payload:payload2,res});
+                         toast2('Error al asignar');
+                       }
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
                       setLoadingSB(false);
                     }}>{es?"+ Asignar rutina actual":"+ Assign current routine"}</button>
@@ -3025,7 +3045,7 @@ function GymApp() {
                 const updatedDays = rActual.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
                 const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
-                else { await sb.createRutina({...payload,id:rActual.id}); setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,saved:true}:r)); }
+                else { const resAS2=await sb.createRutina(payload); if(resAS2&&resAS2[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,saved:true,id:resAS2[0].id}:r));}else{console.error('[auto-save] falló',payload);} }
               }
             } catch(e){ console.error("Auto-save error:",e); }
             setEditEx(null);toast2("Guardado ✓");
