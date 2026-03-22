@@ -1641,7 +1641,23 @@ function GymApp() {
                 session={session}
                 pagosEstado={pagosEstado}
                 togglePago={togglePago}
-                onVerAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
+                onVerAlumno={async (a)=>{
+                  setAlumnoActivo(a);
+                  setTab("alumnos");
+                  setRegistrosSubTab(0);
+                  setLoadingSB(true);
+                  try {
+                    const [ruts, prog, ses] = await Promise.all([
+                      sb.getRutinas(a.id),
+                      sb.getProgreso(a.id),
+                      sb.getSesiones(a.id),
+                    ]);
+                    setRutinasSB(ruts||[]);
+                    setAlumnoProgreso(prog||[]);
+                    setAlumnoSesiones(ses||[]);
+                  } catch(e) { console.error("[onVerAlumno]", e); }
+                  setLoadingSB(false);
+                }}
                 onChatAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
                 sugerencias={sugerencias}
                 setSugerencias={setSugerencias}
