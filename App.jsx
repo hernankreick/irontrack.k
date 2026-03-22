@@ -645,6 +645,10 @@ function GymApp() {
   const [rutinasSB, setRutinasSB] = useState([]);
   const [registrosSubTab, setRegistrosSubTab] = useState(0);
   const [sesionesGlobales, setSesionesGlobales] = useState([]);
+  // progresoGlobal: { [alumnoId]: [{ejercicio_id, kg, reps, fecha}] }
+  const [progresoGlobal, setProgresoGlobal] = useState({});
+  // sugerencias: { [alumnoId]: [{exId, exNombre, tipo, valorActual, valorSugerido, razon, estado}] }
+  const [sugerencias, setSugerencias] = useState({});
 
   const es = lang==="es";
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
@@ -841,25 +845,34 @@ function GymApp() {
       return;
     }
     try {
-      // Filtrar ids válidos — evita query malformada con valores nulos
-      const ids = lista.map(a => a.id).filter(id => id && typeof id === 'string' && id.length > 0);
-      if(ids.length === 0) {
-        console.warn('[cargarSesionesGlobales] ningún alumno tiene id válido');
-        return;
+      const ids = lista.map(alumno => alumno.id).filter(id => id && typeof id === 'string' && id.length > 0);
+      if(ids.length === 0) return;
+      const idsStr = ids.join(',');
+      // Cargar sesiones Y progreso en paralelo — una sola ronda de requests
+      const [sesResult, progResult] = await Promise.all([
+        sbFetch('sesiones?alumno_id=in.(' + idsStr + ')&select=*&order=created_at.desc&limit=500'),
+        sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=alumno_id,ejercicio_id,kg,reps,fecha&order=created_at.desc&limit=3000'),
+      ]);
+      if(sesResult && Array.isArray(sesResult)) setSesionesGlobales(sesResult);
+      if(progResult && Array.isArray(progResult)) {
+        // Indexar por alumno_id para acceso O(1) en el dashboard
+        const idx = {};
+        progResult.forEach(reg => {
+          if(!idx[reg.alumno_id]) idx[reg.alumno_id] = [];
+          idx[reg.alumno_id].push(reg);
+        });
+        setProgresoGlobal(idx);
+        // Calcular sugerencias para cada alumno con los datos frescos
+        const nuevasSugs = {};
+        lista.forEach(alumnoItem => {
+          const progAlu = idx[alumnoItem.id] || [];
+          if(progAlu.length >= 3) {
+            nuevasSugs[alumnoItem.id] = calcularSugerencias(progAlu, [], []);
+          }
+        });
+        setSugerencias(nuevasSugs);
       }
-      // Supabase PostgREST: alumno_id=in.(uuid1,uuid2,...)
-      const query = 'sesiones?alumno_id=in.(' + ids.join(',') + ')'
-        + '&select=*&order=created_at.desc&limit=500';
-      console.log('[cargarSesionesGlobales] fetching', ids.length, 'alumnos...');
-      const resultado = await sbFetch(query);
-      if(resultado && Array.isArray(resultado)) {
-        console.log('[cargarSesionesGlobales] ✓', resultado.length, 'sesiones cargadas');
-        setSesionesGlobales(resultado);
-      } else {
-        console.error('[cargarSesionesGlobales] ✗ respuesta inválida:', resultado);
-        console.error('[cargarSesionesGlobales] query usada:', query);
-      }
-    } catch(e) { console.error('[cargarSesionesGlobales] excepción:', e); }
+    } catch(pgErr) { console.error('[cargarSesionesGlobales]', pgErr); }
   }, [alumnos]);
 
   useEffect(() => {
@@ -1610,11 +1623,14 @@ function GymApp() {
                 es={es}
                 darkMode={darkMode}
                 progress={progress}
+                progresoGlobal={progresoGlobal}
                 session={session}
                 pagosEstado={pagosEstado}
                 togglePago={togglePago}
                 onVerAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
                 onChatAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
+                sugerencias={sugerencias}
+                setSugerencias={setSugerencias}
                 onNotificar={(alumnoId, msg)=>notifyAlumno(alumnoId, msg).then(()=>toast2(es?"Notificación enviada":"Notification sent")).catch(()=>toast2("Error al notificar"))}
               />
             )}
@@ -5521,7 +5537,123 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
 }
 
 
-function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}}) {
+// ── calcularSugerencias ─────────────────────────────────────────────────
+// Analiza el progreso de un alumno y genera sugerencias de sobrecarga.
+// NO modifica nada — solo retorna un array de sugerencias.
+// progresoAlumno: [{ejercicio_id, kg, reps, fecha}] (de Supabase tabla progreso)
+// rutinasAlumno:  array de rutinas del alumno (para saber el método de progresión)
+// allEx:          catálogo de ejercicios para obtener nombres
+function calcularSugerencias(progresoAlumno, rutinasAlumno, allEx) {
+  if(!progresoAlumno || progresoAlumno.length === 0) return [];
+
+  const sugs = [];
+
+  // Agrupar por ejercicio_id
+  const porEjercicio = {};
+  progresoAlumno.forEach(reg => {
+    const exId = reg.ejercicio_id;
+    if(!exId) return;
+    if(!porEjercicio[exId]) porEjercicio[exId] = [];
+    porEjercicio[exId].push({
+      kg:   parseFloat(reg.kg)   || 0,
+      reps: parseInt(reg.reps)   || 0,
+      fecha: reg.fecha || reg.created_at || '',
+    });
+  });
+
+  // Obtener configuración del ejercicio en la rutina (progresion, sets, reps target)
+  const exConfig = {};
+  (rutinasAlumno||[]).forEach(rut => {
+    (rut?.datos?.days || rut?.days || []).forEach(dia => {
+      [...(dia.exercises||[]), ...(dia.warmup||[])].forEach(ex => {
+        if(ex?.id) exConfig[ex.id] = ex;
+      });
+    });
+  });
+
+  Object.entries(porEjercicio).forEach(([exId, registros]) => {
+    if(registros.length < 3) return; // Necesitamos al menos 3 registros
+
+    // Ordenar por fecha descendente (más reciente primero)
+    const ordenados = [...registros].sort((regA, regB) => {
+      return new Date(regB.fecha||0) - new Date(regA.fecha||0);
+    });
+
+    const ultimos3 = ordenados.slice(0, 3);
+    const kgUltimos = ultimos3.map(r => r.kg);
+    const repsUltimas = ultimos3.map(r => r.reps);
+    const maxKg = Math.max(...kgUltimos);
+    const minKg = Math.min(...kgUltimos);
+    const kgConsistente = maxKg > 0 && (maxKg - minKg) / maxKg < 0.1; // variación < 10%
+
+    const exInfo = (allEx||[]).find(e => e.id === exId);
+    const exNombre = exInfo?.name || exId;
+    const config = exConfig[exId] || {};
+    const metodo = config.progresion || 'manual';
+    const repsTarget = parseInt((config.reps||'').split(/[-x]/)[1] || config.reps) || 0;
+
+    // ── Regla 1: +Carga ──────────────────────────────────────────────
+    // 3 sesiones consecutivas con el mismo peso → sugerir +2.5kg
+    if(kgConsistente && maxKg > 0 && (metodo === 'carga' || metodo === 'manual')) {
+      const nuevoKg = Math.round((maxKg + 2.5) * 2) / 2; // redondear a 0.5kg
+      sugs.push({
+        exId,
+        exNombre,
+        tipo: 'carga',
+        icono: '↑',
+        valorActual: maxKg + 'kg',
+        valorSugerido: nuevoKg + 'kg',
+        razon: `3 sesiones estables en ${maxKg}kg — listo para subir`,
+        estado: 'pendiente',
+        config: { campo: 'kg', valor: String(nuevoKg) },
+      });
+    }
+
+    // ── Regla 2: +Reps ───────────────────────────────────────────────
+    // Últimas 3 sesiones en el tope del rango de reps → sugerir +2 reps
+    const repsPromedio = repsUltimas.reduce((acc2,r)=>acc2+r,0) / repsUltimas.length;
+    if(repsTarget > 0 && repsPromedio >= repsTarget && metodo === 'reps') {
+      sugs.push({
+        exId,
+        exNombre,
+        tipo: 'reps',
+        icono: '↑',
+        valorActual: Math.round(repsPromedio) + ' reps',
+        valorSugerido: (repsTarget + 2) + ' reps',
+        razon: `Completa ${repsTarget} reps consistentemente`,
+        estado: 'pendiente',
+        config: { campo: 'reps', valor: String(repsTarget + 2) },
+      });
+    }
+
+    // ── Regla 3: Alerta caída ────────────────────────────────────────
+    // El último registro es notablemente menor al penúltimo
+    if(ordenados.length >= 2) {
+      const ultimo = ordenados[0].kg;
+      const penultimo = ordenados[1].kg;
+      if(penultimo > 0 && ultimo < penultimo * 0.9) { // caída > 10%
+        sugs.push({
+          exId,
+          exNombre,
+          tipo: 'alerta',
+          icono: '⚠',
+          valorActual: ultimo + 'kg',
+          valorSugerido: penultimo + 'kg',
+          razon: `Bajó de ${penultimo}kg a ${ultimo}kg — revisar recuperación`,
+          estado: 'pendiente',
+          config: null,
+        });
+      }
+    }
+  });
+
+  // Prioridad: alertas primero, luego carga, luego reps
+  const orden = { alerta: 0, carga: 1, reps: 2 };
+  return sugs.sort((sugA, sugB) => (orden[sugA.tipo]||9) - (orden[sugB.tipo]||9));
+}
+
+
+function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, progresoGlobal={}, sugerencias={}, setSugerencias=()=>{}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#1E2D40":"#FFFFFF";
@@ -5664,6 +5796,115 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
           </div>
         </>
       )}
+      {(()=>{
+        // ── Panel de sugerencias de sobrecarga progresiva ────────────
+        const todasSugs = Object.entries(sugerencias)
+          .flatMap(([aluId, sugsAlu]) =>
+            (sugsAlu||[])
+              .filter(sg => sg.estado === 'pendiente')
+              .map(sg => ({ ...sg, alumnoId: aluId,
+                alumnoNombre: alumnos.find(al=>al.id===aluId)?.nombre || aluId }))
+          );
+        if(todasSugs.length === 0) return null;
+        const coloresTipo = { carga:'#2563EB', reps:'#22C55E', alerta:'#F59E0B' };
+        const bgTipo      = { carga:'#0d1e33', reps:'#0c2a1a', alerta:'#1f1500' };
+        return (
+          <div style={{marginBottom:20}}>
+            <div style={{...sec,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span>⚡ {es?'SUGERENCIAS DE PROGRESIÓN':'PROGRESSION SUGGESTIONS'}</span>
+              <span style={{fontSize:11,color:textMuted,fontWeight:500}}>
+                {todasSugs.length} {es?'pendientes':'pending'}
+              </span>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {todasSugs.slice(0,6).map((sg, sgIdx) => {
+                const col = coloresTipo[sg.tipo] || '#8B9AB2';
+                const bgS = bgTipo[sg.tipo] || '#162234';
+                return (
+                  <div key={sg.alumnoId+sg.exId+sgIdx}
+                    style={{background:bgCard,border:'1px solid '+col+'44',
+                      borderRadius:12,padding:'12px 14px'}}>
+                    <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
+                      {/* Icono tipo */}
+                      <div style={{width:34,height:34,borderRadius:8,flexShrink:0,
+                        background:col+'22',display:'flex',alignItems:'center',
+                        justifyContent:'center',fontSize:16,fontWeight:900,color:col}}>
+                        {sg.icono}
+                      </div>
+                      {/* Info */}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+                          <span style={{fontSize:11,fontWeight:700,color:textMuted,
+                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                            {sg.alumnoNombre}
+                          </span>
+                          <span style={{fontSize:10,color:textMuted}}>·</span>
+                          <span style={{fontSize:11,fontWeight:700,color:textMain,
+                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                            {sg.exNombre}
+                          </span>
+                        </div>
+                        <div style={{fontSize:13,fontWeight:700,color:col,marginBottom:3}}>
+                          {sg.valorActual} → {sg.valorSugerido}
+                        </div>
+                        <div style={{fontSize:11,color:textMuted,lineHeight:1.4}}>
+                          {sg.razon}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Acciones */}
+                    <div style={{display:'flex',gap:6,marginTop:10}}>
+                      {sg.tipo !== 'alerta' && (
+                        <button className='hov'
+                          onClick={e=>{
+                            e.stopPropagation();
+                            // Aplicar: actualizar la rutina del alumno en el estado
+                            const ruts = routines.filter(r => r.alumno_id === sg.alumnoId || r.alumnoId === sg.alumnoId);
+                            if(ruts.length > 0) {
+                              // Buscar el ejercicio en la rutina y actualizar el campo
+                              // El entrenador deberá guardar después
+                              toast2&&toast2(es?`Aplicá el cambio en RUTINAS → ${sg.exNombre}`:`Apply change in ROUTINES → ${sg.exNombre}`);
+                            }
+                            // Marcar como aplicada
+                            setSugerencias(prev => ({
+                              ...prev,
+                              [sg.alumnoId]: (prev[sg.alumnoId]||[]).map(s =>
+                                s.exId === sg.exId && s.tipo === sg.tipo
+                                  ? {...s, estado:'aplicada'} : s
+                              )
+                            }));
+                          }}
+                          style={{flex:1,padding:'7px 6px',background:col+'22',
+                            color:col,border:'1px solid '+col+'44',borderRadius:8,
+                            fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+                          ✓ {es?'Marcar aplicada':'Mark applied'}
+                        </button>
+                      )}
+                      <button className='hov'
+                        onClick={e=>{
+                          e.stopPropagation();
+                          setSugerencias(prev => ({
+                            ...prev,
+                            [sg.alumnoId]: (prev[sg.alumnoId]||[]).map(s =>
+                              s.exId === sg.exId && s.tipo === sg.tipo
+                                ? {...s, estado:'ignorada'} : s
+                            )
+                          }));
+                        }}
+                        style={{padding:'7px 10px',background:'transparent',
+                          color:textMuted,border:'1px solid '+border,borderRadius:8,
+                          fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+                        {es?'Ignorar':'Dismiss'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {alumnos.length>0&&(
         <>
           <div style={{...sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -5832,56 +6073,61 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                     </svg>
                   </div>
                   {(()=>{
-                    // ── Sparkline tendencia 30d ────────────────────────
-                    const progDataSpark = a.progress||{};
-                    const setsSpark = Object.values(progDataSpark)
-                      .flatMap(pg=>(pg.sets||[]))
-                      .filter(s=>parseFloat(s.kg)>0);
-                    if(setsSpark.length < 3) return null;
-                    // Agrupar en 8 buckets semanales
+                    // ── Sparkline tendencia 30d — datos reales de Supabase ──
+                    const regsAlumno = progresoGlobal[a.id] || [];
+                    const setsFilt = regsAlumno.filter(reg => parseFloat(reg.kg) > 0);
+                    if(setsFilt.length < 3) return null;
                     const nowSpark = Date.now();
                     const bkts = {};
-                    setsSpark.forEach(s=>{
-                      const dObj = new Date(s.date||nowSpark);
-                      const wAgo = Math.min(7, Math.floor((nowSpark - dObj.getTime())/(7*24*60*60*1000)));
-                      if(!bkts[wAgo]) bkts[wAgo]=[];
-                      bkts[wAgo].push(parseFloat(s.kg)||0);
+                    setsFilt.forEach(reg => {
+                      const fechaStr = reg.fecha || reg.created_at || '';
+                      const dObj = fechaStr ? new Date(fechaStr) : new Date();
+                      const wAgo = isNaN(dObj.getTime()) ? 0 : Math.min(7, Math.floor((nowSpark - dObj.getTime())/(7*24*60*60*1000)));
+                      if(!bkts[wAgo]) bkts[wAgo] = [];
+                      bkts[wAgo].push(parseFloat(reg.kg)||0);
                     });
                     const sparkData = [7,6,5,4,3,2,1,0]
-                      .map(w=>bkts[w]?bkts[w].reduce((acc2,v)=>acc2+v,0)/bkts[w].length:null)
-                      .filter(v=>v!==null);
+                      .map(w => bkts[w] ? bkts[w].reduce((acc2,v)=>acc2+v,0)/bkts[w].length : null)
+                      .filter(v => v !== null);
                     if(sparkData.length < 2) return null;
-                    const sMin=Math.min(...sparkData), sMax=Math.max(...sparkData), sRange=sMax-sMin||1;
-                    const W=80, H=20, pad=2;
-                    const pts = sparkData.map((v,idx)=>({
-                      x: pad+(idx/(sparkData.length-1))*(W-pad*2),
-                      y: H-pad-((v-sMin)/sRange)*(H-pad*2)
+                    const sMin = Math.min(...sparkData);
+                    const sMax = Math.max(...sparkData);
+                    const sRange = sMax - sMin || 1;
+                    const W = 84, H = 22, pad = 2;
+                    const pts = sparkData.map((v, si) => ({
+                      x: pad + (si / (sparkData.length - 1)) * (W - pad * 2),
+                      y: H - pad - ((v - sMin) / sRange) * (H - pad * 2)
                     }));
-                    const pathD = pts.map((p,idx)=>idx===0?`M${p.x.toFixed(1)},${p.y.toFixed(1)}`:`L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-                    const first=sparkData[0], last=sparkData[sparkData.length-1];
-                    const trendPct = first>0?Math.round((last-first)/first*100):0;
-                    const trendColor = trendPct>2?"#22C55E":trendPct<-2?"#F59E0B":"#8B9AB2";
+                    const pathD = pts.map((p,si) => si===0 ? `M${p.x.toFixed(1)},${p.y.toFixed(1)}` : `L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                    const areaD = `M${pts[0].x.toFixed(1)},${H} ${pathD} L${pts[pts.length-1].x.toFixed(1)},${H} Z`;
+                    const trendPct = sparkData[0]>0 ? Math.round((sparkData[sparkData.length-1]-sparkData[0])/sparkData[0]*100) : 0;
+                    const trendColor = trendPct>2?'#22C55E':trendPct<-2?'#F59E0B':'#8B9AB2';
+                    const trendFill  = trendPct>2?'rgba(34,197,94,.12)':trendPct<-2?'rgba(245,158,11,.10)':'rgba(139,154,178,.06)';
+                    const maxKg = Math.max(...setsFilt.map(r=>parseFloat(r.kg)||0));
                     return (
                       <div style={{
-                        display:"flex",alignItems:"center",gap:8,
+                        display:'flex',alignItems:'center',gap:8,
                         marginLeft:46,marginTop:4,marginBottom:narrativa?4:0,
-                        padding:"4px 8px",borderRadius:6,
-                        background:"rgba(0,0,0,.15)"
+                        padding:'5px 9px',borderRadius:7,
+                        background:'rgba(0,0,0,.18)',
+                        border:'1px solid rgba(255,255,255,.05)'
                       }}>
-                        <span style={{fontSize:9,color:"#8B9AB2",fontWeight:600,whiteSpace:"nowrap",minWidth:28}}>
-                          30d
-                        </span>
-                        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{flex:1,overflow:"visible"}}>
-                          <path d={pathD} stroke={trendColor} strokeWidth="1.5" fill="none"
-                            strokeLinejoin="round" strokeLinecap="round"/>
+                        <div style={{display:'flex',flexDirection:'column',gap:1,flexShrink:0}}>
+                          <span style={{fontSize:8,color:'#8B9AB2',fontWeight:700,letterSpacing:.5}}>30d</span>
+                          <span style={{fontSize:8,color:trendColor,fontWeight:700}}>{maxKg}kg</span>
+                        </div>
+                        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{flex:1,overflow:'visible'}}>
+                          <path d={areaD} fill={trendFill}/>
+                          <path d={pathD} stroke={trendColor} strokeWidth='1.5' fill='none'
+                            strokeLinejoin='round' strokeLinecap='round'/>
                           <circle cx={pts[pts.length-1].x} cy={pts[pts.length-1].y}
-                            r="2.5" fill={trendColor}/>
+                            r='2.5' fill={trendColor}/>
                         </svg>
                         <span style={{
-                          fontSize:10,fontWeight:800,color:trendColor,
-                          whiteSpace:"nowrap",minWidth:28,textAlign:"right"
+                          fontSize:11,fontWeight:800,color:trendColor,
+                          whiteSpace:'nowrap',minWidth:32,textAlign:'right'
                         }}>
-                          {trendPct>0?"+":""}{trendPct}%
+                          {trendPct>0?'+':''}{trendPct}%
                         </span>
                       </div>
                     );
