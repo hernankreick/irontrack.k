@@ -251,7 +251,11 @@ const sbFetch = async (path, method="GET", body=null) => {
   const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+SB_KEY, "Content-Type": "application/json", "Prefer": "return=representation" } };
   if(body) opts.body = JSON.stringify(body);
   const r = await fetch(SB_URL+"/rest/v1/"+path, opts);
-  if(!r.ok) return null;
+  if(!r.ok) {
+    const errText = await r.text().catch(()=>'');
+    console.error(`[sbFetch] ${method} ${path} → ${r.status}`, errText.slice(0,200));
+    return null;
+  }
   const text = await r.text();
   return text ? JSON.parse(text) : null;
 };
@@ -832,19 +836,30 @@ function GymApp() {
   // Función reutilizable — se llama al montar, al hacer VER y cada 60s
   const cargarSesionesGlobales = React.useCallback(async (alumnosActuales) => {
     const lista = alumnosActuales || alumnos;
-    if(!lista || lista.length === 0) return;
+    if(!lista || lista.length === 0) {
+      console.warn('[cargarSesionesGlobales] sin alumnos, cancelando fetch');
+      return;
+    }
     try {
-      // Filtrar por alumno_id IN (...) para traer solo sesiones de MIS alumnos
-      const ids = lista.map(a => a.id).filter(Boolean);
-      if(ids.length === 0) return;
-      // Supabase PostgREST: alumno_id=in.(id1,id2,...)
+      // Filtrar ids válidos — evita query malformada con valores nulos
+      const ids = lista.map(a => a.id).filter(id => id && typeof id === 'string' && id.length > 0);
+      if(ids.length === 0) {
+        console.warn('[cargarSesionesGlobales] ningún alumno tiene id válido');
+        return;
+      }
+      // Supabase PostgREST: alumno_id=in.(uuid1,uuid2,...)
       const query = 'sesiones?alumno_id=in.(' + ids.join(',') + ')'
         + '&select=*&order=created_at.desc&limit=500';
+      console.log('[cargarSesionesGlobales] fetching', ids.length, 'alumnos...');
       const resultado = await sbFetch(query);
       if(resultado && Array.isArray(resultado)) {
+        console.log('[cargarSesionesGlobales] ✓', resultado.length, 'sesiones cargadas');
         setSesionesGlobales(resultado);
+      } else {
+        console.error('[cargarSesionesGlobales] ✗ respuesta inválida:', resultado);
+        console.error('[cargarSesionesGlobales] query usada:', query);
       }
-    } catch(e) { console.error('[cargarSesionesGlobales]', e); }
+    } catch(e) { console.error('[cargarSesionesGlobales] excepción:', e); }
   }, [alumnos]);
 
   useEffect(() => {
@@ -861,7 +876,7 @@ function GymApp() {
       // Polling cada 60s — el entrenador ve datos frescos sin recargar
       const intervalo = setInterval(() => {
         cargarSesionesGlobales();
-      }, 60000);
+      }, 30000); // Polling cada 30s para datos más frescos
       return () => clearInterval(intervalo);
     }
   }, [sessionData?.role]);
@@ -1246,7 +1261,9 @@ function GymApp() {
           es={es}
           darkMode={darkMode}
           prCelebration={prCelebration}
-          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx}/>
+          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx}
+          sessionData={sessionData}
+          onSesionGuardada={cargarSesionesGlobales}/>
       )}
 
       <div
@@ -3406,7 +3423,7 @@ function GymApp() {
   );
 }
 
-function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx}) {
+function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData, onSesionGuardada}) {
 
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
@@ -3539,7 +3556,7 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
     // ── Modo alumno LOGUEADO: guardar sesión en Supabase ─────────────
     if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
       try {
-        sb.addSesion({
+        const resSesion = await sb.addSesion({
           alumno_id: sessionData.alumnoId,
           rutina_nombre: r?.name||"",
           dia_label: activeDay.label||("Dia "+(session.dIdx+1)),
@@ -3549,6 +3566,16 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
           fecha: hoyFin,
           hora: new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})
         });
+        if(resSesion && resSesion[0]) {
+          console.log('[addSesion] ✓ sesión guardada:', resSesion[0].id);
+          // Notificar a GymApp para que refresque sesionesGlobales
+          // → el entrenador ve los datos inmediatamente
+          if(typeof onSesionGuardada === 'function') {
+            onSesionGuardada();
+          }
+        } else {
+          console.error('[addSesion] ✗ Supabase no confirmó el guardado', resSesion);
+        }
       } catch(e) { console.error('[addSesion alumno logueado]', e); }
     }
     // Avanzar semana solo cuando se completan TODOS los días de la semana
