@@ -976,27 +976,23 @@ function GymApp() {
     // Guardar en Supabase — si offline, guardar en cola local
     const alumnoIdSync = sessionData?.alumnoId || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     if(alumnoIdSync) {
-      try {
-        const rutData = JSON.parse(atob(sharedParam));
-        if(alumnoIdSync) {
-          if(!isOnline) {
-            // Guardar en cola local para sincronizar después
-            const item = {exId, kg:parseFloat(kg)||0, reps:parseInt(reps)||0, note:note||'', date:d};
-            const updated = [...pendingSync, item];
-            setPendingSync(updated);
-            try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
-          } else {
-            sb.addProgreso({
-              alumno_id: alumnoIdSync,
-              ejercicio_id: exId,
-              kg: parseFloat(kg)||0,
-              reps: parseInt(reps)||0,
-              nota: note||"",
-              fecha: d
-            });
-          }
-        }
-      } catch(e) {}
+      if(!isOnline) {
+        // Sin conexión — guardar en cola local
+        const item = {exId, kg:parseFloat(kg)||0, reps:parseInt(reps)||0, note:note||'', date:d};
+        const updated = [...pendingSync, item];
+        setPendingSync(updated);
+        try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
+      } else {
+        // Con conexión — guardar directo en Supabase
+        sb.addProgreso({
+          alumno_id: alumnoIdSync,
+          ejercicio_id: exId,
+          kg: parseFloat(kg)||0,
+          reps: parseInt(reps)||0,
+          nota: note||"",
+          fecha: d
+        }).catch(e => console.error('[addProgreso]', e));
+      }
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
     const exPrevData = progress[exId]||{sets:[],max:0};
@@ -2576,12 +2572,60 @@ function GymApp() {
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
                       setLoadingSB(false);
                     }}>{es?"+ Asignar rutina actual":"+ Assign current routine"}</button>
-                    {alumnoSesiones.length>0&&alumnoSesiones.slice(0,3).map((s,i)=>(
-                      <div key={i} style={{background:bgSub,borderRadius:8,padding:"8px 10px",marginBottom:4,display:"flex",justifyContent:"space-between"}}>
-                        <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✅ {s.dia_label}</div>
-                        <div style={{fontSize:11,color:textMuted}}>{s.fecha}</div>
+                    {alumnoSesiones.length>0&&(
+                      <div style={{marginBottom:8}}>
+                        <div style={{fontSize:11,fontWeight:700,color:textMuted,letterSpacing:1,
+                          textTransform:"uppercase",marginBottom:6}}>
+                          📋 {es?"Últimas sesiones":"Recent sessions"} ({alumnoSesiones.length})
+                        </div>
+                        {alumnoSesiones.slice(0,5).map((s,si)=>{
+                          // Calcular PRs de esta sesión cruzando con alumnoProgreso
+                          const exIds = (s.ejercicios||"").split(",").filter(Boolean);
+                          const prsEnSesion = exIds.filter(exId=>{
+                            const regs = alumnoProgreso.filter(p=>p.ejercicio_id===exId&&p.fecha===s.fecha);
+                            if(!regs.length) return false;
+                            const todosRegs = alumnoProgreso.filter(p=>p.ejercicio_id===exId);
+                            const maxKg = Math.max(...todosRegs.map(p=>parseFloat(p.kg)||0));
+                            const maxEnSesion = Math.max(...regs.map(p=>parseFloat(p.kg)||0));
+                            return maxEnSesion >= maxKg && todosRegs.length > 1;
+                          });
+                          const kgEnSesion = exIds.reduce((acc,exId)=>{
+                            const regs = alumnoProgreso.filter(p=>p.ejercicio_id===exId&&p.fecha===s.fecha);
+                            return acc + regs.reduce((a2,p)=>(parseFloat(p.kg)||0)*(parseInt(p.reps)||0)+a2,0);
+                          },0);
+                          return (
+                            <div key={s.id||si} style={{background:bgSub,borderRadius:10,
+                              padding:"10px 12px",marginBottom:6,
+                              border:"1px solid "+border}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                                <div>
+                                  <span style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✅ {s.dia_label||"Día "+(s.dia_idx+1)}</span>
+                                  {s.rutina_nombre&&<span style={{fontSize:11,color:textMuted,marginLeft:6}}>{s.rutina_nombre}</span>}
+                                </div>
+                                <span style={{fontSize:11,color:textMuted,flexShrink:0}}>{s.fecha}</span>
+                              </div>
+                              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                                {s.semana&&<span style={{fontSize:10,fontWeight:700,
+                                  background:"#2563EB22",color:"#60a5fa",
+                                  borderRadius:4,padding:"2px 6px"}}>
+                                  SEM {s.semana}
+                                </span>}
+                                {kgEnSesion>0&&<span style={{fontSize:10,fontWeight:700,
+                                  background:"#22C55E22",color:"#4ade80",
+                                  borderRadius:4,padding:"2px 6px"}}>
+                                  {Math.round(kgEnSesion).toLocaleString()}kg vol
+                                </span>}
+                                {prsEnSesion.length>0&&<span style={{fontSize:10,fontWeight:700,
+                                  background:"#F59E0B22",color:"#fbbf24",
+                                  borderRadius:4,padding:"2px 6px"}}>
+                                  🏆 {prsEnSesion.length} PR{prsEnSesion.length>1?"s":""}
+                                </span>}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
+                    )}
                     <div style={{marginTop:12,borderTop:"1px solid "+border,paddingTop:12}}>
                       <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,
                         textTransform:"uppercase",marginBottom:8}}>
@@ -3604,6 +3648,7 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
       try {
         const resSesion = await sb.addSesion({
           alumno_id: sessionData.alumnoId,
+          rutina_id: r?.id || null,
           rutina_nombre: r?.name||"",
           dia_label: activeDay.label||("Dia "+(session.dIdx+1)),
           dia_idx: session.dIdx,
