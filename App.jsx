@@ -6229,3 +6229,6 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
     </div>
   );
 }
+
+
+export default GymApp;
