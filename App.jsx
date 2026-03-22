@@ -1920,7 +1920,7 @@ function GymApp() {
 
                 {/* Sparkline de tendencia 30 días */}
                 {(()=>{
-                  const setsAlu = Object.values(a.progress||{})
+                  const setsAlu = Object.values(progress||{})
                     .flatMap(pg => (pg.sets||[]))
                     .filter(s => s.kg > 0)
                     .sort((x,y) => new Date(x.date||0) - new Date(y.date||0));
