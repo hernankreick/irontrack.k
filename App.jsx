@@ -899,7 +899,7 @@ function GymApp() {
             try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
           } else {
             sb.addProgreso({
-              alumno_id: alumnoId,
+              alumno_id: alumnoIdSync,
               ejercicio_id: exId,
               kg: parseFloat(kg)||0,
               reps: parseInt(reps)||0,
@@ -1766,15 +1766,15 @@ function GymApp() {
                       </div>
                     </div>
                   )}
-                  {d.exercises.length>0&&(
+                  {(d.exercises||[]).length>0&&(
                     <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:bgSub,border:"1px solid "+border,borderRadius:12,marginBottom:8}}>
                       <span>💪</span>
                       <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
-                      <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({d.exercises.length} {es?"ejercicios":"exercises"})</span>
+                      <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({(d.exercises||[]).length} {es?"ejercicios":"exercises"})</span>
                     </div>
                   )}
-                  {d.exercises.length===0&&(d.warmup||[]).length===0&&<div style={{color:"#8B9AB2",fontSize:15,padding:"8px 0"}}>Sin ejercicios</div>}
-                  {d.exercises.map((ex,ei)=>{
+                  {(d.exercises||[]).length===0&&(d.warmup||[]).length===0&&<div style={{color:"#8B9AB2",fontSize:15,padding:"8px 0"}}>Sin ejercicios</div>}
+                  {(d.exercises||[]).map((ex,ei)=>{
                     const info=allEx.find(e=>e.id===ex.id);
                     const pat=PATS[info?.pattern]||PATS["core"]||Object.values(PATS)[0]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
                     const col="#2563EB"; // paleta fija - sin colores de patrón
@@ -4108,7 +4108,7 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
     const alumnoId = sessionData?.alumnoId || (sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     if(!alumnoId) return;
     sb.getProgreso(alumnoId).then(d=>{ if(d) setSbData(d); });
-    sb.getSesiones(alumnoId).then(d=>{ if(d) setSesionesLocal(d); });
+    sb.getSesiones(alumnoId).then(d=>{ if(d) setSesionesData(d); });
   },[]);
 
   const getDatos = (exId) => {
@@ -4663,7 +4663,7 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones}) {
         const alumnoId = rutData.alumnoId;
         if(alumnoId) {
           const ses = await sb.getSesiones(alumnoId);
-          setSesionesLocal(ses||[]);
+          setSesionesData(ses||[]);
         }
       } catch(e) {}
       setLoading(false);
