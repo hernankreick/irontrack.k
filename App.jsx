@@ -4072,15 +4072,22 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
   const [selEx, setSelEx] = React.useState(null);
   const [sbData, setSbData] = React.useState([]);
   const [sesionesData, setSesionesData] = React.useState(sesiones||[]);
+  const [loadingGrafico, setLoadingGrafico] = React.useState(true);
   const canvasRef = React.useRef();
   const canvasSem = React.useRef();
   const canvasVol = React.useRef();
 
   React.useEffect(()=>{
     const alumnoId = sessionData?.alumnoId || (sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
-    if(!alumnoId) return;
-    sb.getProgreso(alumnoId).then(d=>{ if(d) setSbData(d); });
-    sb.getSesiones(alumnoId).then(d=>{ if(d) setSesionesData(d); });
+    if(!alumnoId) { setLoadingGrafico(false); return; }
+    Promise.all([
+      sb.getProgreso(alumnoId),
+      sb.getSesiones(alumnoId),
+    ]).then(([prog, ses])=>{
+      if(prog) setSbData(prog);
+      if(ses) setSesionesData(ses);
+      setLoadingGrafico(false);
+    }).catch(()=>setLoadingGrafico(false));
   },[]);
 
   const getDatos = (exId) => {
@@ -4298,6 +4305,13 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
   const volMuscular = vista==="volumen" ? getVolumenMuscular() : [];
   const COLORS = ["#2563EB","#2563EB","#22C55E","#8B9AB2","#2563EB","#8B9AB2","#2563EB"];
 
+  if(loadingGrafico) return (
+    <div style={{textAlign:"center",padding:"40px 0"}}>
+      <div className="sk" style={{height:180,borderRadius:12,marginBottom:12}}/>
+      <div className="sk" style={{height:14,width:"60%",margin:"0 auto"}}/>
+    </div>
+  );
+
   if(exConDatos.length===0 && sesionesData.length===0) return (
     <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
       <div style={{fontSize:36,marginBottom:8}}>📊</div>
@@ -4373,8 +4387,14 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
         };
 
         const exConDatosLocal = (allEx||[]).filter(e=>
-          (progress[e.id]?.sets||[]).some(s=>parseFloat(s.kg)>0)
+          (progress[e.id]?.sets||[]).some(s=>parseFloat(s.kg)>0) ||
+          sbData.some(d=>d.ejercicio_id===e.id&&parseFloat(d.kg)>0)
         );
+
+        // Auto-seleccionar primer ejercicio si no hay selección
+        if(!selEx && exConDatosLocal.length>0) {
+          setTimeout(()=>setSelEx(exConDatosLocal[0].id),0);
+        }
 
         if(exConDatosLocal.length===0) return (
           <div style={{textAlign:"center",padding:"40px 16px"}}>
@@ -6226,3 +6246,10 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
 }
 
 export default GymApp;
+
+
+
+
+
+
+
