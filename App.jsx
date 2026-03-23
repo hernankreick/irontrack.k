@@ -251,11 +251,7 @@ const sbFetch = async (path, method="GET", body=null) => {
   const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+SB_KEY, "Content-Type": "application/json", "Prefer": "return=representation" } };
   if(body) opts.body = JSON.stringify(body);
   const r = await fetch(SB_URL+"/rest/v1/"+path, opts);
-  if(!r.ok) {
-    const errText = await r.text().catch(()=>'');
-    console.error(`[sbFetch] ${method} ${path} → ${r.status}`, errText.slice(0,200));
-    return null;
-  }
+  if(!r.ok) return null;
   const text = await r.text();
   return text ? JSON.parse(text) : null;
 };
@@ -263,7 +259,7 @@ const sbFetch = async (path, method="GET", body=null) => {
 const sb = {
   getAlumnos: (entId) => sbFetch("alumnos?entrenador_id=eq."+entId+"&select=*"),
   createAlumno: (data) => sbFetch("alumnos", "POST", data),
-  getRutinas: (alumnoId) => sbFetch("rutinas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=10"),
+  getRutinas: (alumnoId) => sbFetch("rutinas?alumno_id=eq."+alumnoId+"&select=*"),
   getRutinasByEntrenador: () => sbFetch("rutinas?entrenador_id=eq.entrenador_principal&select=*"),
   createRutina: (data) => sbFetch("rutinas", "POST", data),
   updateRutina: (id, data) => sbFetch("rutinas?id=eq."+id, "PATCH", data),
@@ -642,13 +638,6 @@ function GymApp() {
     cargarAlumnos,
     notifyAlumno,
   } = useAlumnos({ sb });
-  const [rutinasSB, setRutinasSB] = useState([]);
-  const [registrosSubTab, setRegistrosSubTab] = useState(0);
-  const [sesionesGlobales, setSesionesGlobales] = useState([]);
-  // progresoGlobal: { [alumnoId]: [{ejercicio_id, kg, reps, fecha}] }
-  const [progresoGlobal, setProgresoGlobal] = useState({});
-  // sugerencias: { [alumnoId]: [{exId, exNombre, tipo, valorActual, valorSugerido, razon, estado}] }
-  const [sugerencias, setSugerencias] = useState({});
 
   const es = lang==="es";
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
@@ -734,11 +723,11 @@ function GymApp() {
       // Sincronizar sets pendientes
       const pending = JSON.parse(localStorage.getItem('it_pending_sync')||'[]');
       if(pending.length === 0) return;
-      const alumnoIdSync = sessionData?.alumnoId;
+      const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
       if(!alumnoIdSync) return;
       pending.forEach(item => {
         try {
-          sb.addProgreso({
+          console.log("[PROGRESO] enviando a supabase...");sb.addProgreso({
             alumno_id: alumnoIdSync,
             ejercicio_id: item.exId,
             kg: item.kg, reps: item.reps,
@@ -791,14 +780,7 @@ function GymApp() {
           if(decoded?.alumnoId) {
             const ruts = await sbFetch("rutinas?alumno_id=eq."+decoded.alumnoId+"&select=*&order=created_at.desc&limit=1");
             if(ruts && ruts[0] && ruts[0].datos) {
-              setRoutines([{
-                ...ruts[0].datos,
-                id: ruts[0].id,
-                name: ruts[0].nombre || ruts[0].datos?.name || 'Mi Rutina',
-                created: ruts[0].created_at ? new Date(ruts[0].created_at).toLocaleDateString('es-AR') : '',
-                alumnoId: decoded.alumnoId,
-                days: ruts[0].datos?.days || [],
-              }]);
+              setRoutines([{...ruts[0].datos, alumnoId: decoded.alumnoId, id: ruts[0].id}]);
               setSharedLoaded(true);
               return;
             }
@@ -837,74 +819,9 @@ function GymApp() {
   }, [timer, es]);
   useEffect(() => { localStorage.setItem("it_week",String(currentWeek)); },[currentWeek]);
 
-  // Función reutilizable — se llama al montar, al hacer VER y cada 60s
-  const cargarSesionesGlobales = React.useCallback(async (alumnosActuales) => {
-    // Si no se pasan alumnos y el estado local está vacío,
-    // los busca en Supabase antes de continuar.
-    // Esto es necesario cuando la llama el alumno (onSesionGuardada)
-    // porque en ese contexto alumnos=[] en el estado de GymApp.
-    let lista = alumnosActuales || alumnos;
-    if(!lista || lista.length === 0) {
-      try {
-        const sbAlumnos = await sb.getAlumnos('entrenador_principal');
-        if(sbAlumnos && sbAlumnos.length > 0) {
-          setAlumnos(sbAlumnos);
-          lista = sbAlumnos;
-        } else {
-          return; // Sin alumnos en Supabase tampoco — nada que cargar
-        }
-      } catch(fetchErr) {
-        console.error('[cargarSesionesGlobales] no pudo obtener alumnos:', fetchErr);
-        return;
-      }
-    }
-    try {
-      const ids = lista.map(alumno => alumno.id).filter(id => id && typeof id === 'string' && id.length > 0);
-      if(ids.length === 0) return;
-      const idsStr = ids.join(',');
-      // Cargar sesiones Y progreso en paralelo — una sola ronda de requests
-      const [sesResult, progResult] = await Promise.all([
-        sbFetch('sesiones?alumno_id=in.(' + idsStr + ')&select=*&order=created_at.desc&limit=500'),
-        sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=alumno_id,ejercicio_id,kg,reps,fecha&order=created_at.desc&limit=3000'),
-      ]);
-      if(sesResult && Array.isArray(sesResult)) setSesionesGlobales(sesResult);
-      if(progResult && Array.isArray(progResult)) {
-        // Indexar por alumno_id para acceso O(1) en el dashboard
-        const idx = {};
-        progResult.forEach(reg => {
-          if(!idx[reg.alumno_id]) idx[reg.alumno_id] = [];
-          idx[reg.alumno_id].push(reg);
-        });
-        setProgresoGlobal(idx);
-        // Calcular sugerencias para cada alumno con los datos frescos
-        const nuevasSugs = {};
-        lista.forEach(alumnoItem => {
-          const progAlu = idx[alumnoItem.id] || [];
-          if(progAlu.length >= 3) {
-            nuevasSugs[alumnoItem.id] = calcularSugerencias(progAlu, [], []);
-          }
-        });
-        setSugerencias(nuevasSugs);
-      }
-    } catch(pgErr) { console.error('[cargarSesionesGlobales]', pgErr); }
-  }, [alumnos]);
-
   useEffect(() => {
     if(!readOnly && sessionData?.role==="entrenador") {
-      // Carga inicial: primero alumnos, luego sesiones con los ids reales
-      const init = async () => {
-        const sbAlumnos = await sb.getAlumnos('entrenador_principal') || [];
-        setAlumnos(sbAlumnos);
-        if(sbAlumnos.length > 0) {
-          await cargarSesionesGlobales(sbAlumnos);
-        }
-      };
-      init();
-      // Polling cada 60s — el entrenador ve datos frescos sin recargar
-      const intervalo = setInterval(() => {
-        cargarSesionesGlobales();
-      }, 30000); // Polling cada 30s para datos más frescos
-      return () => clearInterval(intervalo);
+      cargarAlumnos();
     }
   }, [sessionData?.role]);
 
@@ -915,14 +832,7 @@ function GymApp() {
         try {
           const ruts = await sbFetch("rutinas?alumno_id=eq."+sessionData.alumnoId+"&select=*&order=created_at.desc&limit=1");
           if(ruts && ruts[0] && ruts[0].datos) {
-            setRoutines([{
-              ...ruts[0].datos,
-              id: ruts[0].id,
-              name: ruts[0].nombre || ruts[0].datos?.name || 'Mi Rutina',
-              created: ruts[0].created_at ? new Date(ruts[0].created_at).toLocaleDateString('es-AR') : '',
-              alumnoId: sessionData.alumnoId,
-              days: ruts[0].datos?.days || [],
-            }]);
+            setRoutines([{...ruts[0].datos, alumnoId: sessionData.alumnoId}]);
           }
         
       // Cargar nota del día
@@ -965,7 +875,7 @@ function GymApp() {
     }, 500); // cada 500ms para mayor precisión
   };
 
-  const logSet = (exId, kg, reps, note, rpe) => {
+  const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe) => {
     const d = new Date().toLocaleDateString("es-AR");
     setProgress(prev=>{
       const ex = {...(prev[exId]||{sets:[],max:0})};
@@ -974,16 +884,14 @@ function GymApp() {
       return {...prev,[exId]:ex};
     });
     // Guardar en Supabase — si offline, guardar en cola local
-    const alumnoIdSync = sessionData?.alumnoId || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
+    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     if(alumnoIdSync) {
       if(!isOnline) {
-        // Sin conexión — guardar en cola local
         const item = {exId, kg:parseFloat(kg)||0, reps:parseInt(reps)||0, note:note||'', date:d};
         const updated = [...pendingSync, item];
         setPendingSync(updated);
         try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
       } else {
-        // Con conexión — guardar directo en Supabase
         sb.addProgreso({
           alumno_id: alumnoIdSync,
           ejercicio_id: exId,
@@ -991,7 +899,7 @@ function GymApp() {
           reps: parseInt(reps)||0,
           nota: note||"",
           fecha: d
-        }).catch(e => console.error('[addProgreso]', e));
+        }).then(function(r){console.log("[PROGRESO] OK",r)}).catch(function(e){console.error("[PROGRESO] ERR",e)});
       }
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
@@ -1284,9 +1192,7 @@ function GymApp() {
           es={es}
           darkMode={darkMode}
           prCelebration={prCelebration}
-          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx}
-          sessionData={sessionData}
-          onSesionGuardada={cargarSesionesGlobales}/>
+          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx}/>
       )}
 
       <div
@@ -1629,34 +1535,15 @@ function GymApp() {
 
             {!esAlumno&&(
               <DashboardEntrenador sb={sb} routines={routines} alumnos={alumnos}
-                sesiones={sesionesGlobales}
+                sesiones={alumnoSesiones}
                 es={es}
                 darkMode={darkMode}
                 progress={progress}
-                progresoGlobal={progresoGlobal}
                 session={session}
                 pagosEstado={pagosEstado}
                 togglePago={togglePago}
-                onVerAlumno={async (a)=>{
-                  setAlumnoActivo(a);
-                  setTab("alumnos");
-                  setRegistrosSubTab(0);
-                  setLoadingSB(true);
-                  try {
-                    const [ruts, prog, ses] = await Promise.all([
-                      sb.getRutinas(a.id),
-                      sb.getProgreso(a.id),
-                      sb.getSesiones(a.id),
-                    ]);
-                    setRutinasSB(ruts||[]);
-                    setAlumnoProgreso(prog||[]);
-                    setAlumnoSesiones(ses||[]);
-                  } catch(e) { console.error("[onVerAlumno]", e); }
-                  setLoadingSB(false);
-                }}
+                onVerAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
                 onChatAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
-                sugerencias={sugerencias}
-                setSugerencias={setSugerencias}
                 onNotificar={(alumnoId, msg)=>notifyAlumno(alumnoId, msg).then(()=>toast2(es?"Notificación enviada":"Notification sent")).catch(()=>toast2("Error al notificar"))}
               />
             )}
@@ -1808,7 +1695,7 @@ function GymApp() {
               </div>
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
-              const diasJSX = (r.days||[]).map((d,di)=>{ return (
+              const diasJSX = r.days.map((d,di)=>{ return (
                 <div key={di} style={{marginBottom:24}}>
                   <div style={{fontSize:18,fontWeight:700,letterSpacing:1,color:textMuted,marginBottom:8,paddingBottom:8,borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057")}}>
                     {es?"Dia ":"Day "}{di+1}
@@ -1871,15 +1758,15 @@ function GymApp() {
                       </div>
                     </div>
                   )}
-                  {(d.exercises||[]).length>0&&(
+                  {d.exercises.length>0&&(
                     <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:bgSub,border:"1px solid "+border,borderRadius:12,marginBottom:8}}>
                       <span>💪</span>
                       <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
-                      <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({(d.exercises||[]).length} {es?"ejercicios":"exercises"})</span>
+                      <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({d.exercises.length} {es?"ejercicios":"exercises"})</span>
                     </div>
                   )}
-                  {(d.exercises||[]).length===0&&(d.warmup||[]).length===0&&<div style={{color:"#8B9AB2",fontSize:15,padding:"8px 0"}}>Sin ejercicios</div>}
-                  {(d.exercises||[]).map((ex,ei)=>{
+                  {d.exercises.length===0&&(d.warmup||[]).length===0&&<div style={{color:"#8B9AB2",fontSize:15,padding:"8px 0"}}>Sin ejercicios</div>}
+                  {d.exercises.map((ex,ei)=>{
                     const info=allEx.find(e=>e.id===ex.id);
                     const pat=PATS[info?.pattern]||PATS["core"]||Object.values(PATS)[0]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
                     const col="#2563EB"; // paleta fija - sin colores de patrón
@@ -1932,7 +1819,7 @@ function GymApp() {
                     const isDayDone=completedDays.includes(dayKey);
                     // Calcular nextDayIdx localmente para esta rutina r
                     const daysCompletedR=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length;
-                    const localNextDayIdx=daysCompletedR < (r.days||[]).length ? daysCompletedR : null;
+                    const localNextDayIdx=daysCompletedR < r.days.length ? daysCompletedR : null;
                     const isNextDay=di===localNextDayIdx;
                     const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
                     if(isDayDone) return(
@@ -1959,9 +1846,9 @@ function GymApp() {
               );
               });
               return (<div key={r.id} style={{marginBottom:16}}>
-                  <div style={{fontSize:28,fontWeight:800,letterSpacing:1,marginBottom:4}}>{r?.name||'Rutina'}</div>
+                  <div style={{fontSize:28,fontWeight:800,letterSpacing:1,marginBottom:4}}>{r.name}</div>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                    <div style={{fontSize:15,color:textMuted}}>{r.created} · {(r.days||[]).length} {es?"dias":"days"}{r.note?" · "+r.note:""}</div>
+                    <div style={{fontSize:15,color:textMuted}}>{r.created} · {r.days.length} {es?es?"dias":"days":"days"}{r.note?" · "+r.note:""}</div>
                     <div style={{display:"flex",gap:8}}>
                       <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",border:"1px solid "+border,color:textMain,borderRadius:8,padding:"8px 12px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onClick={()=>generatePDF(r)}>
                         <Ic name="file-text" size={14}/> PDF
@@ -1982,7 +1869,7 @@ function GymApp() {
                       <div style={{fontSize:15,fontWeight:700,color:textMain,marginBottom:8}}>
                         {es?"Semana":"Week"} <span style={{color:"#2563EB",fontWeight:800}}>{currentWeek+1}</span>
                         <span style={{fontSize:11,color:textMuted,fontWeight:400,marginLeft:8}}>
-                          {completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length}/{(r.days||[]).length} {es?"días":"days"}
+                          {completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length}/{r.days.length} {es?"días":"days"}
                         </span>
                       </div>
                       <div style={{display:"flex",gap:4,justifyContent:"center"}}>
@@ -2252,28 +2139,7 @@ function GymApp() {
                       onClick={()=>setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,collapsed:!rr.collapsed}:rr))}>
                       {r.collapsed?("▼ "+(es?"VER":"VIEW")):("▲ "+(es?"CERRAR":"CLOSE"))}
                     </button>
-                    <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 10px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{
-                      const copia = {
-                        ...r,
-                        id: uid(),
-                        name: (r.name||"Rutina")+" (copia)",
-                        saved: false,
-                        alumno_id: null,
-                        alumno: "",
-                        created: new Date().toLocaleDateString("es-AR"),
-                        collapsed: false,
-                        days: (r.days||[]).map(d=>({
-                          ...d,
-                          exercises: (d.exercises||[]).map(ex=>({...ex})),
-                          warmup: (d.warmup||[]).map(ex=>({...ex}))
-                        }))
-                      };
-                      setRoutines(prev=>[copia,...prev]);
-                      toast2(es?"Rutina duplicada ✓":"Routine duplicated ✓");
-                    }}>
-                      <Ic name="copy" size={15}/>
-                    </button>
-                    <button className="hov" style={{background:"#EF444422",color:"#EF4444",border:"none",borderRadius:8,padding:"8px 10px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setRoutines(p=>p.filter(x=>x.id!==r.id));toast2((es?"Rutina eliminada":"Routine deleted")+" ✓");}}><Ic name="trash-2" size={15}/></button>
+                    <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setRoutines(p=>p.filter(x=>x.id!==r.id));toast2((es?"Rutina eliminada":"Routine deleted")+" ✓");}}><Ic name="trash-2" size={15}/></button>
                   </div>
                 </div>
                 <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
@@ -2282,7 +2148,7 @@ function GymApp() {
                     setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,alumno_id:v,alumno:alumnos.find(a=>a.id===v)?.nombre||""}:rr));
                   }}>
                     <option value="">👤 Sin asignar</option>
-                    {alumnos.map(alumno=><option key={alumno.id} value={alumno.id}>{alumno.nombre}</option>)}
+                    {alumnos.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}
                   </select>
                   <button className="hov" style={{...btn(),padding:"8px 14px",fontSize:15,fontWeight:700}} onClick={async()=>{
                     try{
@@ -2292,13 +2158,7 @@ function GymApp() {
                       if(rActual.saved){
                         await sb.updateRutina(rActual.id,payload);
                       } else {
-                        // Sin id — Supabase genera el UUID automáticamente
-                        const resNew=await sb.createRutina(payload);
-                        if(resNew&&resNew[0]){
-                          setRoutines(p=>p.map(rr=>rr.id===rActual.id?{...rr,saved:true,id:resNew[0].id}:rr));
-                        } else {
-                          console.error('[createRutina] Supabase rechazó:',{payload,res:resNew});
-                        }
+                        await sb.createRutina({...payload,id:rActual.id});
                         setRoutines(p=>p.map(rr=>rr.id===rActual.id?{...rr,saved:true}:rr));
                       }
                       toast2(es?"Rutina guardada ✓":"Routine saved ✓");
@@ -2396,13 +2256,7 @@ function GymApp() {
               <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:textMain}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
               <div style={{display:"flex",gap:8}}>
                 <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)}>💰</button>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={async()=>{
-                  toast2(es?"Actualizando...":"Refreshing...");
-                  const sbAlumnos = await sb.getAlumnos("entrenador_principal") || [];
-                  setAlumnos(sbAlumnos);
-                  if(sbAlumnos.length > 0) await cargarSesionesGlobales(sbAlumnos);
-                  toast2(es?"Datos actualizados ✓":"Data refreshed ✓");
-                }}>↺</button>
+                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos}>↺</button>
                 <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {es?"Nuevo":"New"}</button>
               </div>
             </div>
@@ -2496,17 +2350,9 @@ function GymApp() {
                     <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={async()=>{
                       if(alumnoActivo?.id===a.id){setAlumnoActivo(null);return;}
                       setAlumnoActivo(a);setRegistrosSubTab(0);setLoadingSB(true);
-                      // Cargar datos del alumno individual
-                      const [ruts, prog, ses] = await Promise.all([
-                        sb.getRutinas(a.id),
-                        sb.getProgreso(a.id),
-                        sb.getSesiones(a.id),
-                      ]);
-                      setRutinasSB(ruts||[]);
-                      setAlumnoProgreso(prog||[]);
-                      setAlumnoSesiones(ses||[]);
-                      // Refrescar sesiones globales para actualizar el dashboard
-                      await cargarSesionesGlobales();
+                      const ruts=await sb.getRutinas(a.id);setRutinasSB(ruts||[]);
+                      const prog=await sb.getProgreso(a.id);setAlumnoProgreso(prog||[]);
+                      const ses=await sb.getSesiones(a.id);setAlumnoSesiones(ses||[]);
                       setLoadingSB(false);
                     }}>{alumnoActivo?.id===a.id?"CERRAR":"VER"}</button>
                     <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={async()=>{
@@ -2554,78 +2400,16 @@ function GymApp() {
                       if(ex&&!confirm((es?"Ya tiene: ":"Has: ")+ex.nombre+(es?"\n¿Reemplazar?":"\nReplace?"))) return;
                       if(ex){await sb.deleteRutina(ex.id);setRutinasSB(prev=>prev.filter(x=>x.id!==ex.id));}
                       setLoadingSB(true);
-                      // Payload limpio — solo columnas que existen en Supabase
-                       const payload2 = {
-                         alumno_id: a.id,
-                         entrenador_id: ENTRENADOR_ID,
-                         nombre: rutinaLocal.name||'Rutina',
-                         datos: {days:rutinaLocal.days,alumno:rutinaLocal.alumno||'',note:rutinaLocal.note||''}
-                       };
-                       const res=await sb.createRutina(payload2);
-                       if(res&&res[0]){
-                         setRutinasSB(prev=>[...prev,res[0]]);
-                         toast2('Rutina asignada ✓');
-                       } else {
-                         console.error('[asignar rutina] Error Supabase:',{payload:payload2,res});
-                         toast2('Error al asignar');
-                       }
+                      const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:rutinaLocal.days,alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
                       setLoadingSB(false);
                     }}>{es?"+ Asignar rutina actual":"+ Assign current routine"}</button>
-                    {alumnoSesiones.length>0&&(
-                      <div style={{marginBottom:8}}>
-                        <div style={{fontSize:11,fontWeight:700,color:textMuted,letterSpacing:1,
-                          textTransform:"uppercase",marginBottom:6}}>
-                          📋 {es?"Últimas sesiones":"Recent sessions"} ({alumnoSesiones.length})
-                        </div>
-                        {alumnoSesiones.slice(0,5).map((s,si)=>{
-                          // Calcular PRs de esta sesión cruzando con alumnoProgreso
-                          const exIds = (s.ejercicios||"").split(",").filter(Boolean);
-                          const prsEnSesion = exIds.filter(exId=>{
-                            const regs = alumnoProgreso.filter(p=>p.ejercicio_id===exId&&p.fecha===s.fecha);
-                            if(!regs.length) return false;
-                            const todosRegs = alumnoProgreso.filter(p=>p.ejercicio_id===exId);
-                            const maxKg = Math.max(...todosRegs.map(p=>parseFloat(p.kg)||0));
-                            const maxEnSesion = Math.max(...regs.map(p=>parseFloat(p.kg)||0));
-                            return maxEnSesion >= maxKg && todosRegs.length > 1;
-                          });
-                          const kgEnSesion = exIds.reduce((acc,exId)=>{
-                            const regs = alumnoProgreso.filter(p=>p.ejercicio_id===exId&&p.fecha===s.fecha);
-                            return acc + regs.reduce((a2,p)=>(parseFloat(p.kg)||0)*(parseInt(p.reps)||0)+a2,0);
-                          },0);
-                          return (
-                            <div key={s.id||si} style={{background:bgSub,borderRadius:10,
-                              padding:"10px 12px",marginBottom:6,
-                              border:"1px solid "+border}}>
-                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
-                                <div>
-                                  <span style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✅ {s.dia_label||"Día "+(s.dia_idx+1)}</span>
-                                  {s.rutina_nombre&&<span style={{fontSize:11,color:textMuted,marginLeft:6}}>{s.rutina_nombre}</span>}
-                                </div>
-                                <span style={{fontSize:11,color:textMuted,flexShrink:0}}>{s.fecha}</span>
-                              </div>
-                              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                                {s.semana&&<span style={{fontSize:10,fontWeight:700,
-                                  background:"#2563EB22",color:"#60a5fa",
-                                  borderRadius:4,padding:"2px 6px"}}>
-                                  SEM {s.semana}
-                                </span>}
-                                {kgEnSesion>0&&<span style={{fontSize:10,fontWeight:700,
-                                  background:"#22C55E22",color:"#4ade80",
-                                  borderRadius:4,padding:"2px 6px"}}>
-                                  {Math.round(kgEnSesion).toLocaleString()}kg vol
-                                </span>}
-                                {prsEnSesion.length>0&&<span style={{fontSize:10,fontWeight:700,
-                                  background:"#F59E0B22",color:"#fbbf24",
-                                  borderRadius:4,padding:"2px 6px"}}>
-                                  🏆 {prsEnSesion.length} PR{prsEnSesion.length>1?"s":""}
-                                </span>}
-                              </div>
-                            </div>
-                          );
-                        })}
+                    {alumnoSesiones.length>0&&alumnoSesiones.slice(0,3).map((s,i)=>(
+                      <div key={i} style={{background:bgSub,borderRadius:8,padding:"8px 10px",marginBottom:4,display:"flex",justifyContent:"space-between"}}>
+                        <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✅ {s.dia_label}</div>
+                        <div style={{fontSize:11,color:textMuted}}>{s.fecha}</div>
                       </div>
-                    )}
+                    ))}
                     <div style={{marginTop:12,borderTop:"1px solid "+border,paddingTop:12}}>
                       <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,
                         textTransform:"uppercase",marginBottom:8}}>
@@ -2765,7 +2549,7 @@ function GymApp() {
                 // Solo PR si habia registro previo Y supero el maximo
                 return maxAntes>0 && maxHoy>maxAntes;
               }).length;
-              setResumenSesion({durMin,ejercicios:exsCompleted.length,totalSets:exsCompleted.reduce((acc2,e)=>acc2+(parseInt(e.sets)||3),0),volTotal:Math.round(volTotal),prsNuevos,diaLabel:activeDay.label||("Dia "+(session.dIdx+1)),rutinaName:r?.name||"Entrenamiento",fecha:new Date().toLocaleDateString("es-AR")});
+              setResumenSesion({durMin,ejercicios:exsCompleted.length,totalSets:exsCompleted.reduce((a,e)=>a+(parseInt(e.sets)||3),0),volTotal:Math.round(volTotal),prsNuevos,diaLabel:activeDay.label||("Dia "+(session.dIdx+1)),rutinaName:r?.name||"Entrenamiento",fecha:new Date().toLocaleDateString("es-AR")});
               setSession(null);
               if(readOnly&&sharedParam){try{const rutData=JSON.parse(atob(sharedParam));const alumnoId=rutData.alumnoId;if(alumnoId){sb.addSesion({alumno_id:alumnoId,rutina_nombre:r?.name||"",dia_label:activeDay.label||("Dia "+(session.dIdx+1)),dia_idx:session.dIdx,semana:currentWeek+1,ejercicios:exsCompleted.map(e=>e.id).join(","),fecha:new Date().toLocaleDateString("es-AR"),hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})});}}catch(e){}}
               // Avanzar SIEMPRE a la semana siguiente al terminar cada sesión
@@ -3233,7 +3017,7 @@ function GymApp() {
                 const updatedDays = rActual.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
                 const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
-                else { const resAS2=await sb.createRutina(payload); if(resAS2&&resAS2[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,saved:true,id:resAS2[0].id}:r));}else{console.error('[auto-save] falló',payload);} }
+                else { await sb.createRutina({...payload,id:rActual.id}); setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,saved:true}:r)); }
               }
             } catch(e){ console.error("Auto-save error:",e); }
             setEditEx(null);toast2("Guardado ✓");
@@ -3513,7 +3297,7 @@ function GymApp() {
   );
 }
 
-function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData, onSesionGuardada}) {
+function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx}) {
 
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
@@ -3606,7 +3390,7 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
   const pct = exercises.length>0 ? (totalExDone/exercises.length)*100 : 0;
 
   // Funcion finalizar (igual que antes)
-  const finalizarSesion = async () => {
+  const finalizarSesion = () => {
     const r = activeR;
     const dayKey = session.rId+"-"+session.dIdx+"-w"+currentWeek;
     const newCompleted = completedDays.includes(dayKey)?completedDays:[...completedDays,dayKey];
@@ -3631,7 +3415,7 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
       return maxHoy > (preSessionPRs[ex2.id]||0);
     }).length;
     setResumenSesion({durMin,ejercicios:exsCompleted.length,
-      totalSets:exsCompleted.reduce((acc2,e)=>acc2+(parseInt(e.sets)||3),0),
+      totalSets:exsCompleted.reduce((a,e)=>a+(parseInt(e.sets)||3),0),
       volTotal:Math.round(volTotal),prsNuevos,
       diaLabel:activeDay.label||("Dia "+(session.dIdx+1)),
       rutinaName:r?.name||"Entrenamiento",fecha:hoyFin});
@@ -3643,32 +3427,6 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
         semana:currentWeek+1,ejercicios:exercises.map(e=>e.id).join(","),
         fecha:hoyFin,hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})});
     }catch(e){}}
-    // ── Modo alumno LOGUEADO: guardar sesión en Supabase ─────────────
-    if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
-      try {
-        const resSesion = await sb.addSesion({
-          alumno_id: sessionData.alumnoId,
-          rutina_id: r?.id || null,
-          rutina_nombre: r?.name||"",
-          dia_label: activeDay.label||("Dia "+(session.dIdx+1)),
-          dia_idx: session.dIdx,
-          semana: currentWeek+1,
-          ejercicios: exercises.map(e=>e.id).join(","),
-          fecha: hoyFin,
-          hora: new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})
-        });
-        if(resSesion && resSesion[0]) {
-          console.log('[addSesion] ✓ sesión guardada:', resSesion[0].id);
-          // Notificar a GymApp para que refresque sesionesGlobales
-          // → el entrenador ve los datos inmediatamente
-          if(typeof onSesionGuardada === 'function') {
-            onSesionGuardada();
-          }
-        } else {
-          console.error('[addSesion] ✗ Supabase no confirmó el guardado', resSesion);
-        }
-      } catch(e) { console.error('[addSesion alumno logueado]', e); }
-    }
     // Avanzar semana solo cuando se completan TODOS los días de la semana
     if(daysThisWeek >= totalDays && currentWeek < 3){
       setCompletedDays(prev=>prev.filter(k=>!k.endsWith("-w"+currentWeek)));
@@ -4963,7 +4721,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
     reader.onload = async (ev) => {
       const base64 = ev.target.result;
       const fecha = new Date().toLocaleDateString("es-AR");
-      const res = await sb.addFoto({alumno_id: alumnoId, imagen: base64, fecha, nota:""});
+      const res = await sb.addFoto({alumno_id: alumnoIdSync, imagen: base64, fecha, nota:""});
       if(res && res[0]) setFotos(prev=>[res[0],...prev]);
       setUploading(false);
     };
@@ -5612,123 +5370,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
 }
 
 
-// ── calcularSugerencias ─────────────────────────────────────────────────
-// Analiza el progreso de un alumno y genera sugerencias de sobrecarga.
-// NO modifica nada — solo retorna un array de sugerencias.
-// progresoAlumno: [{ejercicio_id, kg, reps, fecha}] (de Supabase tabla progreso)
-// rutinasAlumno:  array de rutinas del alumno (para saber el método de progresión)
-// allEx:          catálogo de ejercicios para obtener nombres
-function calcularSugerencias(progresoAlumno, rutinasAlumno, allEx) {
-  if(!progresoAlumno || progresoAlumno.length === 0) return [];
-
-  const sugs = [];
-
-  // Agrupar por ejercicio_id
-  const porEjercicio = {};
-  progresoAlumno.forEach(reg => {
-    const exId = reg.ejercicio_id;
-    if(!exId) return;
-    if(!porEjercicio[exId]) porEjercicio[exId] = [];
-    porEjercicio[exId].push({
-      kg:   parseFloat(reg.kg)   || 0,
-      reps: parseInt(reg.reps)   || 0,
-      fecha: reg.fecha || reg.created_at || '',
-    });
-  });
-
-  // Obtener configuración del ejercicio en la rutina (progresion, sets, reps target)
-  const exConfig = {};
-  (rutinasAlumno||[]).forEach(rut => {
-    (rut?.datos?.days || rut?.days || []).forEach(dia => {
-      [...(dia.exercises||[]), ...(dia.warmup||[])].forEach(ex => {
-        if(ex?.id) exConfig[ex.id] = ex;
-      });
-    });
-  });
-
-  Object.entries(porEjercicio).forEach(([exId, registros]) => {
-    if(registros.length < 3) return; // Necesitamos al menos 3 registros
-
-    // Ordenar por fecha descendente (más reciente primero)
-    const ordenados = [...registros].sort((regA, regB) => {
-      return new Date(regB.fecha||0) - new Date(regA.fecha||0);
-    });
-
-    const ultimos3 = ordenados.slice(0, 3);
-    const kgUltimos = ultimos3.map(r => r.kg);
-    const repsUltimas = ultimos3.map(r => r.reps);
-    const maxKg = Math.max(...kgUltimos);
-    const minKg = Math.min(...kgUltimos);
-    const kgConsistente = maxKg > 0 && (maxKg - minKg) / maxKg < 0.1; // variación < 10%
-
-    const exInfo = (allEx||[]).find(e => e.id === exId);
-    const exNombre = exInfo?.name || exId;
-    const config = exConfig[exId] || {};
-    const metodo = config.progresion || 'manual';
-    const repsTarget = parseInt((config.reps||'').split(/[-x]/)[1] || config.reps) || 0;
-
-    // ── Regla 1: +Carga ──────────────────────────────────────────────
-    // 3 sesiones consecutivas con el mismo peso → sugerir +2.5kg
-    if(kgConsistente && maxKg > 0 && (metodo === 'carga' || metodo === 'manual')) {
-      const nuevoKg = Math.round((maxKg + 2.5) * 2) / 2; // redondear a 0.5kg
-      sugs.push({
-        exId,
-        exNombre,
-        tipo: 'carga',
-        icono: '↑',
-        valorActual: maxKg + 'kg',
-        valorSugerido: nuevoKg + 'kg',
-        razon: `3 sesiones estables en ${maxKg}kg — listo para subir`,
-        estado: 'pendiente',
-        config: { campo: 'kg', valor: String(nuevoKg) },
-      });
-    }
-
-    // ── Regla 2: +Reps ───────────────────────────────────────────────
-    // Últimas 3 sesiones en el tope del rango de reps → sugerir +2 reps
-    const repsPromedio = repsUltimas.reduce((acc2,r)=>acc2+r,0) / repsUltimas.length;
-    if(repsTarget > 0 && repsPromedio >= repsTarget && metodo === 'reps') {
-      sugs.push({
-        exId,
-        exNombre,
-        tipo: 'reps',
-        icono: '↑',
-        valorActual: Math.round(repsPromedio) + ' reps',
-        valorSugerido: (repsTarget + 2) + ' reps',
-        razon: `Completa ${repsTarget} reps consistentemente`,
-        estado: 'pendiente',
-        config: { campo: 'reps', valor: String(repsTarget + 2) },
-      });
-    }
-
-    // ── Regla 3: Alerta caída ────────────────────────────────────────
-    // El último registro es notablemente menor al penúltimo
-    if(ordenados.length >= 2) {
-      const ultimo = ordenados[0].kg;
-      const penultimo = ordenados[1].kg;
-      if(penultimo > 0 && ultimo < penultimo * 0.9) { // caída > 10%
-        sugs.push({
-          exId,
-          exNombre,
-          tipo: 'alerta',
-          icono: '⚠',
-          valorActual: ultimo + 'kg',
-          valorSugerido: penultimo + 'kg',
-          razon: `Bajó de ${penultimo}kg a ${ultimo}kg — revisar recuperación`,
-          estado: 'pendiente',
-          config: null,
-        });
-      }
-    }
-  });
-
-  // Prioridad: alertas primero, luego carga, luego reps
-  const orden = { alerta: 0, carga: 1, reps: 2 };
-  return sugs.sort((sugA, sugB) => (orden[sugA.tipo]||9) - (orden[sugB.tipo]||9));
-}
-
-
-function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, progresoGlobal={}, sugerencias={}, setSugerencias=()=>{}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}}) {
+function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#1E2D40":"#FFFFFF";
@@ -5871,115 +5513,6 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
           </div>
         </>
       )}
-      {(()=>{
-        // ── Panel de sugerencias de sobrecarga progresiva ────────────
-        const todasSugs = Object.entries(sugerencias)
-          .flatMap(([aluId, sugsAlu]) =>
-            (sugsAlu||[])
-              .filter(sg => sg.estado === 'pendiente')
-              .map(sg => ({ ...sg, alumnoId: aluId,
-                alumnoNombre: alumnos.find(al=>al.id===aluId)?.nombre || aluId }))
-          );
-        if(todasSugs.length === 0) return null;
-        const coloresTipo = { carga:'#2563EB', reps:'#22C55E', alerta:'#F59E0B' };
-        const bgTipo      = { carga:'#0d1e33', reps:'#0c2a1a', alerta:'#1f1500' };
-        return (
-          <div style={{marginBottom:20}}>
-            <div style={{...sec,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span>⚡ {es?'SUGERENCIAS DE PROGRESIÓN':'PROGRESSION SUGGESTIONS'}</span>
-              <span style={{fontSize:11,color:textMuted,fontWeight:500}}>
-                {todasSugs.length} {es?'pendientes':'pending'}
-              </span>
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              {todasSugs.slice(0,6).map((sg, sgIdx) => {
-                const col = coloresTipo[sg.tipo] || '#8B9AB2';
-                const bgS = bgTipo[sg.tipo] || '#162234';
-                return (
-                  <div key={sg.alumnoId+sg.exId+sgIdx}
-                    style={{background:bgCard,border:'1px solid '+col+'44',
-                      borderRadius:12,padding:'12px 14px'}}>
-                    <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-                      {/* Icono tipo */}
-                      <div style={{width:34,height:34,borderRadius:8,flexShrink:0,
-                        background:col+'22',display:'flex',alignItems:'center',
-                        justifyContent:'center',fontSize:16,fontWeight:900,color:col}}>
-                        {sg.icono}
-                      </div>
-                      {/* Info */}
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
-                          <span style={{fontSize:11,fontWeight:700,color:textMuted,
-                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                            {sg.alumnoNombre}
-                          </span>
-                          <span style={{fontSize:10,color:textMuted}}>·</span>
-                          <span style={{fontSize:11,fontWeight:700,color:textMain,
-                            whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
-                            {sg.exNombre}
-                          </span>
-                        </div>
-                        <div style={{fontSize:13,fontWeight:700,color:col,marginBottom:3}}>
-                          {sg.valorActual} → {sg.valorSugerido}
-                        </div>
-                        <div style={{fontSize:11,color:textMuted,lineHeight:1.4}}>
-                          {sg.razon}
-                        </div>
-                      </div>
-                    </div>
-                    {/* Acciones */}
-                    <div style={{display:'flex',gap:6,marginTop:10}}>
-                      {sg.tipo !== 'alerta' && (
-                        <button className='hov'
-                          onClick={e=>{
-                            e.stopPropagation();
-                            // Aplicar: actualizar la rutina del alumno en el estado
-                            const ruts = routines.filter(r => r.alumno_id === sg.alumnoId || r.alumnoId === sg.alumnoId);
-                            if(ruts.length > 0) {
-                              // Buscar el ejercicio en la rutina y actualizar el campo
-                              // El entrenador deberá guardar después
-                              toast2&&toast2(es?`Aplicá el cambio en RUTINAS → ${sg.exNombre}`:`Apply change in ROUTINES → ${sg.exNombre}`);
-                            }
-                            // Marcar como aplicada
-                            setSugerencias(prev => ({
-                              ...prev,
-                              [sg.alumnoId]: (prev[sg.alumnoId]||[]).map(s =>
-                                s.exId === sg.exId && s.tipo === sg.tipo
-                                  ? {...s, estado:'aplicada'} : s
-                              )
-                            }));
-                          }}
-                          style={{flex:1,padding:'7px 6px',background:col+'22',
-                            color:col,border:'1px solid '+col+'44',borderRadius:8,
-                            fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
-                          ✓ {es?'Marcar aplicada':'Mark applied'}
-                        </button>
-                      )}
-                      <button className='hov'
-                        onClick={e=>{
-                          e.stopPropagation();
-                          setSugerencias(prev => ({
-                            ...prev,
-                            [sg.alumnoId]: (prev[sg.alumnoId]||[]).map(s =>
-                              s.exId === sg.exId && s.tipo === sg.tipo
-                                ? {...s, estado:'ignorada'} : s
-                            )
-                          }));
-                        }}
-                        style={{padding:'7px 10px',background:'transparent',
-                          color:textMuted,border:'1px solid '+border,borderRadius:8,
-                          fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-                        {es?'Ignorar':'Dismiss'}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
       {alumnos.length>0&&(
         <>
           <div style={{...sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -6147,66 +5680,6 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                       <polyline points="9 18 15 12 9 6"/>
                     </svg>
                   </div>
-                  {(()=>{
-                    // ── Sparkline tendencia 30d — datos reales de Supabase ──
-                    const regsAlumno = progresoGlobal[a.id] || [];
-                    const setsFilt = regsAlumno.filter(reg => parseFloat(reg.kg) > 0);
-                    if(setsFilt.length < 3) return null;
-                    const nowSpark = Date.now();
-                    const bkts = {};
-                    setsFilt.forEach(reg => {
-                      const fechaStr = reg.fecha || reg.created_at || '';
-                      const dObj = fechaStr ? new Date(fechaStr) : new Date();
-                      const wAgo = isNaN(dObj.getTime()) ? 0 : Math.min(7, Math.floor((nowSpark - dObj.getTime())/(7*24*60*60*1000)));
-                      if(!bkts[wAgo]) bkts[wAgo] = [];
-                      bkts[wAgo].push(parseFloat(reg.kg)||0);
-                    });
-                    const sparkData = [7,6,5,4,3,2,1,0]
-                      .map(w => bkts[w] ? bkts[w].reduce((acc2,v)=>acc2+v,0)/bkts[w].length : null)
-                      .filter(v => v !== null);
-                    if(sparkData.length < 2) return null;
-                    const sMin = Math.min(...sparkData);
-                    const sMax = Math.max(...sparkData);
-                    const sRange = sMax - sMin || 1;
-                    const W = 84, H = 22, pad = 2;
-                    const pts = sparkData.map((v, si) => ({
-                      x: pad + (si / (sparkData.length - 1)) * (W - pad * 2),
-                      y: H - pad - ((v - sMin) / sRange) * (H - pad * 2)
-                    }));
-                    const pathD = pts.map((p,si) => si===0 ? `M${p.x.toFixed(1)},${p.y.toFixed(1)}` : `L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-                    const areaD = `M${pts[0].x.toFixed(1)},${H} ${pathD} L${pts[pts.length-1].x.toFixed(1)},${H} Z`;
-                    const trendPct = sparkData[0]>0 ? Math.round((sparkData[sparkData.length-1]-sparkData[0])/sparkData[0]*100) : 0;
-                    const trendColor = trendPct>2?'#22C55E':trendPct<-2?'#F59E0B':'#8B9AB2';
-                    const trendFill  = trendPct>2?'rgba(34,197,94,.12)':trendPct<-2?'rgba(245,158,11,.10)':'rgba(139,154,178,.06)';
-                    const maxKg = Math.max(...setsFilt.map(r=>parseFloat(r.kg)||0));
-                    return (
-                      <div style={{
-                        display:'flex',alignItems:'center',gap:8,
-                        marginLeft:46,marginTop:4,marginBottom:narrativa?4:0,
-                        padding:'5px 9px',borderRadius:7,
-                        background:'rgba(0,0,0,.18)',
-                        border:'1px solid rgba(255,255,255,.05)'
-                      }}>
-                        <div style={{display:'flex',flexDirection:'column',gap:1,flexShrink:0}}>
-                          <span style={{fontSize:8,color:'#8B9AB2',fontWeight:700,letterSpacing:.5}}>30d</span>
-                          <span style={{fontSize:8,color:trendColor,fontWeight:700}}>{maxKg}kg</span>
-                        </div>
-                        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{flex:1,overflow:'visible'}}>
-                          <path d={areaD} fill={trendFill}/>
-                          <path d={pathD} stroke={trendColor} strokeWidth='1.5' fill='none'
-                            strokeLinejoin='round' strokeLinecap='round'/>
-                          <circle cx={pts[pts.length-1].x} cy={pts[pts.length-1].y}
-                            r='2.5' fill={trendColor}/>
-                        </svg>
-                        <span style={{
-                          fontSize:11,fontWeight:800,color:trendColor,
-                          whiteSpace:'nowrap',minWidth:32,textAlign:'right'
-                        }}>
-                          {trendPct>0?'+':''}{trendPct}%
-                        </span>
-                      </div>
-                    );
-                  })()}
                   {narrativa&&(
                     <div style={{
                       background:narrativa.bg,
@@ -6751,6 +6224,5 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
     </div>
   );
 }
-
 
 export default GymApp;
