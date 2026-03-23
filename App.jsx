@@ -1192,7 +1192,7 @@ function GymApp() {
           es={es}
           darkMode={darkMode}
           prCelebration={prCelebration}
-          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx}/>
+          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx} sessionData={sessionData} onSesionGuardada={cargarSesionesGlobales}/>
       )}
 
       <div
@@ -6246,6 +6246,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
 }
 
 export default GymApp;
+
 
 
 
