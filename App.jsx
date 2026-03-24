@@ -284,6 +284,7 @@ const sb = {
 
 
 const uid = () => Math.random().toString(36).slice(2,9);
+const normalizeFecha = (f) => { if(!f) return ''; const parts=f.split('/'); if(parts.length===3) return parts.map(function(p){return p.padStart(2,'0')}).join('/'); return f; };
 const fmt = s => String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
 const fmtP = s => { const n=parseInt(s)||0; if(!n) return "No"; if(n<60) return n+"s"; const m=Math.floor(n/60),r=n%60; return r===0?(m+"min"):(m+"m"+r+"s"); };
 
@@ -638,6 +639,55 @@ function GymApp() {
     cargarAlumnos,
     notifyAlumno,
   } = useAlumnos({ sb });
+  const [rutinasSB, setRutinasSB] = useState([]);
+  const [registrosSubTab, setRegistrosSubTab] = useState(0);
+  const [sesionesGlobales, setSesionesGlobales] = useState([]);
+  const [progresoGlobal, setProgresoGlobal] = useState({});
+  const [sugerencias, setSugerencias] = useState({});
+
+  
+
+  const cargarSesionesGlobales = React.useCallback(async function(alumnosActuales) {
+    var lista = alumnosActuales || alumnos;
+    if(!lista || lista.length === 0) {
+      try {
+        var sbAlumnos = await sb.getAlumnos('entrenador_principal');
+        if(sbAlumnos && sbAlumnos.length > 0) { setAlumnos(sbAlumnos); lista = sbAlumnos; }
+        else return;
+      } catch(e) { return; }
+    }
+    try {
+      var ids = lista.map(function(a){return a.id}).filter(function(id){return id && typeof id === 'string'});
+      if(ids.length === 0) return;
+      var idsStr = ids.join(',');
+      var results = await Promise.all([
+        sbFetch('sesiones?alumno_id=in.(' + idsStr + ')&select=*&order=created_at.desc&limit=500'),
+        sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=alumno_id,ejercicio_id,kg,reps,fecha&order=created_at.desc&limit=3000'),
+      ]);
+      if(results[0] && Array.isArray(results[0])) setSesionesGlobales(results[0]);
+      if(results[1] && Array.isArray(results[1])) {
+        var idx2 = {};
+        results[1].forEach(function(reg) {
+          if(!idx2[reg.alumno_id]) idx2[reg.alumno_id] = [];
+          idx2[reg.alumno_id].push(reg);
+        });
+        setProgresoGlobal(idx2);
+      }
+    } catch(e) { console.error('[cargarSesionesGlobales]', e); }
+  }, [alumnos]);
+
+  useEffect(function() {
+    if(sessionData && sessionData.role==='entrenador') {
+      var init = async function() {
+        var sbAlumnos = await sb.getAlumnos('entrenador_principal') || [];
+        setAlumnos(sbAlumnos);
+        if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
+      };
+      init();
+      var intervalo = setInterval(function() { cargarSesionesGlobales(); }, 30000);
+      return function() { clearInterval(intervalo); };
+    }
+  }, [sessionData]);
 
   const es = lang==="es";
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
@@ -1535,14 +1585,22 @@ function GymApp() {
 
             {!esAlumno&&(
               <DashboardEntrenador sb={sb} routines={routines} alumnos={alumnos}
-                sesiones={alumnoSesiones}
+                sesiones={sesionesGlobales}
+                progresoGlobal={progresoGlobal}
                 es={es}
                 darkMode={darkMode}
                 progress={progress}
                 session={session}
                 pagosEstado={pagosEstado}
                 togglePago={togglePago}
-                onVerAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
+                onVerAlumno={async(a)=>{
+                  setAlumnoActivo(a);setTab("alumnos");setLoadingSB(true);
+                  try{
+                    const [ruts,prog,ses]=await Promise.all([sb.getRutinas(a.id),sb.getProgreso(a.id),sb.getSesiones(a.id)]);
+                    setRutinasSB(ruts||[]);setAlumnoProgreso(prog||[]);setAlumnoSesiones(ses||[]);
+                  }catch(e){console.error("[onVerAlumno]",e);}
+                  setLoadingSB(false);
+                }}
                 onChatAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
                 onNotificar={(alumnoId, msg)=>notifyAlumno(alumnoId, msg).then(()=>toast2(es?"Notificación enviada":"Notification sent")).catch(()=>toast2("Error al notificar"))}
               />
@@ -3297,7 +3355,7 @@ function GymApp() {
   );
 }
 
-function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx}) {
+function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData, onSesionGuardada}) {
 
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
@@ -3390,13 +3448,14 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
   const pct = exercises.length>0 ? (totalExDone/exercises.length)*100 : 0;
 
   // Funcion finalizar (igual que antes)
-  const finalizarSesion = () => {
+  const finalizarSesion = async () => {
     const r = activeR;
     const dayKey = session.rId+"-"+session.dIdx+"-w"+currentWeek;
     const newCompleted = completedDays.includes(dayKey)?completedDays:[...completedDays,dayKey];
     const totalDays = r?r.days.length:1;
     const daysThisWeek = newCompleted.filter(k=>k.startsWith(session.rId+"-")&&k.endsWith("-w"+currentWeek)).length;
     setCompletedDays(newCompleted);
+    const semanaParaGuardar = currentWeek + 1;
     const durMin = Math.round((Date.now()-(session.startTime||Date.now()))/60000)||1;
     const exsCompleted = [...(activeDay?.warmup||[]), ...(exercises||[])];
     const hoyFin = new Date().toLocaleDateString("es-AR");
@@ -3411,7 +3470,6 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
       if(!sHoy.length) return false;
       const maxHoy=Math.max(...sHoy.map(s2=>s2.kg||0));
       if(maxHoy<=0) return false;
-      // PR si supera el máximo previo a la sesión (incluye primer registro)
       return maxHoy > (preSessionPRs[ex2.id]||0);
     }).length;
     setResumenSesion({durMin,ejercicios:exsCompleted.length,
@@ -3420,17 +3478,44 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
       diaLabel:activeDay.label||("Dia "+(session.dIdx+1)),
       rutinaName:r?.name||"Entrenamiento",fecha:hoyFin});
     setSession(null);
+    // Guardar sesión — alumno con link
     if(readOnly&&sharedParam){try{
       const rutData=JSON.parse(atob(sharedParam));
-      if(rutData.alumnoId)sb.addSesion({alumno_id:rutData.alumnoId,rutina_nombre:r?.name||"",
-        dia_label:activeDay.label||("Dia "+(session.dIdx+1)),dia_idx:session.dIdx,
-        semana:currentWeek+1,ejercicios:exercises.map(e=>e.id).join(","),
-        fecha:hoyFin,hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})});
+      if(rutData.alumnoId){
+        const existentes=await sb.getSesiones(rutData.alumnoId);
+        const yaExiste=(existentes||[]).some(function(s){return normalizeFecha(s.fecha)===normalizeFecha(hoyFin)&&s.dia_idx===session.dIdx&&s.semana===semanaParaGuardar});
+        if(!yaExiste){
+          sb.addSesion({alumno_id:rutData.alumnoId,rutina_nombre:r?.name||"",
+            dia_label:activeDay.label||("Dia "+(session.dIdx+1)),dia_idx:session.dIdx,
+            semana:semanaParaGuardar,ejercicios:exercises.map(function(e){return e.id}).join(","),
+            fecha:hoyFin,hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})});
+        }
+      }
     }catch(e){}}
-    // Avanzar semana solo cuando se completan TODOS los días de la semana
-    if(daysThisWeek >= totalDays && currentWeek < 3){
+    // Guardar sesión — alumno logueado
+    if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
+      try {
+        const existentes=await sb.getSesiones(sessionData.alumnoId);
+        const yaExiste=(existentes||[]).some(function(s){return normalizeFecha(s.fecha)===normalizeFecha(hoyFin)&&s.dia_idx===session.dIdx&&s.semana===semanaParaGuardar});
+        if(!yaExiste){
+          var resSesion=await sb.addSesion({
+            alumno_id:sessionData.alumnoId,rutina_id:r?.id||null,rutina_nombre:r?.name||"",
+            dia_label:activeDay.label||("Dia "+(session.dIdx+1)),dia_idx:session.dIdx,
+            semana:semanaParaGuardar,ejercicios:exercises.map(function(e){return e.id}).join(","),
+            fecha:hoyFin,hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})
+          });
+          if(resSesion&&resSesion[0])console.log('[addSesion] OK:',resSesion[0].id);
+          if(typeof onSesionGuardada==='function')onSesionGuardada();
+        }
+      } catch(e){console.error('[addSesion]',e);}
+    }
+    // Avanzar semana solo si completó TODOS los días Y no es el mismo día real
+    var lastAdvance=localStorage.getItem('it_last_week_advance_date');
+    var todayStr=new Date().toDateString();
+    if(daysThisWeek >= totalDays && currentWeek < 3 && lastAdvance !== todayStr){
       setCompletedDays(prev=>prev.filter(k=>!k.endsWith("-w"+currentWeek)));
       setCurrentWeek(currentWeek + 1);
+      localStorage.setItem('it_last_week_advance_date',todayStr);
     }
   };
 
@@ -5390,7 +5475,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
 }
 
 
-function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}}) {
+function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, progresoGlobal={}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#1E2D40":"#FFFFFF";
@@ -5541,14 +5626,53 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
           </div>
           <div style={{background:bgCard,border:"1px solid "+border,borderRadius:12,marginBottom:20,overflow:"hidden"}}>
             {alumnos.map((a,i)=>{
-              const alumnoProgress = routines
-                .filter(r=>r.alumno_id===a.id)
-                .flatMap(r=>r.days||[])
-                .flatMap(d=>[...(d.exercises||[]),(d.warmup||[])].flat())
-                .reduce((acc,ex)=>{
-                  if(ex?.id && a.progress?.[ex.id]) acc[ex.id]=a.progress[ex.id];
-                  return acc;
-                }, {});
+              const alumnoProgress = progresoGlobal[a.id] || [];
+
+              // ── Datos del alumno desde Supabase ──────────────────
+              const regsAlumno = progresoGlobal[a.id] || [];
+              const sesAlumno = (sesiones||[]).filter(function(s){return s.alumno_id===a.id})
+                .sort(function(x,y){return new Date(y.created_at||y.fecha)-new Date(x.created_at||x.fecha)});
+              const ultimaSes = sesAlumno[0];
+
+              // PRs por ejercicio
+              const prsPorEj = {};
+              regsAlumno.forEach(function(reg){
+                var exId = reg.ejercicio_id;
+                var kg = parseFloat(reg.kg)||0;
+                if(!prsPorEj[exId] || kg > prsPorEj[exId].kg) {
+                  prsPorEj[exId] = {kg:kg, fecha:reg.fecha};
+                }
+              });
+
+              // Últimos pesos por ejercicio
+              const ultimosPesos = {};
+              regsAlumno.forEach(function(reg){
+                var exId = reg.ejercicio_id;
+                if(!ultimosPesos[exId]) ultimosPesos[exId] = {kg:parseFloat(reg.kg)||0, reps:parseInt(reg.reps)||0, fecha:reg.fecha};
+              });
+
+              // Top 3 PRs
+              const topPRs = Object.entries(prsPorEj)
+                .sort(function(a2,b2){return b2[1].kg-a2[1].kg})
+                .slice(0,3)
+                .map(function(entry){
+                  var exInfo = EX.find(function(e){return e.id===entry[0]});
+                  return {id:entry[0], nombre:exInfo?exInfo.name:entry[0], kg:entry[1].kg};
+                });
+
+              // Tendencia
+              var tendencia = null;
+              if(regsAlumno.length >= 6) {
+                var sortedRegs = regsAlumno.slice().sort(function(a2,b2){return new Date(b2.created_at||b2.fecha)-new Date(a2.created_at||a2.fecha)});
+                var recientes = sortedRegs.slice(0,3);
+                var anteriores = sortedRegs.slice(3,6);
+                var avgRec = recientes.reduce(function(acc,r){return acc+(parseFloat(r.kg)||0)},0)/3;
+                var avgAnt = anteriores.reduce(function(acc,r){return acc+(parseFloat(r.kg)||0)},0)/3;
+                if(avgAnt > 0) {
+                  var pctCambio = Math.round((avgRec-avgAnt)/avgAnt*100);
+                  tendencia = {pct:pctCambio, dir:pctCambio>2?"sube":pctCambio<-2?"baja":"estable"};
+                }
+              }
 
               // ── Narrativa inteligente ──────────────────────────────
               const getNarrativaAlumno = () => {
@@ -5557,7 +5681,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                 let mejorPct = 0;
                 let ejercicioCaida = null;
 
-                const progData = a.progress||{};
+                var regsAlu = progresoGlobal[a.id] || []; var progData = {}; regsAlu.forEach(function(r){if(!progData[r.ejercicio_id])progData[r.ejercicio_id]={sets:[],max:0};progData[r.ejercicio_id].sets.push({kg:parseFloat(r.kg)||0,reps:parseInt(r.reps)||0,date:r.fecha,week:0});progData[r.ejercicio_id].max=Math.max(progData[r.ejercicio_id].max,parseFloat(r.kg)||0);});
                 Object.entries(progData).forEach(([exId, pg])=>{
                   const sets = pg?.sets||[];
                   if(sets.length < 2) return;
@@ -5712,6 +5836,46 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                       {narrativa.tipo==="pr"&&<span style={{background:"#22C55E",color:"#fff",fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:4,marginRight:8}}>PR</span>}
                       {narrativa.tipo==="alerta"&&<span style={{fontSize:12,marginRight:4}}>⚠</span>}
                       {narrativa.msg}
+                    </div>
+                  )}
+                  {/* ── Info expandida de progreso ── */}
+                  {regsAlumno.length>0&&(
+                    <div style={{marginLeft:46,marginTop:8}}>
+                      {ultimaSes&&(
+                        <div style={{fontSize:11,color:textMuted,marginBottom:6}}>
+                          <span style={{fontWeight:700}}>{es?"Última sesión":"Last session"}:</span> {ultimaSes.dia_label||"?"} · {ultimaSes.fecha||"?"} {ultimaSes.hora?" · "+ultimaSes.hora:""}
+                        </div>
+                      )}
+                      {tendencia&&(
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                          <span style={{fontSize:11,fontWeight:700,color:tendencia.dir==="sube"?"#22C55E":tendencia.dir==="baja"?"#EF4444":"#8B9AB2"}}>
+                            {tendencia.dir==="sube"?"↑":tendencia.dir==="baja"?"↓":"→"} {tendencia.pct>0?"+":""}{tendencia.pct}%
+                          </span>
+                          <span style={{fontSize:10,color:textMuted}}>{es?"tendencia carga":"load trend"}</span>
+                        </div>
+                      )}
+                      {topPRs.length>0&&(
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                          {topPRs.map(function(pr){return(
+                            <span key={pr.id} style={{background:"#22C55E15",border:"1px solid #22C55E33",borderRadius:6,padding:"2px 7px",fontSize:10,fontWeight:700,color:"#22C55E"}}>
+                              🏆 {pr.nombre.substring(0,15)} {pr.kg}kg
+                            </span>
+                          )})}
+                        </div>
+                      )}
+                      {Object.keys(ultimosPesos).length>0&&(
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                          {Object.entries(ultimosPesos).slice(0,4).map(function(entry){
+                            var exInfo = EX.find(function(e){return e.id===entry[0]});
+                            var nombre = exInfo?exInfo.name:entry[0];
+                            return(
+                              <span key={entry[0]} style={{background:bgSub,borderRadius:6,padding:"2px 6px",fontSize:9,color:textMuted,fontWeight:600}}>
+                                {nombre.substring(0,12)} {entry[1].kg}kg×{entry[1].reps}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
