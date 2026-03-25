@@ -285,6 +285,144 @@ const sb = {
 
 const uid = () => Math.random().toString(36).slice(2,9);
 const normalizeFecha = (f) => { if(!f) return ''; const parts=f.split('/'); if(parts.length===3) return parts.map(function(p){return p.padStart(2,'0')}).join('/'); return f; };
+
+// ═══════════════════════════════════════════════════════════════
+// MOTOR DE SUGERENCIAS POR EJERCICIO
+// ═══════════════════════════════════════════════════════════════
+function generarSugerenciasAlumno(registros, rutinaDatos, EX) {
+  if(!registros || registros.length === 0 || !rutinaDatos) return [];
+  const dias = rutinaDatos.days || [];
+  const sugerencias = [];
+
+  // Agrupar registros por ejercicio, ordenados por fecha desc
+  const porEj = {};
+  registros.forEach(function(r) {
+    var exId = r.ejercicio_id;
+    if(!porEj[exId]) porEj[exId] = [];
+    porEj[exId].push({ kg: parseFloat(r.kg)||0, reps: parseInt(r.reps)||0, fecha: r.fecha, rpe: parseFloat(r.rpe)||0 });
+  });
+
+  // Para cada ejercicio de la rutina
+  dias.forEach(function(dia, dIdx) {
+    (dia.exercises||[]).forEach(function(ex) {
+      var exId = ex.id;
+      var regs = porEj[exId];
+      if(!regs || regs.length < 2) return;
+
+      var exInfo = EX.find(function(e){ return e.id === exId; });
+      var nombre = exInfo ? exInfo.name : exId;
+
+      // Parsear rango de reps objetivo
+      var repsStr = String(ex.reps||"8-10");
+      var repParts = repsStr.split("-");
+      var repMin = parseInt(repParts[0]) || 8;
+      var repMax = parseInt(repParts[1] || repParts[0]) || repMin;
+
+      // Ordenar por fecha (más reciente primero)
+      var sorted = regs.slice().sort(function(a, b) {
+        return new Date(b.fecha.split('/').reverse().join('-')) - new Date(a.fecha.split('/').reverse().join('-'));
+      });
+
+      var ultimo = sorted[0];
+      var penultimo = sorted[1];
+      var antepenultimo = sorted[2];
+
+      // RPE (si no hay, estimar desde rendimiento)
+      var rpeUlt = ultimo.rpe || 0;
+      var rpePen = penultimo ? (penultimo.rpe || 0) : 0;
+
+      // ── Clasificación interna (NO visible) ──
+      var estado = "optimo";
+
+      // FATIGA: cayeron reps o subió RPE con misma carga
+      if(penultimo) {
+        var mismaCarga = Math.abs(ultimo.kg - penultimo.kg) < 0.5;
+        var cayeronReps = ultimo.reps < penultimo.reps - 1;
+        var subioRPE = rpeUlt > 0 && rpePen > 0 && rpeUlt > rpePen + 0.5;
+        if(mismaCarga && (cayeronReps || (subioRPE && cayeronReps))) {
+          estado = "fatiga";
+        }
+      }
+
+      // MUY EXIGIDO: RPE >= 9 en últimas 2
+      if(rpeUlt >= 9 && rpePen >= 9) {
+        estado = "muy_exigido";
+      }
+
+      // MUY FÁCIL: tope de rango + buen rendimiento en 2 sesiones
+      if(ultimo.reps >= repMax && penultimo && penultimo.reps >= repMax) {
+        if(rpeUlt <= 7.5 || rpeUlt === 0) {
+          estado = "muy_facil";
+        }
+      }
+
+      // ESTANCADO: 3 sesiones iguales
+      if(antepenultimo) {
+        var todosIgual = Math.abs(ultimo.kg - penultimo.kg) < 0.5 &&
+                         Math.abs(ultimo.kg - antepenultimo.kg) < 0.5 &&
+                         Math.abs(ultimo.reps - penultimo.reps) <= 1 &&
+                         Math.abs(ultimo.reps - antepenultimo.reps) <= 1;
+        if(todosIgual && estado === "optimo") {
+          estado = "estancado";
+        }
+      }
+
+      // ── Generar sugerencia (VISIBLE) ──
+      var sugerencia = null;
+      var equipo = exInfo ? exInfo.equip : "";
+      var incBase = (equipo === "Barra" || equipo === "barra") ? 2.5 :
+                    (equipo === "Mancuerna" || equipo === "mancuerna" || equipo === "Mancuernas" || equipo === "mancuernas") ? 1 : 2.5;
+
+      if(estado === "muy_facil") {
+        sugerencia = {
+          exId: exId, nombre: nombre, estado: estado,
+          accion: "Subir a " + (ultimo.kg + incBase) + "kg (+" + incBase + "kg)",
+          ajuste: "Arrancar en " + repMin + " reps",
+          tipo: "subir", prioridad: 1
+        };
+      } else if(estado === "fatiga") {
+        var reduccion = Math.round(ultimo.kg * 0.05 / incBase) * incBase;
+        if(reduccion < incBase) reduccion = incBase;
+        sugerencia = {
+          exId: exId, nombre: nombre, estado: estado,
+          accion: "Bajar a " + (ultimo.kg - reduccion) + "kg esta sesión",
+          ajuste: "Mantener " + repMax + " reps y evaluar recuperación",
+          tipo: "bajar", prioridad: 0
+        };
+      } else if(estado === "muy_exigido") {
+        sugerencia = {
+          exId: exId, nombre: nombre, estado: estado,
+          accion: "Mantener carga, agregar 30s de descanso",
+          ajuste: "Si no mejora en 2 sesiones, quitar 1 serie",
+          tipo: "ajustar", prioridad: 1
+        };
+      } else if(estado === "estancado") {
+        sugerencia = {
+          exId: exId, nombre: nombre, estado: estado,
+          accion: "Cambiar esquema: probar " + (parseInt(ex.sets||3)+1) + "×" + (repMin-2 > 0 ? repMin-2 : repMin) + " con " + (ultimo.kg+incBase) + "kg",
+          ajuste: "Nuevo estímulo para romper meseta",
+          tipo: "cambiar", prioridad: 2
+        };
+      } else if(estado === "optimo") {
+        if(ultimo.reps < repMax) {
+          sugerencia = {
+            exId: exId, nombre: nombre, estado: estado,
+            accion: "Mantener " + ultimo.kg + "kg",
+            ajuste: "Buscar " + (ultimo.reps+1) + " reps para subir carga",
+            tipo: "mantener", prioridad: 3
+          };
+        }
+        // Si ya está en repMax y óptimo, no genera sugerencia (todo bien)
+      }
+
+      if(sugerencia) sugerencias.push(sugerencia);
+    });
+  });
+
+  // Ordenar por prioridad (fatiga primero, luego subir, etc.)
+  sugerencias.sort(function(a, b) { return a.prioridad - b.prioridad; });
+  return sugerencias;
+}
 const fmt = s => String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
 const fmtP = s => { const n=parseInt(s)||0; if(!n) return "No"; if(n<60) return n+"s"; const m=Math.floor(n/60),r=n%60; return r===0?(m+"min"):(m+"m"+r+"s"); };
 
@@ -2470,6 +2608,43 @@ function GymApp() {
                         <div style={{fontSize:11,color:textMuted}}>{s.fecha}</div>
                       </div>
                     ))}
+                    {/* ── SUGERENCIAS ── */}
+                    {(()=>{
+                      const rutSB = rutinasSB.find(r=>r.alumno_id===a.id);
+                      const regsAlu = alumnoProgreso || [];
+                      if(!rutSB || regsAlu.length < 2) return null;
+                      const sugs = generarSugerenciasAlumno(regsAlu, rutSB.datos, EX);
+                      if(sugs.length === 0) return null;
+                      const colores = {
+                        subir: {icon:"↑",bg:"#22C55E12",border:"#22C55E33",color:"#22C55E",btnBg:"#22C55E"},
+                        bajar: {icon:"↓",bg:"#EF444412",border:"#EF444433",color:"#EF4444",btnBg:"#EF4444"},
+                        ajustar: {icon:"⚡",bg:"#F59E0B12",border:"#F59E0B33",color:"#F59E0B",btnBg:"#F59E0B"},
+                        cambiar: {icon:"🔄",bg:"#2563EB12",border:"#2563EB33",color:"#2563EB",btnBg:"#2563EB"},
+                        mantener: {icon:"→",bg:bgSub,border:border,color:textMuted,btnBg:"#2563EB"}
+                      };
+                      return (
+                        <div style={{marginTop:12,marginBottom:8}}>
+                          <div style={{fontSize:11,fontWeight:800,color:"#F59E0B",letterSpacing:2,marginBottom:8,textTransform:"uppercase",display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:14}}>💡</span> {es?"SUGERENCIAS":"SUGGESTIONS"}
+                          </div>
+                          {sugs.map(function(sug,si){
+                            var c = colores[sug.tipo] || colores.mantener;
+                            return (
+                              <div key={si} style={{background:c.bg,border:"1px solid "+c.border,borderRadius:12,padding:"12px",marginBottom:8}}>
+                                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                                  <span style={{fontSize:16,flexShrink:0,marginTop:1}}>{c.icon}</span>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:13,fontWeight:800,color:c.color,marginBottom:2}}>{sug.nombre}</div>
+                                    <div style={{fontSize:14,fontWeight:700,color:textMain}}>{sug.accion}</div>
+                                    <div style={{fontSize:12,color:textMuted,marginTop:2}}>→ {sug.ajuste}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                     <div style={{marginTop:12,borderTop:"1px solid "+border,paddingTop:12}}>
                       <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,
                         textTransform:"uppercase",marginBottom:8}}>
