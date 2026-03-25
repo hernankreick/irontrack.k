@@ -2325,7 +2325,7 @@ function GymApp() {
                 return(
                 <div key={di+"-"+d.exercises.length+"-"+(d.warmup||[]).length} style={{borderLeft:"2px solid #1a1d2e",paddingLeft:8,marginBottom:8}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                    <div style={{fontSize:22,fontWeight:700,color:textMuted,letterSpacing:1}}>{d.label||((es?"DIA ":"DAY ")+(di+1))}</div>
+                    <input value={d.label||""} onChange={function(e){var val=e.target.value;setRoutines(function(p){return p.map(function(rr){return rr.id===r.id?{...rr,days:rr.days.map(function(dd,ddi){return ddi===di?{...dd,label:val}:dd})}:rr})});}} placeholder={(es?"Dia ":"Day ")+(di+1)} style={{fontSize:22,fontWeight:700,color:textMuted,letterSpacing:1,background:"transparent",border:"none",borderBottom:"1px dashed "+border,outline:"none",width:"50%",fontFamily:"inherit",padding:"2px 0"}}/>
                     <button className="hov" onClick={()=>{
                       const destinos=r.days.map(function(_,i){return i}).filter(function(i){return i!==di});
                       if(destinos.length===0){toast2(es?"No hay otros días":"No other days");return;}
@@ -3399,6 +3399,20 @@ function GymApp() {
               </div>
             </div>
             <div style={{marginBottom:12}}><span style={lbl}>NOTA</span><input style={inp} value={newR.note} onChange={e=>setNewR(p=>({...p,note:e.target.value}))} placeholder="Ej: Lun/Mie/Vie"/></div>
+            <div style={{marginBottom:12}}>
+              <span style={lbl}>{es?"NOMBRE DE CADA DÍA":"NAME EACH DAY"}</span>
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {(newR.days||[]).map(function(d,di){return(
+                  <div key={di} style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:13,fontWeight:700,color:textMuted,width:50,flexShrink:0}}>Día {di+1}</span>
+                    <input style={{...inp,marginBottom:0,flex:1}} value={d.label||""} onChange={function(e){
+                      var val=e.target.value;
+                      setNewR(function(p){return{...p,days:p.days.map(function(dd,ddi){return ddi===di?{...dd,label:val}:dd})}});
+                    }} placeholder={es?"Ej: Pierna A, Empuje, Full...":"E.g: Leg A, Push, Full..."}/>
+                  </div>
+                )})}
+              </div>
+            </div>
             <div style={{display:"flex",gap:8}}>
               <button className="hov" style={{...btn(),flex:1,padding:"8px"}} onClick={()=>setNewR(null)}>CANCELAR</button>
               <button className="hov" style={{...btn("#2563EB"),flex:2,padding:"8px",fontSize:18}} onClick={()=>{
