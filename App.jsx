@@ -302,12 +302,29 @@ function generarSugerenciasAlumno(registros, rutinaDatos, EX) {
     porEj[exId].push({ kg: parseFloat(r.kg)||0, reps: parseInt(r.reps)||0, fecha: r.fecha, rpe: parseFloat(r.rpe)||0 });
   });
 
-  // Para cada ejercicio de la rutina
+  // Para cada ejercicio de la rutina (warmup + principales)
   dias.forEach(function(dia, dIdx) {
-    (dia.exercises||[]).forEach(function(ex) {
+    // Warmup (solo si tienen registros con peso)
+    (dia.warmup||[]).forEach(function(ex, eIdx) {
       var exId = ex.id;
       var regs = porEj[exId];
       if(!regs || regs.length < 2) return;
+      // Solo generar sugerencias para warmup con peso
+      if(!regs.some(function(r){return r.kg > 0})) return;
+
+      procesarEjercicio(exId, ex, regs, "warmup", dIdx, eIdx);
+    });
+    // Bloque principal
+    (dia.exercises||[]).forEach(function(ex, eIdx) {
+      var exId = ex.id;
+      var regs = porEj[exId];
+      if(!regs || regs.length < 2) return;
+
+      procesarEjercicio(exId, ex, regs, "exercises", dIdx, eIdx);
+    });
+  });
+
+  function procesarEjercicio(exId, ex, regs, bloque, dIdx, eIdx) {
 
       var exInfo = EX.find(function(e){ return e.id === exId; });
       var nombre = exInfo ? exInfo.name : exId;
@@ -415,9 +432,14 @@ function generarSugerenciasAlumno(registros, rutinaDatos, EX) {
         // Si ya está en repMax y óptimo, no genera sugerencia (todo bien)
       }
 
-      if(sugerencia) sugerencias.push(sugerencia);
-    });
-  });
+      if(sugerencia) {
+        sugerencia.bloque = bloque;
+        sugerencia.dIdx = dIdx;
+        sugerencia.eIdx = eIdx;
+        sugerencia.exData = ex;
+        sugerencias.push(sugerencia);
+      }
+  }
 
   // Ordenar por prioridad (fatiga primero, luego subir, etc.)
   sugerencias.sort(function(a, b) { return a.prioridad - b.prioridad; });
@@ -2571,7 +2593,23 @@ function GymApp() {
                             <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:4}}>{dias.length} {es?"días":"days"}</div>
                             {dias.map((d,di)=>(
                               <div key={di} style={{background:bgSub,borderRadius:12,padding:"8px 12px",marginBottom:8,marginTop:8,border:"1px solid "+border}}>
-                                <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{d.label||("Día "+(di+1))} · {(d.exercises||[]).length} ej.</div>
+                                <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{d.label||("Día "+(di+1))} · {((d.warmup||[]).length+(d.exercises||[]).length)} ej.</div>
+                                {(d.warmup||[]).length>0&&(
+                                  <div style={{marginBottom:8}}>
+                                    <div style={{fontSize:10,fontWeight:700,color:"#F59E0B",letterSpacing:1,marginBottom:4}}>🔥 {es?"ENTRADA EN CALOR":"WARM-UP"}</div>
+                                    {(d.warmup||[]).map((ex,ei)=>{
+                                      const exInfo=allEx.find(e=>e.id===ex.id);
+                                      return <div key={"w"+ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
+                                        <div style={{width:3,height:16,borderRadius:2,background:"#F59E0B44",flexShrink:0,marginTop:0}}/>
+                                        <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{es?exInfo?.name:exInfo?.nameEn||exInfo?.name||ex.id}</div>
+                                        <div style={{fontSize:11,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
+                                        <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
+                                      </div>;
+                                    })}
+                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"warmup"});setAddExSearch("");setAddExPat(null);}} style={{width:"100%",marginTop:4,padding:"4px",background:"transparent",border:"1px dashed #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit"}}>+ {es?"Añadir calentamiento":"Add warm-up"}</button>
+                                  </div>
+                                )}
+                                <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1,marginBottom:4}}>💪 {es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</div>
                                 {(d.exercises||[]).map((ex,ei)=>{
                                   const exInfo=allEx.find(e=>e.id===ex.id);
                                   return <div key={ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.exercises||[]).length-1?"1px solid "+border:"none"}}>
@@ -2630,13 +2668,22 @@ function GymApp() {
                           {sugs.map(function(sug,si){
                             var c = colores[sug.tipo] || colores.mantener;
                             return (
-                              <div key={si} style={{background:c.bg,border:"1px solid "+c.border,borderRadius:12,padding:"12px",marginBottom:8}}>
+                              <div key={si} id={"sug-"+si} style={{background:c.bg,border:"1px solid "+c.border,borderRadius:12,padding:"12px",marginBottom:8}}>
                                 <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
                                   <span style={{fontSize:16,flexShrink:0,marginTop:1}}>{c.icon}</span>
                                   <div style={{flex:1,minWidth:0}}>
                                     <div style={{fontSize:13,fontWeight:800,color:c.color,marginBottom:2}}>{sug.nombre}</div>
                                     <div style={{fontSize:14,fontWeight:700,color:textMain}}>{sug.accion}</div>
                                     <div style={{fontSize:12,color:textMuted,marginTop:2}}>→ {sug.ajuste}</div>
+                                    <div style={{display:"flex",gap:8,marginTop:8}}>
+                                      <button className="hov" onClick={function(){
+                                        setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:{...sug.exData}});
+                                      }} style={{padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{es?"APLICAR":"APPLY"}</button>
+                                      <button className="hov" onClick={function(){
+                                        var el=document.getElementById("sug-"+si);
+                                        if(el){el.style.opacity="0";el.style.height="0";el.style.padding="0";el.style.margin="0";el.style.overflow="hidden";el.style.transition="all .3s ease";}
+                                      }} style={{padding:"5px 14px",background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"IGNORAR":"IGNORE"}</button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
