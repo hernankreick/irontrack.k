@@ -871,7 +871,8 @@ function GymApp() {
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
   const [preSessionPRs, setPreSessionPRs] = useState({});
-  const [prCelebration, setPrCelebration] = useState(null); // {ejercicio, kg}
+  const [prCelebration, setPrCelebration] = useState(null); // {ejercicio, kg, prevKg, diff, exId}
+  const [sessionPRList, setSessionPRList] = useState([]); // [{exId, ejercicio, kg, prevKg, diff}]
   const [swipeState, setSwipeState] = useState({});
   const [btnFlash, setBtnFlash] = useState(false); // {[setKey]: {x, swiping}}
   const [notaDia, setNotaDia] = useState(""); // nota del entrenador al alumno
@@ -1133,8 +1134,16 @@ function GymApp() {
     const newKgVal = parseFloat(kg)||0;
     if(newKgVal > (exPrevData.max||0) && (exPrevData.max||0) > 0) {
       const exInfoCel = [...EX,...(customEx||[])].find(e=>e.id===exId);
-      setPrCelebration({ejercicio: exInfoCel?.name||exId, kg: newKgVal});
-      setTimeout(()=>setPrCelebration(null), 2500);
+      const prevMax = exPrevData.max||0;
+      const diff = Math.round((newKgVal - prevMax)*10)/10;
+      setPrCelebration({ejercicio: exInfoCel?.name||exId, kg: newKgVal, prevKg: prevMax, diff: diff, exId: exId});
+      // Guardar PR en lista de la sesión
+      setSessionPRList(function(prev){
+        var existe = prev.find(function(p){return p.exId===exId && p.kg===newKgVal});
+        if(existe) return prev;
+        return [...prev, {exId:exId, ejercicio:exInfoCel?.name||exId, kg:newKgVal, prevKg:prevMax, diff:diff}];
+      });
+      setTimeout(()=>setPrCelebration(null), 3000);
     }
     if(!isOnline) {
       toast2(es?'Set guardado localmente':'Set saved locally');
@@ -1418,7 +1427,7 @@ function GymApp() {
           es={es}
           darkMode={darkMode}
           prCelebration={prCelebration}
-          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx} sessionData={sessionData} onSesionGuardada={cargarSesionesGlobales}/>
+          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx} sessionData={sessionData} onSesionGuardada={cargarSesionesGlobales} sessionPRList={sessionPRList}/>
       )}
 
       <div
@@ -1877,7 +1886,7 @@ function GymApp() {
                           const snap={};
                           [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                           setPreSessionPRs({...snap});
-                          setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
+                          setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                         }}>
                         <Ic name="zap" size={16}/> {es?"EMPEZAR AHORA":"START NOW"}
                       </button>
@@ -1908,7 +1917,7 @@ function GymApp() {
                             const snap={};
                             [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                             setPreSessionPRs({...snap});
-                            setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
+                            setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                           }}>
                           ⚡ {es?"Entrenar":"Train"}
                         </button>
@@ -2066,7 +2075,7 @@ function GymApp() {
                         const snap={};
                         [...(r.days[di]?.warmup||[]),...(r.days[di]?.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                         setPreSessionPRs({...snap});
-                        setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
+                        setSessionPRList([]);setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
                       }}>⚡ {es?"INICIAR ENTRENAMIENTO":"START WORKOUT"}</button>
                     );
                     if(isFuture) return(
@@ -3130,31 +3139,42 @@ function GymApp() {
         </div>
       )}
       {prCelebration&&(
-        <div style={{
+        <div onClick={()=>setPrCelebration(null)} style={{
           position:"fixed",inset:0,zIndex:500,
           display:"flex",alignItems:"center",justifyContent:"center",
-          background:"rgba(0,0,0,0.85)",
-          animation:"fadeIn .2s ease"
+          background:"rgba(0,0,0,0.92)",
+          animation:"fadeIn .2s ease",cursor:"pointer"
         }}>
           <div style={{
-            textAlign:"center",padding:"40px 32px",
+            textAlign:"center",padding:"48px 32px",
             background:"linear-gradient(135deg,#1a1a1a,#2a1f00)",
             borderRadius:28,border:"2px solid #f59e0b55",
-            maxWidth:320,width:"90%",
-            boxShadow:"0 0 60px #f59e0b33"
+            maxWidth:340,width:"90%",
+            boxShadow:"0 0 80px #f59e0b44",
+            animation:"fadeIn .3s ease"
           }}>
-            <div style={{fontSize:48,marginBottom:8,filter:"drop-shadow(0 0 20px #f59e0b)"}}>🏆</div>
-            <div style={{fontSize:13,fontWeight:800,color:"#60A5FA",letterSpacing:3,marginBottom:8,textTransform:"uppercase"}}>
-              {es?"NUEVO RÉCORD":"NEW RECORD"}
+            <div style={{fontSize:64,marginBottom:12,filter:"drop-shadow(0 0 24px #f59e0b)",animation:"pulse 1s infinite"}}>🏆</div>
+            <div style={{fontSize:15,fontWeight:900,color:"#fbbf24",letterSpacing:4,marginBottom:12,textTransform:"uppercase"}}>
+              {es?"¡NUEVO PR!":"NEW PR!"}
             </div>
-            <div style={{fontSize:28,fontWeight:900,color:"#FFFFFF",marginBottom:4,lineHeight:1.1}}>
+            <div style={{fontSize:24,fontWeight:900,color:"#FFFFFF",marginBottom:8,lineHeight:1.2}}>
               {prCelebration.ejercicio}
             </div>
-            <div style={{fontSize:48,fontWeight:900,color:"#60A5FA",letterSpacing:1}}>
+            <div style={{fontSize:56,fontWeight:900,color:"#fbbf24",letterSpacing:1,lineHeight:1}}>
               {prCelebration.kg} kg
             </div>
-            <div style={{fontSize:13,color:"#8B9AB2",marginTop:12}}>
-              {es?"¡Superaste tu máximo personal!":"You beat your personal best!"}
+            {prCelebration.diff>0&&(
+              <div style={{marginTop:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                <span style={{background:"#22C55E22",border:"1px solid #22C55E44",borderRadius:8,padding:"4px 12px",fontSize:15,fontWeight:800,color:"#22C55E"}}>
+                  +{prCelebration.diff}kg
+                </span>
+                <span style={{fontSize:13,color:"#8B9AB2"}}>
+                  vs {prCelebration.prevKg}kg
+                </span>
+              </div>
+            )}
+            <div style={{fontSize:12,color:"#8B9AB244",marginTop:16}}>
+              {es?"Tocá para cerrar":"Tap to close"}
             </div>
           </div>
         </div>
@@ -3183,11 +3203,24 @@ function GymApp() {
             </div>
 
             {resumenSesion.prsNuevos>0&&(
-              <div style={{background:"#60A5FA22",border:"1px solid #f59e0b44",borderRadius:12,padding:"12px",marginBottom:16}}>
-                <div style={{fontSize:28}}>🏆</div>
-                <div style={{fontSize:18,fontWeight:800,color:"#60A5FA",marginTop:4}}>
+              <div style={{background:"#fbbf2412",border:"1px solid #fbbf2444",borderRadius:12,padding:"12px",marginBottom:16}}>
+                <div style={{fontSize:28,marginBottom:4}}>🏆</div>
+                <div style={{fontSize:18,fontWeight:800,color:"#fbbf24",marginBottom:8}}>
                   {resumenSesion.prsNuevos} nuevo{resumenSesion.prsNuevos>1?"s":""} PR!
                 </div>
+                {sessionPRList.length>0&&(
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {sessionPRList.map(function(pr,pi){return(
+                      <div key={pi} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 10px"}}>
+                        <span style={{fontSize:13,fontWeight:700,color:textMain}}>{pr.ejercicio}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:15,fontWeight:900,color:"#fbbf24"}}>{pr.kg}kg</span>
+                          <span style={{fontSize:11,fontWeight:700,color:"#22C55E"}}>+{pr.diff}kg</span>
+                        </div>
+                      </div>
+                    )})}
+                  </div>
+                )}
               </div>
             )}
 
@@ -3738,7 +3771,7 @@ function GymApp() {
   );
 }
 
-function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData, onSesionGuardada}) {
+function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData, onSesionGuardada, sessionPRList}) {
 
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
@@ -3968,8 +4001,11 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
                   {pat.icon}
                 </div>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:28,fontWeight:900,color:textMain,lineHeight:1.1}}>
+                  <div style={{fontSize:28,fontWeight:900,color:textMain,lineHeight:1.1,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     {es?info?.name:info?.nameEn||info?.name}
+                    {sessionPRList&&sessionPRList.some(function(p){return p.exId===ex.id})&&(
+                      <span style={{background:"#fbbf2422",border:"1px solid #fbbf2444",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:800,color:"#fbbf24",flexShrink:0}}>🏆 PR</span>
+                    )}
                   </div>
                   <div style={{fontSize:13,color:pat.color,fontWeight:700,marginTop:4}}>
                     {ex.sets}×{ex.reps} {ex.kg?("· "+ex.kg+"kg"):""} {ex.pause?("· "+fmtTime(ex.pause)+" desc"):""}
