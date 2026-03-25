@@ -2308,7 +2308,28 @@ function GymApp() {
                 const hasWarmup = (d.warmup||[]).length>0;
                 return(
                 <div key={di+"-"+d.exercises.length+"-"+(d.warmup||[]).length} style={{borderLeft:"2px solid #1a1d2e",paddingLeft:8,marginBottom:8}}>
-                  <div style={{fontSize:22,fontWeight:700,color:textMuted,marginBottom:8,letterSpacing:1}}>{es?"DIA ":"DAY "}{di+1}</div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                    <div style={{fontSize:22,fontWeight:700,color:textMuted,letterSpacing:1}}>{d.label||((es?"DIA ":"DAY ")+(di+1))}</div>
+                    <button className="hov" onClick={()=>{
+                      const destinos=r.days.map(function(_,i){return i}).filter(function(i){return i!==di});
+                      if(destinos.length===0){toast2(es?"No hay otros días":"No other days");return;}
+                      const destStr=destinos.map(function(i){return "Día "+(i+1)+(r.days[i].label?" ("+r.days[i].label+")":"")}).join(", ");
+                      const sel=prompt((es?"Copiar a qué día(s)? Escribí los números separados por coma.\nDisponibles: ":"Copy to which day(s)? Enter numbers separated by comma.\nAvailable: ")+destStr, destinos.map(function(i){return i+1}).join(","));
+                      if(!sel) return;
+                      var indices=sel.split(",").map(function(s){return parseInt(s.trim())-1}).filter(function(i){return i>=0&&i<r.days.length&&i!==di});
+                      if(indices.length===0){toast2(es?"Ningún día válido":"No valid day");return;}
+                      setRoutines(function(p){return p.map(function(rr){
+                        if(rr.id!==r.id) return rr;
+                        return {...rr,days:rr.days.map(function(dd,ddi){
+                          if(indices.indexOf(ddi)===-1) return dd;
+                          return {...dd,warmup:(d.warmup||[]).map(function(e){return {...e}}),exercises:(d.exercises||[]).map(function(e){return {...e}})};
+                        })};
+                      })});
+                      toast2((es?"Día duplicado a ":"Day duplicated to ")+indices.map(function(i){return "Día "+(i+1)}).join(", ")+" ✓");
+                    }} style={{background:"#2563EB15",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:"#2563EB",cursor:"pointer",fontFamily:"inherit"}}>
+                      <Ic name="copy" size={12} color="#2563EB"/> {es?"Duplicar día":"Duplicate day"}
+                    </button>
+                  </div>
                   <div style={{marginBottom:8}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:hasWarmup||d.showWarmup?6:0}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2357,6 +2378,11 @@ function GymApp() {
                       onClick={()=>setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,collapsed:!rr.collapsed}:rr))}>
                       {r.collapsed?("▼ "+(es?"VER":"VIEW")):("▲ "+(es?"CERRAR":"CLOSE"))}
                     </button>
+                    <button className="hov" style={{background:"#22C55E22",color:"#22C55E",border:"none",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{
+                      const copia = {...r, id:uid(), name:r.name+" (copia)", days:r.days.map(function(d){return {...d,warmup:(d.warmup||[]).map(function(e){return {...e}}),exercises:(d.exercises||[]).map(function(e){return {...e}})}}), collapsed:false, saved:false};
+                      setRoutines(function(p){return [...p, copia]});
+                      toast2((es?"Rutina duplicada":"Routine duplicated")+" ✓");
+                    }}><Ic name="copy" size={15}/></button>
                     <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setRoutines(p=>p.filter(x=>x.id!==r.id));toast2((es?"Rutina eliminada":"Routine deleted")+" ✓");}}><Ic name="trash-2" size={15}/></button>
                   </div>
                 </div>
@@ -2618,6 +2644,46 @@ function GymApp() {
                                   <div style={{background:bgSub,border:"1px solid "+border,borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
                                     <span style={{fontSize:11,color:textMuted}}>{es?"Sem. cal:":"Cal. wk:"} {semCalLabel}</span>
                                   </div>
+                                </div>
+                                {(()=>{
+                                  var proxDia, proxSemana;
+                                  if(diasCompletados >= dias.length) {
+                                    proxDia = 1;
+                                    proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1;
+                                  } else {
+                                    proxDia = diasCompletados + 1;
+                                    proxSemana = semanaCiclo;
+                                  }
+                                  var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
+                                  var nuevoCiclo = semanaCiclo >= 4 && diasCompletados >= dias.length;
+                                  return (
+                                    <div style={{marginTop:8,background:"#2563EB08",border:"1px solid #2563EB22",borderRadius:8,padding:"8px 10px",display:"flex",alignItems:"center",gap:6}}>
+                                      <span style={{fontSize:13}}>▶</span>
+                                      <span style={{fontSize:13,fontWeight:700,color:textMain}}>
+                                        {es?"Próxima sesión:":"Next session:"} {proxLabel} · {es?"Semana":"Week"} {proxSemana}
+                                      </span>
+                                      {nuevoCiclo&&<span style={{fontSize:10,fontWeight:700,color:"#F59E0B",marginLeft:4}}>{es?"(nuevo ciclo)":"(new cycle)"}</span>}
+                                    </div>
+                                  );
+                                })()}
+                                <div style={{display:"flex",gap:8,marginTop:8}}>
+                                  <button className="hov" onClick={()=>{
+                                    if(!confirm(es?"¿Reiniciar semana actual? El alumno volverá a Día 1 de la semana "+semanaCiclo+".":"Reset current week? Athlete will restart at Day 1 of week "+semanaCiclo+".")) return;
+                                    // Limpiar completedDays de esta semana para esta rutina
+                                    setCompletedDays(function(prev){return prev.filter(function(k){return !k.endsWith("-w"+(semanaCiclo-1))})});
+                                    toast2(es?"Semana reiniciada ✓":"Week reset ✓");
+                                  }} style={{flex:1,padding:"6px",background:"transparent",border:"1px solid #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit"}}>
+                                    ↩ {es?"Reiniciar semana":"Reset week"}
+                                  </button>
+                                  <button className="hov" onClick={()=>{
+                                    if(!confirm(es?"¿Reiniciar rutina completa? Volverá a Semana 1, Día 1. El historial de progreso se mantiene.":"Reset entire routine? Will go back to Week 1, Day 1. Progress history is kept.")) return;
+                                    setCompletedDays([]);
+                                    setCurrentWeek(0);
+                                    localStorage.removeItem('it_last_week_advance_date');
+                                    toast2(es?"Rutina reiniciada ✓":"Routine reset ✓");
+                                  }} style={{flex:1,padding:"6px",background:"transparent",border:"1px solid #EF444444",borderRadius:8,fontSize:11,fontWeight:700,color:"#EF4444",cursor:"pointer",fontFamily:"inherit"}}>
+                                    🔄 {es?"Reiniciar rutina":"Reset routine"}
+                                  </button>
                                 </div>
                               );
                             })()}
