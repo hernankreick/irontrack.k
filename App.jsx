@@ -2196,7 +2196,7 @@ function GymApp() {
         )}
         {tab==="library"&&(
           <div>
-            {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es}/>}
+            {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines}/>}
             {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab}/>}
           </div>
         )}
@@ -6277,105 +6277,76 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
 }
 
 
-function LibraryAlumno({allEx, es, darkMode}) {
+function LibraryAlumno({allEx, es, darkMode, routines}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
   const bgSub = _dm?"#162234":"#EEF2F7";
   const border = _dm?"#2D4057":"#E2E8F0";
   const textMain = _dm?"#FFFFFF":"#0F1923";
   const textMuted = _dm?"#8B9AB2":"#64748B";
 
-  const [grupoActivo, setGrupoActivo] = React.useState("todos");
-  const [q, setQ] = React.useState("");
-
-  const GRUPOS = [
-    {key:"todos",     label:"TODO",       labelEn:"ALL",        icon:"⚡",  color:"#2563EB"},
-    {key:"cuad",      label:"CUADRICEPS", labelEn:"QUADS",      icon:"R",  color:"#22C55E"},
-    {key:"isquios",   label:"ISQUIOS",    labelEn:"HAMSTRINGS", icon:"R",  color:"#8B9AB2"},
-    {key:"gluteos",   label:"GLUTEOS",    labelEn:"GLUTES",     icon:"GL",  color:"#8B9AB2"},
-    {key:"pecho",     label:"PECHO",      labelEn:"CHEST",      icon:"E",  color:"#2563EB"},
-    {key:"espalda",   label:"ESPALDA",    labelEn:"BACK",       icon:"T",  color:"#2563EB"},
-    {key:"brazos",    label:"BRAZOS",     labelEn:"ARMS",       icon:"BR", color:"#2563EB"},
-    {key:"core",      label:"CORE",       labelEn:"CORE",       icon:"·",  color:"#8B9AB2"},
-    {key:"movilidad", label:"MOVILIDAD",  labelEn:"MOBILITY",   icon:"·",  color:"#2563EB"},
-    {key:"cardio",    label:"CARDIO",     labelEn:"CARDIO",     icon:"C",  color:"#60A5FA"},
-    {key:"oly",       label:"OLIMPICOS",  labelEn:"OLYMPIC",    icon:"B",  color:"#8B9AB2"},
-  ];
-
-  const matchGrupo = (e, key) => {
-    if (key === "todos")    return true;
-    if (key === "cuad")     return e.pattern === "rodilla";
-    if (key === "isquios")  return e.pattern === "bisagra" && !/glut/i.test(e.muscle||"");
-    if (key === "gluteos")  return e.pattern === "bisagra" && /glut/i.test(e.muscle||"");
-    if (key === "pecho")    return e.pattern === "empuje"  && /pecho/i.test(e.muscle||"");
-    if (key === "espalda")  return e.pattern === "traccion" && !/bicep|tricep/i.test(e.muscle||"");
-    if (key === "brazos")   return (e.pattern === "empuje" || e.pattern === "traccion") && /bicep|tricep/i.test(e.muscle||"");
-    if (key === "core")     return e.pattern === "core";
-    if (key === "movilidad")return e.pattern === "movilidad";
-    if (key === "cardio")   return e.pattern === "cardio";
-    if (key === "oly")      return e.pattern === "oly";
-    return false;
-  };
-
-  const filtered = (allEx||[]).filter(e => {
-    const nombre = es ? e.name : (e.nameEn || e.name);
-    const matchQ = !q || nombre.toLowerCase().includes(q.toLowerCase());
-    return matchQ && matchGrupo(e, grupoActivo);
+  // Obtener ejercicios únicos de todas las rutinas del alumno
+  const rutina = (routines||[])[0];
+  const dias = rutina?.days || [];
+  const ejerciciosUnicos = {};
+  dias.forEach(function(d, di) {
+    (d.warmup||[]).forEach(function(ex) {
+      if(!ejerciciosUnicos[ex.id]) ejerciciosUnicos[ex.id] = {ex:ex, dia:d.label||("Día "+(di+1)), bloque:"warmup"};
+    });
+    (d.exercises||[]).forEach(function(ex) {
+      if(!ejerciciosUnicos[ex.id]) ejerciciosUnicos[ex.id] = {ex:ex, dia:d.label||("Día "+(di+1)), bloque:"principal"};
+    });
   });
 
-  const g = GRUPOS.find(x => x.key === grupoActivo);
-  const card = {background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"16px 18px",marginBottom:8};
-  const tagStyle = col => ({background:"#162234",color:"#8B9AB2",padding:"2px 7px",borderRadius:6,fontSize:11,fontWeight:700,border:"1px solid #2D4057"});
-  const PAT_COLORS = {rodilla:"#8B9AB2",bisagra:"#8B9AB2",empuje:"#8B9AB2",traccion:"#8B9AB2",core:"#8B9AB2",movilidad:"#2563EB",cardio:"#60A5FA",oly:"#8B9AB2"};
+  const lista = Object.entries(ejerciciosUnicos).map(function(entry) {
+    var exId = entry[0], data = entry[1];
+    var info = (allEx||[]).find(function(e) { return e.id === exId; });
+    return { id: exId, info: info, ex: data.ex, dia: data.dia, bloque: data.bloque };
+  });
+
+  if(lista.length === 0) return (
+    <div style={{textAlign:"center",padding:"60px 0",color:textMuted}}>
+      <div style={{fontSize:48,marginBottom:12}}>💪</div>
+      <div style={{fontSize:18,fontWeight:700}}>{es?"Sin ejercicios en tu rutina":"No exercises in your routine"}</div>
+      <div style={{fontSize:13,marginTop:4,color:textMuted}}>{es?"Tu entrenador te asignará una rutina":"Your coach will assign you a routine"}</div>
+    </div>
+  );
 
   return (
     <div>
-      <input
-        placeholder={es?"Buscar ejercicio...":"Search exercise..."}
-        value={q} onChange={e=>setQ(e.target.value)}
-        style={{background:bgSub,border:"1px solid "+border,borderRadius:12,padding:"12px 14px",
-          color:textMain,fontSize:15,width:"100%",marginBottom:12,fontFamily:"inherit",outline:"none"}}
-      />
-      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:12,scrollbarWidth:"none"}}>
-        {GRUPOS.map(gr=>(
-          <button key={gr.key} onClick={()=>{setGrupoActivo(gr.key);setQ("");}}
-            style={{padding:"8px 13px",borderRadius:20,fontSize:13,fontWeight:700,cursor:"pointer",
-              border: grupoActivo===gr.key ? "1px solid "+gr.color : "1px solid "+border,
-              background: grupoActivo===gr.key ? "#2563EB22" : "#162234",
-              color: grupoActivo===gr.key ? "#2563EB" : "#8B9AB2",
-              whiteSpace:"nowrap",fontFamily:"inherit"}}>
-            {gr.icon} {es?gr.label:gr.labelEn}
-          </button>
-        ))}
+      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>
+        {es?"MIS EJERCICIOS":"MY EXERCISES"} ({lista.length})
       </div>
-      {grupoActivo !== "todos" && !q && g && (
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,padding:"8px 12px",
-          background:g.color+"15",border:"1px solid "+g.color+"33",borderRadius:12}}>
-          <span style={{fontSize:22}}>{g.icon}</span>
-          <div style={{fontSize:18,fontWeight:900,color:g.color}}>{es?g.label:g.labelEn}</div>
-          <div style={{marginLeft:"auto",fontSize:13,color:g.color,fontWeight:700}}>{filtered.length} {es?"ejercicios":"exercises"}</div>
-        </div>
-      )}
-      <div style={{fontSize:13,color:textMuted,marginBottom:8}}>{filtered.length} {es?"ejercicios":"exercises"}</div>
-      {filtered.map(e => {
-        const nombre = es ? e.name : (e.nameEn || e.name);
-        const patCol = PAT_COLORS[e.pattern] || "#8B9AB2";
+      {lista.map(function(item) {
+        var info = item.info;
+        var ex = item.ex;
+        var nombre = info ? (es ? info.name : (info.nameEn||info.name)) : item.id;
+        var musculo = info?.muscle || "";
+        var patron = info?.pattern || "";
+        var tieneVideo = info?.youtube;
+        var PAT_ICONS = {rodilla:"🦵",bisagra:"🏋️",empuje:"💪",traccion:"🏗️",core:"🎯",movilidad:"🧘",cardio:"🏃",oly:"🏋️"};
+        var iconPat = PAT_ICONS[patron] || "💪";
+
         return (
-          <div key={e.id} style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"16px",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div key={item.id} style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"14px",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:44,height:44,borderRadius:12,background:"#2563EB15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
+                {iconPat}
+              </div>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:8}}>{nombre}</div>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-                  <span style={{background:"#162234",color:"#8B9AB2",padding:"4px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid "+border}}>{e.pattern?.toUpperCase()}</span>
-                  {e.muscle&&<span style={{color:textMuted,fontSize:11}}>{e.muscle}</span>}
+                <div style={{fontSize:16,fontWeight:800,color:textMain,marginBottom:2}}>{nombre}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                  {musculo&&<span style={{fontSize:11,color:textMuted}}>{musculo}</span>}
+                  <span style={{fontSize:10,color:textMuted,background:bgSub,borderRadius:4,padding:"1px 5px"}}>{item.dia}</span>
+                  {ex.sets&&ex.reps&&<span style={{fontSize:11,fontWeight:700,color:"#2563EB"}}>{ex.sets}×{ex.reps}</span>}
+                  {ex.kg&&<span style={{fontSize:11,color:textMuted}}>{ex.kg}kg</span>}
                 </div>
               </div>
-              {e.youtube&&(
-                <a href={e.youtube} target="_blank" rel="noopener noreferrer"
-                  style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",
-                    background:"#162234",color:"#8B9AB2",border:"1px solid "+border,
-                    borderRadius:12,textDecoration:"none",fontSize:18,flexShrink:0}}>▶</a>
+              {tieneVideo&&(
+                <a href={info.youtube} target="_blank" rel="noopener noreferrer"
+                  style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",
+                    background:"#EF4444",color:"#fff",border:"none",
+                    borderRadius:10,textDecoration:"none",fontSize:16,flexShrink:0,fontWeight:700}}>▶</a>
               )}
             </div>
           </div>
