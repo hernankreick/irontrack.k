@@ -804,6 +804,7 @@ function GymApp() {
   const [sesionesGlobales, setSesionesGlobales] = useState([]);
   const [progresoGlobal, setProgresoGlobal] = useState({});
   const [sugerencias, setSugerencias] = useState({});
+  const [rutinasSBEntrenador, setRutinasSBEntrenador] = useState([]);
 
   
 
@@ -842,6 +843,7 @@ function GymApp() {
         var sbAlumnos = await sb.getAlumnos('entrenador_principal') || [];
         setAlumnos(sbAlumnos);
         if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
+        try { var rutsDB = await sb.getRutinasByEntrenador(); if(rutsDB && Array.isArray(rutsDB)) setRutinasSBEntrenador(rutsDB); } catch(e) {}
       };
       init();
       var intervalo = setInterval(function() { cargarSesionesGlobales(); }, 30000);
@@ -2486,6 +2488,31 @@ function GymApp() {
                 </div>
               );
             })}
+            {/* ── Rutinas asignadas (Supabase) ── */}
+            {rutinasSBEntrenador.length>0&&(<div style={{marginTop:16}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#22C55E",letterSpacing:2,marginBottom:8,textTransform:"uppercase",borderLeft:"3px solid #22C55E",paddingLeft:8}}>{es?"RUTINAS ASIGNADAS":"ASSIGNED ROUTINES"} ({rutinasSBEntrenador.length})</div>
+              {rutinasSBEntrenador.map(function(rSB,ri){
+                var alumnoInfo=alumnos.find(function(al){return al.id===rSB.alumno_id});
+                var diasSB=rSB.datos?.days||[];
+                return(<div key={rSB.id||ri} style={{background:bgCard,borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid "+border}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{fontSize:18,fontWeight:800,color:textMain}}>{rSB.nombre}</div>
+                        <span style={{background:"#22C55E22",color:"#22C55E",borderRadius:6,padding:"1px 7px",fontSize:10,fontWeight:700}}>☁️</span>
+                      </div>
+                      {alumnoInfo&&<div style={{fontSize:13,fontWeight:700,color:textMuted,marginTop:2}}>👤 {alumnoInfo.nombre||alumnoInfo.email}</div>}
+                      <div style={{fontSize:13,color:textMuted}}>{diasSB.length} {es?"días":"days"}</div>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var rutLocal={id:rSB.id,...(rSB.datos||{}),name:rSB.nombre,saved:true,alumno_id:rSB.alumno_id,alumno:alumnoInfo?.nombre||""};setRoutines(function(p){var ex=p.find(function(x){return x.id===rSB.id});return ex?p:[rutLocal,...p]});toast2(es?"Abierta para editar":"Opened for editing");}}>{es?"Editar":"Edit"}</button>
+                      <button className="hov" style={{background:"#22C55E22",color:"#22C55E",border:"none",borderRadius:8,padding:"8px 10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var copia={id:uid(),name:rSB.nombre+" (copia)",days:(rSB.datos?.days||[]).map(function(d){return{...d,warmup:(d.warmup||[]).map(function(e){return{...e}}),exercises:(d.exercises||[]).map(function(e){return{...e}})}}),collapsed:false,saved:false};setRoutines(function(p){return[...p,copia]});toast2(es?"Duplicada":"Duplicated");}}><Ic name="copy" size={14}/></button>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>{diasSB.map(function(d,di){return(<span key={di} style={{background:bgSub,borderRadius:6,padding:"2px 8px",fontSize:11,color:textMuted,fontWeight:600}}>{d.label||("Día "+(di+1))} · {((d.warmup||[]).length+(d.exercises||[]).length)} ej.</span>)})}</div>
+                </div>);
+              })}
+            </div>)}
             {Object.keys(progress).length===0&&(
               <div style={{textAlign:"center",padding:"60px 0",color:textMuted}}>
                 <div style={{fontSize:48,marginBottom:12}}>📊</div>
@@ -2727,13 +2754,7 @@ function GymApp() {
                       const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:rutinaLocal.days,alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
                       setLoadingSB(false);
-                    }}>{es?"+ Asignar rutina actual":"+ Assign current routine"}</button>
-                    {alumnoSesiones.length>0&&alumnoSesiones.slice(0,3).map((s,i)=>(
-                      <div key={i} style={{background:bgSub,borderRadius:8,padding:"8px 10px",marginBottom:4,display:"flex",justifyContent:"space-between"}}>
-                        <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✅ {s.dia_label}</div>
-                        <div style={{fontSize:11,color:textMuted}}>{s.fecha}</div>
-                      </div>
-                    ))}
+                    }}>{rutinasSB.find(r=>r.alumno_id===a.id)?(es?"🔄 Cambiar rutina":"🔄 Change routine"):(es?"+ Asignar rutina":"+ Assign routine")}</button>
                     {/* ── SUGERENCIAS ── */}
                     {(()=>{
                       const rutSB = rutinasSB.find(r=>r.alumno_id===a.id);
