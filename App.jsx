@@ -4565,577 +4565,162 @@ function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode}) {
 
 function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, es, darkMode, sesiones, allEx}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
   const bgSub = _dm?"#162234":"#EEF2F7";
   const border = _dm?"#2D4057":"#E2E8F0";
   const textMain = _dm?"#FFFFFF":"#0F1923";
   const textMuted = _dm?"#8B9AB2":"#64748B";
 
-  const [vista, setVista] = React.useState("ejercicio"); // ejercicio | semanas | volumen
-  const [selEx, setSelEx] = React.useState(null);
   const [sbData, setSbData] = React.useState([]);
-  const [sesionesData, setSesionesData] = React.useState(sesiones||[]);
   const [loadingGrafico, setLoadingGrafico] = React.useState(true);
-  const canvasRef = React.useRef();
-  const canvasSem = React.useRef();
-  const canvasVol = React.useRef();
+  const [expandedEx, setExpandedEx] = React.useState(null);
 
   React.useEffect(()=>{
     const alumnoId = sessionData?.alumnoId || (sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     if(!alumnoId) { setLoadingGrafico(false); return; }
-    Promise.all([
-      sb.getProgreso(alumnoId),
-      sb.getSesiones(alumnoId),
-    ]).then(([prog, ses])=>{
+    sb.getProgreso(alumnoId).then(function(prog){
       if(prog) setSbData(prog);
-      if(ses) setSesionesData(ses);
       setLoadingGrafico(false);
-    }).catch(()=>setLoadingGrafico(false));
+    }).catch(function(){setLoadingGrafico(false)});
   },[]);
 
   const getDatos = (exId) => {
     const local = (progress[exId]?.sets||[]).map(s=>({kg:parseFloat(s.kg)||0,reps:parseInt(s.reps)||0,fecha:s.date})).filter(s=>s.kg>0);
     const remote = sbData.filter(d=>d.ejercicio_id===exId&&d.kg>0).map(d=>({kg:parseFloat(d.kg),reps:parseInt(d.reps)||0,fecha:d.fecha}));
-    const todos = [...local,...remote].sort((a,b)=>a.fecha>b.fecha?1:-1);
+    const todos = [...local,...remote].sort(function(a,b){
+      var da=a.fecha?a.fecha.split('/').reverse().join('-'):'';
+      var db=b.fecha?b.fecha.split('/').reverse().join('-'):'';
+      return da>db?1:-1;
+    });
     const seen = new Set();
     return todos.filter(d=>{ const k=d.fecha+d.kg; if(seen.has(k))return false; seen.add(k); return true; }).slice(-20);
   };
 
-  const exConDatos = EX.filter(e=>{
-    const local = (progress[e.id]?.sets||[]).some(s=>parseFloat(s.kg)>0);
-    const remote = sbData.some(d=>d.ejercicio_id===e.id&&d.kg>0);
-    return local || remote;
+  // Ejercicios con datos (de la rutina del alumno + cualquiera con registros)
+  const exConDatos = (allEx||EX||[]).filter(function(e){
+    return (progress[e.id]?.sets||[]).some(function(s){return parseFloat(s.kg)>0}) ||
+           sbData.some(function(d){return d.ejercicio_id===e.id&&parseFloat(d.kg)>0});
   });
-
-  // PR por ejercicio
-  const getPR = (exId) => {
-    const datos = getDatos(exId);
-    if(!datos.length) return null;
-    return Math.max(...datos.map(d=>d.kg));
-  };
-
-  // Grupo muscular por ejercicio
-  const MUSCULOS = {
-    sq:"Piernas",leg:"Piernas",legcurl:"Piernas",legext:"Piernas",
-    bp:"Pecho",inc:"Pecho",fly:"Pecho",
-    row:"Espalda",pull:"Espalda",dead:"Espalda",suppu:"Espalda",
-    press:"Hombros",lateralfly:"Hombros",
-    curl:"Bíceps",hammer:"Bíceps",
-    trico:"Tríceps",
-    plank:"Core",crunch:"Core",ab:"Core"
-  };
-  const getMus = (id) => {
-    for(const k in MUSCULOS) { if(id.includes(k)) return MUSCULOS[k]; }
-    return "Otros";
-  };
-
-  // Datos de volumen semanal
-  const getVolumenSemanal = () => {
-    // Agrupar por s.week (semana de la rutina: 0,1,2,3)
-    // Así funciona aunque el alumno haya entrenado todo en el mismo día
-    const semanas = {};
-    Object.values(progress||{}).forEach(pg=>{
-      (pg.sets||[]).forEach(s=>{
-        const w = s.week !== undefined ? s.week : 0;
-        const key = "sem_"+w;
-        if(!semanas[key]) semanas[key] = {series:0, tonelaje:0, maxKg:0, totalReps:0, semKey:key, week:w};
-        semanas[key].series += 1;
-        semanas[key].tonelaje += (parseFloat(s.kg)||0)*(parseInt(s.reps)||0);
-        semanas[key].maxKg = Math.max(semanas[key].maxKg, parseFloat(s.kg)||0);
-        semanas[key].totalReps += parseInt(s.reps)||0;
-      });
-    });
-    // Ordenar por número de semana
-    const ordenadas = Object.values(semanas).sort((a,b)=>a.week-b.week);
-    return ordenadas.map((s,i)=>({...s, label:"Sem "+(s.week+1)}));
-  };
-
-  // Series por patron de movimiento a lo largo de semanas
-  const getVolumenPorPatron = () => {
-    // Usar progress real: cada set registrado tiene kg, reps, date
-    const semanas = {};
-    Object.entries(progress||{}).forEach(([exId, pg])=>{
-      const exInfo = EX.find(e=>e.id===exId);
-      const patron = exInfo?.pattern||"otros";
-      (pg.sets||[]).forEach(s=>{
-        const fecha = s.date||"";
-        if(!fecha) return;
-        // Convertir fecha a comienzo de semana
-        const parts = fecha.split("/");
-        let d;
-        if(parts.length===3) {
-          // formato dd/mm/yyyy
-          d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
-        } else {
-          d = new Date(fecha);
-        }
-        if(isNaN(d.getTime())) return;
-        const startOfWeek = new Date(d);
-        startOfWeek.setDate(d.getDate() - d.getDay());
-        const semKey = startOfWeek.toISOString().slice(0,10);
-        if(!semanas[semKey]) semanas[semKey] = {semKey, patrones:{}};
-        if(!semanas[semKey].patrones[patron]) semanas[semKey].patrones[patron] = {series:0, reps:0, tonelaje:0};
-        semanas[semKey].patrones[patron].series += 1;
-        semanas[semKey].patrones[patron].reps += parseInt(s.reps)||0;
-        semanas[semKey].patrones[patron].tonelaje += (parseFloat(s.kg)||0)*(parseInt(s.reps)||0);
-      });
-    });
-    const semsOrdenadas = Object.values(semanas).sort((a,b)=>a.semKey>b.semKey?1:-1).slice(-8);
-    const todosPatrones = [...new Set(semsOrdenadas.flatMap(s=>Object.keys(s.patrones)))];
-    return {semanas: semsOrdenadas.map((s,i)=>({...s,label:"Sem "+(i+1)})), patrones: todosPatrones};
-  };
-
-  // Total por musculo (para el tab volumen - resumen)
-  const getVolumenMuscular = () => {
-    const musculos = {};
-    sesionesData.forEach(ses=>{
-      const ejercicios = Array.isArray(ses.ejercicios) ? ses.ejercicios : [];
-      ejercicios.forEach(ex=>{
-        const mus = getMus(ex.id||"");
-        const sets = (ex.sets||[]).filter(s=>parseFloat(s.kg)>0);
-        if(!musculos[mus]) musculos[mus] = {series:0, tonelaje:0};
-        musculos[mus].series += sets.length;
-        sets.forEach(s=>{ musculos[mus].tonelaje += (parseFloat(s.kg)||0)*(parseInt(s.reps)||0); });
-      });
-    });
-    return Object.entries(musculos).map(([k,v])=>({nombre:k,...v})).sort((a,b)=>b.series-a.series);
-  };
-
-  // CANVAS: curva de progreso por ejercicio
-  React.useEffect(()=>{
-    try {
-    if(vista!=="ejercicio"||!selEx||!canvasRef.current) return;
-    const datos = getDatos(selEx);
-    if(datos.length<2) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const W=canvas.width, H=canvas.height;
-    const pad={top:30,right:20,bottom:44,left:50};
-    const maxKg = Math.max(...datos.map(d=>d.kg));
-    const minKg = Math.min(...datos.map(d=>d.kg));
-    const range = maxKg-minKg||1;
-    ctx.clearRect(0,0,W,H);
-    ctx.fillStyle="#162234"; ctx.fillRect(0,0,W,H);
-    // Grid lines
-    for(let i=0;i<=4;i++){
-      const y=pad.top+(H-pad.top-pad.bottom)*i/4;
-      ctx.strokeStyle="#2D4057"; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(W-pad.right,y); ctx.stroke();
-      ctx.fillStyle="#8B9AB2"; ctx.font="11px DM Sans,Arial"; ctx.textAlign="right";
-      ctx.fillText(Math.round(maxKg-range*i/4)+"kg",pad.left-4,y+4);
-    }
-    const pts = datos.map((d,i)=>({
-      x:pad.left+(W-pad.left-pad.right)*i/(datos.length-1),
-      y:pad.top+(H-pad.top-pad.bottom)*(1-(d.kg-minKg)/range),
-      kg:d.kg, fecha:d.fecha
-    }));
-    // Área
-    ctx.beginPath(); ctx.moveTo(pts[0].x,H-pad.bottom);
-    pts.forEach(p=>ctx.lineTo(p.x,p.y));
-    ctx.lineTo(pts[pts.length-1].x,H-pad.bottom); ctx.closePath();
-    ctx.fillStyle="rgba(239,68,68,0.12)"; ctx.fill();
-    // Línea
-    ctx.beginPath(); ctx.strokeStyle="#2563EB"; ctx.lineWidth=2.5;
-    pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)); ctx.stroke();
-    // PR line
-    const prY = pad.top+(H-pad.top-pad.bottom)*(1-(maxKg-minKg)/range);
-    ctx.setLineDash([4,4]); ctx.strokeStyle="#8B9AB2"; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(pad.left,prY); ctx.lineTo(W-pad.right,prY); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle="#8B9AB2"; ctx.font="bold 10px DM Sans,Arial"; ctx.textAlign="left";
-    ctx.fillText("PR "+maxKg+"kg",pad.left+4,prY-4);
-    // Puntos
-    pts.forEach((p,i)=>{
-      const isPR = p.kg===maxKg;
-      ctx.beginPath(); ctx.arc(p.x,p.y,isPR?6:4,0,Math.PI*2);
-      ctx.fillStyle=isPR?"#8B9AB2":"#2563EB"; ctx.fill();
-      if(isPR){ctx.fillStyle="#8B9AB2";ctx.font="bold 11px DM Sans,Arial";ctx.textAlign="center";ctx.fillText("★",p.x,p.y-10);}
-      ctx.fillStyle="#FFFFFF"; ctx.font="10px DM Sans,Arial"; ctx.textAlign="center";
-      ctx.fillText(p.kg+"kg",p.x,p.y-(isPR?22:10));
-    });
-    // Fechas
-    ctx.fillStyle="#8B9AB2"; ctx.font="10px DM Sans,Arial"; ctx.textAlign="center";
-    const step=Math.ceil(pts.length/4);
-    pts.forEach((p,i)=>{ if(i%step===0||i===pts.length-1) ctx.fillText(p.fecha.slice(5),p.x,H-pad.bottom+14); });
-    } catch(e){ console.error("canvas err",e); }
-  },[selEx,sbData,vista]);
-
-  // CANVAS: comparar semanas (barras)
-  React.useEffect(()=>{
-    try {
-    if(vista!=="semanas"||!canvasSem.current) return;
-    const datos = getVolumenSemanal();
-    if(!datos.length) return;
-    const canvas=canvasSem.current;
-    const ctx=canvas.getContext("2d");
-    const W=canvas.width,H=canvas.height;
-    const pad={top:20,right:10,bottom:50,left:55};
-    ctx.clearRect(0,0,W,H);
-    ctx.fillStyle="#162234"; ctx.fillRect(0,0,W,H);
-    const maxSeries=Math.max(...datos.map(d=>d.series))||1;
-    const maxTon=Math.max(...datos.map(d=>d.tonelaje))||1;
-    const bw=(W-pad.left-pad.right)/datos.length-6;
-    datos.forEach((d,i)=>{
-      const x=pad.left+i*(W-pad.left-pad.right)/datos.length+3;
-      // Series (azul)
-      const hS=(H-pad.top-pad.bottom)*(d.series/maxSeries);
-      ctx.fillStyle="#2563EB"; ctx.fillRect(x,H-pad.bottom-hS,bw*0.45,hS);
-      // Tonelaje (rojo)
-      const hT=(H-pad.top-pad.bottom)*(d.tonelaje/maxTon);
-      ctx.fillStyle="#2563EB"; ctx.fillRect(x+bw*0.48,H-pad.bottom-hT,bw*0.45,hT);
-      // Label semana
-      ctx.fillStyle="#8B9AB2"; ctx.font="10px DM Sans,Arial"; ctx.textAlign="center";
-      ctx.fillText(d.label,x+bw/2,H-pad.bottom+14);
-      // Valores
-      if(d.series>0){ctx.fillStyle="#2563EB";ctx.font="9px DM Sans,Arial";ctx.textAlign="center";ctx.fillText(d.series,x+bw*0.22,H-pad.bottom-hS-3);}
-    });
-    // Leyenda
-    ctx.fillStyle="#2563EB"; ctx.fillRect(pad.left,8,12,10);
-    ctx.fillStyle="#2D4057"; ctx.font="10px DM Sans,Arial"; ctx.textAlign="left"; ctx.fillText("Series",pad.left+15,17);
-    ctx.fillStyle="#2563EB"; ctx.fillRect(pad.left+70,8,12,10);
-    ctx.fillStyle="#2D4057"; ctx.fillText("Tonelaje",pad.left+85,17);
-    // Eje Y
-    for(let i=0;i<=4;i++){
-      const y=pad.top+(H-pad.top-pad.bottom)*i/4;
-      ctx.strokeStyle="#2D4057";ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
-      ctx.fillStyle="#8B9AB2";ctx.font="10px DM Sans,Arial";ctx.textAlign="right";
-      ctx.fillText(Math.round(maxSeries*(1-i/4)),pad.left-3,y+4);
-    }
-    } catch(e){ console.error("Canvas semanas:",e); }
-  },[sesiones,vista]);
-
-  const volMuscular = vista==="volumen" ? getVolumenMuscular() : [];
-  const COLORS = ["#2563EB","#2563EB","#22C55E","#8B9AB2","#2563EB","#8B9AB2","#2563EB"];
 
   if(loadingGrafico) return (
     <div style={{textAlign:"center",padding:"40px 0"}}>
-      <div className="sk" style={{height:180,borderRadius:12,marginBottom:12}}/>
-      <div className="sk" style={{height:14,width:"60%",margin:"0 auto"}}/>
+      <div className="sk" style={{height:80,borderRadius:12,marginBottom:8}}/>
+      <div className="sk" style={{height:80,borderRadius:12,marginBottom:8}}/>
+      <div className="sk" style={{height:80,borderRadius:12}}/>
     </div>
   );
 
-  if(exConDatos.length===0 && sesionesData.length===0) return (
-    <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
-      <div style={{fontSize:36,marginBottom:8}}>📊</div>
-      <div style={{fontSize:15,fontWeight:700}}>Sin datos aún</div>
-      <div style={{fontSize:13,marginTop:4}}>Registrá series con peso para ver el gráfico</div>
+  if(exConDatos.length===0) return (
+    <div style={{textAlign:"center",padding:"40px 16px"}}>
+      <div style={{fontSize:44,marginBottom:12}}>📊</div>
+      <div style={{fontSize:17,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin datos aún":"No data yet"}</div>
+      <div style={{fontSize:13,color:textMuted,lineHeight:1.6}}>{es?"Registrá sets con peso para ver tu progreso.":"Log sets with weight to see your progress."}</div>
     </div>
   );
 
   return (
     <div>
-      <div style={{display:"flex",gap:8,marginBottom:12}}>
-        {[
-          {k:"ejercicio", lbl:<><Ic name="activity" size={13}/> {es?"Ejercicio":"Exercise"}</>},
-          {k:"semanas",   lbl:<><Ic name="calendar" size={13}/> {es?"Semanas":"Weeks"}</>},
-          {k:"volumen",   lbl:<><Ic name="bar-chart-2" size={13}/> {es?"Volumen":"Volume"}</>},
-        ].map(({k,lbl})=>(          <button key={k} onClick={()=>setVista(k)} style={{background:vista===k?"#2563EB":"#2D4057",color:vista===k?"#fff":"#8B9AB2",border:"none",borderRadius:8,padding:"8px 12px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",flex:1}}>
-            {lbl}
-          </button>
-        ))}
+      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>
+        {es?"PROGRESO POR EJERCICIO":"PROGRESS BY EXERCISE"} ({exConDatos.length})
       </div>
-            {vista==="ejercicio"&&(()=>{
-        // ── helpers de narrativa ──────────────────────────────
-        const getNarrativa = (exId) => {
-          const datos = getDatos(exId);
-          if(!datos||datos.length<2) return null;
-          const pr = getPR(exId);
-          const primero = datos[0];
-          const ultimo  = datos[datos.length-1];
-          const totalSets = (progress[exId]?.sets||[]).length;
-          const semanas = [...new Set((progress[exId]?.sets||[]).map(s=>s.week))].length;
-
-          // ── Variación de carga ──
-          const diffKg = pr - primero.kg;
-          const pctKg  = primero.kg>0 ? Math.round(diffKg/primero.kg*100) : 0;
-
-          // ── Frase principal ──
-          let frase = "";
-          if(pctKg>0){
-            frase = es
-              ? `Pasaste de ${primero.kg} kg a ${pr} kg — subiste un ${pctKg}% de carga.`
-              : `You went from ${primero.kg} kg to ${pr} kg — a ${pctKg}% load increase.`;
-          } else if(pctKg===0){
-            frase = es
-              ? `Mantuviste ${pr} kg en todos los registros. Intentá subir el peso la próxima semana.`
-              : `You maintained ${pr} kg across all records. Try increasing weight next session.`;
-          } else {
-            frase = es
-              ? `El máximo registrado es ${pr} kg con ${totalSets} sets en ${semanas} semana${semanas!==1?"s":""}.`
-              : `Your best is ${pr} kg across ${totalSets} sets over ${semanas} week${semanas!==1?"s":""}.`;
-          }
-
-          // ── Tendencia reciente (últimos 3 registros) ──
-          let tendencia = null;
-          if(datos.length>=3){
-            const rec = datos.slice(-3);
-            const subio = rec[2].kg > rec[0].kg;
-            const igual = rec[2].kg === rec[0].kg;
-            tendencia = igual
-              ? (es ? "Tendencia: estable en los últimos 3 registros." : "Trend: stable over last 3 records.")
-              : subio
-                ? (es ? `Tendencia: en alza (+${Math.round((rec[2].kg-rec[0].kg)*10)/10} kg en últimas 3 sesiones).` : `Trend: rising (+${Math.round((rec[2].kg-rec[0].kg)*10)/10} kg last 3 sessions).`)
-                : (es ? `Tendencia: bajó ${Math.round((rec[0].kg-rec[2].kg)*10)/10} kg en últimas 3 sesiones — revisá la técnica o el descanso.` : `Trend: dropped ${Math.round((rec[0].kg-rec[2].kg)*10)/10} kg last 3 sessions — check form or recovery.`);
-          }
-
-          // ── PR reciente ──
-          const sets = (progress[exId]?.sets||[]);
-          const esPRReciente = sets.length>0 && parseFloat(sets[0]?.kg||0)===pr;
-          const prMsg = esPRReciente
-            ? (es ? "Rompiste tu récord personal en el último registro." : "You broke your personal record in your last session.")
-            : null;
-
-          return { frase, tendencia, prMsg, pctKg, pr, primero, ultimo, totalSets, semanas };
-        };
-
-        const exConDatosLocal = (allEx||[]).filter(e=>
-          (progress[e.id]?.sets||[]).some(s=>parseFloat(s.kg)>0) ||
-          sbData.some(d=>d.ejercicio_id===e.id&&parseFloat(d.kg)>0)
-        );
-
-        // Auto-seleccionar primer ejercicio si no hay selección
-        if(!selEx && exConDatosLocal.length>0) {
-          setTimeout(()=>setSelEx(exConDatosLocal[0].id),0);
-        }
-
-        if(exConDatosLocal.length===0) return (
-          <div style={{textAlign:"center",padding:"40px 16px"}}>
-            <div style={{fontSize:44,marginBottom:12}}>📊</div>
-            <div style={{fontSize:17,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin datos aún":"No data yet"}</div>
-            <div style={{fontSize:13,color:textMuted,lineHeight:1.6}}>{es?"Registrá sets con peso en tu entrenamiento para ver tu progreso.":"Log sets with weight to see your progress here."}</div>
-          </div>
-        );
-
-        const narrativa = selEx ? getNarrativa(selEx) : null;
+      {exConDatos.map(function(e){
+        var datos = getDatos(e.id);
+        if(datos.length===0) return null;
+        var pr = Math.max.apply(null, datos.map(function(d){return d.kg}));
+        var ultimo = datos[datos.length-1];
+        var primero = datos[0];
+        var diff = datos.length>=2 ? Math.round((ultimo.kg-primero.kg)*10)/10 : 0;
+        var pct = primero.kg>0 ? Math.round((ultimo.kg-primero.kg)/primero.kg*100) : 0;
+        var isExpanded = expandedEx===e.id;
+        var tendDir = pct>0?"sube":pct<0?"baja":"estable";
 
         return (
-          <div>
-            {/* Selector de ejercicios */}
-            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
-              {exConDatosLocal.map(e=>{
-                const pr=getPR(e.id);
-                const nar=getNarrativa(e.id);
-                const isUp = nar&&nar.pctKg>0;
-                return (
-                  <button key={e.id} onClick={()=>setSelEx(e.id)}
-                    style={{background:selEx===e.id?"#2563EB":bgSub,
-                      border:"1px solid "+(selEx===e.id?"#2563EB":border),
-                      borderRadius:20,padding:"8px 12px",cursor:"pointer",
-                      display:"flex",alignItems:"center",gap:4,fontFamily:"inherit"}}>
-                    <span style={{fontSize:12,color:selEx===e.id?"#fff":textMain,fontWeight:600}}>{e.name}</span>
-                    {pr>0&&<span style={{fontSize:10,color:selEx===e.id?"rgba(255,255,255,0.8)":isUp?"#22C55E":"#8B9AB2",fontWeight:700}}>{pr}kg</span>}
-                    {isUp&&<span style={{fontSize:9,color:selEx===e.id?"#90EE90":"#22C55E",fontWeight:700}}>+{nar.pctKg}%</span>}
-                  </button>
-                );
-              })}
+          <div key={e.id} style={{background:bgCard,border:"1px solid "+(isExpanded?"#2563EB":border),borderRadius:12,marginBottom:8,overflow:"hidden",transition:"all .2s"}}>
+            {/* Card compacta - siempre visible */}
+            <div onClick={function(){setExpandedEx(isExpanded?null:e.id)}} style={{padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:40,height:40,borderRadius:10,background:tendDir==="sube"?"#22C55E15":tendDir==="baja"?"#EF444415":"#2563EB15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                {tendDir==="sube"?"↑":tendDir==="baja"?"↓":"→"}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:textMain,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{es?e.name:(e.nameEn||e.name)}</div>
+                <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2}}>
+                  <span style={{fontSize:12,color:textMuted}}>{es?"Último":"Last"}: {ultimo.kg}kg×{ultimo.reps}</span>
+                  {datos.length>=2&&<span style={{fontSize:11,fontWeight:700,color:tendDir==="sube"?"#22C55E":tendDir==="baja"?"#EF4444":"#8B9AB2"}}>{pct>0?"+":""}{pct}%</span>}
+                </div>
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:18,fontWeight:900,color:"#fbbf24"}}>{pr}kg</div>
+                <div style={{fontSize:10,fontWeight:700,color:"#fbbf24"}}>PR</div>
+              </div>
+              <div style={{fontSize:13,color:textMuted,flexShrink:0}}>{isExpanded?"▲":"▼"}</div>
             </div>
 
-            {selEx&&narrativa&&(
-              <div>
-                {/* Tarjeta de narrativa */}
-                <div style={{background:narrativa.prMsg?"#0c1f12":bgSub,
-                  border:"1px solid "+(narrativa.prMsg?"#1a3d22":border),
-                  borderRadius:14,padding:"16px",marginBottom:12}}>
-                  {narrativa.prMsg&&(
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                      <div style={{background:"#22C55E",borderRadius:6,padding:"4px 8px",fontSize:11,color:"#fff",fontWeight:700}}>PR</div>
-                      <div style={{fontSize:12,color:"#4ade80",fontWeight:600}}>{narrativa.prMsg}</div>
-                    </div>
-                  )}
-                  <div style={{fontSize:14,color:narrativa.prMsg?"#d1fae5":textMain,lineHeight:1.65,marginBottom:narrativa.tendencia?10:0,fontWeight:500}}>
-                    {narrativa.frase}
-                  </div>
-                  {narrativa.tendencia&&(
-                    <div style={{fontSize:12,color:textMuted,lineHeight:1.5,borderTop:"1px solid "+(narrativa.prMsg?"#1a3d22":border),paddingTop:8,marginTop:4}}>
-                      {narrativa.tendencia}
-                    </div>
-                  )}
-                </div>
-
-                {/* Stats compactos */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
-                  <div style={{background:bgSub,borderRadius:10,padding:"8px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:22,fontWeight:800,color:"#2563EB"}}>{narrativa.pr}kg</div>
-                    <div style={{fontSize:10,color:textMuted,marginTop:2}}>PR</div>
-                  </div>
-                  <div style={{background:bgSub,borderRadius:10,padding:"8px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:22,fontWeight:800,color:narrativa.pctKg>0?"#22C55E":narrativa.pctKg<0?"#EF4444":textMuted}}>
-                      {narrativa.pctKg>0?"+":""}{narrativa.pctKg}%
-                    </div>
-                    <div style={{fontSize:10,color:textMuted,marginTop:2}}>{es?"vs inicio":"vs start"}</div>
-                  </div>
-                  <div style={{background:bgSub,borderRadius:10,padding:"8px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:22,fontWeight:800,color:textMain}}>{narrativa.totalSets}</div>
-                    <div style={{fontSize:10,color:textMuted,marginTop:2}}>sets</div>
-                  </div>
-                </div>
-
-                {/* Gráfico de línea con canvas */}
-                {getDatos(selEx).length>=2&&(
-                  <div style={{borderRadius:12,overflow:"hidden",marginBottom:8}}>
-                    <canvas ref={canvasRef} width={340} height={180} style={{width:"100%",height:"auto",display:"block"}}/>
-                  </div>
-                )}
-
-                {/* Mini historial de últimos registros */}
-                <div style={{marginTop:8}}>
-                  <div style={{fontSize:11,color:textMuted,fontWeight:600,marginBottom:8,letterSpacing:.5}}>{es?"ÚLTIMOS REGISTROS":"RECENT RECORDS"}</div>
-                  {getDatos(selEx).slice(-5).reverse().map((d,i)=>{
-                    const isPR2 = d.kg===narrativa.pr;
+            {/* Gráfico expandido */}
+            {isExpanded&&(
+              <div style={{padding:"0 14px 14px",borderTop:"1px solid "+border}}>
+                {/* Mini gráfico SVG inline */}
+                <div style={{height:120,position:"relative",marginTop:8}}>
+                  {(function(){
+                    var W=300,H=100,padL=40,padR=10,padT=10,padB=20;
+                    var pts=datos;
+                    if(pts.length<2) return <div style={{textAlign:"center",padding:"20px 0",fontSize:13,color:textMuted}}>{es?"Necesitás al menos 2 registros":"Need at least 2 records"}</div>;
+                    var kgs=pts.map(function(p){return p.kg});
+                    var minK=Math.min.apply(null,kgs);
+                    var maxK=Math.max.apply(null,kgs);
+                    var rangeK=maxK-minK||1;
+                    var points=pts.map(function(p,i){
+                      var x=padL+(W-padL-padR)*i/(pts.length-1);
+                      var y=padT+(H-padT-padB)*(1-(p.kg-minK)/rangeK);
+                      return{x:x,y:y,kg:p.kg,reps:p.reps,fecha:p.fecha};
+                    });
+                    var pathD="M"+points.map(function(p){return p.x+","+p.y}).join("L");
+                    var areaD=pathD+"L"+points[points.length-1].x+","+(H-padB)+"L"+points[0].x+","+(H-padB)+"Z";
                     return(
-                      <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid "+border}}>
-                        <div style={{fontSize:12,color:textMuted,minWidth:70}}>{d.fecha||"—"}</div>
-                        <div style={{flex:1,background:bgSub,borderRadius:6,height:6,overflow:"hidden"}}>
-                          <div style={{height:"100%",background:isPR2?"#22C55E":"#2563EB",borderRadius:6,width:Math.round(d.kg/narrativa.pr*100)+"%",transition:"width .3s"}}/>
-                        </div>
-                        <div style={{fontSize:13,fontWeight:700,color:isPR2?"#22C55E":textMain,minWidth:50,textAlign:"right"}}>{d.kg}kg</div>
-                        {isPR2&&<div style={{fontSize:10,color:"#22C55E",fontWeight:700}}>PR</div>}
-                      </div>
+                      <svg width="100%" viewBox={"0 0 "+W+" "+H} style={{overflow:"visible"}}>
+                        <defs><linearGradient id={"grad-"+e.id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563EB" stopOpacity="0.3"/><stop offset="100%" stopColor="#2563EB" stopOpacity="0"/></linearGradient></defs>
+                        {[0,0.25,0.5,0.75,1].map(function(f,i){
+                          var y2=padT+(H-padT-padB)*f;
+                          var val=Math.round(maxK-(maxK-minK)*f);
+                          return(<g key={i}><line x1={padL} y1={y2} x2={W-padR} y2={y2} stroke={border} strokeWidth="0.5"/><text x={padL-4} y={y2+3} textAnchor="end" fill={textMuted} fontSize="9">{val}</text></g>);
+                        })}
+                        <path d={areaD} fill={"url(#grad-"+e.id+")"}/>
+                        <path d={pathD} fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        {points.map(function(p,i){return(
+                          <g key={i}>
+                            <circle cx={p.x} cy={p.y} r={i===points.length-1?5:3} fill={p.kg>=pr?"#fbbf24":"#2563EB"} stroke={_dm?"#0F1923":"#fff"} strokeWidth="2"/>
+                            {i===points.length-1&&<text x={p.x} y={p.y-10} textAnchor="middle" fill="#2563EB" fontSize="11" fontWeight="700">{p.kg}kg</text>}
+                          </g>
+                        )})}
+                        {pts.length<=8&&points.map(function(p,i){return(
+                          <text key={"f"+i} x={p.x} y={H-padB+12} textAnchor="middle" fill={textMuted} fontSize="8">{(p.fecha||"").split("/").slice(0,2).join("/")}</text>
+                        )})}
+                      </svg>
                     );
-                  })}
+                  })()}
                 </div>
-              </div>
-            )}
-
-            {selEx&&!narrativa&&(
-              <div style={{textAlign:"center",padding:"32px 16px"}}>
-                <div style={{fontSize:40,marginBottom:8}}>🏋️</div>
-                <div style={{fontSize:15,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Falta un registro más":"One more record needed"}</div>
-                <div style={{fontSize:13,color:textMuted,lineHeight:1.6}}>{es?"Registrá al menos 2 sesiones de este ejercicio para ver tu evolución.":"Log at least 2 sessions of this exercise to see your evolution."}</div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-{vista==="semanas"&&(()=>{
-        const sem = getVolumenSemanal();
-        if(sem.length===0) return (
-          <div style={{textAlign:"center",padding:"40px 16px"}}>
-            <div style={{fontSize:44,marginBottom:12}}>📅</div>
-            <div style={{fontSize:17,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin datos aún":"No data yet"}</div>
-            <div style={{fontSize:13,color:textMuted,lineHeight:1.6}}>{es?"Registrá sets en tu entrenamiento para ver tu evolución.":"Log sets in your workout to see your evolution."}</div>
-          </div>
-        );
-        const maxSeries = Math.max(...sem.map(s=>s.series), 1);
-        const maxKg     = Math.max(...sem.map(s=>s.maxKg), 1);
-        const maxTon    = Math.max(...sem.map(s=>s.tonelaje), 1);
-        const ultima    = sem[sem.length-1];
-        const anterior  = sem.length>=2 ? sem[sem.length-2] : null;
-        const diffSeries = anterior&&anterior.series>0 ? Math.round((ultima.series-anterior.series)/anterior.series*100) : null;
-        const diffKg     = anterior&&anterior.maxKg>0   ? Math.round((ultima.maxKg-anterior.maxKg)/anterior.maxKg*100)   : null;
-        return (
-          <div>
-            {anterior&&(
-              <div style={{display:"flex",gap:8,marginBottom:16}}>
-                <div style={{background:bgSub,borderRadius:10,padding:"8px 10px",textAlign:"center",flex:1}}>
-                  <div style={{fontSize:20,fontWeight:800,color:"#2563EB"}}>{ultima.series}</div>
-                  <div style={{fontSize:10,color:textMuted}}>{es?"Series":"Sets"}</div>
-                  {diffSeries!==null&&<div style={{fontSize:11,fontWeight:700,color:diffSeries>=0?"#22C55E":"#EF4444"}}>{diffSeries>=0?"+":""}{diffSeries}%</div>}
-                </div>
-                <div style={{background:bgSub,borderRadius:10,padding:"8px 10px",textAlign:"center",flex:1}}>
-                  <div style={{fontSize:20,fontWeight:800,color:"#22C55E"}}>{ultima.maxKg}kg</div>
-                  <div style={{fontSize:10,color:textMuted}}>{es?"Max kg":"Max kg"}</div>
-                  {diffKg!==null&&<div style={{fontSize:11,fontWeight:700,color:diffKg>=0?"#22C55E":"#EF4444"}}>{diffKg>=0?"+":""}{diffKg}%</div>}
-                </div>
-                <div style={{background:bgSub,borderRadius:10,padding:"8px 10px",textAlign:"center",flex:1}}>
-                  <div style={{fontSize:20,fontWeight:800,color:"#8B9AB2"}}>{Math.round(ultima.tonelaje/1000*10)/10}t</div>
-                  <div style={{fontSize:10,color:textMuted}}>{es?"Tonelaje":"Volume"}</div>
-                </div>
-              </div>
-            )}
-            <div style={{fontSize:12,color:textMuted,marginBottom:8,fontWeight:600}}>{es?"Series por semana":"Sets per week"}</div>
-            <div style={{display:"flex",alignItems:"flex-end",gap:4,height:120,marginBottom:16}}>
-              {sem.map((s,i)=>{
-                const pct = Math.max((s.series/maxSeries)*100, 3);
-                const isLast = i===sem.length-1;
-                return (
-                  <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                    <div style={{fontSize:10,color:isLast?"#2563EB":textMuted,fontWeight:700}}>{s.series}</div>
-                    <div style={{width:"100%",height:pct+"%",background:isLast?"#2563EB":"#2563EB55",borderRadius:"3px 3px 0 0",minHeight:4}}/>
-                    <div style={{fontSize:10,color:isLast?textMain:textMuted,fontWeight:isLast?700:400}}>{s.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{fontSize:12,color:textMuted,marginBottom:8,fontWeight:600}}>{es?"Kg máximo por semana":"Max kg per week"}</div>
-            <div style={{display:"flex",alignItems:"flex-end",gap:4,height:100,marginBottom:8}}>
-              {sem.map((s,i)=>{
-                const pct = Math.max((s.maxKg/maxKg)*100, 3);
-                const isLast = i===sem.length-1;
-                return (
-                  <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                    <div style={{fontSize:10,color:isLast?"#22C55E":textMuted,fontWeight:700}}>{s.maxKg>0?s.maxKg+"kg":""}</div>
-                    <div style={{width:"100%",height:pct+"%",background:isLast?"#22C55E":"#22C55E55",borderRadius:"3px 3px 0 0",minHeight:4}}/>
-                    <div style={{fontSize:10,color:isLast?textMain:textMuted,fontWeight:isLast?700:400}}>{s.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-            {sem.length===1&&(
-              <div style={{textAlign:"center",padding:"8px",fontSize:12,color:textMuted,background:bgSub,borderRadius:8}}>
-                {es?"💪 Completá la Semana 2 para ver tu evolución":"💪 Complete Week 2 to see your evolution"}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-      {vista==="volumen"&&(()=>{
-        const {semanas:semsVol, patrones:patsVol} = getVolumenPorPatron();
-        const PAT_COLORS = {empuje:"#2563EB",traccion:"#2563EB",rodilla:"#22C55E",bisagra:"#8B9AB2",core:"#8B9AB2",movilidad:"#2563EB",cardio:"#60A5FA",oly:"#8B9AB2",otros:"#8B9AB2"};
-        const PAT_LABELS = {empuje:"Empuje",traccion:"Traccion",rodilla:"Rodilla/Cuads",bisagra:"Bisagra/Glu",core:"Core",movilidad:"Movilidad",cardio:"Cardio",oly:"Olimpico",otros:"Otros"};
-        // Calcular totales por patron
-        const totalesPorPatron = {};
-        patsVol.forEach(pat=>{
-          totalesPorPatron[pat] = semsVol.reduce((acc,s)=>{
-            const d = s.patrones[pat]||{series:0,reps:0,tonelaje:0};
-            return {series:acc.series+(d.series||0), reps:acc.reps+(d.reps||0), tonelaje:acc.tonelaje+(d.tonelaje||0)};
-          }, {series:0,reps:0,tonelaje:0});
-        });
-        if(semsVol.length===0) return (
-          <div style={{textAlign:"center",padding:"32px 16px"}}>
-            <div style={{fontSize:44,marginBottom:12}}>💪</div>
-            <div style={{fontSize:18,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin sesiones aún":"No sessions yet"}</div>
-            <div style={{fontSize:13,color:textMuted,lineHeight:1.5}}>{es?"Completá tu primer entrenamiento para ver el análisis de volumen por patrón muscular":"Complete your first workout to unlock volume analysis by muscle pattern"}</div>
-          </div>
-        );
-        return (
-          <div>
-            <div style={{fontSize:15,color:textMuted,marginBottom:12,fontWeight:700}}>Series por patron — {semsVol.length} semanas</div>
-            {patsVol.map((pat,pi)=>{
-              const col = PAT_COLORS[pat]||"#8B9AB2";
-              const maxVal = Math.max(...semsVol.map(s=>(s.patrones[pat]?.series||0)),1);
-              return (
-                <div key={pat} style={{marginBottom:16}}>
-                  <div style={{marginBottom:8}}>
-                    <div style={{display:"flex",justifyContent:"space-between"}}>
-                      <span style={{fontSize:22,fontWeight:900,color:col}}>{PAT_LABELS[pat]||pat}</span>
-                      <span style={{fontSize:18,fontWeight:900,color:col}}>{totalesPorPatron[pat]?.series||0} series</span>
-                    </div>
-                    <div style={{fontSize:15,color:textMuted,marginBottom:8}}>
-                      {totalesPorPatron[pat]?.reps||0} reps totales · {Math.round(totalesPorPatron[pat]?.tonelaje||0).toLocaleString()} kg tonelaje
-                    </div>
-                  </div>
-                  <div style={{display:"flex",gap:4,alignItems:"flex-end",height:60}}>
-                    {semsVol.map((s,si)=>{
-                      const val = s.patrones[pat]?.series||0;
-                      const pct = val/maxVal;
-                      return (
-                        <div key={si} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                          <div style={{fontSize:13,color:col,fontWeight:900}}>{val>0?val:""}</div>
-                          <div style={{width:"100%",background:col,borderRadius:"3px 3px 0 0",height:Math.max(pct*50,val>0?4:0),opacity:0.85}}/>
-                          <div style={{fontSize:13,color:textMuted,whiteSpace:"nowrap",fontWeight:700}}>{s.label}</div>
+                {/* Historial de registros */}
+                <div style={{marginTop:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{es?"HISTORIAL":"HISTORY"} ({datos.length})</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                    {datos.slice().reverse().slice(0,6).map(function(d,i){
+                      var esPR=d.kg>=pr;
+                      return(
+                        <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",background:esPR?"#fbbf2410":bgSub,borderRadius:6,border:esPR?"1px solid #fbbf2433":"none"}}>
+                          <span style={{fontSize:12,color:textMuted}}>{d.fecha}</span>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:13,fontWeight:700,color:esPR?"#fbbf24":textMain}}>{d.kg}kg × {d.reps}</span>
+                            {esPR&&<span style={{fontSize:9,fontWeight:700,color:"#fbbf24"}}>🏆</span>}
+                          </div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
         );
-      })()}
+      })}
     </div>
   );
 }
