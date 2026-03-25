@@ -2591,6 +2591,36 @@ function GymApp() {
                             <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:4,textTransform:"uppercase"}}>{es?"RUTINA ACTIVA":"ACTIVE ROUTINE"}</div>
                             <div style={{fontSize:22,fontWeight:900,color:textMain}}>{rutinaActiva.nombre}</div>
                             <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:4}}>{dias.length} {es?"días":"days"}</div>
+                            {/* ── Info de semana ── */}
+                            {(()=>{
+                              const sesAlu = (alumnoSesiones||[]).sort(function(x,y){return new Date(y.created_at||y.fecha)-new Date(x.created_at||x.fecha)});
+                              // Semana del ciclo: la más alta registrada en sesiones
+                              const semanaCiclo = sesAlu.length > 0 ? Math.max.apply(null, sesAlu.map(function(s){return parseInt(s.semana)||1})) : 1;
+                              // Sesiones en la semana actual del ciclo
+                              const sesEstaSemana = sesAlu.filter(function(s){return (parseInt(s.semana)||1) === semanaCiclo});
+                              const diasCompletados = sesEstaSemana.length;
+                              // Semana calendario
+                              const hoyDate = new Date();
+                              const inicioSemana = new Date(hoyDate);
+                              inicioSemana.setDate(hoyDate.getDate() - hoyDate.getDay() + 1);
+                              const diaSem = inicioSemana.getDate();
+                              const mesSem = inicioSemana.getMonth() + 1;
+                              const semCalLabel = diaSem + "/" + mesSem + " — " + (diaSem+6) + "/" + mesSem;
+                              return (
+                                <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
+                                  <div style={{background:"#2563EB15",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
+                                    <span style={{fontSize:12}}>📅</span>
+                                    <span style={{fontSize:12,fontWeight:800,color:"#2563EB"}}>{es?"Semana":"Week"} {semanaCiclo} {es?"de":"of"} 4</span>
+                                  </div>
+                                  <div style={{background:bgSub,border:"1px solid "+border,borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
+                                    <span style={{fontSize:12,fontWeight:700,color:textMuted}}>{diasCompletados}/{dias.length} {es?"días":"days"}</span>
+                                  </div>
+                                  <div style={{background:bgSub,border:"1px solid "+border,borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
+                                    <span style={{fontSize:11,color:textMuted}}>{es?"Sem. cal:":"Cal. wk:"} {semCalLabel}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                             {dias.map((d,di)=>(
                               <div key={di} style={{background:bgSub,borderRadius:12,padding:"8px 12px",marginBottom:8,marginTop:8,border:"1px solid "+border}}>
                                 <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{d.label||("Día "+(di+1))} · {((d.warmup||[]).length+(d.exercises||[]).length)} ej.</div>
