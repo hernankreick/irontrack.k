@@ -2678,7 +2678,6 @@ function GymApp() {
                                 </div>
                                 </>
                               );
-                              );
                             })()}
                             {dias.map((d,di)=>(
                               <div key={di} style={{background:bgSub,borderRadius:12,padding:"8px 12px",marginBottom:8,marginTop:8,border:"1px solid "+border}}>
