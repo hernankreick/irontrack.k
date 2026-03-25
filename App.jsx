@@ -1044,14 +1044,28 @@ function GymApp() {
         try {
           const ruts = await sbFetch("rutinas?alumno_id=eq."+sessionData.alumnoId+"&select=*&order=created_at.desc&limit=1");
           if(ruts && ruts[0] && ruts[0].datos) {
-            setRoutines([{...ruts[0].datos, alumnoId: sessionData.alumnoId}]);
+            const rSB = ruts[0];
+            const rutLocal = {
+              id: rSB.id,
+              name: rSB.nombre || "Rutina",
+              days: rSB.datos?.days || [],
+              alumno: rSB.datos?.alumno || sessionData.name || "",
+              note: rSB.datos?.note || "",
+              alumno_id: sessionData.alumnoId,
+              saved: true
+            };
+            setRoutines(function(prev) {
+              // No duplicar si ya existe
+              var existe = prev.find(function(r) { return r.id === rSB.id; });
+              if(existe) return prev.map(function(r) { return r.id === rSB.id ? rutLocal : r; });
+              return [rutLocal];
+            });
           }
-        
-      // Cargar nota del día
-      sb.getNota(sessionData.alumnoId).then(res=>{
-        if(res && res[0]) setNotaDia(res[0].contenido||res[0].texto||"");
-      }).catch(()=>{});
-    } catch(e) {}
+          // Cargar nota del día
+          sb.getNota(sessionData.alumnoId).then(function(res) {
+            if(res && res[0]) setNotaDia(res[0].contenido||res[0].texto||"");
+          }).catch(function(){});
+        } catch(e) { console.error('[cargarRutinaAlumno]', e); }
       })();
     }
   }, [sessionData?.alumnoId]);
