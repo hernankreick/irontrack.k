@@ -2633,6 +2633,7 @@ function GymApp() {
                               const mesSem = inicioSemana.getMonth() + 1;
                               const semCalLabel = diaSem + "/" + mesSem + " — " + (diaSem+6) + "/" + mesSem;
                               return (
+                                <>
                                 <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
                                   <div style={{background:"#2563EB15",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
                                     <span style={{fontSize:12}}>📅</span>
@@ -2645,31 +2646,21 @@ function GymApp() {
                                     <span style={{fontSize:11,color:textMuted}}>{es?"Sem. cal:":"Cal. wk:"} {semCalLabel}</span>
                                   </div>
                                 </div>
-                                {(()=>{
-                                  var proxDia, proxSemana;
-                                  if(diasCompletados >= dias.length) {
-                                    proxDia = 1;
-                                    proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1;
-                                  } else {
-                                    proxDia = diasCompletados + 1;
-                                    proxSemana = semanaCiclo;
-                                  }
-                                  var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
-                                  var nuevoCiclo = semanaCiclo >= 4 && diasCompletados >= dias.length;
-                                  return (
-                                    <div style={{marginTop:8,background:"#2563EB08",border:"1px solid #2563EB22",borderRadius:8,padding:"8px 10px",display:"flex",alignItems:"center",gap:6}}>
-                                      <span style={{fontSize:13}}>▶</span>
-                                      <span style={{fontSize:13,fontWeight:700,color:textMain}}>
-                                        {es?"Próxima sesión:":"Next session:"} {proxLabel} · {es?"Semana":"Week"} {proxSemana}
-                                      </span>
-                                      {nuevoCiclo&&<span style={{fontSize:10,fontWeight:700,color:"#F59E0B",marginLeft:4}}>{es?"(nuevo ciclo)":"(new cycle)"}</span>}
-                                    </div>
-                                  );
-                                })()}
+                                <div style={{marginTop:8,background:"#2563EB08",border:"1px solid #2563EB22",borderRadius:8,padding:"8px 10px",display:"flex",alignItems:"center",gap:6}}>
+                                  <span style={{fontSize:13}}>▶</span>
+                                  <span style={{fontSize:13,fontWeight:700,color:textMain}}>
+                                    {es?"Próxima sesión:":"Next session:"} {(()=>{
+                                      var proxDia, proxSemana;
+                                      if(diasCompletados >= dias.length) { proxDia = 1; proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1; }
+                                      else { proxDia = diasCompletados + 1; proxSemana = semanaCiclo; }
+                                      var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
+                                      return proxLabel + " · " + (es?"Semana ":"Week ") + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (es?" (nuevo ciclo)":" (new cycle)") : "");
+                                    })()}
+                                  </span>
+                                </div>
                                 <div style={{display:"flex",gap:8,marginTop:8}}>
                                   <button className="hov" onClick={()=>{
                                     if(!confirm(es?"¿Reiniciar semana actual? El alumno volverá a Día 1 de la semana "+semanaCiclo+".":"Reset current week? Athlete will restart at Day 1 of week "+semanaCiclo+".")) return;
-                                    // Limpiar completedDays de esta semana para esta rutina
                                     setCompletedDays(function(prev){return prev.filter(function(k){return !k.endsWith("-w"+(semanaCiclo-1))})});
                                     toast2(es?"Semana reiniciada ✓":"Week reset ✓");
                                   }} style={{flex:1,padding:"6px",background:"transparent",border:"1px solid #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit"}}>
@@ -2685,6 +2676,8 @@ function GymApp() {
                                     🔄 {es?"Reiniciar rutina":"Reset routine"}
                                   </button>
                                 </div>
+                                </>
+                              );
                               );
                             })()}
                             {dias.map((d,di)=>(
