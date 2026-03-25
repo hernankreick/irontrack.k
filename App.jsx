@@ -2436,12 +2436,14 @@ function GymApp() {
                                 <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{d.label||("Día "+(di+1))} · {(d.exercises||[]).length} ej.</div>
                                 {(d.exercises||[]).map((ex,ei)=>{
                                   const exInfo=allEx.find(e=>e.id===ex.id);
-                                  return <div key={ei} style={{display:"flex",gap:8,padding:"4px 0",borderBottom:ei<(d.exercises||[]).length-1?"1px solid "+border:"none"}}>
-                                    <div style={{width:3,height:16,borderRadius:2,background:border,flexShrink:0,marginTop:4}}/>
+                                  return <div key={ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.exercises||[]).length-1?"1px solid "+border:"none"}}>
+                                    <div style={{width:3,height:16,borderRadius:2,background:border,flexShrink:0,marginTop:0}}/>
                                     <div style={{flex:1,fontSize:15,fontWeight:700,color:textMain}}>{es?exInfo?.name:exInfo?.nameEn||exInfo?.name||ex.id}</div>
-                                    <div style={{fontSize:11,color:textMuted}}>{ex.sets}×{ex.reps}</div>
+                                    <div style={{fontSize:11,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
+                                    <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
                                   </div>;
                                 })}
+                                <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"exercises"});setAddExSearch("");setAddExPat(null);}} style={{width:"100%",marginTop:8,padding:"6px",background:"transparent",border:"1px dashed "+border,borderRadius:8,fontSize:13,fontWeight:700,color:"#2563EB",cursor:"pointer",fontFamily:"inherit"}}>+ {es?"Añadir ejercicio":"Add exercise"}</button>
                               </div>
                             ))}
                             <div style={{display:"flex",gap:8,marginTop:8}}>
@@ -3067,6 +3069,7 @@ function GymApp() {
         <EditExModal darkMode={darkMode} key={editEx.rId+"-"+editEx.dIdx+"-"+editEx.eIdx} editEx={editEx} btn={btn} inp={inp} allEx={allEx} es={es} PATS={PATS}
           onSave={async(updated)=>{
             const blq = editEx.bloque||"exercises";
+            // Actualizar routines locales
             setRoutines(p=>p.map(r=>r.id===editEx.rId?{...r,days:r.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d)}:r));
             // Auto-guardar en Supabase inmediatamente
             try {
@@ -3076,6 +3079,15 @@ function GymApp() {
                 const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
                 else { await sb.createRutina({...payload,id:rActual.id}); setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,saved:true}:r)); }
+              } else {
+                // Buscar en rutinasSB (edición desde vista alumno)
+                const rSB = rutinasSB.find(x=>x.id===editEx.rId);
+                if(rSB) {
+                  const diasActualizados = (rSB.datos?.days||[]).map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
+                  const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:"entrenador_principal"};
+                  await sb.updateRutina(rSB.id, payloadSB);
+                  setRutinasSB(prev=>prev.map(r=>r.id===rSB.id?{...r,datos:{...r.datos,days:diasActualizados}}:r));
+                }
               }
             } catch(e){ console.error("Auto-save error:",e); }
             setEditEx(null);toast2("Guardado ✓");
@@ -3270,8 +3282,20 @@ function GymApp() {
               }).map(ex=>{
                 const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
                 return(
-                  <div key={ex.id} className="hov" style={{display:"flex",alignItems:"center",gap:12,padding:"16px 10px",borderRadius:12,marginBottom:8,background:darkMode?"#162234":"#E2E8F0",cursor:"pointer"}} onClick={()=>{
-                    const blk=addExModal.bloque||"exercises"; setRoutines(p=>p.map(r=>r.id===addExModal.rId?{...r,days:r.days.map((d,i)=>i===addExModal.dIdx?{...d,[blk]:[...(d[blk]||[]),{id:ex.id,sets:"",reps:"",kg:"",pause:0,note:"",weeks:[]}]}:d)}:r));
+                  <div key={ex.id} className="hov" style={{display:"flex",alignItems:"center",gap:12,padding:"16px 10px",borderRadius:12,marginBottom:8,background:darkMode?"#162234":"#E2E8F0",cursor:"pointer"}} onClick={async()=>{
+                    const blk=addExModal.bloque||"exercises";
+                    const newEx={id:ex.id,sets:"3",reps:"8-10",kg:"",pause:0,note:"",weeks:[]};
+                    // Actualizar routines locales
+                    setRoutines(p=>p.map(r=>r.id===addExModal.rId?{...r,days:r.days.map((d,i)=>i===addExModal.dIdx?{...d,[blk]:[...(d[blk]||[]),newEx]}:d)}:r));
+                    // Si es rutina de rutinasSB, guardar en Supabase
+                    const rSB = rutinasSB.find(x=>x.id===addExModal.rId);
+                    if(rSB) {
+                      try {
+                        const diasAct = (rSB.datos?.days||[]).map((d,i)=>i===addExModal.dIdx?{...d,[blk]:[...(d[blk]||[]),newEx]}:d);
+                        await sb.updateRutina(rSB.id, {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:"entrenador_principal"});
+                        setRutinasSB(prev=>prev.map(r=>r.id===rSB.id?{...r,datos:{...r.datos,days:diasAct}}:r));
+                      } catch(e){ console.error("Add ex save error:",e); }
+                    }
                     toast2((es?"Agregado":"Added")+": "+(es?ex.name:ex.nameEn));
                     setAddExModal(null);
                   }}>
