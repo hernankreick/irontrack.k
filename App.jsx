@@ -1857,8 +1857,11 @@ function GymApp() {
                     </div>
                   )}
                   <div style={{background:bgCard,borderRadius:12,padding:"12px 16px",marginBottom:8,border:"1px solid "+border}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                       <span style={{fontSize:13,fontWeight:800,color:textMuted,letterSpacing:0.3}}>{es?"ESTA SEMANA":"THIS WEEK"}</span>
+                      <span style={{fontSize:12,fontWeight:700,color:"#2563EB"}}>{es?"Semana":"Week"} {currentWeek+1} {es?"de":"of"} 4</span>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
                       <span style={{fontSize:13,fontWeight:900,color:"#2563EB"}}>{daysCompletedThisWeek}/{totalDays} {es?"días":"days"}</span>
                     </div>
                     <div style={{display:"flex",gap:8}}>
@@ -1869,7 +1872,7 @@ function GymApp() {
                           <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                             <div style={{width:"100%",height:7,borderRadius:4,background:done?"#22C55E":isNext?"#2563EB":border}}/>
                             <div style={{fontSize:11,fontWeight:700,color:done?"#22C55E":isNext?"#2563EB":textMuted,textTransform:"uppercase"}}>
-                              {(d.label||("D"+(i+1))).slice(0,3)}
+                              {(d.label||("D"+(i+1))).slice(0,6)}
                             </div>
                           </div>
                         );
@@ -1880,7 +1883,7 @@ function GymApp() {
                     <div style={{background:"#2563EB11",borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid #243040"}}>
                       <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:4}}>{es?"HOY":"TODAY"}</div>
                       <div style={{fontSize:22,fontWeight:900,color:textMain,marginBottom:4}}>{todayDay.label||("Día "+(nextDayIdx+1))}</div>
-                      <div style={{fontSize:13,color:textMuted,marginBottom:12}}>{(todayDay.exercises||[]).length} {es?"ejercicios":"exercises"} · {r0?.name}</div>
+                      <div style={{fontSize:13,color:textMuted,marginBottom:12}}>{((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {es?"ejercicios":"exercises"} · {r0?.name}</div>
                       <button className="hov" style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}
                         onClick={()=>{
                           const snap={};
