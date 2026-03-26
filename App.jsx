@@ -2639,7 +2639,7 @@ function GymApp() {
                   </div>
                   <div style={{display:"flex",gap:8}}>
                     <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>{setEditAlumnoModal(a);setEditAlumnoEmail(a.email);setEditAlumnoPass("");}}>✏️</button>
-                    <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>{setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}>💬</button>
+                    <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={function(e){e.stopPropagation();console.log("[CHAT] abriendo para",a.id,a.nombre);setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}>💬</button>
                     <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={async()=>{
                       if(alumnoActivo?.id===a.id){setAlumnoActivo(null);return;}
                       setAlumnoActivo(a);setRegistrosSubTab(0);setLoadingSB(true);
@@ -3457,6 +3457,28 @@ function GymApp() {
                 setRoutines(p=>[...p,{...newR,id:uid(),created:new Date().toLocaleDateString("es-AR")}]);
                 setNewR(null); toast2("Rutina creada ✓");
               }}>CREAR</button>
+            </div>
+          </div>
+        </div>
+      )}
+            {/* ── Modal chat entrenador ── */}
+      {chatModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setChatModal(null)}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxWidth:480,border:"1px solid "+border,maxHeight:"80vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:32,height:32,borderRadius:"50%",background:"#2563EB22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#2563EB"}}>
+                  {(chatModal.alumnoNombre||"?").slice(0,2).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{fontSize:15,fontWeight:800,color:textMain}}>{chatModal.alumnoNombre}</div>
+                  <div style={{fontSize:11,color:textMuted}}>{es?"Chat interno":"Internal chat"}</div>
+                </div>
+              </div>
+              <button onClick={()=>setChatModal(null)} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer",padding:"4px"}}><Ic name="x" size={18}/></button>
+            </div>
+            <div style={{flex:1,overflow:"hidden"}}>
+              <Chat darkMode={darkMode} es={es} alumnoId={chatModal.alumnoId} alumnoNombre={chatModal.alumnoNombre} esEntrenador={true} sb={sb}/>
             </div>
           </div>
         </div>
@@ -5173,30 +5195,8 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
         </div>
       )}
 
-      {/* ── Modal chat entrenador ── */}
-      {chatModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setChatModal(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxWidth:480,border:"1px solid "+border,maxHeight:"80vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:32,height:32,borderRadius:"50%",background:"#2563EB22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#2563EB"}}>
-                  {(chatModal.alumnoNombre||"?").slice(0,2).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{fontSize:15,fontWeight:800,color:textMain}}>{chatModal.alumnoNombre}</div>
-                  <div style={{fontSize:11,color:textMuted}}>{es?"Chat interno":"Internal chat"}</div>
-                </div>
-              </div>
-              <button onClick={()=>setChatModal(null)} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer",padding:"4px"}}><Ic name="x" size={18}/></button>
-            </div>
-            <div style={{flex:1,overflow:"hidden"}}>
-              <Chat darkMode={darkMode} es={es} alumnoId={chatModal.alumnoId} alumnoNombre={chatModal.alumnoNombre} esEntrenador={true} sb={sb}/>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ── Modal duplicar día ── */}
+                  {/* ── Modal duplicar día ── */}
       {dupDayModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setDupDayModal(null)}>
           <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,border:"1px solid "+border}} onClick={e=>e.stopPropagation()}>
@@ -5729,7 +5729,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   </div>
                 </div>
                 <div style={{display:"flex",gap:8}}>
-                  <button className="hov" onClick={function(){onChatAlumno&&onChatAlumno(a)}}
+                  <button className="hov" onClick={function(e){e.stopPropagation();console.log("[CHAT-DASH] abriendo para",a.id);onChatAlumno&&onChatAlumno(a)}}
                     style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",
                       borderRadius:8,padding:"8px 10px",fontSize:18,cursor:"pointer",
                       display:"flex",alignItems:"center"}}>💬</button>
