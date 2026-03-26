@@ -5186,8 +5186,30 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
               <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>LINK YOUTUBE</div>
               <div style={{fontSize:11,color:"#60A5FA",marginBottom:8}}><Ic name="info" size={14} color="#60a5fa"/> {es?"Ideal: video corto -30 seg (YouTube Shorts)":"Ideal: short video -30 sec (YouTube Shorts)"}</div>
               <input style={inpS} value={editYT} onChange={e=>setEditYT(e.target.value)} placeholder="https://youtube.com/shorts/..."/>
-              {editYT&&(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(
-                <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>▶️ {es?"Link valido ✓":"Valid link ✓"}</div>
+              {editYT&&(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(()=>{
+                var videoId = null;
+                try {
+                  if(editYT.includes("shorts/")) videoId = editYT.split("shorts/")[1].split("?")[0].split("&")[0];
+                  else if(editYT.includes("v=")) videoId = editYT.split("v=")[1].split("&")[0];
+                  else if(editYT.includes("youtu.be/")) videoId = editYT.split("youtu.be/")[1].split("?")[0];
+                } catch(e){}
+                if(!videoId) return <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>✓ {es?"Link detectado":"Link detected"}</div>;
+                return (
+                  <div style={{marginTop:10}}>
+                    <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{es?"PREVIEW":"PREVIEW"}</div>
+                    <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                      <img src={"https://img.youtube.com/vi/"+videoId+"/mqdefault.jpg"} style={{width:120,height:68,borderRadius:8,objectFit:"cover",border:"1px solid "+border}} onError={function(e){e.target.style.display="none"}}/>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✓ {es?"Video detectado":"Video detected"}</div>
+                        <div style={{fontSize:11,color:textMuted,marginTop:2}}>ID: {videoId}</div>
+                        <a href={editYT} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#2563EB",textDecoration:"none",marginTop:4,display:"inline-block"}}>{es?"Abrir en YouTube ↗":"Open in YouTube ↗"}</a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              {editYT&&!(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(
+                <div style={{marginTop:8,fontSize:12,color:"#F59E0B"}}>⚠ {es?"No parece un link de YouTube":"Doesn't look like a YouTube link"}</div>
               )}
             </div>
             <div style={{display:"flex",gap:8}}>
