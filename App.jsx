@@ -2079,7 +2079,7 @@ function GymApp() {
                         [...(r.days[di]?.warmup||[]),...(r.days[di]?.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                         setPreSessionPRs({...snap});
                         setSessionPRList([]);setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
-                      }}>⚡ {es?"INICIAR ENTRENAMIENTO":"START WORKOUT"}</button>
+                      }}>⚡ {es?"ENTRENAR ESTE DÍA":"TRAIN THIS DAY"}</button>
                     );
                     if(isFuture) return(
                       <div style={{textAlign:"center",padding:"8px",color:textMuted,fontSize:13,fontWeight:700,background:bgSub,borderRadius:12,marginTop:4}}>
@@ -4531,18 +4531,36 @@ function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode}) {
 
   const [abierto, setAbierto] = React.useState(false);
   const [unread, setUnread] = React.useState(0);
-  const [lastCount, setLastCount] = React.useState(0);
+  const lastCountRef = React.useRef(0);
 
   React.useEffect(()=>{
     if(!alumnoId) return;
-    const check = ()=>sb.getMensajes(alumnoId).then(m=>{
-      if(m && m.length > lastCount && !abierto) { setUnread(m.length-lastCount); }
-      setLastCount(m?.length||0);
+    const check = ()=>sb.getMensajes(alumnoId).then(function(m){
+      var total = m?.length||0;
+      if(!abierto && total > lastCountRef.current) {
+        setUnread(total - lastCountRef.current);
+      }
+      if(abierto) {
+        // Si el chat está abierto, marcar todo como leído
+        lastCountRef.current = total;
+        setUnread(0);
+      }
     });
     check();
     const interval = setInterval(check, 15000);
     return ()=>clearInterval(interval);
   },[alumnoId, abierto]);
+
+  const toggleChat = function() {
+    setAbierto(function(prev) {
+      if(!prev) {
+        // Al abrir: resetear unread y actualizar lastCount
+        setUnread(0);
+        sb.getMensajes(alumnoId).then(function(m){ lastCountRef.current = m?.length||0; });
+      }
+      return !prev;
+    });
+  };
 
   if(!alumnoId) return null;
 
@@ -4558,7 +4576,7 @@ function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode}) {
           es={es}/>
         </div>
       )}
-      <button onClick={()=>{setAbierto(a=>!a);setUnread(0);}} style={{position:"fixed",bottom:86,right:14,background:"#2563EB",color:"#fff",border:"none",borderRadius:"50%",width:40,height:40,fontSize:15,cursor:"pointer",zIndex:149,boxShadow:"0 4px 12px rgba(239,68,68,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <button onClick={toggleChat} style={{position:"fixed",bottom:86,right:14,background:"#2563EB",color:"#fff",border:"none",borderRadius:"50%",width:40,height:40,fontSize:15,cursor:"pointer",zIndex:149,boxShadow:"0 4px 12px rgba(239,68,68,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}>
         💬
         {unread>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#22C55E",color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{unread}</span>}
       </button>
