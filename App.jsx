@@ -874,6 +874,7 @@ function GymApp() {
   const [addExPat, setAddExPat] = useState(null);
   const [newR, setNewR] = useState(null);
   const [dupDayModal, setDupDayModal] = useState(null); // {rId, dIdx, days}
+  const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
   const [editEx, setEditEx] = useState(null);
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
@@ -1793,7 +1794,7 @@ function GymApp() {
                   }catch(e){console.error("[onVerAlumno]",e);}
                   setLoadingSB(false);
                 }}
-                onChatAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
+                onChatAlumno={(a)=>{setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}
                 onNotificar={(alumnoId, msg)=>notifyAlumno(alumnoId, msg).then(()=>toast2(es?"Notificación enviada":"Notification sent")).catch(()=>toast2("Error al notificar"))}
               />
             )}
@@ -2638,6 +2639,7 @@ function GymApp() {
                   </div>
                   <div style={{display:"flex",gap:8}}>
                     <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>{setEditAlumnoModal(a);setEditAlumnoEmail(a.email);setEditAlumnoPass("");}}>✏️</button>
+                    <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>{setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}>💬</button>
                     <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={async()=>{
                       if(alumnoActivo?.id===a.id){setAlumnoActivo(null);return;}
                       setAlumnoActivo(a);setRegistrosSubTab(0);setLoadingSB(true);
@@ -5168,6 +5170,29 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
           <button onClick={agregarEjercicio} style={{width:"100%",padding:12,background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
             {es?"+ AGREGAR EJERCICIO":"+ ADD EXERCISE"}
           </button>
+        </div>
+      )}
+
+      {/* ── Modal chat entrenador ── */}
+      {chatModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setChatModal(null)}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxWidth:480,border:"1px solid "+border,maxHeight:"80vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:32,height:32,borderRadius:"50%",background:"#2563EB22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#2563EB"}}>
+                  {(chatModal.alumnoNombre||"?").slice(0,2).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{fontSize:15,fontWeight:800,color:textMain}}>{chatModal.alumnoNombre}</div>
+                  <div style={{fontSize:11,color:textMuted}}>{es?"Chat interno":"Internal chat"}</div>
+                </div>
+              </div>
+              <button onClick={()=>setChatModal(null)} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer",padding:"4px"}}><Ic name="x" size={18}/></button>
+            </div>
+            <div style={{flex:1,overflow:"hidden"}}>
+              <Chat darkMode={darkMode} es={es} alumnoId={chatModal.alumnoId} alumnoNombre={chatModal.alumnoNombre} esEntrenador={true} sb={sb}/>
+            </div>
+          </div>
         </div>
       )}
 
