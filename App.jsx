@@ -5729,12 +5729,10 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   </div>
                 </div>
                 <div style={{display:"flex",gap:8}}>
-                  {tel&&(
-                    <a href={"https://wa.me/549"+tel+"?text="+waMsg} target="_blank"
-                      style={{background:"#25D36622",color:"#25D366",border:"1px solid #25D36633",
-                        borderRadius:8,padding:"8px 10px",fontSize:18,textDecoration:"none",
-                        display:"flex",alignItems:"center"}}>💬</a>
-                  )}
+                  <button className="hov" onClick={function(){onChatAlumno&&onChatAlumno(a)}}
+                    style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",
+                      borderRadius:8,padding:"8px 10px",fontSize:18,cursor:"pointer",
+                      display:"flex",alignItems:"center"}}>💬</button>
                   {a.onesignal_id&&(
                     <button className="hov"
                       onClick={()=>{
