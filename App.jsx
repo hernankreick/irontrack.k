@@ -397,7 +397,8 @@ function generarSugerenciasAlumno(registros, rutinaDatos, EX) {
           exId: exId, nombre: nombre, estado: estado,
           accion: "Subir a " + (ultimo.kg + incBase) + "kg (+" + incBase + "kg)",
           ajuste: "Arrancar en " + repMin + " reps",
-          tipo: "subir", prioridad: 1
+          tipo: "subir", prioridad: 1,
+          sugKg: String(ultimo.kg + incBase), sugReps: String(repMin), sugSets: ex.sets||"3", sugPause: ex.pause||""
         };
       } else if(estado === "fatiga") {
         var reduccion = Math.round(ultimo.kg * 0.05 / incBase) * incBase;
@@ -406,21 +407,24 @@ function generarSugerenciasAlumno(registros, rutinaDatos, EX) {
           exId: exId, nombre: nombre, estado: estado,
           accion: "Bajar a " + (ultimo.kg - reduccion) + "kg esta sesión",
           ajuste: "Mantener " + repMax + " reps y evaluar recuperación",
-          tipo: "bajar", prioridad: 0
+          tipo: "bajar", prioridad: 0,
+          sugKg: String(ultimo.kg - reduccion), sugReps: String(repMax), sugSets: ex.sets||"3", sugPause: ex.pause||""
         };
       } else if(estado === "muy_exigido") {
         sugerencia = {
           exId: exId, nombre: nombre, estado: estado,
           accion: "Mantener carga, agregar 30s de descanso",
           ajuste: "Si no mejora en 2 sesiones, quitar 1 serie",
-          tipo: "ajustar", prioridad: 1
+          tipo: "ajustar", prioridad: 1,
+          sugKg: String(ultimo.kg), sugReps: ex.reps||"", sugSets: ex.sets||"3", sugPause: String(parseInt(ex.pause||90)+30)
         };
       } else if(estado === "estancado") {
         sugerencia = {
           exId: exId, nombre: nombre, estado: estado,
           accion: "Cambiar esquema: probar " + (parseInt(ex.sets||3)+1) + "×" + (repMin-2 > 0 ? repMin-2 : repMin) + " con " + (ultimo.kg+incBase) + "kg",
           ajuste: "Nuevo estímulo para romper meseta",
-          tipo: "cambiar", prioridad: 2
+          tipo: "cambiar", prioridad: 2,
+          sugKg: String(ultimo.kg+incBase), sugReps: String(repMin-2>0?repMin-2:repMin), sugSets: String(parseInt(ex.sets||3)+1), sugPause: ex.pause||""
         };
       } else if(estado === "optimo") {
         if(ultimo.reps < repMax) {
@@ -428,10 +432,10 @@ function generarSugerenciasAlumno(registros, rutinaDatos, EX) {
             exId: exId, nombre: nombre, estado: estado,
             accion: "Mantener " + ultimo.kg + "kg",
             ajuste: "Buscar " + (ultimo.reps+1) + " reps para subir carga",
-            tipo: "mantener", prioridad: 3
+            tipo: "mantener", prioridad: 3,
+            sugKg: String(ultimo.kg), sugReps: String(ultimo.reps+1), sugSets: ex.sets||"3", sugPause: ex.pause||""
           };
         }
-        // Si ya está en repMax y óptimo, no genera sugerencia (todo bien)
       }
 
       if(sugerencia) {
@@ -869,6 +873,7 @@ function GymApp() {
   const [addExSearch, setAddExSearch] = useState("");
   const [addExPat, setAddExPat] = useState(null);
   const [newR, setNewR] = useState(null);
+  const [dupDayModal, setDupDayModal] = useState(null); // {rId, dIdx, days}
   const [editEx, setEditEx] = useState(null);
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
@@ -2341,21 +2346,8 @@ function GymApp() {
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                     <input value={d.label||""} onChange={function(e){var val=e.target.value;setRoutines(function(p){return p.map(function(rr){return rr.id===r.id?{...rr,days:rr.days.map(function(dd,ddi){return ddi===di?{...dd,label:val}:dd})}:rr})});}} placeholder={(es?"Dia ":"Day ")+(di+1)} style={{fontSize:22,fontWeight:700,color:textMuted,letterSpacing:1,background:"transparent",border:"none",borderBottom:"1px dashed "+border,outline:"none",width:"50%",fontFamily:"inherit",padding:"2px 0"}}/>
                     <button className="hov" onClick={()=>{
-                      const destinos=r.days.map(function(_,i){return i}).filter(function(i){return i!==di});
-                      if(destinos.length===0){toast2(es?"No hay otros días":"No other days");return;}
-                      const destStr=destinos.map(function(i){return "Día "+(i+1)+(r.days[i].label?" ("+r.days[i].label+")":"")}).join(", ");
-                      const sel=prompt((es?"Copiar a qué día(s)? Escribí los números separados por coma.\nDisponibles: ":"Copy to which day(s)? Enter numbers separated by comma.\nAvailable: ")+destStr, destinos.map(function(i){return i+1}).join(","));
-                      if(!sel) return;
-                      var indices=sel.split(",").map(function(s){return parseInt(s.trim())-1}).filter(function(i){return i>=0&&i<r.days.length&&i!==di});
-                      if(indices.length===0){toast2(es?"Ningún día válido":"No valid day");return;}
-                      setRoutines(function(p){return p.map(function(rr){
-                        if(rr.id!==r.id) return rr;
-                        return {...rr,days:rr.days.map(function(dd,ddi){
-                          if(indices.indexOf(ddi)===-1) return dd;
-                          return {...dd,warmup:(d.warmup||[]).map(function(e){return {...e}}),exercises:(d.exercises||[]).map(function(e){return {...e}})};
-                        })};
-                      })});
-                      toast2((es?"Día duplicado a ":"Day duplicated to ")+indices.map(function(i){return "Día "+(i+1)}).join(", ")+" ✓");
+                      if(r.days.length<2){toast2(es?"No hay otros días":"No other days");return;}
+                      setDupDayModal({rId:r.id, dIdx:di, days:r.days, selected:[], sourceDay:d});
                     }} style={{background:"#2563EB15",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 10px",fontSize:11,fontWeight:700,color:"#2563EB",cursor:"pointer",fontFamily:"inherit"}}>
                       <Ic name="copy" size={12} color="#2563EB"/> {es?"Duplicar día":"Duplicate day"}
                     </button>
@@ -2814,7 +2806,12 @@ function GymApp() {
                                     <div style={{fontSize:12,color:textMuted,marginTop:2}}>→ {sug.ajuste}</div>
                                     <div style={{display:"flex",gap:8,marginTop:8}}>
                                       <button className="hov" onClick={function(){
-                                        setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:{...sug.exData}});
+                                        var exConSug = {...sug.exData};
+                                        if(sug.sugKg) exConSug.kg = sug.sugKg;
+                                        if(sug.sugReps) exConSug.reps = sug.sugReps;
+                                        if(sug.sugSets) exConSug.sets = sug.sugSets;
+                                        if(sug.sugPause) exConSug.pause = sug.sugPause;
+                                        setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:exConSug});
                                       }} style={{padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{es?"APLICAR":"APPLY"}</button>
                                       <button className="hov" onClick={function(){
                                         var el=document.getElementById("sug-"+si);
@@ -5171,6 +5168,74 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
           <button onClick={agregarEjercicio} style={{width:"100%",padding:12,background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
             {es?"+ AGREGAR EJERCICIO":"+ ADD EXERCISE"}
           </button>
+        </div>
+      )}
+
+      {/* ── Modal duplicar día ── */}
+      {dupDayModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setDupDayModal(null)}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,border:"1px solid "+border}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:4}}>
+              {es?"Duplicar":"Duplicate"} {dupDayModal.days[dupDayModal.dIdx]?.label||("Día "+(dupDayModal.dIdx+1))}
+            </div>
+            <div style={{fontSize:13,color:textMuted,marginBottom:16}}>
+              {es?"Seleccioná los días destino":"Select destination days"}
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+              {dupDayModal.days.map(function(d,di){
+                if(di===dupDayModal.dIdx) return (
+                  <div key={di} style={{padding:"10px 16px",borderRadius:12,background:"#2563EB22",border:"2px solid #2563EB",opacity:0.5}}>
+                    <div style={{fontSize:13,fontWeight:800,color:"#2563EB"}}>{d.label||("Día "+(di+1))}</div>
+                    <div style={{fontSize:10,color:textMuted}}>{es?"Origen":"Source"}</div>
+                  </div>
+                );
+                var isSelected = dupDayModal.selected.indexOf(di)!==-1;
+                var tieneEj = ((d.warmup||[]).length+(d.exercises||[]).length)>0;
+                return (
+                  <div key={di} onClick={function(){
+                    setDupDayModal(function(prev){
+                      var sel = prev.selected.indexOf(di)!==-1
+                        ? prev.selected.filter(function(x){return x!==di})
+                        : [...prev.selected, di];
+                      return {...prev, selected:sel};
+                    });
+                  }} style={{padding:"10px 16px",borderRadius:12,cursor:"pointer",transition:"all .15s",
+                    background:isSelected?"#22C55E22":bgSub,
+                    border:isSelected?"2px solid #22C55E":"2px solid "+border}}>
+                    <div style={{fontSize:13,fontWeight:800,color:isSelected?"#22C55E":textMain}}>{d.label||("Día "+(di+1))}</div>
+                    <div style={{fontSize:10,color:textMuted}}>
+                      {tieneEj?((d.warmup||[]).length+(d.exercises||[]).length)+" ej.":"vacío"}
+                    </div>
+                    {isSelected&&<div style={{fontSize:10,fontWeight:700,color:"#22C55E",marginTop:2}}>✓ {es?"Seleccionado":"Selected"}</div>}
+                  </div>
+                );
+              })}
+            </div>
+            {dupDayModal.selected.some(function(di){return ((dupDayModal.days[di]?.warmup||[]).length+(dupDayModal.days[di]?.exercises||[]).length)>0})&&(
+              <div style={{background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:8,padding:"8px 10px",marginBottom:12,fontSize:12,color:"#F59E0B"}}>
+                ⚠ {es?"Algunos días seleccionados tienen ejercicios. Se reemplazarán.":"Some selected days have exercises. They will be replaced."}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setDupDayModal(null)} style={{flex:1,padding:12,background:bgSub,color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"CANCELAR":"CANCEL"}</button>
+              <button onClick={function(){
+                if(dupDayModal.selected.length===0){toast2(es?"Seleccioná al menos un día":"Select at least one day");return;}
+                var src=dupDayModal.sourceDay;
+                var sel=dupDayModal.selected;
+                setRoutines(function(p){return p.map(function(rr){
+                  if(rr.id!==dupDayModal.rId) return rr;
+                  return {...rr,days:rr.days.map(function(dd,ddi){
+                    if(sel.indexOf(ddi)===-1) return dd;
+                    return {...dd,warmup:(src.warmup||[]).map(function(e){return {...e}}),exercises:(src.exercises||[]).map(function(e){return {...e}})};
+                  })};
+                })});
+                toast2((es?"Duplicado a ":"Duplicated to ")+sel.map(function(i){return dupDayModal.days[i]?.label||("Día "+(i+1))}).join(", ")+" ✓");
+                setDupDayModal(null);
+              }} style={{flex:1,padding:12,background:dupDayModal.selected.length>0?"#2563EB":"#2D4057",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                {es?"DUPLICAR":"DUPLICATE"} {dupDayModal.selected.length>0&&("("+dupDayModal.selected.length+")")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
