@@ -279,6 +279,8 @@ const sb = {
   saveConfig: (data) => sbFetch("config?id=eq.pagos", "PATCH", data),
   getMensajes: (alumnoId) => sbFetch("mensajes?alumno_id=eq."+alumnoId+"&select=*&order=created_at.asc&limit=50"),
   addMensaje: (data) => sbFetch("mensajes", "POST", data),
+  getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
+  setNota: (data) => sbFetch("notas", "POST", data),
 };
 
 
@@ -2079,7 +2081,7 @@ function GymApp() {
                         [...(r.days[di]?.warmup||[]),...(r.days[di]?.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                         setPreSessionPRs({...snap});
                         setSessionPRList([]);setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
-                      }}>⚡ {es?"ENTRENAR ESTE DÍA":"TRAIN THIS DAY"}</button>
+                      }}>⚡ {es?"INICIAR ENTRENAMIENTO":"START WORKOUT"}</button>
                     );
                     if(isFuture) return(
                       <div style={{textAlign:"center",padding:"8px",color:textMuted,fontSize:13,fontWeight:700,background:bgSub,borderRadius:12,marginTop:4}}>
@@ -2868,7 +2870,7 @@ function GymApp() {
           </div>
         )}
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
-        <ChatFlotante darkMode={darkMode} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
+        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
       )}
       {false&&session&&activeDay&&(
         <div style={{
@@ -4520,7 +4522,7 @@ function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es}) {
   );
 }
 
-function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode}) {
+function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode, es}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
