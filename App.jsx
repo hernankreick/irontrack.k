@@ -3461,6 +3461,74 @@ function GymApp() {
           </div>
         </div>
       )}
+
+                  {/* ── Modal duplicar día ── */}
+      {dupDayModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setDupDayModal(null)}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,border:"1px solid "+border}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:4}}>
+              {es?"Duplicar":"Duplicate"} {dupDayModal.days[dupDayModal.dIdx]?.label||("Día "+(dupDayModal.dIdx+1))}
+            </div>
+            <div style={{fontSize:13,color:textMuted,marginBottom:16}}>
+              {es?"Seleccioná los días destino":"Select destination days"}
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+              {dupDayModal.days.map(function(d,di){
+                if(di===dupDayModal.dIdx) return (
+                  <div key={di} style={{padding:"10px 16px",borderRadius:12,background:"#2563EB22",border:"2px solid #2563EB",opacity:0.5}}>
+                    <div style={{fontSize:13,fontWeight:800,color:"#2563EB"}}>{d.label||("Día "+(di+1))}</div>
+                    <div style={{fontSize:10,color:textMuted}}>{es?"Origen":"Source"}</div>
+                  </div>
+                );
+                var isSelected = dupDayModal.selected.indexOf(di)!==-1;
+                var tieneEj = ((d.warmup||[]).length+(d.exercises||[]).length)>0;
+                return (
+                  <div key={di} onClick={function(){
+                    setDupDayModal(function(prev){
+                      var sel = prev.selected.indexOf(di)!==-1
+                        ? prev.selected.filter(function(x){return x!==di})
+                        : [...prev.selected, di];
+                      return {...prev, selected:sel};
+                    });
+                  }} style={{padding:"10px 16px",borderRadius:12,cursor:"pointer",transition:"all .15s",
+                    background:isSelected?"#22C55E22":bgSub,
+                    border:isSelected?"2px solid #22C55E":"2px solid "+border}}>
+                    <div style={{fontSize:13,fontWeight:800,color:isSelected?"#22C55E":textMain}}>{d.label||("Día "+(di+1))}</div>
+                    <div style={{fontSize:10,color:textMuted}}>
+                      {tieneEj?((d.warmup||[]).length+(d.exercises||[]).length)+" ej.":"vacío"}
+                    </div>
+                    {isSelected&&<div style={{fontSize:10,fontWeight:700,color:"#22C55E",marginTop:2}}>✓ {es?"Seleccionado":"Selected"}</div>}
+                  </div>
+                );
+              })}
+            </div>
+            {dupDayModal.selected.some(function(di){return ((dupDayModal.days[di]?.warmup||[]).length+(dupDayModal.days[di]?.exercises||[]).length)>0})&&(
+              <div style={{background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:8,padding:"8px 10px",marginBottom:12,fontSize:12,color:"#F59E0B"}}>
+                ⚠ {es?"Algunos días seleccionados tienen ejercicios. Se reemplazarán.":"Some selected days have exercises. They will be replaced."}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setDupDayModal(null)} style={{flex:1,padding:12,background:bgSub,color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"CANCELAR":"CANCEL"}</button>
+              <button onClick={function(){
+                if(dupDayModal.selected.length===0){toast2(es?"Seleccioná al menos un día":"Select at least one day");return;}
+                var src=dupDayModal.sourceDay;
+                var sel=dupDayModal.selected;
+                setRoutines(function(p){return p.map(function(rr){
+                  if(rr.id!==dupDayModal.rId) return rr;
+                  return {...rr,days:rr.days.map(function(dd,ddi){
+                    if(sel.indexOf(ddi)===-1) return dd;
+                    return {...dd,warmup:(src.warmup||[]).map(function(e){return {...e}}),exercises:(src.exercises||[]).map(function(e){return {...e}})};
+                  })};
+                })});
+                toast2((es?"Duplicado a ":"Duplicated to ")+sel.map(function(i){return dupDayModal.days[i]?.label||("Día "+(i+1))}).join(", ")+" ✓");
+                setDupDayModal(null);
+              }} style={{flex:1,padding:12,background:dupDayModal.selected.length>0?"#2563EB":"#2D4057",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                {es?"DUPLICAR":"DUPLICATE"} {dupDayModal.selected.length>0&&("("+dupDayModal.selected.length+")")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
             {/* ── Modal chat entrenador ── */}
       {chatModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setChatModal(null)}>
@@ -5196,73 +5264,6 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
       )}
 
 
-                  {/* ── Modal duplicar día ── */}
-      {dupDayModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setDupDayModal(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,border:"1px solid "+border}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:4}}>
-              {es?"Duplicar":"Duplicate"} {dupDayModal.days[dupDayModal.dIdx]?.label||("Día "+(dupDayModal.dIdx+1))}
-            </div>
-            <div style={{fontSize:13,color:textMuted,marginBottom:16}}>
-              {es?"Seleccioná los días destino":"Select destination days"}
-            </div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
-              {dupDayModal.days.map(function(d,di){
-                if(di===dupDayModal.dIdx) return (
-                  <div key={di} style={{padding:"10px 16px",borderRadius:12,background:"#2563EB22",border:"2px solid #2563EB",opacity:0.5}}>
-                    <div style={{fontSize:13,fontWeight:800,color:"#2563EB"}}>{d.label||("Día "+(di+1))}</div>
-                    <div style={{fontSize:10,color:textMuted}}>{es?"Origen":"Source"}</div>
-                  </div>
-                );
-                var isSelected = dupDayModal.selected.indexOf(di)!==-1;
-                var tieneEj = ((d.warmup||[]).length+(d.exercises||[]).length)>0;
-                return (
-                  <div key={di} onClick={function(){
-                    setDupDayModal(function(prev){
-                      var sel = prev.selected.indexOf(di)!==-1
-                        ? prev.selected.filter(function(x){return x!==di})
-                        : [...prev.selected, di];
-                      return {...prev, selected:sel};
-                    });
-                  }} style={{padding:"10px 16px",borderRadius:12,cursor:"pointer",transition:"all .15s",
-                    background:isSelected?"#22C55E22":bgSub,
-                    border:isSelected?"2px solid #22C55E":"2px solid "+border}}>
-                    <div style={{fontSize:13,fontWeight:800,color:isSelected?"#22C55E":textMain}}>{d.label||("Día "+(di+1))}</div>
-                    <div style={{fontSize:10,color:textMuted}}>
-                      {tieneEj?((d.warmup||[]).length+(d.exercises||[]).length)+" ej.":"vacío"}
-                    </div>
-                    {isSelected&&<div style={{fontSize:10,fontWeight:700,color:"#22C55E",marginTop:2}}>✓ {es?"Seleccionado":"Selected"}</div>}
-                  </div>
-                );
-              })}
-            </div>
-            {dupDayModal.selected.some(function(di){return ((dupDayModal.days[di]?.warmup||[]).length+(dupDayModal.days[di]?.exercises||[]).length)>0})&&(
-              <div style={{background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:8,padding:"8px 10px",marginBottom:12,fontSize:12,color:"#F59E0B"}}>
-                ⚠ {es?"Algunos días seleccionados tienen ejercicios. Se reemplazarán.":"Some selected days have exercises. They will be replaced."}
-              </div>
-            )}
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setDupDayModal(null)} style={{flex:1,padding:12,background:bgSub,color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"CANCELAR":"CANCEL"}</button>
-              <button onClick={function(){
-                if(dupDayModal.selected.length===0){toast2(es?"Seleccioná al menos un día":"Select at least one day");return;}
-                var src=dupDayModal.sourceDay;
-                var sel=dupDayModal.selected;
-                setRoutines(function(p){return p.map(function(rr){
-                  if(rr.id!==dupDayModal.rId) return rr;
-                  return {...rr,days:rr.days.map(function(dd,ddi){
-                    if(sel.indexOf(ddi)===-1) return dd;
-                    return {...dd,warmup:(src.warmup||[]).map(function(e){return {...e}}),exercises:(src.exercises||[]).map(function(e){return {...e}})};
-                  })};
-                })});
-                toast2((es?"Duplicado a ":"Duplicated to ")+sel.map(function(i){return dupDayModal.days[i]?.label||("Día "+(i+1))}).join(", ")+" ✓");
-                setDupDayModal(null);
-              }} style={{flex:1,padding:12,background:dupDayModal.selected.length>0?"#2563EB":"#2D4057",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-                {es?"DUPLICAR":"DUPLICATE"} {dupDayModal.selected.length>0&&("("+dupDayModal.selected.length+")")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {editModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setEditModal(null)}>
