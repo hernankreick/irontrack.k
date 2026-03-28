@@ -883,6 +883,7 @@ function GymApp() {
   const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
   const [videoOverrides, setVideoOverrides] = useState({}); // {ejercicioId: url}
   const [videoModal, setVideoModal] = useState(null); // {url, nombre}
+  const [expandedPlanDay, setExpandedPlanDay] = useState(null); // "rutId-dayIdx"
   const [editEx, setEditEx] = useState(null);
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
@@ -1965,166 +1966,121 @@ function GymApp() {
               </div>
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
-              const diasJSX = r.days.map((d,di)=>{ return (
-                <div key={di} style={{marginBottom:24}}>
-                  <div style={{fontSize:18,fontWeight:700,letterSpacing:1,color:textMuted,marginBottom:8,paddingBottom:8,borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057")}}>
-                    {es?"Dia ":"Day "}{di+1}
-                  </div>
-                  {(d.warmup||[]).length>0&&(
-                    <div style={{marginBottom:12}}>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:bgSub,border:"1px solid "+border,borderRadius:12,marginBottom:8,cursor:"pointer"}}
-                        onClick={()=>setRoutines(p=>p.map(r2=>r2.id===r.id?{...r2,days:r2.days.map((dd,ddi)=>ddi===di?{...dd,showWarmup:!dd.showWarmup}:dd)}:r2))}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span style={{width:4,height:16,borderRadius:2,background:"#F59E0B",flexShrink:0}}/>
-                          <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"ENTRADA EN CALOR":"WARM UP"}</span>
-                          <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({(d.warmup||[]).length} {es?"ejercicios":"exercises"})</span>
-                        </div>
-                        <span style={{fontSize:13,color:textMuted}}>{d.showWarmup?"▲":"▼"}</span>
-                      </div>
-                      <div>
-                      {d.showWarmup&&(d.warmup||[]).map((ex,ei)=>{
-                        const info=allEx.find(e=>e.id===ex.id);
-                        const pat=PATS[info?.pattern]||PATS["core"]||Object.values(PATS)[0]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
-                        return(
-                          <div key={ei} style={{background:"#3B82F608",border:"1px solid "+border,borderRadius:12,padding:"8px 12px",marginBottom:4,display:"flex",alignItems:"center",gap:8}}>
-                            <div style={{width:3,alignSelf:"stretch",borderRadius:2,background:"#8B9AB2",flexShrink:0,marginRight:4}}/>
-                            <div style={{flex:1}}>
-                              <div style={{fontSize:15,fontWeight:700}}>{es?info?.name:info?.nameEn||info?.name}</div>
-                             {info?.youtube&&<a href={info.youtube} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:4,background:"#2563EB22",color:"#8B9AB2",border:"1px solid #243040",borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:700,textDecoration:"none",marginTop:4}}>▶ VER</a>}
-                              {(()=>{
-                                const weeks4=Array.from({length:4},(_,wi)=>(ex.weeks||[])[wi]||{});
-                                const s0=ex.sets||"-"; const r0=ex.reps||"-";
-                                return(
-                                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginTop:8}}>
-                                    {weeks4.map((w,wi)=>{
-                                      const active=wi===currentWeek;
-                                      const s=w.sets||s0; const r=w.reps||r0;
-                                      const kg2=w.kg||ex.kg||"";
-                                      const metodo=ex.progresion||"manual";
-                                      const pausa2=w.pausa||ex.pause||"";
-                                      const filled=!!(w.sets||w.reps||w.kg);
-                                      const objLabel = active ? (
-                                        metodo==="carga"&&kg2 ? kg2+"kg" :
-                                        metodo==="reps" ? (w.reps||ex.reps||"")+" reps" :
-                                        metodo==="series" ? (w.sets||ex.sets||"")+" series" :
-                                        metodo==="pausa"&&pausa2 ? pausa2+"s pausa" :
-                                        null
-                                      ) : null;
-                                      return(
-                                        <div key={wi} style={{background:active?"#2563EB":"#162234",borderRadius:12,padding:active?"12px 6px":"9px 5px",textAlign:"center",border:active?"2px solid #2563EB":filled?"1px solid #243040":"1px solid "+border,transition:"all .2s"}}>
-                                          <div style={{fontSize:active?11:9,fontWeight:700,letterSpacing:1,color:active?"#FFFFFF":"#8B9AB2",marginBottom:active?6:4}}>{active?"→ ":" "}SEM {wi+1}</div>
-                                          <div style={{fontSize:active?18:14,fontWeight:800,color:active?"#FFFFFF":filled?"#FFFFFF":"#8B9AB2"}}>{s}×{r}</div>
-                                          {active&&objLabel?(<div style={{fontSize:14,fontWeight:800,color:"#FFFFFF",marginTop:4}}>{objLabel}</div>):(kg2?<div style={{fontSize:active?12:10,fontWeight:700,color:active?"#FFFFFF":"#8B9AB2",marginTop:4}}>{kg2}kg</div>:null)}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      </div>
-                    </div>
-                  )}
-                  {d.exercises.length>0&&(
-                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:bgSub,border:"1px solid "+border,borderRadius:12,marginBottom:8}}>
-                      <span style={{width:4,height:16,borderRadius:2,background:"#2563EB",flexShrink:0}}/>
-                      <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
-                      <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({d.exercises.length} {es?"ejercicios":"exercises"})</span>
-                    </div>
-                  )}
-                  {d.exercises.length===0&&(d.warmup||[]).length===0&&<div style={{color:"#8B9AB2",fontSize:15,padding:"8px 0"}}>Sin ejercicios</div>}
-                  {d.exercises.map((ex,ei)=>{
-                    const info=allEx.find(e=>e.id===ex.id);
-                    const pat=PATS[info?.pattern]||PATS["core"]||Object.values(PATS)[0]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
-                    const col="#2563EB"; // paleta fija - sin colores de patrón
-                    const weeks=Array.from({length:4},(_,wi)=>(ex.weeks||[])[wi]||{});
-                    return(
-                      <div key={ei} style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"16px",marginBottom:8}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                          <div style={{width:3,alignSelf:"stretch",borderRadius:2,background:border,flexShrink:0,minHeight:54}}/>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:28,fontWeight:800,color:textMain,letterSpacing:0.5}}>{es?info?.name:info?.nameEn||info?.name}</div>
-                            {info?.youtube&&<a href={info.youtube} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:4,background:"#162234",color:"#8B9AB2",border:"1px solid #243040",borderRadius:6,padding:"4px 9px",fontSize:13,fontWeight:700,textDecoration:"none",marginTop:4}}>▶ VER VIDEO</a>}
-                            <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
-                              {ex.kg&&<span style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:6,padding:"4px 8px",fontSize:15,fontWeight:700,color:textMain}}>{ex.kg} kg</span>}
-                              {ex.pause&&<span style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:6,padding:"4px 8px",fontSize:15,color:textMuted}}>⏱ {fmtP(ex.pause)}</span>}
-                            </div>
-                          </div>
-                          <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:"pointer",flexShrink:0}} onClick={()=>setLogModal({...info,...ex})}>Registrar</button>
-                        </div>
-                        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-                          {weeks.map((w,wi)=>{
-                            const active=wi===currentWeek;
-                            const s=w.sets||ex.sets||"-";
-                            const rp=w.reps||ex.reps||"-";
-                            const kg2=w.kg||ex.kg||"";
-                            const metodo=ex.progresion||"manual";
-                            const pausa2=w.pausa||ex.pause||"";
-                            const filled=w.sets||w.reps||w.kg;
-                            const objLabel = active ? (
-                              metodo==="carga"&&kg2 ? kg2+"kg" :
-                              metodo==="reps" ? (w.reps||ex.reps||"")+" reps" :
-                              metodo==="series" ? (w.sets||ex.sets||"")+" series" :
-                              metodo==="pausa"&&pausa2 ? pausa2+"s pausa" :
-                              null
-                            ) : null;
-                            return(
-                              <div key={wi} style={{background:active?"#2563EB":"#162234",borderRadius:12,padding:active?"12px 6px":"9px 5px",textAlign:"center",border:active?"2px solid #2563EB":filled?"1px solid #243040":"1px solid "+border,transition:"all .2s"}}>
-                                <div style={{fontSize:active?11:9,fontWeight:700,letterSpacing:1,color:active?"#FFFFFF":filled?"#8B9AB2":"#8B9AB2",marginBottom:active?6:4}}>{active?"→ ":""}SEM {wi+1}</div>
-                                <div style={{fontSize:active?18:14,fontWeight:800,color:active?"#FFFFFF":filled?"#FFFFFF":"#8B9AB2"}}>{s}x{rp}</div>
-                                {active&&objLabel?(<div style={{fontSize:15,fontWeight:800,color:"#FFFFFF",marginTop:4}}>{objLabel}</div>):(kg2?<div style={{fontSize:active?14:12,fontWeight:700,color:active?"#FFFFFF":"#8B9AB2",marginTop:4}}>{kg2}kg</div>:null)}
-                                {w.note&&<div style={{fontSize:11,color:active?"#8B9AB2":"#8B9AB2",marginTop:4,lineHeight:1.2}}>{w.note}</div>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {(()=>{
-                    const dayKey=r.id+"-"+di+"-w"+currentWeek;
-                    const isDayDone=completedDays.includes(dayKey);
-                    // Calcular nextDayIdx localmente para esta rutina r
-                    const daysCompletedR=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length;
-                    const localNextDayIdx=daysCompletedR < r.days.length ? daysCompletedR : null;
-                    const isNextDay=di===localNextDayIdx;
-                    const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
-                    if(isDayDone) return(
-                      <div style={{textAlign:"center",padding:"8px",color:"#22C55E",fontSize:15,fontWeight:700}}>
-                        ✅ {es?"Día completado esta semana":"Day completed this week"}
-                      </div>
-                    );
-                    if(isNextDay) return(
-                      <button className="hov" style={{...btn("#2563EB"),color:"#fff",width:"100%",marginTop:4,padding:"12px",fontSize:15,fontWeight:900,letterSpacing:1}} onClick={()=>{
-                        const snap={};
-                        [...(r.days[di]?.warmup||[]),...(r.days[di]?.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
-                        setPreSessionPRs({...snap});
-                        setSessionPRList([]);setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
-                      }}>⚡ {es?"INICIAR ENTRENAMIENTO":"START WORKOUT"}</button>
-                    );
-                    if(isFuture) return(
-                      <div style={{textAlign:"center",padding:"8px",color:textMuted,fontSize:13,fontWeight:700,background:bgSub,borderRadius:12,marginTop:4}}>
-                        <Ic name="lock" size={14}/> {es?`Completá el Día ${localNextDayIdx+1} primero`:`Complete Day ${localNextDayIdx+1} first`}
-                      </div>
-                    );
-                    return null;
-                  })()}
-                </div>
-              );
-              });
               return (<div key={r.id} style={{marginBottom:16}}>
                   <div style={{fontSize:28,fontWeight:800,letterSpacing:1,marginBottom:4}}>{r.name}</div>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                    <div style={{fontSize:15,color:textMuted}}>{r.created} · {r.days.length} {es?es?"dias":"days":"days"}{r.note?" · "+r.note:""}</div>
+                    <div style={{fontSize:15,color:textMuted}}>{r.created} · {r.days.length} {es?"dias":"days"}{r.note?" · "+r.note:""}</div>
                     <div style={{display:"flex",gap:8}}>
                       <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",border:"1px solid "+border,color:textMain,borderRadius:8,padding:"8px 12px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onClick={()=>generatePDF(r)}>
                         <Ic name="file-text" size={14}/> PDF
                       </button>
                     </div>
-                  <div>{diasJSX}</div>
+                  </div>
+                  {r.days.map((d,di)=>{
+                    const dayKey=r.id+"-"+di+"-w"+currentWeek;
+                    const isDayDone=completedDays.includes(dayKey);
+                    const daysCompletedR=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length;
+                    const localNextDayIdx=daysCompletedR < r.days.length ? daysCompletedR : null;
+                    const isNextDay=di===localNextDayIdx;
+                    const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
+                    const totalEj=((d.warmup||[]).length+(d.exercises||[]).length);
+                    const isOpen=expandedPlanDay===r.id+"-"+di;
+                    const exNames=(d.exercises||[]).slice(0,3).map(function(ex){var inf=allEx.find(function(e){return e.id===ex.id});return inf?(es?inf.name:(inf.nameEn||inf.name)):ex.id}).join(", ");
+
+                    return(
+                      <div key={di} style={{background:bgCard,border:"1px solid "+(isNextDay?"#2563EB":isDayDone?"#22C55E44":border),borderRadius:12,marginBottom:8,overflow:"hidden"}}>
+                        {/* Header del día - siempre visible */}
+                        <div onClick={function(){setExpandedPlanDay(isOpen?null:r.id+"-"+di)}} style={{padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+                          <div style={{width:36,height:36,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0,
+                            background:isDayDone?"#22C55E22":isNextDay?"#2563EB22":bgSub,
+                            color:isDayDone?"#22C55E":isNextDay?"#2563EB":textMuted,
+                            border:"1px solid "+(isDayDone?"#22C55E44":isNextDay?"#2563EB44":border)}}>
+                            {isDayDone?"✓":(di+1)}
+                          </div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:15,fontWeight:700,color:textMain}}>{d.label||((es?"Día ":"Day ")+(di+1))}</div>
+                            <div style={{fontSize:12,color:textMuted,marginTop:1}}>
+                              {totalEj} {es?"ejercicios":"exercises"}{!isOpen&&exNames?" · "+exNames:""}
+                            </div>
+                          </div>
+                          {isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#22C55E",flexShrink:0}}>{es?"Listo":"Done"}</span>}
+                          {isNextDay&&!isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#2563EB",flexShrink:0}}>{es?"Siguiente":"Next"}</span>}
+                          <span style={{fontSize:13,color:textMuted,flexShrink:0}}>{isOpen?"▲":"▼"}</span>
+                        </div>
+
+                        {/* Contenido expandido */}
+                        {isOpen&&(
+                          <div style={{padding:"0 14px 14px",borderTop:"1px solid "+border}}>
+                            {(d.warmup||[]).length>0&&(
+                              <div style={{marginTop:8,marginBottom:8}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                  <span style={{width:3,height:12,borderRadius:2,background:"#F59E0B"}}/>
+                                  <span style={{fontSize:11,fontWeight:700,color:"#F59E0B",letterSpacing:1}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</span>
+                                </div>
+                                {(d.warmup||[]).map(function(ex,ei){
+                                  var inf=allEx.find(function(e){return e.id===ex.id});
+                                  var vUrl=(videoOverrides&&videoOverrides[ex.id])||inf?.youtube||"";
+                                  return(
+                                    <div key={ei} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
+                                      <div style={{width:3,height:16,borderRadius:2,background:"#F59E0B44",flexShrink:0}}/>
+                                      <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
+                                      <span style={{fontSize:11,color:textMuted}}>{ex.sets||"-"}×{ex.reps||"-"}</span>
+                                      {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:es?inf?.name:(inf?.nameEn||inf?.name)});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <div style={{marginBottom:8}}>
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                <span style={{width:3,height:12,borderRadius:2,background:"#2563EB"}}/>
+                                <span style={{fontSize:11,fontWeight:700,color:"#2563EB",letterSpacing:1}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
+                              </div>
+                              {d.exercises.map(function(ex,ei){
+                                var inf=allEx.find(function(e){return e.id===ex.id});
+                                var vUrl=(videoOverrides&&videoOverrides[ex.id])||inf?.youtube||"";
+                                var w=((ex.weeks||[])[currentWeek])||{};
+                                var s=w.sets||ex.sets||"-";
+                                var rp=w.reps||ex.reps||"-";
+                                var kg2=w.kg||ex.kg||"";
+                                return(
+                                  <div key={ei} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:ei<d.exercises.length-1?"1px solid "+border:"none"}}>
+                                    <div style={{width:3,height:20,borderRadius:2,background:border,flexShrink:0}}/>
+                                    <div style={{flex:1,minWidth:0}}>
+                                      <div style={{fontSize:15,fontWeight:700,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
+                                      <div style={{fontSize:12,color:textMuted,marginTop:1}}>
+                                        {s}×{rp}{kg2?" · "+kg2+"kg":""}{ex.pause?" · "+fmtP(ex.pause):""}
+                                      </div>
+                                    </div>
+                                    {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:es?inf?.name:(inf?.nameEn||inf?.name)});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {/* Botón iniciar/estado del día */}
+                            {isDayDone&&(
+                              <div style={{textAlign:"center",padding:"8px",color:"#22C55E",fontSize:13,fontWeight:700}}>
+                                ✅ {es?"Día completado esta semana":"Day completed this week"}
+                              </div>
+                            )}
+                            {isNextDay&&!isDayDone&&(
+                              <button className="hov" style={{width:"100%",marginTop:4,padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:900,letterSpacing:1,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
+                                var snap={};
+                                [].concat(d.warmup||[],d.exercises||[]).forEach(function(ex){snap[ex.id]=progress[ex.id]?.max||0});
+                                setPreSessionPRs(snap);
+                                setSessionPRList([]);setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
+                              }}>{es?"INICIAR ENTRENAMIENTO":"START WORKOUT"}</button>
+                            )}
+                            {isFuture&&(
+                              <div style={{textAlign:"center",padding:"8px",color:textMuted,fontSize:12,fontWeight:700,background:bgSub,borderRadius:8,marginTop:4}}>
+                                <Ic name="lock" size={13}/> {es?"Completá el Día "+(localNextDayIdx+1)+" primero":"Complete Day "+(localNextDayIdx+1)+" first"}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
                     background:bgCard,borderRadius:12,padding:"8px 16px",border:"1px solid "+border,
                     marginBottom:4}}>
