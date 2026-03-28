@@ -281,12 +281,18 @@ const sb = {
   addMensaje: (data) => sbFetch("mensajes", "POST", data),
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
+  getVideoOverrides: () => sbFetch("video_overrides?select=ejercicio_id,youtube_url"),
+  setVideoOverride: async (ejercicioId, url) => {
+    await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE");
+    return sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"});
+  },
 };
 
 
 
 const uid = () => Math.random().toString(36).slice(2,9);
 const normalizeFecha = (f) => { if(!f) return ''; const parts=f.split('/'); if(parts.length===3) return parts.map(function(p){return p.padStart(2,'0')}).join('/'); return f; };
+const getYTVideoId = (url) => { if(!url) return null; try { if(url.includes("shorts/")) return url.split("shorts/")[1].split("?")[0].split("&")[0]; if(url.includes("v=")) return url.split("v=")[1].split("&")[0]; if(url.includes("youtu.be/")) return url.split("youtu.be/")[1].split("?")[0]; } catch(e){} return null; };
 
 // ═══════════════════════════════════════════════════════════════
 // MOTOR DE SUGERENCIAS POR EJERCICIO
@@ -875,6 +881,8 @@ function GymApp() {
   const [newR, setNewR] = useState(null);
   const [dupDayModal, setDupDayModal] = useState(null); // {rId, dIdx, days}
   const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
+  const [videoOverrides, setVideoOverrides] = useState({}); // {ejercicioId: url}
+  const [videoModal, setVideoModal] = useState(null); // {url, nombre}
   const [editEx, setEditEx] = useState(null);
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
@@ -1085,6 +1093,14 @@ function GymApp() {
     sb.getConfig().then(res => {
       if(res && res[0]) setAliasData(res[0]);
     }).catch(()=>{});
+    // Cargar video overrides
+    sb.getVideoOverrides().then(function(res){
+      if(res && Array.isArray(res)) {
+        var map = {};
+        res.forEach(function(r){ map[r.ejercicio_id] = r.youtube_url; });
+        setVideoOverrides(map);
+      }
+    }).catch(function(){});
   }, []);
 
   const toast2 = msg => { setToast(msg); setTimeout(()=>setToast(null),2200); };
@@ -1435,7 +1451,7 @@ function GymApp() {
           es={es}
           darkMode={darkMode}
           prCelebration={prCelebration}
-          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx} sessionData={sessionData} onSesionGuardada={cargarSesionesGlobales} sessionPRList={sessionPRList}/>
+          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx} sessionData={sessionData} onSesionGuardada={cargarSesionesGlobales} sessionPRList={sessionPRList} videoOverrides={videoOverrides} setVideoModal={setVideoModal}/>
       )}
 
       <div
@@ -2216,8 +2232,8 @@ function GymApp() {
         )}
         {tab==="library"&&(
           <div>
-            {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines}/>}
-            {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab}/>}
+            {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal}/>}
+            {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>}
           </div>
         )}
         {tab==="routines"&&!esAlumno&&(
@@ -2445,7 +2461,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
           </div>
         )}
         {tab==="progress"&&(readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId)&&(
@@ -2465,7 +2481,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
           </div>
         )}
         {tab==="progress"&&(
@@ -2481,7 +2497,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
           </div>
         )}
         {tab==="progress"&&(
@@ -3529,6 +3545,24 @@ function GymApp() {
           </div>
         </div>
       )}
+            {/* ── Modal video embebido ── */}
+      {videoModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.95)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}} onClick={()=>setVideoModal(null)}>
+          <div style={{width:"100%",maxWidth:480,padding:"0 16px"}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{videoModal.nombre||""}</div>
+              <button onClick={()=>setVideoModal(null)} style={{background:"none",border:"none",color:"#8B9AB2",fontSize:24,cursor:"pointer"}}>✕</button>
+            </div>
+            <div style={{position:"relative",paddingBottom:"56.25%",height:0,borderRadius:12,overflow:"hidden"}}>
+              <iframe
+                src={"https://www.youtube.com/embed/"+videoModal.videoId+"?autoplay=1&rel=0&modestbranding=1"}
+                style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+                allow="autoplay; encrypted-media" allowFullScreen/>
+            </div>
+          </div>
+        </div>
+      )}
+
             {/* ── Modal chat entrenador ── */}
       {chatModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setChatModal(null)}>
@@ -3865,7 +3899,7 @@ function GymApp() {
   );
 }
 
-function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData, onSesionGuardada, sessionPRList}) {
+function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData, onSesionGuardada, sessionPRList, videoOverrides, setVideoModal}) {
 
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
@@ -4105,13 +4139,13 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
                     {ex.sets}×{ex.reps} {ex.kg?("· "+ex.kg+"kg"):""} {ex.pause?("· "+fmtTime(ex.pause)+" desc"):""}
                   </div>
                 </div>
-                {info?.youtube&&(
-                  <a href={info.youtube} target="_blank" rel="noreferrer"
+                {(()=>{var vUrl=(videoOverrides&&videoOverrides[ex.id])||info?.youtube;if(!vUrl)return null;return(
+                  <button onClick={function(){var vid=getYTVideoId(vUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:es?info?.name:(info?.nameEn||info?.name)})}else{window.open(vUrl,"_blank")}}}
                     style={{background:"#2D4057",color:"#2563EB",border:"1px solid #243040",
-                      borderRadius:8,padding:"8px 8px",fontSize:13,fontWeight:700,textDecoration:"none",flexShrink:0}}>
+                      borderRadius:8,padding:"8px 8px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>
                     ▶
-                  </a>
-                )}
+                  </button>
+                )})()}
               </div>
               {(pr>0||ultimoSet)&&(
                 <div style={{display:"flex",gap:8,marginTop:8}}>
@@ -5038,7 +5072,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
   );
 }
 
-function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
+function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, videoOverrides, setVideoOverrides, setVideoModal}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
@@ -5062,7 +5096,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
   const [newEquip, setNewEquip] = React.useState("");
   const [newYT, setNewYT] = React.useState("");
   const [borrarId, setBorrarId] = React.useState(null);
-  const [ytOverrides, setYtOverrides] = React.useState(()=>{try{return JSON.parse(localStorage.getItem("it_yt_ov")||"{}")}catch(e){return {}}});
+  const ytOverrides = videoOverrides || {};
 
   const patrones = ["todos","empuje","traccion","rodilla","bisagra","core","movilidad","cardio","oly"];
   const musculos = ["todos","Cuadriceps","Gluteo","Isquios","Pecho","Dorsal","Hombro","Biceps","Triceps","Core","Pantorrilla"];
@@ -5093,11 +5127,13 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
       const updated = customEx.map(e=>e.id===editModal.id?{...e,name:editNombre,youtube:editYT}:e);
       setCustomEx(updated);
       localStorage.setItem("it_cex", JSON.stringify(updated));
-    } else {
-      // Ejercicio base: guardar solo el override de youtube
-      const newOverrides = {...ytOverrides, [editModal.id]: editYT};
-      setYtOverrides(newOverrides);
-      localStorage.setItem("it_yt_ov", JSON.stringify(newOverrides));
+    }
+    // Guardar override de youtube en Supabase
+    if(editYT) {
+      try {
+        await sb.setVideoOverride(editModal.id, editYT);
+        if(setVideoOverrides) setVideoOverrides(function(prev){return {...prev, [editModal.id]: editYT}});
+      } catch(e){ console.error("[videoOverride]",e); }
     }
     setEditModal(null); toast2(es?"Link actualizado ✓":"Link updated ✓");
   };
@@ -6046,7 +6082,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
 }
 
 
-function LibraryAlumno({allEx, es, darkMode, routines}) {
+function LibraryAlumno({allEx, es, darkMode, routines, videoOverrides, setVideoModal}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bgCard = _dm?"#162234":"#FFFFFF";
   const bgSub = _dm?"#162234":"#EEF2F7";
@@ -6092,7 +6128,8 @@ function LibraryAlumno({allEx, es, darkMode, routines}) {
         var nombre = info ? (es ? info.name : (info.nameEn||info.name)) : item.id;
         var musculo = info?.muscle || "";
         var patron = info?.pattern || "";
-        var tieneVideo = info?.youtube;
+        var tieneVideo = (videoOverrides&&videoOverrides[item.id]) || info?.youtube;
+        var videoUrl = (videoOverrides&&videoOverrides[item.id]) || info?.youtube || "";
         var PAT_ICONS = {rodilla:"🦵",bisagra:"🏋️",empuje:"💪",traccion:"🏗️",core:"🎯",movilidad:"🧘",cardio:"🏃",oly:"🏋️"};
         var iconPat = PAT_ICONS[patron] || "💪";
 
@@ -6112,10 +6149,10 @@ function LibraryAlumno({allEx, es, darkMode, routines}) {
                 </div>
               </div>
               {tieneVideo&&(
-                <a href={info.youtube} target="_blank" rel="noopener noreferrer"
+                <button onClick={function(){var vid=getYTVideoId(videoUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:nombre})}else{window.open(videoUrl,"_blank")}}}
                   style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",
                     background:"#EF4444",color:"#fff",border:"none",
-                    borderRadius:10,textDecoration:"none",fontSize:16,flexShrink:0,fontWeight:700}}>▶</a>
+                    borderRadius:10,fontSize:16,flexShrink:0,fontWeight:700,cursor:"pointer"}}>▶</button>
               )}
             </div>
           </div>
