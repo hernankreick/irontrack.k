@@ -1975,7 +1975,7 @@ function GymApp() {
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:bgSub,border:"1px solid "+border,borderRadius:12,marginBottom:8,cursor:"pointer"}}
                         onClick={()=>setRoutines(p=>p.map(r2=>r2.id===r.id?{...r2,days:r2.days.map((dd,ddi)=>ddi===di?{...dd,showWarmup:!dd.showWarmup}:dd)}:r2))}>
                         <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span>🔥</span>
+                          <span style={{width:4,height:16,borderRadius:2,background:"#F59E0B",flexShrink:0}}/>
                           <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"ENTRADA EN CALOR":"WARM UP"}</span>
                           <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({(d.warmup||[]).length} {es?"ejercicios":"exercises"})</span>
                         </div>
@@ -2030,7 +2030,7 @@ function GymApp() {
                   )}
                   {d.exercises.length>0&&(
                     <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:bgSub,border:"1px solid "+border,borderRadius:12,marginBottom:8}}>
-                      <span>💪</span>
+                      <span style={{width:4,height:16,borderRadius:2,background:"#2563EB",flexShrink:0}}/>
                       <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
                       <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({d.exercises.length} {es?"ejercicios":"exercises"})</span>
                     </div>
@@ -2372,7 +2372,7 @@ function GymApp() {
                   <div style={{marginBottom:8}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:hasWarmup||d.showWarmup?6:0}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:15}}>🔥</span>
+                        <span style={{width:4,height:16,borderRadius:2,background:"#F59E0B",flexShrink:0}}/>
                         <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"ENTRADA EN CALOR":"WARM UP"}</span>
                         {hasWarmup&&<span style={{fontSize:15,color:textMuted,fontWeight:700}}>({(d.warmup||[]).length})</span>}
                       </div>
@@ -2387,7 +2387,7 @@ function GymApp() {
                   <div>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:15}}>💪</span>
+                        <span style={{width:4,height:16,borderRadius:2,background:"#2563EB",flexShrink:0}}/>
                         <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
                         <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({d.exercises.length})</span>
                       </div>
@@ -2749,7 +2749,7 @@ function GymApp() {
                                 <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{d.label||("Día "+(di+1))} · {((d.warmup||[]).length+(d.exercises||[]).length)} ej.</div>
                                 {(d.warmup||[]).length>0&&(
                                   <div style={{marginBottom:8}}>
-                                    <div style={{fontSize:10,fontWeight:700,color:"#F59E0B",letterSpacing:1,marginBottom:4}}>🔥 {es?"ENTRADA EN CALOR":"WARM-UP"}</div>
+                                    <div style={{fontSize:10,fontWeight:700,color:"#F59E0B",letterSpacing:1,marginBottom:4}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</div>
                                     {(d.warmup||[]).map((ex,ei)=>{
                                       const exInfo=allEx.find(e=>e.id===ex.id);
                                       return <div key={"w"+ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
@@ -2762,7 +2762,7 @@ function GymApp() {
                                     <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"warmup"});setAddExSearch("");setAddExPat(null);}} style={{width:"100%",marginTop:4,padding:"4px",background:"transparent",border:"1px dashed #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit"}}>+ {es?"Añadir calentamiento":"Add warm-up"}</button>
                                   </div>
                                 )}
-                                <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1,marginBottom:4}}>💪 {es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</div>
+                                <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1,marginBottom:4}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</div>
                                 {(d.exercises||[]).map((ex,ei)=>{
                                   const exInfo=allEx.find(e=>e.id===ex.id);
                                   return <div key={ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.exercises||[]).length-1?"1px solid "+border:"none"}}>
@@ -6130,15 +6130,13 @@ function LibraryAlumno({allEx, es, darkMode, routines, videoOverrides, setVideoM
         var patron = info?.pattern || "";
         var tieneVideo = (videoOverrides&&videoOverrides[item.id]) || info?.youtube;
         var videoUrl = (videoOverrides&&videoOverrides[item.id]) || info?.youtube || "";
-        var PAT_ICONS = {rodilla:"🦵",bisagra:"🏋️",empuje:"💪",traccion:"🏗️",core:"🎯",movilidad:"🧘",cardio:"🏃",oly:"🏋️"};
-        var iconPat = PAT_ICONS[patron] || "💪";
+        var PAT_COLORS = {rodilla:"#22C55E",bisagra:"#8B9AB2",empuje:"#2563EB",traccion:"#60A5FA",core:"#F59E0B",movilidad:"#A78BFA",cardio:"#EF4444",oly:"#8B9AB2"};
+        var barColor = PAT_COLORS[patron] || "#2563EB";
 
         return (
           <div key={item.id} style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"14px",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:44,height:44,borderRadius:12,background:"#2563EB15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>
-                {iconPat}
-              </div>
+              <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:barColor,flexShrink:0,minHeight:36}}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:16,fontWeight:800,color:textMain,marginBottom:2}}>{nombre}</div>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
