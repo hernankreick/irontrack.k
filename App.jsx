@@ -2112,7 +2112,6 @@ function GymApp() {
                       </div>
                     </div>
 
-                    </div>
                     <button className="hov"
                       onClick={()=>currentWeek<3&&setCurrentWeek(w=>w+1)}
                       style={{width:36,height:36,borderRadius:8,border:"1px solid "+border,
@@ -2122,7 +2121,7 @@ function GymApp() {
                         display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>›</button>
                   </div>
 
-                {/* Sparkline de tendencia 30 días */}
+                  {/* Sparkline de tendencia 30 días */}
                 {(()=>{
                   const setsAlu = Object.values(progress||{})
                     .flatMap(pg => (pg.sets||[]))
