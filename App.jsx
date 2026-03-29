@@ -283,8 +283,8 @@ const sb = {
   setNota: (data) => sbFetch("notas", "POST", data),
   getVideoOverrides: () => sbFetch("video_overrides?select=ejercicio_id,youtube_url"),
   setVideoOverride: async (ejercicioId, url) => {
-    await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE");
-    return sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"});
+    try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
+    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
   },
 };
 
@@ -2396,8 +2396,8 @@ function GymApp() {
                       if(rActual.saved){
                         await sb.updateRutina(rActual.id,payload);
                       } else {
-                        await sb.createRutina({...payload,id:rActual.id});
-                        setRoutines(p=>p.map(rr=>rr.id===rActual.id?{...rr,saved:true}:rr));
+                        const res = await sb.createRutina(payload);
+                        if(res&&res[0]){setRoutines(p=>p.map(rr=>rr.id===rActual.id?{...rr,id:res[0].id,saved:true}:rr));}
                       }
                       toast2(es?"Rutina guardada ✓":"Routine saved ✓");
                     }catch(e){toast2("Error al guardar");}
@@ -3553,7 +3553,7 @@ function GymApp() {
                 const updatedDays = rActual.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
                 const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
-                else { await sb.createRutina({...payload,id:rActual.id}); setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,saved:true}:r)); }
+                else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
               } else {
                 // Buscar en rutinasSB (edición desde vista alumno)
                 const rSB = rutinasSB.find(x=>x.id===editEx.rId);
@@ -3749,11 +3749,11 @@ function GymApp() {
               ))}
             </div>
             <div style={{overflowY:"auto",flex:1}}>
-              {EX.filter(e=>{
+              {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
                 if(!q) return true;
-                return e.name.toLowerCase().includes(q)||e.nameEn.toLowerCase().includes(q)||e.muscle.toLowerCase().includes(q);
+                return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||(e.muscle||"").toLowerCase().includes(q);
               }).map(ex=>{
                 const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
                 return(
