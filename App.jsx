@@ -2655,19 +2655,18 @@ function GymApp() {
                             <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:4}}>{dias.length} {es?"días":"days"}</div>
                             {/* ── Info de semana ── */}
                             {(()=>{
-                              const sesAlu = (alumnoSesiones||[]).sort(function(x,y){return new Date(y.created_at||y.fecha)-new Date(x.created_at||x.fecha)});
-                              // Semana del ciclo: la más alta registrada en sesiones
-                              const semanaCiclo = sesAlu.length > 0 ? Math.max.apply(null, sesAlu.map(function(s){return parseInt(s.semana)||1})) : 1;
-                              // Sesiones en la semana actual del ciclo
-                              const sesEstaSemana = sesAlu.filter(function(s){return (parseInt(s.semana)||1) === semanaCiclo});
-                              const diasCompletados = sesEstaSemana.length;
-                              // Semana calendario
+                              // Usar currentWeek global (sincronizado con el alumno)
+                              const semanaCiclo = currentWeek + 1;
+                              // Días completados esta semana desde completedDays
+                              const rId = rutinaActiva.id;
+                              const diasCompletados = completedDays.filter(function(k){return k.startsWith(rId+"-") && k.endsWith("-w"+currentWeek)}).length;
+                              // Semana calendario (corregido para fin de mes)
                               const hoyDate = new Date();
                               const inicioSemana = new Date(hoyDate);
-                              inicioSemana.setDate(hoyDate.getDate() - hoyDate.getDay() + 1);
-                              const diaSem = inicioSemana.getDate();
-                              const mesSem = inicioSemana.getMonth() + 1;
-                              const semCalLabel = diaSem + "/" + mesSem + " — " + (diaSem+6) + "/" + mesSem;
+                              inicioSemana.setDate(hoyDate.getDate() - ((hoyDate.getDay()+6)%7));
+                              const finSemana = new Date(inicioSemana);
+                              finSemana.setDate(inicioSemana.getDate() + 6);
+                              const semCalLabel = inicioSemana.getDate() + "/" + (inicioSemana.getMonth()+1) + " — " + finSemana.getDate() + "/" + (finSemana.getMonth()+1);
                               return (
                                 <>
                                 <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
