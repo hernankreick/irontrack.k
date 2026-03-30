@@ -282,6 +282,10 @@ const sb = {
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
   getVideoOverrides: () => sbFetch("video_overrides?select=ejercicio_id,youtube_url"),
+  getCustomEx: () => sbFetch("ejercicios_custom?entrenador_id=eq.entrenador_principal&select=*"),
+  addCustomEx: (data) => sbFetch("ejercicios_custom", "POST", data),
+  deleteCustomEx: (id) => sbFetch("ejercicios_custom?id=eq."+id, "DELETE"),
+  updateCustomEx: (id, data) => sbFetch("ejercicios_custom?id=eq."+id, "PATCH", data),
   setVideoOverride: async (ejercicioId, url) => {
     try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
     try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
@@ -1100,6 +1104,18 @@ function GymApp() {
         var map = {};
         res.forEach(function(r){ map[r.ejercicio_id] = r.youtube_url; });
         setVideoOverrides(map);
+      }
+    }).catch(function(){});
+    // Cargar ejercicios custom desde Supabase
+    sb.getCustomEx().then(function(res){
+      if(res && Array.isArray(res) && res.length > 0) {
+        var exs = res.map(function(e){ return {id:e.id, name:e.name, nameEn:e.name_en||e.name, pattern:e.pattern||"empuje", muscle:e.muscle||"", equip:e.equip||"Libre", youtube:e.youtube||""}; });
+        setCustomEx(function(prev){
+          // Merge: Supabase tiene prioridad, agregar locales que no estén
+          var ids = new Set(exs.map(function(e){return e.id}));
+          var locales = (prev||[]).filter(function(e){return !ids.has(e.id)});
+          return [...exs, ...locales];
+        });
       }
     }).catch(function(){});
   }, []);
@@ -5082,6 +5098,8 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
       const updated = customEx.map(e=>e.id===editModal.id?{...e,name:editNombre,youtube:editYT}:e);
       setCustomEx(updated);
       localStorage.setItem("it_cex", JSON.stringify(updated));
+      // Actualizar en Supabase
+      try { await sb.updateCustomEx(editModal.id, {name:editNombre, youtube:editYT}); } catch(e){}
     }
     // Guardar override de youtube en Supabase
     if(editYT) {
@@ -5092,18 +5110,23 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
     }
     setEditModal(null); toast2(es?"Link actualizado ✓":"Link updated ✓");
   };
-  const borrarEjercicio = (id) => {
+  const borrarEjercicio = async (id) => {
     const updated = customEx.filter(e=>e.id!==id);
     setCustomEx(updated);
     localStorage.setItem("it_cex", JSON.stringify(updated));
+    try { await sb.deleteCustomEx(id); } catch(e){}
     setBorrarId(null); toast2(es?"Ejercicio eliminado ✓":"Exercise deleted ✓");
   };
-  const agregarEjercicio = () => {
+  const agregarEjercicio = async () => {
     if(!newNombre.trim()){toast2(es?"Ingresa un nombre":"Enter a name");return;}
     const newEx = {id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, pattern:newPat, muscle:newMus, equip:newEquip||"Libre", youtube:newYT};
     const updated = [...(customEx||[]), newEx];
     setCustomEx(updated);
     localStorage.setItem("it_cex", JSON.stringify(updated));
+    // Guardar en Supabase
+    try {
+      await sb.addCustomEx({id:newEx.id, name:newEx.name, name_en:newEx.nameEn, pattern:newEx.pattern, muscle:newEx.muscle, equip:newEx.equip, youtube:newEx.youtube, entrenador_id:"entrenador_principal"});
+    } catch(e){ console.error("[addCustomEx]",e); }
     setNewNombre(""); setNewPat("empuje"); setNewMus(""); setNewEquip(""); setNewYT("");
     setTab(0); toast2(es?"Ejercicio agregado ✓":"Exercise added ✓");
   };
