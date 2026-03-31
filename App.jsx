@@ -1635,38 +1635,49 @@ function GymApp() {
                           {es?"REGISTRAR SET "+(setsHoy.length+1):"LOG SET "+(setsHoy.length+1)}
                         </div>
                         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                          <div style={{background:bgSub,borderRadius:12,padding:"8px 6px",textAlign:"center",border:"1px solid "+border}}>
-                            <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>PESO (KG)</div>
-                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                          <div style={{background:bgSub,borderRadius:12,padding:"10px 6px",textAlign:"center",border:"1px solid "+border}}>
+                            <div style={{fontSize:12,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>PESO (KG)</div>
+                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                               <button className="hov" id={"kg-minus-"+activeExIdx}
-                                style={{width:44,height:44,background:bgCard,border:"1px solid "+border,borderRadius:12,
-                                  fontSize:22,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
+                                style={{width:52,height:52,background:bgCard,border:"1px solid "+border,borderRadius:14,
+                                  fontSize:24,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
                                   display:"flex",alignItems:"center",justifyContent:"center"}}
                                 onClick={()=>{
                                   const el=document.getElementById("kg-inp-"+activeExIdx);
                                   if(el) el.value=String(Math.max(0,(parseFloat(el.value)||0)-2.5));
-                                }}>−</button>
+                                }}
+                                onTouchStart={function(e){var el=document.getElementById("kg-inp-"+activeExIdx);this._holdTimer=setTimeout(function(){this._holding=true;el.value=String(Math.max(0,(parseFloat(el.value)||0)-5))}.bind(this),400)}.bind(this)}
+                                onTouchEnd={function(){clearTimeout(this._holdTimer);this._holding=false}}
+                                onMouseDown={function(e){var el=document.getElementById("kg-inp-"+activeExIdx);this._holdTimer=setTimeout(function(){this._holding=true;el.value=String(Math.max(0,(parseFloat(el.value)||0)-5))}.bind(this),400)}.bind(this)}
+                                onMouseUp={function(){clearTimeout(this._holdTimer);this._holding=false}}
+                                >−</button>
                               <input id={"kg-inp-"+activeExIdx}
                                 type="number" defaultValue={lastKg||""}
                                 placeholder={lastKg||"0"}
-                                style={{...inp,textAlign:"center",fontSize:26,fontWeight:900,color:textMain,
-                                  width:0,flex:1,height:44,padding:"0 2px",minWidth:0}}/>
+                                style={{...inp,textAlign:"center",fontSize:32,fontWeight:900,color:textMain,
+                                  width:0,flex:1,height:52,padding:"0 2px",minWidth:0,borderRadius:14}}/>
                               <button className="hov" id={"kg-plus-"+activeExIdx}
-                                style={{width:44,height:44,background:bgCard,border:"1px solid "+border,borderRadius:12,
-                                  fontSize:22,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
+                                style={{width:52,height:52,background:"#2563EB22",border:"1px solid #2563EB44",borderRadius:14,
+                                  fontSize:24,fontWeight:900,color:"#2563EB",cursor:"pointer",flexShrink:0,
                                   display:"flex",alignItems:"center",justifyContent:"center"}}
                                 onClick={()=>{
                                   const el=document.getElementById("kg-inp-"+activeExIdx);
                                   if(el) el.value=String((parseFloat(el.value)||0)+2.5);
-                                }}>+</button>
+                                }}
+                                onTouchStart={function(e){var el=document.getElementById("kg-inp-"+activeExIdx);this._holdTimer=setTimeout(function(){this._holding=true;el.value=String((parseFloat(el.value)||0)+5)}.bind(this),400)}.bind(this)}
+                                onTouchEnd={function(){clearTimeout(this._holdTimer);this._holding=false}}
+                                onMouseDown={function(e){var el=document.getElementById("kg-inp-"+activeExIdx);this._holdTimer=setTimeout(function(){this._holding=true;el.value=String((parseFloat(el.value)||0)+5)}.bind(this),400)}.bind(this)}
+                                onMouseUp={function(){clearTimeout(this._holdTimer);this._holding=false}}
+                                >+</button>
                             </div>
+                            <div style={{fontSize:10,color:textMuted,marginTop:4}}>{es?"Mantené para ±5kg":"Hold for ±5kg"}</div>
                           </div>
-                          <div style={{background:bgSub,borderRadius:12,padding:"8px 6px",textAlign:"center",border:"1px solid "+border}}>
-                            <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>REPS</div>
-                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
+                          <div style={{background:bgSub,borderRadius:12,padding:"10px 6px",textAlign:"center",border:"1px solid "+border}}>
+                            <div style={{fontSize:12,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>REPS</div>
+                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                               <button className="hov" id={"rp-minus-"+activeExIdx}
-                                style={{width:44,height:44,background:bgCard,border:"1px solid "+border,borderRadius:12,
-                                  fontSize:22,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
+                                style={{width:52,height:52,background:bgCard,border:"1px solid "+border,borderRadius:14,
+                                  fontSize:24,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
                                   display:"flex",alignItems:"center",justifyContent:"center"}}
                                 onClick={()=>{
                                   const el=document.getElementById("rp-inp-"+activeExIdx);
@@ -1674,11 +1685,11 @@ function GymApp() {
                                 }}>−</button>
                               <input id={"rp-inp-"+activeExIdx}
                                 type="number" defaultValue={targetReps}
-                                style={{...inp,textAlign:"center",fontSize:26,fontWeight:900,color:textMain,
-                                  width:0,flex:1,height:44,padding:"0 2px",minWidth:0}}/>
+                                style={{...inp,textAlign:"center",fontSize:32,fontWeight:900,color:textMain,
+                                  width:0,flex:1,height:52,padding:"0 2px",minWidth:0,borderRadius:14}}/>
                               <button className="hov" id={"rp-plus-"+activeExIdx}
-                                style={{width:44,height:44,background:bgCard,border:"1px solid "+border,borderRadius:12,
-                                  fontSize:22,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
+                                style={{width:52,height:52,background:"#22C55E22",border:"1px solid #22C55E44",borderRadius:14,
+                                  fontSize:24,fontWeight:900,color:"#22C55E",cursor:"pointer",flexShrink:0,
                                   display:"flex",alignItems:"center",justifyContent:"center"}}
                                 onClick={()=>{
                                   const el=document.getElementById("rp-inp-"+activeExIdx);
@@ -2037,10 +2048,10 @@ function GymApp() {
                                   var inf=allEx.find(function(e){return e.id===ex.id});
                                   var vUrl=(videoOverrides&&videoOverrides[ex.id])||inf?.youtube||"";
                                   return(
-                                    <div key={ei} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
-                                      <div style={{width:3,height:16,borderRadius:2,background:"#F59E0B44",flexShrink:0}}/>
-                                      <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
-                                      <span style={{fontSize:11,color:textMuted}}>{ex.sets||"-"}×{ex.reps||"-"}</span>
+                                    <div key={ei} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
+                                      <div style={{width:3,height:20,borderRadius:2,background:"#F59E0B44",flexShrink:0}}/>
+                                      <div style={{flex:1,fontSize:16,fontWeight:700,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
+                                      <span style={{fontSize:13,color:"#A3B4CC",fontWeight:600}}>{ex.sets||"-"}×{ex.reps||"-"}</span>
                                       {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:es?inf?.name:(inf?.nameEn||inf?.name)});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
                                     </div>
                                   );
@@ -2060,12 +2071,12 @@ function GymApp() {
                                 var rp=w.reps||ex.reps||"-";
                                 var kg2=w.kg||ex.kg||"";
                                 return(
-                                  <div key={ei} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:ei<d.exercises.length-1?"1px solid "+border:"none"}}>
-                                    <div style={{width:3,height:20,borderRadius:2,background:border,flexShrink:0}}/>
+                                  <div key={ei} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 0",borderBottom:ei<d.exercises.length-1?"1px solid "+border:"none"}}>
+                                    <div style={{width:3,height:24,borderRadius:2,background:border,flexShrink:0}}/>
                                     <div style={{flex:1,minWidth:0}}>
-                                      <div style={{fontSize:15,fontWeight:700,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
-                                      <div style={{fontSize:12,color:textMuted,marginTop:1}}>
-                                        {s}×{rp}{kg2?" · "+kg2+"kg":""}{ex.pause?" · "+fmtP(ex.pause):""}
+                                      <div style={{fontSize:17,fontWeight:800,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
+                                      <div style={{fontSize:13,color:"#A3B4CC",fontWeight:500,marginTop:2,display:"flex",gap:6,flexWrap:"wrap"}}>
+                                        <span style={{fontWeight:700}}>{s}×{rp}</span>{kg2&&<span>{kg2}kg</span>}{ex.pause&&<span>⏱ {fmtP(ex.pause)}</span>}
                                       </div>
                                     </div>
                                     {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:es?inf?.name:(inf?.nameEn||inf?.name)});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
@@ -4099,14 +4110,16 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
                   {pat.icon}
                 </div>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:28,fontWeight:900,color:textMain,lineHeight:1.1,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <div style={{fontSize:24,fontWeight:900,color:textMain,lineHeight:1.15,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     {es?info?.name:info?.nameEn||info?.name}
                     {sessionPRList&&sessionPRList.some(function(p){return p.exId===ex.id})&&(
                       <span style={{background:"#fbbf2422",border:"1px solid #fbbf2444",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:800,color:"#fbbf24",flexShrink:0}}>🏆 PR</span>
                     )}
                   </div>
-                  <div style={{fontSize:13,color:pat.color,fontWeight:700,marginTop:4}}>
-                    {ex.sets}×{ex.reps} {ex.kg?("· "+ex.kg+"kg"):""} {ex.pause?("· "+fmtTime(ex.pause)+" desc"):""}
+                  <div style={{fontSize:14,color:"#A3B4CC",fontWeight:600,marginTop:6,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                    <span style={{background:"#2563EB22",borderRadius:6,padding:"2px 8px",color:"#60A5FA",fontWeight:700}}>{ex.sets}×{ex.reps}</span>
+                    {ex.kg&&<span style={{background:bgSub,borderRadius:6,padding:"2px 8px"}}>{ex.kg}kg</span>}
+                    {ex.pause&&<span style={{background:bgSub,borderRadius:6,padding:"2px 8px"}}>⏱ {fmtTime(ex.pause)}</span>}
                   </div>
                 </div>
                 {(()=>{var vUrl=(videoOverrides&&videoOverrides[ex.id])||info?.youtube;if(!vUrl)return null;return(
