@@ -1215,7 +1215,7 @@ function GymApp() {
   const btn=(col,txt)=>({background:col||(darkMode?"#2D4057":"#E2E8F0"),color:txt||(darkMode?"#FFFFFF":"#0F1923"),border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",letterSpacing:1});
   const tag=(col)=>({background:"#162234",color:"#8B9AB2",border:"1px solid #2D4057",borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700});
 
-  const allEx = [...EX, ...customEx];
+  const allEx = React.useMemo(function(){ return [...EX, ...(customEx||[])]; }, [customEx]);
   const filteredEx = allEx.filter(e=>{
     const q=search.toLowerCase();
     if(filterPat && e.pattern!==filterPat) return false;
@@ -1382,6 +1382,7 @@ function GymApp() {
         "@keyframes rippleOut{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)}100%{box-shadow:0 0 0 20px rgba(34,197,94,0)}}" +
 
         ".num{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}" +
+        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}.card-ex{will-change:transform;contain:layout style paint}" +
         "@keyframes checkPop{0%{transform:scale(0.3) rotate(-15deg);opacity:0}60%{transform:scale(1.3) rotate(5deg);opacity:1}80%{transform:scale(0.9) rotate(-3deg)}100%{transform:scale(1) rotate(0deg);opacity:1}}@keyframes slideUpFade{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}@keyframes prGlow{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.6);transform:scale(1)}50%{box-shadow:0 0 0 12px rgba(34,197,94,0);transform:scale(1.05)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0);transform:scale(1)}}@keyframes rowComplete{0%{background:rgba(34,197,94,0.0)}15%{background:rgba(34,197,94,0.3)}100%{background:transparent}}" +
         "select{background:"+bgSub+";color:"+textMain+";border:1px solid "+border+";border-radius:8px;padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;width:100%}" +
         ".app-inner{max-width:1200px;margin:0 auto;width:100%}" +
@@ -1480,7 +1481,7 @@ function GymApp() {
           if(!dir && y < 20 && headerCollapsed) setHeaderCollapsed(false);
           lastScrollY.current = y;
         }}
-        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100vh - 130px)",paddingBottom:100,paddingTop:12,display:session&&activeDay?"none":"block"}}>
+        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100vh - 130px)",paddingBottom:100,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth"}}>
         {tab==="plan"&&esAlumno&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&(
           <div>
@@ -4099,7 +4100,7 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
           );
         })}
       </div>
-      <div style={{flex:1,overflowY:"auto",padding:"12px 16px 0"}}>
+      <div style={{flex:1,overflowY:"auto",padding:"12px 16px 0",WebkitOverflowScrolling:"touch"}}>
 
         {ex&&(
           <>
@@ -5315,7 +5316,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
                   <div style={{marginTop:10}}>
                     <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{es?"PREVIEW":"PREVIEW"}</div>
                     <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                      <img src={"https://img.youtube.com/vi/"+videoId+"/mqdefault.jpg"} style={{width:120,height:68,borderRadius:8,objectFit:"cover",border:"1px solid "+border}} onError={function(e){e.target.style.display="none"}}/>
+                      <img loading="lazy" src={"https://img.youtube.com/vi/"+videoId+"/mqdefault.jpg"} style={{width:120,height:68,borderRadius:8,objectFit:"cover",border:"1px solid "+border}} onError={function(e){e.target.style.display="none"}}/>
                       <div>
                         <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✓ {es?"Video detectado":"Video detected"}</div>
                         <div style={{fontSize:11,color:textMuted,marginTop:2}}>ID: {videoId}</div>
@@ -6072,7 +6073,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
 }
 
 
-function LibraryAlumno({allEx, es, darkMode, routines, videoOverrides, setVideoModal}) {
+const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, routines, videoOverrides, setVideoModal}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bgCard = _dm?"#162234":"#FFFFFF";
   const bgSub = _dm?"#162234":"#EEF2F7";
@@ -6148,7 +6149,7 @@ function LibraryAlumno({allEx, es, darkMode, routines, videoOverrides, setVideoM
       })}
     </div>
   );
-}
+});
 
 
 function OnboardingScreen({es, darkMode, onDone}) {
