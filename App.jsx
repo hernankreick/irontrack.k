@@ -1631,54 +1631,54 @@ function GymApp() {
                       })}
                     </div>
                     {setsHoy.length < totalSets && (
-                      <div style={{background:bgSub,borderRadius:16,padding:"16px",border:"1px solid "+curPat.color+"33"}}>
-                        <div style={{fontSize:11,fontWeight:800,color:curPat.color,letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>
+                      <div style={{background:bgSub,borderRadius:12,padding:"12px",border:"1px solid "+curPat.color+"33"}}>
+                        <div style={{fontSize:10,fontWeight:800,color:curPat.color,letterSpacing:2,marginBottom:8,textTransform:"uppercase"}}>
                           {es?"REGISTRAR SET "+(setsHoy.length+1):"LOG SET "+(setsHoy.length+1)}
                         </div>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                          <div style={{background:bgSub,borderRadius:12,padding:"10px 6px",textAlign:"center",border:"1px solid "+border}}>
-                            <div style={{fontSize:12,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>PESO (KG)</div>
-                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                          <div style={{background:bgSub,borderRadius:10,padding:"8px 4px",textAlign:"center",border:"1px solid "+border}}>
+                            <div style={{fontSize:10,fontWeight:800,color:"#64748B",letterSpacing:1,marginBottom:6}}>PESO (KG)</div>
+                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
                               <button className="hov" id={"kg-minus-"+activeExIdx}
-                                style={{width:52,height:52,background:bgCard,border:"1px solid "+border,borderRadius:14,
-                                  fontSize:24,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
+                                style={{width:38,height:38,background:bgCard,border:"1px solid "+border,borderRadius:10,
+                                  fontSize:20,fontWeight:900,color:"#64748B",cursor:"pointer",flexShrink:0,
                                   display:"flex",alignItems:"center",justifyContent:"center"}}
                                 onClick={()=>{
                                   const el=document.getElementById("kg-inp-"+activeExIdx);
                                   if(el) el.value=String(Math.max(0,(parseFloat(el.value)||0)-2.5));
                                 }}
-                                onTouchStart={function(e){var el=document.getElementById("kg-inp-"+activeExIdx);this._holdTimer=setTimeout(function(){this._holding=true;el.value=String(Math.max(0,(parseFloat(el.value)||0)-5))}.bind(this),400)}.bind(this)}
-                                onTouchEnd={function(){clearTimeout(this._holdTimer);this._holding=false}}
-                                onMouseDown={function(e){var el=document.getElementById("kg-inp-"+activeExIdx);this._holdTimer=setTimeout(function(){this._holding=true;el.value=String(Math.max(0,(parseFloat(el.value)||0)-5))}.bind(this),400)}.bind(this)}
-                                onMouseUp={function(){clearTimeout(this._holdTimer);this._holding=false}}
+                                onTouchStart={function(){var el=document.getElementById("kg-inp-"+activeExIdx);var self=this;self._holdTimer=setTimeout(function(){el.value=String(Math.max(0,(parseFloat(el.value)||0)-5))},400)}}
+                                onTouchEnd={function(){clearTimeout(this._holdTimer)}}
+                                onMouseDown={function(){var el=document.getElementById("kg-inp-"+activeExIdx);var self=this;self._holdTimer=setTimeout(function(){el.value=String(Math.max(0,(parseFloat(el.value)||0)-5))},400)}}
+                                onMouseUp={function(){clearTimeout(this._holdTimer)}}
                                 >−</button>
                               <input id={"kg-inp-"+activeExIdx}
                                 type="number" defaultValue={lastKg||""}
                                 placeholder={lastKg||"0"}
-                                style={{...inp,textAlign:"center",fontSize:32,fontWeight:900,color:textMain,
-                                  width:0,flex:1,height:52,padding:"0 2px",minWidth:0,borderRadius:14}}/>
+                                style={{...inp,textAlign:"center",fontSize:24,fontWeight:900,color:"#fff",
+                                  width:0,flex:1,height:38,padding:"0 2px",minWidth:0,borderRadius:10}}/>
                               <button className="hov" id={"kg-plus-"+activeExIdx}
-                                style={{width:52,height:52,background:"#2563EB22",border:"1px solid #2563EB44",borderRadius:14,
-                                  fontSize:24,fontWeight:900,color:"#2563EB",cursor:"pointer",flexShrink:0,
+                                style={{width:38,height:38,background:"#2563EB22",border:"1px solid #2563EB44",borderRadius:10,
+                                  fontSize:20,fontWeight:900,color:"#2563EB",cursor:"pointer",flexShrink:0,
                                   display:"flex",alignItems:"center",justifyContent:"center"}}
                                 onClick={()=>{
                                   const el=document.getElementById("kg-inp-"+activeExIdx);
                                   if(el) el.value=String((parseFloat(el.value)||0)+2.5);
                                 }}
-                                onTouchStart={function(e){var el=document.getElementById("kg-inp-"+activeExIdx);this._holdTimer=setTimeout(function(){this._holding=true;el.value=String((parseFloat(el.value)||0)+5)}.bind(this),400)}.bind(this)}
-                                onTouchEnd={function(){clearTimeout(this._holdTimer);this._holding=false}}
-                                onMouseDown={function(e){var el=document.getElementById("kg-inp-"+activeExIdx);this._holdTimer=setTimeout(function(){this._holding=true;el.value=String((parseFloat(el.value)||0)+5)}.bind(this),400)}.bind(this)}
-                                onMouseUp={function(){clearTimeout(this._holdTimer);this._holding=false}}
+                                onTouchStart={function(){var el=document.getElementById("kg-inp-"+activeExIdx);var self=this;self._holdTimer=setTimeout(function(){el.value=String((parseFloat(el.value)||0)+5)},400)}}
+                                onTouchEnd={function(){clearTimeout(this._holdTimer)}}
+                                onMouseDown={function(){var el=document.getElementById("kg-inp-"+activeExIdx);var self=this;self._holdTimer=setTimeout(function(){el.value=String((parseFloat(el.value)||0)+5)},400)}}
+                                onMouseUp={function(){clearTimeout(this._holdTimer)}}
                                 >+</button>
                             </div>
-                            <div style={{fontSize:10,color:textMuted,marginTop:4}}>{es?"Mantené para ±5kg":"Hold for ±5kg"}</div>
+                            <div style={{fontSize:9,color:"#4B5563",marginTop:3}}>{es?"Hold ±5kg":"Hold ±5kg"}</div>
                           </div>
-                          <div style={{background:bgSub,borderRadius:12,padding:"10px 6px",textAlign:"center",border:"1px solid "+border}}>
-                            <div style={{fontSize:12,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>REPS</div>
-                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                          <div style={{background:bgSub,borderRadius:10,padding:"8px 4px",textAlign:"center",border:"1px solid "+border}}>
+                            <div style={{fontSize:10,fontWeight:800,color:"#64748B",letterSpacing:1,marginBottom:6}}>REPS</div>
+                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
                               <button className="hov" id={"rp-minus-"+activeExIdx}
-                                style={{width:52,height:52,background:bgCard,border:"1px solid "+border,borderRadius:14,
-                                  fontSize:24,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
+                                style={{width:38,height:38,background:bgCard,border:"1px solid "+border,borderRadius:10,
+                                  fontSize:20,fontWeight:900,color:"#64748B",cursor:"pointer",flexShrink:0,
                                   display:"flex",alignItems:"center",justifyContent:"center"}}
                                 onClick={()=>{
                                   const el=document.getElementById("rp-inp-"+activeExIdx);
@@ -1686,11 +1686,11 @@ function GymApp() {
                                 }}>−</button>
                               <input id={"rp-inp-"+activeExIdx}
                                 type="number" defaultValue={targetReps}
-                                style={{...inp,textAlign:"center",fontSize:32,fontWeight:900,color:textMain,
-                                  width:0,flex:1,height:52,padding:"0 2px",minWidth:0,borderRadius:14}}/>
+                                style={{...inp,textAlign:"center",fontSize:24,fontWeight:900,color:"#fff",
+                                  width:0,flex:1,height:38,padding:"0 2px",minWidth:0,borderRadius:10}}/>
                               <button className="hov" id={"rp-plus-"+activeExIdx}
-                                style={{width:52,height:52,background:"#22C55E22",border:"1px solid #22C55E44",borderRadius:14,
-                                  fontSize:24,fontWeight:900,color:"#22C55E",cursor:"pointer",flexShrink:0,
+                                style={{width:38,height:38,background:"#22C55E22",border:"1px solid #22C55E44",borderRadius:10,
+                                  fontSize:20,fontWeight:900,color:"#22C55E",cursor:"pointer",flexShrink:0,
                                   display:"flex",alignItems:"center",justifyContent:"center"}}
                                 onClick={()=>{
                                   const el=document.getElementById("rp-inp-"+activeExIdx);
@@ -1699,12 +1699,12 @@ function GymApp() {
                             </div>
                           </div>
                         </div>
-                        <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                        <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
                           {[targetReps-2,targetReps-1,targetReps,targetReps+1,targetReps+2].filter(n=>n>0).map(n=>(
                             <button key={n} className="hov"
-                              style={{padding:"8px 12px",border:"1px solid "+(n===targetReps?curPat.color:border),
-                                borderRadius:8,background:n===targetReps?curPat.color+"22":"transparent",
-                                color:n===targetReps?curPat.color:textMuted,fontSize:15,fontWeight:800,
+                              style={{padding:"6px 10px",border:"1px solid "+(n===targetReps?curPat.color:border),
+                                borderRadius:6,background:n===targetReps?curPat.color+"22":"transparent",
+                                color:n===targetReps?curPat.color:"#64748B",fontSize:13,fontWeight:700,
                                 cursor:"pointer",fontFamily:"inherit"}}
                               onClick={()=>{
                                 const inp=document.getElementById("rp-inp-"+activeExIdx);
@@ -1713,14 +1713,14 @@ function GymApp() {
                           ))}
                         </div>
                                                 <button className="hov"
-                          style={{width:"100%",padding:"16px",
+                          style={{width:"100%",padding:"12px",
                             background:btnFlash?"#22C55E":(curPat.color==="#22C55E"?green:curPat.color),
                             color:"#fff",
-                            borderRadius:12,fontSize:22,fontWeight:900,
+                            borderRadius:10,fontSize:16,fontWeight:900,
                             cursor:"pointer",fontFamily:"inherit",letterSpacing:1,
                             transition:"background 0.2s ease, transform 0.15s ease",
                             animation:btnFlash?"successPulse 0.4s ease":"none",
-                            boxShadow:btnFlash?"0 4px 20px rgba(34,197,94,0.5)":"0 4px 14px rgba(59,130,246,0.4)"}}                          onClick={()=>{
+                            boxShadow:btnFlash?"0 4px 20px rgba(34,197,94,0.5)":"0 4px 14px rgba(59,130,246,0.3)"}}                          onClick={()=>{
                             const kgInp = document.getElementById("kg-inp-"+activeExIdx);
                             const rpInp = document.getElementById("rp-inp-"+activeExIdx);
                             const kgVal = parseFloat(kgInp?.value)||0;
@@ -1875,11 +1875,11 @@ function GymApp() {
                     transition:"max-height 0.35s cubic-bezier(.4,0,.2,1), opacity 0.25s ease",
                     marginBottom:headerCollapsed?0:10
                   }}>
-                  <div style={{marginBottom:12}}>
-                    <div style={{fontSize:13,color:textMuted,fontWeight:500,letterSpacing:0.3}}>
+                  <div style={{marginBottom:8}}>
+                    <div style={{fontSize:11,color:textMuted,fontWeight:600,letterSpacing:1}}>
                       {new Date().getHours()<12?(es?"BUENOS DÍAS":"GOOD MORNING"):new Date().getHours()<18?(es?"BUENAS TARDES":"GOOD AFTERNOON"):(es?"BUENAS NOCHES":"GOOD EVENING")}
                     </div>
-                    <div style={{fontSize:28,fontWeight:900,color:textMain}}>{sessionData?.name?.split(" ")[0]||"Atleta"}</div>
+                    <div style={{fontSize:20,fontWeight:900,color:textMain}}>{sessionData?.name?.split(" ")[0]||"Atleta"}</div>
                     {rachaActual>=2&&(
                       <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
                         <div style={{
