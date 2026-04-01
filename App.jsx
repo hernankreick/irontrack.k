@@ -1811,54 +1811,54 @@ function GymApp() {
                     )}
                   </div>
                   {timer&&(
-                    <div style={{background:timer.remaining<10?"#2563EB18":"#22C55E18",border:"1px solid "+(timer.remaining<10?"#2563EB33":"#22C55E30"),borderRadius:16,padding:"16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{position:"relative",width:56,height:56,flexShrink:0}}>
-                        <svg width="56" height="56" style={{position:"absolute",top:0,left:0,transform:"rotate(-90deg)"}}>
-                          <circle cx="28" cy="28" r="24" fill="none" stroke={darkMode?"#2D4057":"#E2E8F0"} strokeWidth="4"/>
-                          <circle cx="28" cy="28" r="24" fill="none"
-                            stroke={timer.remaining<10?"#2563EB":"#22C55E"} strokeWidth="4"
-                            strokeDasharray={`${2*Math.PI*24}`}
-                            strokeDashoffset={`${2*Math.PI*24*(1-timer.remaining/timer.total)}`}
+                    <div style={{background:"#0D1520",border:"1px solid "+(timer.remaining<10?"#2563EB33":"#1a2535"),borderRadius:12,padding:"12px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{position:"relative",width:44,height:44,flexShrink:0}}>
+                        <svg width="44" height="44" style={{transform:"rotate(-90deg)"}}>
+                          <circle cx="22" cy="22" r="19" fill="none" stroke="#1a2535" strokeWidth="3"/>
+                          <circle cx="22" cy="22" r="19" fill="none"
+                            stroke={timer.remaining<10?"#2563EB":"#22C55E"} strokeWidth="3"
+                            strokeDasharray={`${2*Math.PI*19}`}
+                            strokeDashoffset={`${2*Math.PI*19*(1-timer.remaining/timer.total)}`}
                             strokeLinecap="round"
                             style={{transition:"stroke-dashoffset 1s linear"}}/>
                         </svg>
-                        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:900,color:timer.remaining<10?"#2563EB":"#22C55E"}}>
+                        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:timer.remaining<10?"#2563EB":"#22C55E"}}>
                           {timer.remaining}
                         </div>
                       </div>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:15,fontWeight:900,color:textMain}}>{es?"DESCANSANDO":"RESTING"}</div>
-                        <div style={{fontSize:13,color:textMuted}}>{es?"El próximo set en":"Next set in"} {timer.remaining}s</div>
+                        <div style={{fontSize:12,fontWeight:800,color:timer.remaining<10?"#2563EB":"#94A3B8"}}>{es?"DESCANSO":"REST"}</div>
+                        <div style={{fontSize:11,color:"#475569"}}>{es?"Próximo set en":"Next set in"} {timer.remaining}s</div>
                       </div>
                       <button className="hov" onClick={()=>startTimer(0)}
-                        style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"8px 14px",color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                        style={{background:"transparent",border:"1px solid #1a2535",borderRadius:8,padding:"6px 12px",color:"#475569",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
                         {es?"Saltar":"Skip"}
                       </button>
                     </div>
                   )}
-                  <div style={{display:"flex",gap:8,marginBottom:12}}>
+                  <div style={{display:"flex",gap:8,marginBottom:10}}>
                     {activeExIdx>0&&(
                       <button className="hov" onClick={()=>setActiveExIdx(activeExIdx-1)}
-                        style={{flex:1,padding:"8px",background:bgCard,border:"1px solid "+border,borderRadius:12,color:textMuted,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                        style={{flex:1,padding:"10px",background:"#0D1520",border:"1px solid #1a2535",borderRadius:10,color:"#64748B",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
                         ← {es?"Anterior":"Prev"}
                       </button>
                     )}
                     {activeExIdx<exs.length-1&&(
                       <button className="hov" onClick={()=>setActiveExIdx(activeExIdx+1)}
-                        style={{flex:2,padding:"8px",background:bgCard,border:"1px solid "+border,borderRadius:12,color:textMain,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                        {es?"Siguiente":"Next"} → {((es?nextInfo?.name:nextInfo?.nameEn||nextInfo?.name)||"").slice(0,18)}
+                        style={{flex:2,padding:"10px",background:"#0D1520",border:"1px solid #1a2535",borderRadius:10,color:"#94A3B8",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                        {es?"Siguiente":"Next"} →
                       </button>
                     )}
                   </div>
                   {nextEx&&(
-                    <div style={{background:bgCard,borderRadius:12,padding:"12px 16px",border:"1px solid "+border,display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,minWidth:60}}>{es?"PRÓXIMO":"NEXT UP"}</div>
-                      <div style={{width:1,height:30,background:border}}/>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:15,fontWeight:800,color:textMain}}>{es?nextInfo?.name:nextInfo?.nameEn||nextInfo?.name}</div>
-                        <div style={{fontSize:13,color:textMuted}}>{nextEx.sets}×{nextEx.reps} {nextEx.kg?("· "+nextEx.kg+"kg"):""}</div>
+                    <div style={{background:"#0D1520",borderRadius:10,padding:"10px 14px",border:"1px solid #1a2535",display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{width:3,height:28,borderRadius:2,background:"#1E3A5F",flexShrink:0}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1,marginBottom:2}}>{es?"SIGUIENTE":"NEXT UP"}</div>
+                        <div style={{fontSize:14,fontWeight:700,color:"#94A3B8"}}>{es?nextInfo?.name:nextInfo?.nameEn||nextInfo?.name}</div>
+                        <div style={{fontSize:11,color:"#475569",marginTop:1}}>{nextInfo?.muscle||""} · {nextEx.sets}×{nextEx.reps}{nextEx.kg?" · "+nextEx.kg+"kg":""}</div>
                       </div>
-                      <div style={{fontSize:22}}>{PATS[nextInfo?.pattern]?.icon||"💪"}</div>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   )}
                   {allDone&&(
@@ -4157,29 +4157,25 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
         {ex&&(
           <>
             <div style={{marginBottom:12}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                <div style={{width:48,height:48,borderRadius:12,background:pat.color+"22",
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>
-                  {pat.icon}
-                </div>
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:12,background:"#0D1520",borderRadius:10,border:"1px solid #1a2535"}}>
+                <div style={{width:4,height:36,borderRadius:2,background:pat.color||"#2563EB",flexShrink:0}}/>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:24,fontWeight:900,color:textMain,lineHeight:1.15,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <div style={{fontSize:18,fontWeight:800,color:"#fff",lineHeight:1.15,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                     {es?info?.name:info?.nameEn||info?.name}
                     {sessionPRList&&sessionPRList.some(function(p){return p.exId===ex.id})&&(
-                      <span style={{background:"#fbbf2422",border:"1px solid #fbbf2444",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:800,color:"#fbbf24",flexShrink:0}}>🏆 PR</span>
+                      <span style={{background:"#fbbf2422",border:"1px solid #fbbf2444",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:800,color:"#fbbf24",flexShrink:0}}>PR</span>
                     )}
                   </div>
-                  <div style={{fontSize:14,color:"#A3B4CC",fontWeight:600,marginTop:6,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                    <span style={{background:"#2563EB22",borderRadius:6,padding:"2px 8px",color:"#60A5FA",fontWeight:700}}>{ex.sets}×{ex.reps}</span>
-                    {ex.kg&&<span style={{background:bgSub,borderRadius:6,padding:"2px 8px"}}>{ex.kg}kg</span>}
-                    {ex.pause&&<span style={{background:bgSub,borderRadius:6,padding:"2px 8px"}}>⏱ {fmtTime(ex.pause)}</span>}
+                  <div style={{fontSize:12,color:"#64748B",fontWeight:600,marginTop:4,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                    <span style={{background:"#2563EB22",borderRadius:4,padding:"1px 6px",color:"#60A5FA",fontWeight:700}}>{ex.sets}×{ex.reps}</span>
+                    {ex.kg&&<span>{ex.kg}kg</span>}
+                    {ex.pause&&<span>⏱ {fmtTime(ex.pause)}</span>}
                   </div>
                 </div>
                 {(()=>{var vUrl=(videoOverrides&&videoOverrides[ex.id])||info?.youtube;if(!vUrl)return null;return(
-                  <button onClick={function(){var vid=getYTVideoId(vUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:es?info?.name:(info?.nameEn||info?.name)})}else{window.open(vUrl,"_blank")}}}
-                    style={{background:"#2D4057",color:"#2563EB",border:"1px solid #243040",
-                      borderRadius:8,padding:"8px 8px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0}}>
-                    ▶
+                  <button className="hov" onClick={function(){var vid=getYTVideoId(vUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:es?info?.name:(info?.nameEn||info?.name)})}else{window.open(vUrl,"_blank")}}}
+                    style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:8,padding:"6px 12px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",gap:4}}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>VER
                   </button>
                 )})()}
               </div>
