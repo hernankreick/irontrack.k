@@ -1734,6 +1734,8 @@ function GymApp() {
                             const kgVal = parseFloat(kgInp?.value)||0;
                             const rpVal = parseInt(rpInp?.value)||targetReps;
                             if(kgVal<=0){kgInp?.focus();return;}
+                            // Haptic feedback
+                            try{if(navigator.vibrate)navigator.vibrate(50)}catch(e){}
                             // Flash del botón
                             setBtnFlash(true);
                             setTimeout(()=>setBtnFlash(false), 500);
@@ -1767,27 +1769,27 @@ function GymApp() {
                     )}
                   </div>
                   {timer&&(
-                    <div style={{background:timer.remaining<10?"#2563EB18":"#22C55E18",border:"1px solid "+(timer.remaining<10?"#2563EB33":"#22C55E30"),borderRadius:16,padding:"16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{position:"relative",width:56,height:56,flexShrink:0}}>
-                        <svg width="56" height="56" style={{position:"absolute",top:0,left:0,transform:"rotate(-90deg)"}}>
-                          <circle cx="28" cy="28" r="24" fill="none" stroke={darkMode?"#2D4057":"#E2E8F0"} strokeWidth="4"/>
-                          <circle cx="28" cy="28" r="24" fill="none"
-                            stroke={timer.remaining<10?"#2563EB":"#22C55E"} strokeWidth="4"
-                            strokeDasharray={`${2*Math.PI*24}`}
-                            strokeDashoffset={`${2*Math.PI*24*(1-timer.remaining/timer.total)}`}
+                    <div style={{background:"#0D1520",border:"1px solid "+(timer.remaining<10?"#2563EB33":"#1a2535"),borderRadius:12,padding:"12px 14px",marginBottom:10,display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{position:"relative",width:44,height:44,flexShrink:0}}>
+                        <svg width="44" height="44" style={{transform:"rotate(-90deg)"}}>
+                          <circle cx="22" cy="22" r="19" fill="none" stroke="#1a2535" strokeWidth="3"/>
+                          <circle cx="22" cy="22" r="19" fill="none"
+                            stroke={timer.remaining<10?"#2563EB":"#22C55E"} strokeWidth="3"
+                            strokeDasharray={`${2*Math.PI*19}`}
+                            strokeDashoffset={`${2*Math.PI*19*(1-timer.remaining/timer.total)}`}
                             strokeLinecap="round"
                             style={{transition:"stroke-dashoffset 1s linear"}}/>
                         </svg>
-                        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:900,color:timer.remaining<10?"#2563EB":"#22C55E"}}>
+                        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,color:timer.remaining<10?"#2563EB":"#22C55E"}}>
                           {timer.remaining}
                         </div>
                       </div>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:15,fontWeight:900,color:textMain}}>{es?"DESCANSANDO":"RESTING"}</div>
-                        <div style={{fontSize:13,color:textMuted}}>{es?"El próximo set en":"Next set in"} {timer.remaining}s</div>
+                        <div style={{fontSize:12,fontWeight:800,color:timer.remaining<10?"#2563EB":"#94A3B8"}}>{es?"DESCANSO":"REST"}</div>
+                        <div style={{fontSize:11,color:"#475569"}}>{es?"Próximo set en":"Next set in"} {timer.remaining}s</div>
                       </div>
                       <button className="hov" onClick={()=>startTimer(0)}
-                        style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"8px 14px",color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                        style={{background:"transparent",border:"1px solid #1a2535",borderRadius:8,padding:"6px 12px",color:"#475569",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
                         {es?"Saltar":"Skip"}
                       </button>
                     </div>
@@ -1807,14 +1809,14 @@ function GymApp() {
                     )}
                   </div>
                   {nextEx&&(
-                    <div style={{background:bgCard,borderRadius:12,padding:"12px 16px",border:"1px solid "+border,display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,minWidth:60}}>{es?"PRÓXIMO":"NEXT UP"}</div>
-                      <div style={{width:1,height:30,background:border}}/>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:15,fontWeight:800,color:textMain}}>{es?nextInfo?.name:nextInfo?.nameEn||nextInfo?.name}</div>
-                        <div style={{fontSize:13,color:textMuted}}>{nextEx.sets}×{nextEx.reps} {nextEx.kg?("· "+nextEx.kg+"kg"):""}</div>
+                    <div style={{background:"#0D1520",borderRadius:10,padding:"10px 14px",border:"1px solid #1a2535",display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{width:3,height:28,borderRadius:2,background:"#1E3A5F",flexShrink:0}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1,marginBottom:2}}>{es?"SIGUIENTE":"NEXT UP"}</div>
+                        <div style={{fontSize:14,fontWeight:700,color:"#94A3B8"}}>{es?nextInfo?.name:nextInfo?.nameEn||nextInfo?.name}</div>
+                        <div style={{fontSize:11,color:"#475569",marginTop:1}}>{nextInfo?.muscle||""} · {nextEx.sets}×{nextEx.reps}{nextEx.kg?" · "+nextEx.kg+"kg":""}</div>
                       </div>
-                      <div style={{fontSize:22}}>{PATS[nextInfo?.pattern]?.icon||"💪"}</div>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   )}
                   {allDone&&(
