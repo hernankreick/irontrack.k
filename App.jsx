@@ -1382,7 +1382,7 @@ function GymApp() {
         "@keyframes rippleOut{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)}100%{box-shadow:0 0 0 20px rgba(34,197,94,0)}}" +
 
         ".num{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}" +
-        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}.card-ex{will-change:transform;contain:layout style paint}" +
+        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}.card-ex{will-change:transform;contain:layout style paint}.hov:active{opacity:0.7;transform:scale(0.97)}" +
         "@keyframes checkPop{0%{transform:scale(0.3) rotate(-15deg);opacity:0}60%{transform:scale(1.3) rotate(5deg);opacity:1}80%{transform:scale(0.9) rotate(-3deg)}100%{transform:scale(1) rotate(0deg);opacity:1}}@keyframes slideUpFade{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}@keyframes prGlow{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.6);transform:scale(1)}50%{box-shadow:0 0 0 12px rgba(34,197,94,0);transform:scale(1.05)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0);transform:scale(1)}}@keyframes rowComplete{0%{background:rgba(34,197,94,0.0)}15%{background:rgba(34,197,94,0.3)}100%{background:transparent}}" +
         "select{background:"+bgSub+";color:"+textMain+";border:1px solid "+border+";border-radius:8px;padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;width:100%}" +
         ".app-inner{max-width:1200px;margin:0 auto;width:100%}" +
@@ -1631,9 +1631,17 @@ function GymApp() {
                       })}
                     </div>
                     {setsHoy.length < totalSets && (
-                      <div style={{background:bgSub,borderRadius:12,padding:"12px",border:"1px solid "+curPat.color+"33"}}>
-                        <div style={{fontSize:10,fontWeight:800,color:curPat.color,letterSpacing:2,marginBottom:8,textTransform:"uppercase"}}>
-                          {es?"REGISTRAR SET "+(setsHoy.length+1):"LOG SET "+(setsHoy.length+1)}
+                      <div style={{background:"#0D1520",borderRadius:12,padding:"12px",border:"1px solid #1a2535"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                          <div style={{fontSize:10,fontWeight:800,color:"#2563EB",letterSpacing:2,textTransform:"uppercase"}}>
+                            {es?"SET "+(setsHoy.length+1)+" DE "+totalSets:"SET "+(setsHoy.length+1)+" OF "+totalSets}
+                          </div>
+                          <div style={{fontSize:10,fontWeight:600,color:"#475569"}}>
+                            {es?"Ej ":"Ex "}{activeExIdx+1}/{exs.length}
+                          </div>
+                        </div>
+                        <div style={{height:2,borderRadius:1,background:"#1a2535",marginBottom:10}}>
+                          <div style={{height:"100%",borderRadius:1,background:"#2563EB",width:Math.round((setsHoy.length/totalSets)*100)+"%",transition:"width .3s ease"}}/>
                         </div>
                         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                           <div style={{background:bgSub,borderRadius:10,padding:"8px 4px",textAlign:"center",border:"1px solid "+border}}>
@@ -1849,136 +1857,146 @@ function GymApp() {
               const hoy = new Date().toLocaleDateString("es-AR");
               const totalDays = r0?.days?.length||0;
               const daysCompletedThisWeek = completedDays.filter(k=>k.startsWith((r0?.id||"")+"-")&&k.endsWith("-w"+currentWeek)).length;
-              // Racha: semanas consecutivas con al menos 1 día entrenado
               const rachaActual = (() => {
                 if(!r0) return 0;
                 let streak = 0;
-                // Semana actual cuenta si ya entrenó algo
                 for(let w = currentWeek; w >= 0; w--) {
                   const daysInWeek = completedDays.filter(k =>
                     k.startsWith(r0.id+"-") && k.endsWith("-w"+w)
                   ).length;
                   if(daysInWeek > 0) streak++;
-                  else if(w < currentWeek) break; // semana anterior sin días = se rompe la racha
+                  else if(w < currentWeek) break;
                 }
                 return streak;
               })();
               const nextDayIdx = daysCompletedThisWeek < totalDays ? daysCompletedThisWeek : null;
               const todayDay = nextDayIdx !== null ? r0?.days?.[nextDayIdx] : null;
               const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeek)));
+              const faltanDias = totalDays - daysCompletedThisWeek;
+              const pctSemana = totalDays > 0 ? Math.round((daysCompletedThisWeek/totalDays)*100) : 0;
               return (
                 <div style={{marginBottom:16}}>
                   <div style={{
                     overflow:"hidden",
-                    maxHeight:headerCollapsed?"0px":"500px",
+                    maxHeight:headerCollapsed?"0px":"600px",
                     opacity:headerCollapsed?0:1,
                     transition:"max-height 0.35s cubic-bezier(.4,0,.2,1), opacity 0.25s ease",
-                    marginBottom:headerCollapsed?0:10
+                    marginBottom:headerCollapsed?0:8
                   }}>
-                  <div style={{marginBottom:8}}>
-                    <div style={{fontSize:11,color:textMuted,fontWeight:600,letterSpacing:1}}>
-                      {new Date().getHours()<12?(es?"BUENOS DÍAS":"GOOD MORNING"):new Date().getHours()<18?(es?"BUENAS TARDES":"GOOD AFTERNOON"):(es?"BUENAS NOCHES":"GOOD EVENING")}
+                  {/* Saludo compacto */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                    <div>
+                      <div style={{fontSize:11,color:"#64748B",fontWeight:600,letterSpacing:1.5}}>
+                        {new Date().getHours()<12?(es?"BUENOS DÍAS":"GOOD MORNING"):new Date().getHours()<18?(es?"BUENAS TARDES":"GOOD AFTERNOON"):(es?"BUENAS NOCHES":"GOOD EVENING")}
+                      </div>
+                      <div style={{fontSize:18,fontWeight:800,color:textMain,marginTop:1}}>{sessionData?.name?.split(" ")[0]||"Atleta"}</div>
                     </div>
-                    <div style={{fontSize:20,fontWeight:900,color:textMain}}>{sessionData?.name?.split(" ")[0]||"Atleta"}</div>
                     {rachaActual>=2&&(
-                      <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
-                        <div style={{
-                          display:"flex",alignItems:"center",gap:4,
-                          background:"#F59E0B12",border:"1px solid #F59E0B33",
-                          borderRadius:20,padding:"3px 10px"
-                        }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                          <span style={{fontSize:11,fontWeight:700,color:"#fbbf24"}}>
-                            {rachaActual} {es?"semanas seguidas":"weeks straight"}
-                          </span>
-                        </div>
+                      <div style={{display:"flex",alignItems:"center",gap:4,background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:20,padding:"3px 10px"}}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                        <span style={{fontSize:10,fontWeight:700,color:"#fbbf24"}}>{rachaActual} {es?"sem":"wk"}</span>
                       </div>
                     )}
                   </div>
+
+                  {/* Nota del entrenador */}
                   {notaDia&&(
-                    <div style={{background:"#2563EB12",border:"1px solid #2563EB33",borderRadius:12,
-                      padding:"12px 16px",marginBottom:8,display:"flex",gap:8,alignItems:"flex-start",
-                      animation:"slideUpFade 0.4s ease"}}>
-                      <span style={{fontSize:18,flexShrink:0}}><Ic name="bookmark" size={16}/></span>
+                    <div style={{background:"#2563EB08",border:"1px solid #2563EB22",borderRadius:10,
+                      padding:"10px 12px",marginBottom:8,display:"flex",gap:8,alignItems:"flex-start"}}>
+                      <Ic name="bookmark" size={14} color="#2563EB"/>
                       <div style={{flex:1}}>
-                        <div style={{fontSize:11,fontWeight:600,color:"#2563EB",letterSpacing:1,
-                          marginBottom:4,textTransform:"uppercase"}}>
-                          {es?"Nota de tu entrenador":"Coach note"}
-                        </div>
-                        <div style={{fontSize:15,color:textMain,lineHeight:1.5,fontWeight:400}}>{notaDia}</div>
+                        <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1,marginBottom:2,textTransform:"uppercase"}}>{es?"Nota del entrenador":"Coach note"}</div>
+                        <div style={{fontSize:13,color:"#CBD5E1",lineHeight:1.4}}>{notaDia}</div>
                       </div>
                     </div>
                   )}
-                  <div style={{background:bgCard,borderRadius:12,padding:"12px 16px",marginBottom:8,border:"1px solid "+border}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                      <span style={{fontSize:13,fontWeight:800,color:textMuted,letterSpacing:0.3}}>{es?"ESTA SEMANA":"THIS WEEK"}</span>
-                      <span style={{fontSize:12,fontWeight:700,color:"#2563EB"}}>{es?"Semana":"Week"} {currentWeek+1} {es?"de":"of"} 4</span>
-                    </div>
-                    <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
-                      <span style={{fontSize:13,fontWeight:900,color:"#2563EB"}}>{daysCompletedThisWeek}/{totalDays} {es?"días":"days"}</span>
-                    </div>
-                    <div style={{display:"flex",gap:8}}>
-                      {(r0?.days||[]).map((d,i)=>{
-                        const done = completedDays.includes((r0?.id||"")+"-"+i+"-w"+currentWeek);
-                        const isNext = i===nextDayIdx;
-                        return (
-                          <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                            <div style={{width:"100%",height:7,borderRadius:4,background:done?"#22C55E":isNext?"#2563EB":border}}/>
-                            <div style={{fontSize:11,fontWeight:700,color:done?"#22C55E":isNext?"#2563EB":textMuted,textTransform:"uppercase"}}>
-                              {(d.label||("D"+(i+1))).slice(0,6)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+
+                  {/* HERO CARD - Próximo entrenamiento */}
                   {todayDay&&!yaEntrenoHoy&&!session&&(
-                    <div style={{background:"#2563EB11",borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid #243040"}}>
-                      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:4}}>{es?"HOY":"TODAY"}</div>
-                      <div style={{fontSize:22,fontWeight:900,color:textMain,marginBottom:4}}>{todayDay.label||("Día "+(nextDayIdx+1))}</div>
-                      <div style={{fontSize:13,color:textMuted,marginBottom:12}}>{((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {es?"ejercicios":"exercises"} · {r0?.name}</div>
-                      <button className="hov" style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}
+                    <div style={{background:"linear-gradient(135deg,#0F1B2E,#162544)",borderRadius:14,padding:"20px 16px",marginBottom:10,border:"1px solid #1E3A5F"}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                        <div style={{fontSize:10,fontWeight:800,color:"#2563EB",letterSpacing:2}}>{es?"HOY":"TODAY"}</div>
+                        <div style={{fontSize:10,fontWeight:600,color:"#64748B"}}>{es?"Semana":"Week"} {currentWeek+1}/4</div>
+                      </div>
+                      <div style={{fontSize:20,fontWeight:900,color:"#fff",marginBottom:2}}>{todayDay.label||("Día "+(nextDayIdx+1))}</div>
+                      <div style={{fontSize:13,color:"#94A3B8",marginBottom:16}}>{((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {es?"ejercicios":"exercises"} · {r0?.name}</div>
+                      <button className="hov" style={{width:"100%",padding:"14px",background:"#2563EB",color:"#fff",border:"none",borderRadius:10,fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",letterSpacing:0.5,display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"opacity .15s"}}
                         onClick={()=>{
                           const snap={};
                           [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                           setPreSessionPRs({...snap});
                           setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                         }}>
-                        <Ic name="zap" size={16}/> {es?"EMPEZAR AHORA":"START NOW"}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        {es?"EMPEZAR AHORA":"START NOW"}
                       </button>
                     </div>
                   )}
+
+                  {/* Entrenamiento completado */}
                   {yaEntrenoHoy&&!session&&(
-                    <div style={{background:"#22C55E12",borderRadius:12,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:28}}>✅</span>
+                    <div style={{background:"#22C55E08",borderRadius:14,padding:"16px",marginBottom:10,border:"1px solid #22C55E22",display:"flex",alignItems:"center",gap:10}}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                       <div>
-                        <div style={{fontSize:15,fontWeight:900,color:"#22C55E"}}>{es?"¡Entrenamiento completado!":"Workout done!"}</div>
-                        <div style={{fontSize:13,color:textMuted}}>{es?"Descansá 💪":"Rest up 💪"}</div>
+                        <div style={{fontSize:14,fontWeight:800,color:"#22C55E"}}>{es?"Entrenamiento completado":"Workout done"}</div>
+                        <div style={{fontSize:12,color:"#64748B"}}>{es?"Buen trabajo, descansá":"Good work, rest up"}</div>
                       </div>
                     </div>
                   )}
-                  </div>
-                  {headerCollapsed&&(
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                      marginBottom:8,animation:"fadeIn 0.2s ease"}}>
-                      <div style={{fontSize:15,fontWeight:700,color:textMain}}>
-                        {sessionData?.name?.split(" ")[0]||"Atleta"}
+
+                  {/* Barra de progreso semanal */}
+                  <div style={{background:"#0D1520",borderRadius:10,padding:"12px 14px",marginBottom:8,border:"1px solid #1a2535"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontSize:11,fontWeight:700,color:"#64748B",letterSpacing:1}}>{es?"ESTA SEMANA":"THIS WEEK"}</span>
+                      <span style={{fontSize:11,fontWeight:800,color:"#2563EB"}}>{daysCompletedThisWeek}/{totalDays}</span>
+                    </div>
+                    <div style={{height:4,borderRadius:2,background:"#1a2535",marginBottom:8}}>
+                      <div style={{height:"100%",borderRadius:2,background:pctSemana>=100?"#22C55E":"#2563EB",width:pctSemana+"%",transition:"width .4s ease"}}/>
+                    </div>
+                    <div style={{display:"flex",gap:6}}>
+                      {(r0?.days||[]).map((d,i)=>{
+                        const done = completedDays.includes((r0?.id||"")+"-"+i+"-w"+currentWeek);
+                        const isNext = i===nextDayIdx;
+                        return (
+                          <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                            <div style={{width:"100%",height:3,borderRadius:2,background:done?"#22C55E":isNext?"#2563EB":"#1a2535"}}/>
+                            <div style={{fontSize:9,fontWeight:700,color:done?"#22C55E":isNext?"#2563EB":"#475569"}}>
+                              {(d.label||("D"+(i+1))).slice(0,5)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {faltanDias>0&&!yaEntrenoHoy&&(
+                      <div style={{display:"flex",alignItems:"center",gap:6,marginTop:8}}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                        <span style={{fontSize:11,fontWeight:600,color:"#64748B"}}>
+                          {es?"Te faltan "+faltanDias+" entrenamiento"+(faltanDias>1?"s":"")+" esta semana":""+faltanDias+" workout"+(faltanDias>1?"s":"")+" left this week"}
+                        </span>
                       </div>
+                    )}
+                  </div>
+                  </div>
+
+                  {/* Header colapsado */}
+                  {headerCollapsed&&(
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                      <div style={{fontSize:14,fontWeight:700,color:textMain}}>{sessionData?.name?.split(" ")[0]||"Atleta"}</div>
                       {todayDay&&!yaEntrenoHoy&&!session&&(
-                        <button className="hov"
-                          style={{background:"#2563EB",color:"#fff",border:"none",
-                            borderRadius:8,padding:"8px 14px",fontSize:13,
-                            fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
+                        <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
                           onClick={()=>{
                             const snap={};
                             [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                             setPreSessionPRs({...snap});
                             setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                           }}>
-                          ⚡ {es?"Entrenar":"Train"}
+                          {es?"Entrenar":"Train"}
                         </button>
                       )}
-                      {yaEntrenoHoy&&<span style={{fontSize:13,color:"#22C55E",fontWeight:600}}>✅ {es?"Listo hoy":"Done today"}</span>}
+                      {yaEntrenoHoy&&<span style={{fontSize:11,color:"#22C55E",fontWeight:600}}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:"middle",marginRight:3}}><polyline points="20 6 9 17 4 12"/></svg>
+                        {es?"Listo":"Done"}
+                      </span>}
                     </div>
                   )}
                   <div style={{display:"none"}}/>
