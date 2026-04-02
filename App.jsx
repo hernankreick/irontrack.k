@@ -4275,80 +4275,114 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
                   )}
                 </div>
 
-                <div style={{padding:"16px"}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                    <div>
-                      <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>KG</div>
-                      <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <button className="hov" onClick={()=>adjustKg(-2.5)}
-                          style={{width:44,height:52,background:bgSub,border:"1px solid "+border,
-                            borderRadius:12,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>−</button>
-                        <input style={{flex:1,background:bgSub,border:"1px solid "+(isPR?"#60A5FA":border),
-                          borderRadius:12,color:isPR?"#60A5FA":textMain,fontSize:28,fontWeight:900,
-                          textAlign:"center",padding:"8px 4px",fontFamily:"inherit",height:52}}
-                          type="number" value={kg} onChange={e=>setKg(e.target.value)}
-                          placeholder="0"/>
-                        <button className="hov" onClick={()=>adjustKg(2.5)}
-                          style={{width:44,height:52,background:bgSub,border:"1px solid "+border,
-                            borderRadius:12,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>+</button>
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>REPS</div>
-                      <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <button className="hov" onClick={()=>setReps(v=>String(Math.max(1,(parseInt(v)||0)-1)))}
-                          style={{width:44,height:52,background:bgSub,border:"1px solid "+border,
-                            borderRadius:12,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>−</button>
-                        <input style={{flex:1,background:bgSub,border:"1px solid "+border,
-                          borderRadius:12,color:textMain,fontSize:28,fontWeight:900,
-                          textAlign:"center",padding:"8px 4px",fontFamily:"inherit",height:52}}
-                          type="number" value={reps} onChange={e=>setReps(e.target.value)}
-                          placeholder="0"/>
-                        <button className="hov" onClick={()=>setReps(v=>String((parseInt(v)||0)+1))}
-                          style={{width:44,height:52,background:bgSub,border:"1px solid "+border,
-                            borderRadius:12,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>+</button>
-                      </div>
-                    </div>
+                <div style={{padding:"14px"}}>
+                  {/* Header progreso */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <div style={{fontSize:10,fontWeight:800,color:"#2563EB",letterSpacing:2}}>SET {setActualNum} {es?"DE":"OF"} {totalSets}</div>
+                    <div style={{fontSize:10,fontWeight:600,color:"#475569"}}>{es?"Ej":"Ex"} {activeExIdx+1}/{exercises.length}</div>
                   </div>
-                  {ex.reps&&(
-                    <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-                      {(()=>{
-                        const target=parseInt(ex.reps)||8;
-                        return [target-2,target-1,target,target+1,target+2].filter(v=>v>0).map(v=>(
-                          <button key={v} className="hov"
-                            onClick={()=>setReps(String(v))}
-                            style={{padding:"4px 12px",borderRadius:8,fontSize:13,fontWeight:800,
-                              cursor:"pointer",fontFamily:"inherit",border:"1px solid "+(parseInt(reps)===v?pat.color:border),
-                              background:parseInt(reps)===v?pat.color+"22":"transparent",
-                              color:parseInt(reps)===v?pat.color:textMuted}}>
-                            {v}
-                          </button>
-                        ));
-                      })()}
+                  <div style={{height:2,borderRadius:1,background:"#1a2535",marginBottom:12}}>
+                    <div style={{height:"100%",borderRadius:1,background:"#2563EB",width:Math.round((setsHoy.length/totalSets)*100)+"%",transition:"width .3s"}}/>
+                  </div>
+
+                  {/* PESO - input editable + botón [+] */}
+                  <div style={{marginBottom:10}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                      <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>PESO</span>
+                      {parseFloat(kg)>0&&<span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{es?"Último":"Last"}: {kg}kg</span>}
                     </div>
-                  )}
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{flex:1,position:"relative"}}>
+                        <input
+                          type="number" value={kg} onChange={e=>setKg(e.target.value)}
+                          placeholder="0"
+                          style={{width:"100%",height:48,background:"#111827",border:"1px solid #1E3A5F",borderRadius:10,
+                            textAlign:"left",fontSize:20,fontWeight:800,color:"#fff",padding:"0 40px 0 14px",
+                            fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
+                        <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:14,fontWeight:600,color:"#475569",pointerEvents:"none"}}>kg</span>
+                      </div>
+                      <button className="hov"
+                        style={{width:48,height:48,background:"#2563EB",border:"none",borderRadius:10,
+                          fontSize:22,fontWeight:900,color:"#fff",cursor:"pointer",flexShrink:0,
+                          display:"flex",alignItems:"center",justifyContent:"center"}}
+                        onClick={()=>adjustKg(2.5)}
+                        onTouchStart={function(){var self=this;self._ht=setTimeout(function(){adjustKg(5)},400)}}
+                        onTouchEnd={function(){clearTimeout(this._ht)}}
+                        onMouseDown={function(){var self=this;self._ht=setTimeout(function(){adjustKg(5)},400)}}
+                        onMouseUp={function(){clearTimeout(this._ht)}}
+                        >+</button>
+                    </div>
+                    <div style={{fontSize:9,color:"#374151",marginTop:3}}>{es?"Hold + para +5kg":"Hold + for +5kg"}</div>
+                  </div>
+
+                  {/* REPS - pills dinámicas extendidas */}
+                  <div style={{marginBottom:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                      <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>REPS</span>
+                      <span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{reps} reps</span>
+                    </div>
+                    {(()=>{
+                      var repsStr=(ex?.reps||"8").toString();
+                      var prts=repsStr.split(/[-–x]/);
+                      var rMin=parseInt(prts[0])||8;
+                      var rMax=prts[1]?parseInt(prts[1])||rMin:rMin;
+                      if(rMax<rMin)rMax=rMin;
+                      var lo=Math.max(1,rMin-3),hi=rMax+10;
+                      var pills=[];for(var n=lo;n<=hi;n++)pills.push(n);
+                      return(
+                        <div
+                          onTouchStart={function(e){this._swX=e.touches[0].clientX}}
+                          onTouchEnd={function(e){
+                            var dx=e.changedTouches[0].clientX-(this._swX||0);
+                            var cur=parseInt(reps)||rMin;
+                            if(dx<-30&&cur<hi){setReps(String(cur+1));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}
+                            else if(dx>30&&cur>lo){setReps(String(cur-1));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}
+                          }}
+                          style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+                          {pills.map(function(pn){
+                            var inR=pn>=rMin&&pn<=rMax;
+                            var isT=parseInt(reps)===pn;
+                            return(
+                              <button key={pn} className="hov"
+                                style={{minWidth:36,height:36,padding:"0 6px",border:"none",
+                                  borderRadius:8,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",flexShrink:0,
+                                  transition:"transform .15s,background .15s",
+                                  background:isT?"#22C55E":inR?"#22C55E18":"#111827",
+                                  color:isT?"#fff":inR?"#22C55E":"#475569",
+                                  boxShadow:isT?"0 2px 8px rgba(34,197,94,0.3)":"none"}}
+                                onClick={function(){setReps(String(pn));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}}>{pn}</button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                    <div style={{fontSize:9,color:"#374151",textAlign:"center",marginTop:3}}>{es?"← deslizá para cambiar reps →":"← swipe to change reps →"}</div>
+                  </div>
+
+                  {/* BOTÓN REGISTRAR */}
                   <button className={"hov"+(showCheckAnim?" check-pulse":"")} onClick={handleLogSet}
                     disabled={!kg||!reps}
-                    style={{width:"100%",padding:"16px",
-                      background:(!kg||!reps)?(darkMode?"#2D4057":"#E2E8F0"):showCheckAnim?"#22C55E":(isPR?"#60A5FA":"#2563EB"),
-                      color:(!kg||!reps)?textMuted:"#fff",border:"none",borderRadius:12,
-                      fontSize:22,fontWeight:900,cursor:(!kg||!reps)?"default":"pointer",
-                      fontFamily:"inherit",letterSpacing:1,marginBottom:8,
+                    style={{width:"100%",padding:"14px",
+                      background:(!kg||!reps)?"#1a2535":showCheckAnim?"#22C55E":"#2563EB",
+                      color:(!kg||!reps)?"#475569":"#fff",border:"none",borderRadius:10,
+                      fontSize:16,fontWeight:800,cursor:(!kg||!reps)?"default":"pointer",
+                      fontFamily:"inherit",letterSpacing:0.5,marginBottom:8,
                       transition:"background .15s ease",
-                      boxShadow:(!kg||!reps)?"none":(isPR?"0 4px 20px #f59e0b44":"0 4px 20px #243040")}}>
+                      display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                     {showCheckAnim
                       ?(<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="4 12 9 17 20 7"/>
-                          </svg>
-                          {es?"SET REGISTRADO":"SET LOGGED"}
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 12 9 17 20 7"/></svg>
+                          {es?"LISTO":"DONE"}
                         </span>)
-                      :(<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><Ic name="check-sm" size={20} color="#fff"/>{es?"REGISTRAR SET "+setActualNum:"LOG SET "+setActualNum}</span>)
+                      :(<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          {es?"REGISTRAR SET "+setActualNum:"LOG SET "+setActualNum}
+                        </span>)
                     }
                   </button>
                   <button onClick={()=>setShowAdvanced(v=>!v)}
-                    style={{width:"100%",background:"transparent",border:"none",color:textMuted,
-                      fontSize:13,fontWeight:700,cursor:"pointer",padding:"2px",fontFamily:"inherit"}}>
+                    style={{width:"100%",background:"transparent",border:"none",color:"#475569",
+                      fontSize:11,fontWeight:700,cursor:"pointer",padding:"2px",fontFamily:"inherit"}}>
                     {showAdvanced?"▲":"▼"} {es?"Pausa · Nota · RPE":"Rest · Note · RPE"}
                   </button>
                   {showAdvanced&&(
@@ -4407,18 +4441,18 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
                 )}
               </div>
             )}
-            <div style={{display:"flex",gap:8,marginBottom:12}}>
+            <div style={{display:"flex",gap:8,marginBottom:10}}>
               {activeExIdx>0&&(
                 <button className="hov" onClick={()=>setActiveExIdx(activeExIdx-1)}
-                  style={{flex:1,padding:"8px",background:bgSub,border:"1px solid "+border,
-                    borderRadius:12,color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                  style={{flex:1,padding:"10px",background:"#0D1520",border:"1px solid #1a2535",
+                    borderRadius:10,color:"#64748B",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
                   ← {es?"Anterior":"Prev"}
                 </button>
               )}
               {activeExIdx<exercises.length-1&&(
                 <button className="hov" onClick={()=>setActiveExIdx(activeExIdx+1)}
-                  style={{flex:1,padding:"8px",background:bgSub,border:"1px solid "+border,
-                    borderRadius:12,color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+                  style={{flex:2,padding:"10px",background:"#0D1520",border:"1px solid #1a2535",
+                    borderRadius:10,color:"#94A3B8",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
                   {es?"Siguiente":"Next"} →
                 </button>
               )}
@@ -4426,17 +4460,15 @@ function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, st
           </>
         )}
         {nextEx&&nextInfo&&(
-          <div style={{background:bgSub,borderRadius:12,padding:"8px 16px",marginBottom:12,
-            border:"1px solid "+border,display:"flex",alignItems:"center",gap:8}}>
-            <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,flexShrink:0}}>
-              {es?"SIGUIENTE":"NEXT"}
+          <div style={{background:"#0D1520",borderRadius:10,padding:"10px 14px",marginBottom:12,
+            border:"1px solid #1a2535",display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:3,height:28,borderRadius:2,background:"#1E3A5F",flexShrink:0}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1,marginBottom:2}}>{es?"SIGUIENTE":"NEXT UP"}</div>
+              <div style={{fontSize:14,fontWeight:700,color:"#94A3B8"}}>{es?nextInfo.name:nextInfo.nameEn||nextInfo.name}</div>
+              <div style={{fontSize:11,color:"#475569",marginTop:1}}>{nextInfo.muscle||""} · {nextEx.sets}×{nextEx.reps}{nextEx.kg?" · "+nextEx.kg+"kg":""}</div>
             </div>
-            <div style={{flex:1,fontSize:15,fontWeight:800,color:textMuted}}>
-              {es?nextInfo.name:nextInfo.nameEn||nextInfo.name}
-            </div>
-            <div style={{fontSize:13,color:textMuted,fontWeight:500,flexShrink:0}}>
-              {nextEx.sets}×{nextEx.reps}
-            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
           </div>
         )}
       </div>
@@ -4507,45 +4539,81 @@ function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onClose, da
           </div>
         </div>
       )}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:12}}>
+        {/* PESO */}
         <div>
-          <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>KG {isPR?"🏆":""}</div>
-          <div style={{display:"flex",alignItems:"center",gap:4}}>
-            <button className="hov" onClick={()=>adjustKg(-2.5)}
-              style={{width:36,height:44,background:bgSub,border:"1px solid "+border,borderRadius:8,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>−</button>
-            <input
-              style={{...inp,textAlign:"center",fontSize:22,fontWeight:900,color:isPR?"#60A5FA":textMain,
-                borderColor:isPR?"#60A5FA":border,flex:1,height:44,padding:"0"}}
-              type="number" value={kg} onChange={e=>setKg(e.target.value)}
-              placeholder={lastSet?.kg?String(lastSet.kg):"0"}/>
-            <button className="hov" onClick={()=>adjustKg(2.5)}
-              style={{width:36,height:44,background:bgSub,border:"1px solid "+border,borderRadius:8,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>+</button>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>PESO {isPR?"🏆":""}</span>
+            {lastSet&&<span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{es?"Último":"Last"}: {lastSet.kg}kg</span>}
           </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{flex:1,position:"relative"}}>
+              <input
+                type="number" value={kg} onChange={e=>setKg(e.target.value)}
+                placeholder={lastSet?.kg?String(lastSet.kg):"0"}
+                style={{width:"100%",height:48,background:"#111827",border:"1px solid "+(isPR?"#60A5FA":"#1E3A5F"),borderRadius:10,
+                  textAlign:"left",fontSize:20,fontWeight:800,color:isPR?"#60A5FA":"#fff",padding:"0 40px 0 14px",
+                  fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
+              <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:14,fontWeight:600,color:"#475569",pointerEvents:"none"}}>kg</span>
+            </div>
+            <button className="hov"
+              style={{width:48,height:48,background:"#2563EB",border:"none",borderRadius:10,
+                fontSize:22,fontWeight:900,color:"#fff",cursor:"pointer",flexShrink:0,
+                display:"flex",alignItems:"center",justifyContent:"center"}}
+              onClick={()=>adjustKg(2.5)}
+              onTouchStart={function(){var self=this;self._ht=setTimeout(function(){adjustKg(5)},400)}}
+              onTouchEnd={function(){clearTimeout(this._ht)}}
+              >+</button>
+          </div>
+          <div style={{fontSize:9,color:"#374151",marginTop:3}}>{es?"Hold + para +5kg":"Hold + for +5kg"}</div>
         </div>
+        {/* REPS pills */}
         <div>
-          <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>REPS</div>
-          <div style={{display:"flex",alignItems:"center",gap:4}}>
-            <button className="hov" onClick={()=>setReps(v=>String(Math.max(1,(parseInt(v)||0)-1)))}
-              style={{width:36,height:44,background:bgSub,border:"1px solid "+border,borderRadius:8,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>−</button>
-            <input
-              style={{...inp,textAlign:"center",fontSize:22,fontWeight:900,color:textMain,flex:1,height:44,padding:"0"}}
-              type="number" value={reps} onChange={e=>setReps(e.target.value)}
-              placeholder={ex.reps||"0"}/>
-            <button className="hov" onClick={()=>setReps(v=>String((parseInt(v)||0)+1))}
-              style={{width:36,height:44,background:bgSub,border:"1px solid "+border,borderRadius:8,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>+</button>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>REPS</span>
+            <span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{reps} reps</span>
           </div>
+          {(()=>{
+            var repsStr=(ex?.reps||"8").toString();
+            var prts=repsStr.split(/[-–x]/);
+            var rMin=parseInt(prts[0])||8;
+            var rMax=prts[1]?parseInt(prts[1])||rMin:rMin;
+            if(rMax<rMin)rMax=rMin;
+            var lo=Math.max(1,rMin-3),hi=rMax+10;
+            var pills=[];for(var n=lo;n<=hi;n++)pills.push(n);
+            return(
+              <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+                {pills.map(function(pn){
+                  var inR=pn>=rMin&&pn<=rMax;
+                  var isT=parseInt(reps)===pn;
+                  return(
+                    <button key={pn} className="hov"
+                      style={{minWidth:36,height:36,padding:"0 6px",border:"none",
+                        borderRadius:8,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",flexShrink:0,
+                        background:isT?"#22C55E":inR?"#22C55E18":"#111827",
+                        color:isT?"#fff":inR?"#22C55E":"#475569",
+                        boxShadow:isT?"0 2px 8px rgba(34,197,94,0.3)":"none"}}
+                      onClick={function(){setReps(String(pn));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}}>{pn}</button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          <div style={{fontSize:9,color:"#374151",textAlign:"center",marginTop:3}}>{es?"← deslizá para cambiar reps →":"← swipe to change reps →"}</div>
         </div>
       </div>
       <button className="hov"
-        style={{width:"100%",padding:"16px",background:isPR?"#60A5FA":(pat?.color||"#2563EB"),
-          color:"#fff",border:"none",borderRadius:12,fontSize:22,fontWeight:900,
-          cursor:"pointer",fontFamily:"inherit",letterSpacing:1,marginBottom:8,
-          boxShadow:isPR?"0 4px 20px #f59e0b44":"0 4px 20px "+(pat?.color||"#2563EB")+"44"}}
+        style={{width:"100%",padding:"14px",background:isPR?"#60A5FA":"#2563EB",
+          color:"#fff",border:"none",borderRadius:10,fontSize:16,fontWeight:800,
+          cursor:"pointer",fontFamily:"inherit",letterSpacing:0.5,marginBottom:8,
+          display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
         onClick={()=>{
           if(!kg||!reps) return;
+          try{navigator.vibrate&&navigator.vibrate(50)}catch(e){}
           onLog(parseFloat(kg),parseInt(reps),note,pause,rpe);
         }}>
-        {isPR?"":""}{es?"+ REGISTRAR SET":"+ LOG SET"}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        {es?"REGISTRAR SET":"LOG SET"}
       </button>
       <button onClick={()=>setShowAdvanced(v=>!v)}
         style={{width:"100%",background:"transparent",border:"none",color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",padding:"4px",fontFamily:"inherit",marginBottom:showAdvanced?10:0}}>
