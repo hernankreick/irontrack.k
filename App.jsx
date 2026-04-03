@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { useAlumnos } from './hooks/useAlumnos.js';
+import { ROUTINE_TEMPLATES, instantiateTemplate, emptyDays, getTemplateById } from './lib/routineTemplates.js';
 
 
 const PATS = {
@@ -688,6 +689,7 @@ const Ic = ({name, size=18, color="currentColor", strokeWidth=2, style={}}) => {
     "camera":        <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></>,
     "check-circle":  <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
     "check-sm":      <polyline points="5 12 10 17 19 7"/>,
+    "clock":         <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
     "chevron-right": <polyline points="9 18 15 12 9 6"/>,
     "chevron-left":  <polyline points="15 18 9 12 15 6"/>,
     "copy":          <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>,
@@ -702,6 +704,7 @@ const Ic = ({name, size=18, color="currentColor", strokeWidth=2, style={}}) => {
     "message-circle":<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>,
     "moon":          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>,
     "plus":          <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    "refresh-cw":    <><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></>,
     "save":          <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>,
     "settings":      <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
     "share":         <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></>,
@@ -820,6 +823,8 @@ function GymApp() {
   const [sesionesGlobales, setSesionesGlobales] = useState([]);
   const [progresoGlobal, setProgresoGlobal] = useState({});
   const [sugerencias, setSugerencias] = useState({});
+  // Estado del dropdown de sugerencias por alumno (para no mostrar listas interminables).
+  const [sugsOpen, setSugsOpen] = useState({});
   const [rutinasSBEntrenador, setRutinasSBEntrenador] = useState([]);
 
   
@@ -882,7 +887,15 @@ function GymApp() {
   const [addExModal, setAddExModal] = useState(null); // {rId, dIdx}
   const [addExSearch, setAddExSearch] = useState("");
   const [addExPat, setAddExPat] = useState(null);
+  const [addExSelectedIds, setAddExSelectedIds] = useState([]);
   const [newR, setNewR] = useState(null);
+  /** Rutina local usada al pulsar "Asignar rutina" en cada alumno (explícita si hay varias). */
+  const [assignRoutineId, setAssignRoutineId] = useState(null);
+  const routineForAssign = useMemo(function(){
+    if(!routines.length) return null;
+    var id = assignRoutineId && routines.some(function(r){return r.id===assignRoutineId;}) ? assignRoutineId : routines[routines.length-1].id;
+    return routines.find(function(r){return r.id===id;}) || null;
+  }, [routines, assignRoutineId]);
   const [dupDayModal, setDupDayModal] = useState(null); // {rId, dIdx, days}
   const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
   const [videoOverrides, setVideoOverrides] = useState({}); // {ejercicioId: url}
@@ -2284,13 +2297,13 @@ function GymApp() {
             <div style={{overflowX:"auto",paddingBottom:8,marginBottom:12}}>
               <div style={{display:"flex",gap:8,width:"max-content"}}>
                 {["todas","app","scan"].map(f=>(
-                  <button key={f} className="hov" onClick={()=>setFiltroRut&&setFiltroRut(f)} style={{padding:"8px 16px",borderRadius:20,fontSize:13,fontWeight:700,cursor:"pointer",border:"1px solid",fontFamily:"Barlow Condensed,sans-serif",background:bgCard,borderColor:"#2D4057",color:textMuted}}>
-                    {f==="todas"?"TODAS":f==="app"?"✏️ APP":"📷 ESCANEADAS"}
+                  <button key={f} className="hov" onClick={()=>setFiltroRut&&setFiltroRut(f)} style={{padding:"8px 14px",borderRadius:20,fontSize:13,fontWeight:700,cursor:"pointer",border:"1px solid",fontFamily:"Barlow Condensed,sans-serif",background:bgCard,borderColor:"#2D4057",color:textMuted,display:"inline-flex",alignItems:"center",gap:6}}>
+                    {f==="todas"?"TODAS":f==="app"?(<><Ic name="edit-2" size={14} color={textMuted}/> APP</>):(<><Ic name="camera" size={14} color={textMuted}/> {es?"ESCANEADAS":"SCANNED"}</>)}
                   </button>
                 ))}
               </div>
             </div>
-            <button className="hov" style={{...btn("#2563EB"),width:"100%",marginBottom:12,padding:"8px",fontSize:18}} onClick={()=>setNewR({name:"",numDays:3,days:Array.from({length:3},(_,i)=>({label:"Dia "+(i+1),warmup:[],exercises:[],showWarmup:false,showMain:true})),note:""})}>
+            <button className="hov" style={{...btn("#2563EB"),width:"100%",marginBottom:12,padding:"8px",fontSize:18}} onClick={()=>setNewR({templateId:"blank",name:"",numDays:3,days:emptyDays(3,es),note:"",alumno:"",showAdvanced:false})}>
               {es?"+ NUEVA RUTINA":"+ NEW ROUTINE"}
             </button>
             {routines.map(r=>{
@@ -2337,8 +2350,8 @@ function GymApp() {
                                 </span>
                               )}
                               {ex.pause&&parseInt(ex.pause)>0&&(
-                                <span style={{background:bgSub,color:textMuted,borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700}}>
-                                  ⏱{fmtP(ex.pause)}
+                                <span style={{background:bgSub,color:textMuted,borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700,display:"inline-flex",alignItems:"center",gap:4}}>
+                                  <Ic name="clock" size={14} color={textMuted}/>{fmtP(ex.pause)}
                                 </span>
                               )}
                               {ex.progresion&&ex.progresion!=="manual"&&(
@@ -2380,7 +2393,7 @@ function GymApp() {
                                   <div style={{fontWeight:700,color:textMain,marginBottom:2}}>S{wi+1}</div>
                                   <div style={{fontSize:11}}>{w.sets||ex.sets||"—"}×{w.reps||ex.reps||"—"}</div>
                                   {(w.kg||ex.kg)&&<div style={{fontSize:11,color:"#60a5fa"}}>{w.kg||ex.kg}kg</div>}
-                                  {w.pausa&&<div style={{fontSize:10,color:textMuted}}>⏱{w.pausa}s</div>}
+                                  {w.pausa&&<div style={{fontSize:10,color:textMuted,display:"flex",alignItems:"center",gap:3,justifyContent:"center"}}><Ic name="clock" size={10} color={textMuted}/>{w.pausa}s</div>}
                                   {delta&&<div style={{fontSize:10,color:"#4ade80",fontWeight:700,marginTop:2}}>{delta}</div>}
                                 </div>
                               );
@@ -2412,12 +2425,12 @@ function GymApp() {
                         {hasWarmup&&<span style={{fontSize:15,color:textMuted,fontWeight:700}}>({(d.warmup||[]).length})</span>}
                       </div>
                       <div style={{display:"flex",gap:4}}>
-                        <button className="hov" style={{...btn("#2563EB22"),color:"#8B9AB2",fontSize:13,padding:"4px 9px"}} onClick={()=>{setAddExModal({rId:r.id,dIdx:di,bloque:"warmup"});setAddExSearch("");setAddExPat(null);}}>+ add</button>
+                        <button className="hov" style={{...btn("#2563EB22"),color:"#8B9AB2",fontSize:13,padding:"4px 10px",display:"inline-flex",alignItems:"center",gap:5}} onClick={()=>{setAddExModal({rId:r.id,dIdx:di,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}}><Ic name="plus" size={14} color="#8B9AB2"/>{es?"Añadir":"Add"}</button>
                         {hasWarmup&&<button className="hov" style={{...btn(),fontSize:13,padding:"4px 9px",background:darkMode?"#162234":"#E2E8F0",color:textMuted}} onClick={()=>toggleBlock("showWarmup")}>{d.showWarmup?"▲":"▼"}</button>}
                       </div>
                     </div>
                     {(d.showWarmup||false)&&hasWarmup&&renderExList(d.warmup||[],"warmup")}
-                    {!hasWarmup&&<div style={{fontSize:13,color:"#8B9AB2",padding:"8px 0"}}>Sin ejercicios - tocá + add para agregar</div>}
+                    {!hasWarmup&&<div style={{fontSize:13,color:"#8B9AB2",padding:"8px 0"}}>{es?"Sin ejercicios. Usá «Añadir» para sumar calentamiento.":"No exercises. Use «Add» to add warm-up."}</div>}
                   </div>
                   <div>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
@@ -2427,12 +2440,12 @@ function GymApp() {
                         <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({d.exercises.length})</span>
                       </div>
                       <div style={{display:"flex",gap:4}}>
-                        <button className="hov" style={{...btn("#22C55E20"),color:"#22C55E",fontSize:13,padding:"4px 9px"}} onClick={()=>{setAddExModal({rId:r.id,dIdx:di,bloque:"exercises"});setAddExSearch("");setAddExPat(null);}}>+ add</button>
+                        <button className="hov" style={{...btn("#22C55E20"),color:"#22C55E",fontSize:13,padding:"4px 10px",display:"inline-flex",alignItems:"center",gap:5}} onClick={()=>{setAddExModal({rId:r.id,dIdx:di,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}}><Ic name="plus" size={14} color="#22C55E"/>{es?"Añadir":"Add"}</button>
                         {d.exercises.length>0&&<button className="hov" style={{...btn(),fontSize:13,padding:"4px 9px",background:darkMode?"#162234":"#E2E8F0",color:textMuted}} onClick={()=>toggleBlock("showMain")}>{d.showMain!==false?"▲":"▼"}</button>}
                       </div>
                     </div>
                     {d.showMain!==false&&renderExList(d.exercises,"exercises")}
-                    {d.exercises.length===0&&<div style={{fontSize:13,color:"#8B9AB2",padding:"8px 0"}}>Sin ejercicios - tocá + add para agregar</div>}
+                    {d.exercises.length===0&&<div style={{fontSize:13,color:"#8B9AB2",padding:"8px 0"}}>{es?"Sin ejercicios. Usá «Añadir» para sumar al bloque principal.":"No exercises. Use «Add» for the main block."}</div>}
                   </div>
                 </div>
                 );
@@ -2442,9 +2455,9 @@ function GymApp() {
                   <div>
                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                       <div style={{fontSize:28,fontWeight:800}}>{r.name}</div>
-                      {r.scanned&&<span style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #60a5fa33",borderRadius:6,padding:"1px 7px",fontSize:11,fontWeight:700}}>📷 Escaneada</span>}
+                      {r.scanned&&<span style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #60a5fa33",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,display:"inline-flex",alignItems:"center",gap:4}}><Ic name="image" size={12} color="#2563EB"/>{es?"Escaneada":"Scanned"}</span>}
                     </div>
-                    {r.alumno&&<div style={{fontSize:15,fontWeight:700,color:textMuted,marginTop:4}}>👤 {r.alumno}</div>}
+                    {r.alumno&&<div style={{fontSize:15,fontWeight:700,color:textMuted,marginTop:4,display:"flex",alignItems:"center",gap:6}}><Ic name="user" size={15} color={textMuted}/>{r.alumno}</div>}
                     <div style={{fontSize:18,color:textMuted,fontWeight:700}}>{r.days.length} {es?"dias":"days"}</div>
                   </div>
                   <div style={{display:"flex",gap:8}}>
@@ -2455,6 +2468,7 @@ function GymApp() {
                     <button className="hov" style={{background:"#22C55E22",color:"#22C55E",border:"none",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{
                       const copia = {...r, id:uid(), name:r.name+" (copia)", days:r.days.map(function(d){return {...d,warmup:(d.warmup||[]).map(function(e){return {...e}}),exercises:(d.exercises||[]).map(function(e){return {...e}})}}), collapsed:false, saved:false};
                       setRoutines(function(p){return [...p, copia]});
+                      setAssignRoutineId(copia.id);
                       toast2((es?"Rutina duplicada":"Routine duplicated")+" ✓");
                     }}><Ic name="copy" size={15}/></button>
                     <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setRoutines(p=>p.filter(x=>x.id!==r.id));toast2((es?"Rutina eliminada":"Routine deleted")+" ✓");}}><Ic name="trash-2" size={15}/></button>
@@ -2465,7 +2479,7 @@ function GymApp() {
                     const v=e.target.value;
                     setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,alumno_id:v,alumno:alumnos.find(a=>a.id===v)?.nombre||""}:rr));
                   }}>
-                    <option value="">👤 Sin asignar</option>
+                    <option value="">{es?"Sin asignar":"Unassigned"}</option>
                     {alumnos.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}
                   </select>
                   <button className="hov" style={{...btn(),padding:"8px 14px",fontSize:15,fontWeight:700}} onClick={async()=>{
@@ -2578,7 +2592,7 @@ function GymApp() {
                     </div>
                     <div style={{display:"flex",gap:8}}>
                       <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var rutLocal={id:rSB.id,...(rSB.datos||{}),name:rSB.nombre,saved:true,alumno_id:rSB.alumno_id,alumno:alumnoInfo?.nombre||""};setRoutines(function(p){var ex=p.find(function(x){return x.id===rSB.id});return ex?p:[rutLocal,...p]});toast2(es?"Abierta para editar":"Opened for editing");}}>{es?"Editar":"Edit"}</button>
-                      <button className="hov" style={{background:"#22C55E22",color:"#22C55E",border:"none",borderRadius:8,padding:"8px 10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var copia={id:uid(),name:rSB.nombre+" (copia)",days:(rSB.datos?.days||[]).map(function(d){return{...d,warmup:(d.warmup||[]).map(function(e){return{...e}}),exercises:(d.exercises||[]).map(function(e){return{...e}})}}),collapsed:false,saved:false};setRoutines(function(p){return[...p,copia]});toast2(es?"Duplicada":"Duplicated");}}><Ic name="copy" size={14}/></button>
+                      <button className="hov" style={{background:"#22C55E22",color:"#22C55E",border:"none",borderRadius:8,padding:"8px 10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var newId=uid();var copia={id:newId,name:rSB.nombre+" (copia)",days:(rSB.datos?.days||[]).map(function(d){return{...d,warmup:(d.warmup||[]).map(function(e){return{...e}}),exercises:(d.exercises||[]).map(function(e){return{...e}})}}),collapsed:false,saved:false};setRoutines(function(p){return[...p,copia]});setAssignRoutineId(newId);toast2(es?"Duplicada":"Duplicated");}}><Ic name="copy" size={14}/></button>
                     </div>
                   </div>
                   <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>{diasSB.map(function(d,di){return(<span key={di} style={{background:bgSub,borderRadius:6,padding:"2px 8px",fontSize:11,color:textMuted,fontWeight:600}}>{d.label||("Día "+(di+1))} · {((d.warmup||[]).length+(d.exercises||[]).length)} ej.</span>)})}</div>
@@ -2598,11 +2612,30 @@ function GymApp() {
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:textMain}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
               <div style={{display:"flex",gap:8}}>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)}>💰</button>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos}>↺</button>
+                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={es?"Datos de pago":"Payment info"}><Ic name="share" size={16}/></button>
+                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={es?"Actualizar":"Refresh"}><Ic name="refresh-cw" size={16}/></button>
                 <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {es?"Nuevo":"New"}</button>
               </div>
             </div>
+
+            {routines.length>0&&(
+              <div style={{marginBottom:12,padding:"12px 14px",background:bgSub,borderRadius:12,border:"1px solid "+border}}>
+                <div style={{fontSize:11,fontWeight:800,letterSpacing:0.8,color:"#2563EB",marginBottom:8}}>{es?"RUTINA QUE SE ASIGNA AL TOCAR «ASIGNAR»":"ROUTINE USED WHEN YOU TAP «ASSIGN»"}</div>
+                {routines.length===1 ? (
+                  <div style={{fontSize:16,fontWeight:700,color:textMain}}>{routines[0].name}</div>
+                ) : (
+                  <select
+                    style={{width:"100%",background:bgCard,color:textMain,border:"1px solid "+border,borderRadius:10,padding:"10px 12px",fontSize:15,fontWeight:600,fontFamily:"inherit",cursor:"pointer",outline:"none"}}
+                    value={routineForAssign?.id||""}
+                    onChange={function(e){setAssignRoutineId(e.target.value);}}>
+                    {routines.map(function(r){
+                      return <option key={r.id} value={r.id}>{r.name||"—"} · {(r.days||[]).length} {es?"días":"days"}</option>;
+                    })}
+                  </select>
+                )}
+                <div style={{fontSize:12,color:textMuted,marginTop:6}}>{es?"Creá o editá rutinas en RUTINAS. Con varias listas, elegí cuál mandar acá.":"Create or edit routines under ROUTINES. If you have several, pick which one to send."}</div>
+              </div>
+            )}
 
             {newAlumnoForm&&(
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>{setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}}>
@@ -2676,7 +2709,9 @@ function GymApp() {
             )}
             {alumnos.length===0&&!loadingSB&&(
               <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
-                <div style={{fontSize:36,marginBottom:8}}>👥</div>
+                <div style={{fontSize:36,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <Ic name="users" size={34} color={textMuted}/>
+                </div>
                 <div style={{fontSize:15,fontWeight:700}}>{es?"Sin alumnos aún":"No athletes yet"}</div>
               </div>
             )}
@@ -2689,8 +2724,22 @@ function GymApp() {
                     <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:4}}>{a.email}</div>
                   </div>
                   <div style={{display:"flex",gap:8}}>
-                    <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>{setEditAlumnoModal(a);setEditAlumnoEmail(a.email);setEditAlumnoPass("");}}>✏️</button>
-                    <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={function(e){e.stopPropagation();console.log("[CHAT] abriendo para",a.id,a.nombre);setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}>💬</button>
+                    <button
+                      className="hov"
+                      style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center"}}
+                      onClick={()=>{if(!confirm(es?"¿Editar alumno?":"Edit athlete?")) return; setEditAlumnoModal(a);setEditAlumnoEmail(a.email);setEditAlumnoPass("");}}
+                      aria-label={es?"Editar alumno":"Edit athlete"}
+                    >
+                      <Ic name="edit-2" size={16} color={textMuted}/>
+                    </button>
+                    <button
+                      className="hov"
+                      style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center"}}
+                      onClick={function(e){e.stopPropagation();console.log("[CHAT] abriendo para",a.id,a.nombre);setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}
+                      aria-label={es?"Abrir chat":"Open chat"}
+                    >
+                      <Ic name="message-circle" size={16} color="#2563EB"/>
+                    </button>
                     <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={async()=>{
                       if(alumnoActivo?.id===a.id){setAlumnoActivo(null);return;}
                       setAlumnoActivo(a);setRegistrosSubTab(0);setLoadingSB(true);
@@ -2735,7 +2784,7 @@ function GymApp() {
                                 <>
                                 <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
                                   <div style={{background:"#2563EB15",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
-                                    <span style={{fontSize:12}}>📅</span>
+                                    <Ic name="calendar" size={14} color="#2563EB"/>
                                     <span style={{fontSize:12,fontWeight:800,color:"#2563EB"}}>{es?"Semana":"Week"} {semanaCiclo} {es?"de":"of"} 4</span>
                                   </div>
                                   <div style={{background:bgSub,border:"1px solid "+border,borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
@@ -2746,7 +2795,7 @@ function GymApp() {
                                   </div>
                                 </div>
                                 <div style={{marginTop:8,background:"#2563EB08",border:"1px solid #2563EB22",borderRadius:8,padding:"8px 10px",display:"flex",alignItems:"center",gap:6}}>
-                                  <span style={{fontSize:13}}>▶</span>
+                                  <Ic name="chevron-right" size={14} color={textMain}/>
                                   <span style={{fontSize:13,fontWeight:700,color:textMain}}>
                                     {es?"Próxima sesión:":"Next session:"} {(()=>{
                                       var proxDia, proxSemana;
@@ -2763,7 +2812,7 @@ function GymApp() {
                                     setCompletedDays(function(prev){return prev.filter(function(k){return !k.endsWith("-w"+(semanaCiclo-1))})});
                                     toast2(es?"Semana reiniciada ✓":"Week reset ✓");
                                   }} style={{flex:1,padding:"6px",background:"transparent",border:"1px solid #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit"}}>
-                                    ↩ {es?"Reiniciar semana":"Reset week"}
+                                    <Ic name="refresh-cw" size={14} color="#F59E0B"/> {es?"Reiniciar semana":"Reset week"}
                                   </button>
                                   <button className="hov" onClick={()=>{
                                     if(!confirm(es?"¿Reiniciar rutina completa? Volverá a Semana 1, Día 1. El historial de progreso se mantiene.":"Reset entire routine? Will go back to Week 1, Day 1. Progress history is kept.")) return;
@@ -2772,7 +2821,7 @@ function GymApp() {
                                     localStorage.removeItem('it_last_week_advance_date');
                                     toast2(es?"Rutina reiniciada ✓":"Routine reset ✓");
                                   }} style={{flex:1,padding:"6px",background:"transparent",border:"1px solid #EF444444",borderRadius:8,fontSize:11,fontWeight:700,color:"#EF4444",cursor:"pointer",fontFamily:"inherit"}}>
-                                    🔄 {es?"Reiniciar rutina":"Reset routine"}
+                                    <Ic name="refresh-cw" size={14} color="#EF4444"/> {es?"Reiniciar rutina":"Reset routine"}
                                   </button>
                                 </div>
                                 </>
@@ -2793,7 +2842,7 @@ function GymApp() {
                                         <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
                                       </div>;
                                     })}
-                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"warmup"});setAddExSearch("");setAddExPat(null);}} style={{width:"100%",marginTop:4,padding:"4px",background:"transparent",border:"1px dashed #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit"}}>+ {es?"Añadir calentamiento":"Add warm-up"}</button>
+                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:4,padding:"6px",background:"transparent",border:"1px dashed #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#F59E0B"/>{es?"Añadir entrada en calor":"Add warm-up"}</button>
                                   </div>
                                 )}
                                 <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1,marginBottom:4}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</div>
@@ -2806,27 +2855,31 @@ function GymApp() {
                                     <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
                                   </div>;
                                 })}
-                                <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"exercises"});setAddExSearch("");setAddExPat(null);}} style={{width:"100%",marginTop:8,padding:"6px",background:"transparent",border:"1px dashed "+border,borderRadius:8,fontSize:13,fontWeight:700,color:"#2563EB",cursor:"pointer",fontFamily:"inherit"}}>+ {es?"Añadir ejercicio":"Add exercise"}</button>
+                                <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed "+border,borderRadius:8,fontSize:13,fontWeight:700,color:"#2563EB",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#2563EB"/>{es?"Añadir bloque principal":"Add main block"}</button>
                               </div>
                             ))}
                             <div style={{display:"flex",gap:8,marginTop:8}}>
-                              <button className="hov" style={{flex:2,padding:"8px",background:bgSub,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(es?"Abierta en RUTINAS":"Opened in ROUTINES");}}>✏️ {es?"Editar":"Edit"}</button>
+                              <button className="hov" style={{flex:2,padding:"8px",background:bgSub,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(es?"¿Editar esta rutina?":"Edit this routine?")) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(es?"Abierta en RUTINAS":"Opened in ROUTINES");}}><Ic name="edit-2" size={16} color={textMuted}/>{es?"Editar":"Edit"}</button>
                               <button className="hov" style={{padding:"8px 16px",background:bgSub,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(es?"¿Quitar rutina?":"Remove?")) return;await sb.deleteRutina(rutinaActiva.id);setRutinasSB(prev=>prev.filter(x=>x.id!==rutinaActiva.id));toast2(es?"Quitada":"Removed");}}><Ic name="trash-2" size={15}/></button>
                             </div>
                           </div>
                         </div>
                       );
                     })()}
-                    <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8}} onClick={async()=>{
-                      const rutinaLocal=routines[0];if(!rutinaLocal){toast2("Creá una rutina en RUTINAS");return;}
+                    <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={async()=>{
+                      const rutinaLocal=routineForAssign;if(!rutinaLocal){toast2(es?"Creá una rutina en RUTINAS":"Create a routine in ROUTINES");return;}
                       const ex=rutinasSB.find(r=>r.alumno_id===a.id);
-                      if(ex&&!confirm((es?"Ya tiene: ":"Has: ")+ex.nombre+(es?"\n¿Reemplazar?":"\nReplace?"))) return;
+                      const rutinaNombre=rutinaLocal.name||"Rutina";
+                      var msg = ex
+                        ? (es?("Ya tiene: "+ex.nombre+"\n¿Reemplazar por: "+rutinaNombre+"?"):("Has: "+ex.nombre+"\nReplace with: "+rutinaNombre+"?"))
+                        : (es?("¿Asignar rutina: "+rutinaNombre+" a "+a.nombre+"?"):("Assign routine: "+rutinaNombre+" to "+a.nombre+"?"));
+                      if(!confirm(msg)) return;
                       if(ex){await sb.deleteRutina(ex.id);setRutinasSB(prev=>prev.filter(x=>x.id!==ex.id));}
                       setLoadingSB(true);
                       const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:rutinaLocal.days,alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
                       setLoadingSB(false);
-                    }}>{rutinasSB.find(r=>r.alumno_id===a.id)?(es?"🔄 Cambiar rutina":"🔄 Change routine"):(es?"+ Asignar rutina":"+ Assign routine")}</button>
+                    }}>{rutinasSB.find(r=>r.alumno_id===a.id)?(<><Ic name="refresh-cw" size={16}/>{es?"Cambiar rutina":"Change routine"}</>):(<><Ic name="plus" size={16}/>{es?"Asignar rutina":"Assign routine"}</>)}</button>
                     {/* ── SUGERENCIAS ── */}
                     {(()=>{
                       const rutSB = rutinasSB.find(r=>r.alumno_id===a.id);
@@ -2834,54 +2887,88 @@ function GymApp() {
                       if(!rutSB || regsAlu.length < 2) return null;
                       const sugs = generarSugerenciasAlumno(regsAlu, rutSB.datos, EX);
                       if(sugs.length === 0) return null;
+                      var open = !!sugsOpen[a.id];
                       const colores = {
-                        subir: {icon:"↑",bg:"#22C55E12",border:"#22C55E33",color:"#22C55E",btnBg:"#22C55E"},
-                        bajar: {icon:"↓",bg:"#EF444412",border:"#EF444433",color:"#EF4444",btnBg:"#EF4444"},
-                        ajustar: {icon:"⚡",bg:"#F59E0B12",border:"#F59E0B33",color:"#F59E0B",btnBg:"#F59E0B"},
-                        cambiar: {icon:"🔄",bg:"#2563EB12",border:"#2563EB33",color:"#2563EB",btnBg:"#2563EB"},
-                        mantener: {icon:"→",bg:bgSub,border:border,color:textMuted,btnBg:"#2563EB"}
+                        subir: {icon:(<Ic name="trending-up" size={16} color="#22C55E"/>),bg:"#22C55E12",border:"#22C55E33",color:"#22C55E",btnBg:"#22C55E"},
+                        bajar: {icon:(<Ic name="trending-up" size={16} color="#EF4444" style={{transform:"rotate(180deg)"}}/>),bg:"#EF444412",border:"#EF444433",color:"#EF4444",btnBg:"#EF4444"},
+                        ajustar: {icon:(<Ic name="zap" size={16} color="#F59E0B"/>),bg:"#F59E0B12",border:"#F59E0B33",color:"#F59E0B",btnBg:"#F59E0B"},
+                        cambiar: {icon:(<Ic name="refresh-cw" size={16} color="#2563EB"/>),bg:"#2563EB12",border:"#2563EB33",color:"#2563EB",btnBg:"#2563EB"},
+                        mantener: {icon:(<Ic name="chevron-right" size={16} color={textMuted}/>),bg:bgSub,border:border,color:textMuted,btnBg:"#2563EB"}
                       };
                       return (
                         <div style={{marginTop:12,marginBottom:8}}>
-                          <div style={{fontSize:11,fontWeight:800,color:"#F59E0B",letterSpacing:2,marginBottom:8,textTransform:"uppercase",display:"flex",alignItems:"center",gap:6}}>
-                            <span style={{fontSize:14}}>💡</span> {es?"SUGERENCIAS":"SUGGESTIONS"}
-                          </div>
-                          {sugs.map(function(sug,si){
-                            var c = colores[sug.tipo] || colores.mantener;
-                            return (
-                              <div key={si} id={"sug-"+si} style={{background:c.bg,border:"1px solid "+c.border,borderRadius:12,padding:"12px",marginBottom:8}}>
-                                <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                                  <span style={{fontSize:16,flexShrink:0,marginTop:1}}>{c.icon}</span>
-                                  <div style={{flex:1,minWidth:0}}>
-                                    <div style={{fontSize:13,fontWeight:800,color:c.color,marginBottom:2}}>{sug.nombre}</div>
-                                    <div style={{fontSize:14,fontWeight:700,color:textMain}}>{sug.accion}</div>
-                                    <div style={{fontSize:12,color:textMuted,marginTop:2}}>→ {sug.ajuste}</div>
-                                    <div style={{display:"flex",gap:8,marginTop:8}}>
-                                      <button className="hov" onClick={function(){
-                                        var exConSug = {...sug.exData};
-                                        if(sug.sugKg) exConSug.kg = sug.sugKg;
-                                        if(sug.sugReps) exConSug.reps = sug.sugReps;
-                                        if(sug.sugSets) exConSug.sets = sug.sugSets;
-                                        if(sug.sugPause) exConSug.pause = sug.sugPause;
-                                        setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:exConSug});
-                                      }} style={{padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{es?"APLICAR":"APPLY"}</button>
-                                      <button className="hov" onClick={function(){
-                                        var el=document.getElementById("sug-"+si);
-                                        if(el){el.style.opacity="0";el.style.height="0";el.style.padding="0";el.style.margin="0";el.style.overflow="hidden";el.style.transition="all .3s ease";}
-                                      }} style={{padding:"5px 14px",background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"IGNORAR":"IGNORE"}</button>
+                          <button
+                            type="button"
+                            className="hov"
+                            onClick={function(){ setSugsOpen(function(prev){ return {...prev, [a.id]: !prev[a.id]}; }); }}
+                            style={{
+                              width:"100%",
+                              background:bgSub,
+                              border:"1px solid "+border,
+                              borderRadius:12,
+                              padding:"10px 12px",
+                              cursor:"pointer",
+                              display:"flex",
+                              alignItems:"center",
+                              justifyContent:"space-between",
+                              gap:10
+                            }}
+                          >
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              <Ic name="info" size={16} color="#F59E0B"/>
+                              <div style={{fontSize:11,fontWeight:800,color:"#F59E0B",letterSpacing:2,textTransform:"uppercase"}}>{es?"SUGERENCIAS":"SUGGESTIONS"}</div>
+                              <span style={{fontSize:12,fontWeight:800,color:textMuted,background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:999,padding:"2px 8px"}}>{sugs.length}</span>
+                            </div>
+                            <Ic
+                              name="chevron-right"
+                              size={18}
+                              color={textMuted}
+                              style={{transition:"transform .18s ease", transform: open ? "rotate(90deg)" : "rotate(0deg)"}}
+                            />
+                          </button>
+                          {open && (
+                            <div style={{marginTop:10,maxHeight:260,overflowY:"auto",paddingRight:4}}>
+                              {sugs.map(function(sug,si){
+                                var c = colores[sug.tipo] || colores.mantener;
+                                return (
+                                  <div key={si} id={"sug-"+si} style={{background:c.bg,border:"1px solid "+c.border,borderRadius:12,padding:"12px",marginBottom:8}}>
+                                    <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                                      <div style={{flexShrink:0,marginTop:1}}>{c.icon}</div>
+                                      <div style={{flex:1,minWidth:0}}>
+                                        <div style={{fontSize:13,fontWeight:800,color:c.color,marginBottom:2}}>{sug.nombre}</div>
+                                        <div style={{fontSize:14,fontWeight:700,color:textMain}}>{sug.accion}</div>
+                                        <div style={{fontSize:12,color:textMuted,marginTop:2,display:"flex",alignItems:"center",gap:4}}>
+                                          <Ic name="chevron-right" size={12} color={textMuted}/>
+                                          {sug.ajuste}
+                                        </div>
+                                        <div style={{display:"flex",gap:8,marginTop:8}}>
+                                          <button className="hov" onClick={function(){
+                                            var exConSug = {...sug.exData};
+                                            if(sug.sugKg) exConSug.kg = sug.sugKg;
+                                            if(sug.sugReps) exConSug.reps = sug.sugReps;
+                                            if(sug.sugSets) exConSug.sets = sug.sugSets;
+                                            if(sug.sugPause) exConSug.pause = sug.sugPause;
+                                            setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:exConSug});
+                                          }} style={{padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{es?"APLICAR":"APPLY"}</button>
+                                          <button className="hov" onClick={function(){
+                                            var el=document.getElementById("sug-"+si);
+                                            if(el){el.style.opacity="0";el.style.height="0";el.style.padding="0";el.style.margin="0";el.style.overflow="hidden";el.style.transition="all .3s ease";}
+                                          }} style={{padding:"5px 14px",background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"IGNORAR":"IGNORE"}</button>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </div>
-                            );
-                          })}
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
                     <div style={{marginTop:12,borderTop:"1px solid "+border,paddingTop:12}}>
                       <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,
                         textTransform:"uppercase",marginBottom:8}}>
-                        📌 {es?"Nota del día":"Daily note"}
+                        <Ic name="bookmark" size={14} color={textMuted}/> {es?"Nota del día":"Daily note"}
                       </div>
                       <textarea
                         style={{width:"100%",background:bgSub,color:textMain,border:"1px solid "+border,
@@ -3472,41 +3559,90 @@ function GymApp() {
       {newR&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:120,overflowY:"auto"}} onClick={()=>setNewR(null)}>
           <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:28,fontWeight:800,letterSpacing:2,marginBottom:12}}>NUEVA RUTINA</div>
-            <div style={{marginBottom:8}}><span style={lbl}>NOMBRE DE LA RUTINA</span><input style={inp} value={newR.name} onChange={e=>setNewR(p=>({...p,name:e.target.value}))} placeholder="Ej: PPL Fuerza"/></div>
-            <div style={{marginBottom:8}}><span style={lbl}>NOMBRE DEL ALUMNO</span><input style={inp} value={newR.alumno||""} onChange={e=>setNewR(p=>({...p,alumno:e.target.value}))} placeholder="Ej: Agustin Sevita"/></div>
-            <div style={{marginBottom:8}}>
-              <span style={lbl}>{es?"CANTIDAD DE DIAS":"NUMBER OF DAYS"}</span>
-              <div style={{display:"flex",gap:8}}>
-                {[1,2,3,4,5,6,7].map(n=>(
-                  <button key={n} className="hov" style={{...btn(newR.numDays===n?"#2563EB":undefined),padding:"8px 0",flex:1,fontSize:18}} onClick={()=>setNewR(p=>({...p,numDays:n,days:Array.from({length:n},(_,i)=>({label:"Dia "+(i+1),warmup:[],exercises:[],showWarmup:false,showMain:true}))}))}>
-                    {n}
+            <div style={{fontSize:22,fontWeight:800,letterSpacing:1,marginBottom:4}}>{es?"Nueva rutina":"New routine"}</div>
+            <div style={{fontSize:13,color:textMuted,marginBottom:14}}>{es?"Elegí una plantilla o en blanco. Podés afinar después.":"Pick a template or start blank. Refine anytime."}</div>
+            <span style={lbl}>{es?"INICIO RÁPIDO":"QUICK START"}</span>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14,marginTop:6}}>
+              <button type="button" className="hov" style={{...btn(newR.templateId==="blank"?"#2563EB":undefined),padding:"10px 14px",fontSize:14,fontWeight:700,borderRadius:12}} onClick={()=>setNewR(p=>({...p,templateId:"blank",numDays:p.numDays||3,days:emptyDays(p.numDays||3,es)}))}>
+                {es?"En blanco":"Blank"}
+              </button>
+              {ROUTINE_TEMPLATES.map(function(T){
+                var active=newR.templateId===T.id;
+                return(
+                  <button key={T.id} type="button" className="hov" style={{...btn(active?"#22C55E":undefined),padding:"10px 14px",fontSize:14,fontWeight:700,borderRadius:12,maxWidth:"100%",textAlign:"left"}} onClick={function(){
+                    var tpl=getTemplateById(T.id);
+                    if(!tpl) return;
+                    setNewR(function(p){
+                      return{...p,templateId:T.id,name:es?tpl.nameEs:tpl.nameEn,numDays:tpl.days.length,days:instantiateTemplate(tpl,es)};
+                    });
+                  }}>
+                    {es?T.nameEs:T.nameEn}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-            <div style={{marginBottom:12}}><span style={lbl}>NOTA</span><input style={inp} value={newR.note} onChange={e=>setNewR(p=>({...p,note:e.target.value}))} placeholder="Ej: Lun/Mie/Vie"/></div>
-            <div style={{marginBottom:12}}>
-              <span style={lbl}>{es?"NOMBRE DE CADA DÍA":"NAME EACH DAY"}</span>
-              <div style={{display:"flex",flexDirection:"column",gap:6}}>
-                {(newR.days||[]).map(function(d,di){return(
-                  <div key={di} style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:13,fontWeight:700,color:textMuted,width:50,flexShrink:0}}>Día {di+1}</span>
-                    <input style={{...inp,marginBottom:0,flex:1}} value={d.label||""} onChange={function(e){
-                      var val=e.target.value;
-                      setNewR(function(p){return{...p,days:p.days.map(function(dd,ddi){return ddi===di?{...dd,label:val}:dd})}});
-                    }} placeholder={es?"Ej: Pierna A, Empuje, Full...":"E.g: Leg A, Push, Full..."}/>
-                  </div>
-                )})}
+            <div style={{marginBottom:10}}><span style={lbl}>{es?"NOMBRE":"NAME"}</span><input style={inp} value={newR.name} onChange={e=>setNewR(p=>({...p,name:e.target.value}))} placeholder={es?"Ej: PPL Juan":"E.g: John PPL"}/></div>
+            {newR.templateId==="blank"&&(
+              <div style={{marginBottom:10}}>
+                <span style={lbl}>{es?"DÍAS":"DAYS"}</span>
+                <div style={{display:"flex",gap:8}}>
+                  {[1,2,3,4,5,6,7].map(n=>(
+                    <button key={n} type="button" className="hov" style={{...btn(newR.numDays===n?"#2563EB":undefined),padding:"8px 0",flex:1,fontSize:18}} onClick={()=>setNewR(p=>({...p,numDays:n,days:emptyDays(n,es)}))}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+            {newR.templateId&&newR.templateId!=="blank"&&(
+              <div style={{fontSize:13,color:textMuted,marginBottom:12,padding:"8px 10px",background:bgSub,borderRadius:10,border:"1px solid "+border}}>
+                {(function(){
+                  var T=getTemplateById(newR.templateId);
+                  if(!T) return null;
+                  var n=(newR.days||[]).length;
+                  var ex=(newR.days||[]).reduce(function(a,d){return a+(d.exercises||[]).length;},0);
+                  return(es?T.hintEs:T.hintEn)+" · "+n+(es?" días · ":" days · ")+ex+(es?" ejercicios":" exercises");
+                })()}
+              </div>
+            )}
+            <button type="button" className="hov" style={{width:"100%",padding:"10px",marginBottom:12,background:"transparent",border:"1px dashed "+border,borderRadius:12,color:textMuted,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>setNewR(p=>({...p,showAdvanced:!p.showAdvanced}))}>
+              {newR.showAdvanced?(es?"▲ Menos opciones":"▲ Fewer options"):(es?"▼ Nota, alumno, nombres de día":"▼ Note, client, day names")}
+            </button>
+            {newR.showAdvanced&&(
+              <div style={{marginBottom:12}}>
+                <div style={{marginBottom:8}}>
+                  <span style={lbl}>{es?"NOTA (opcional)":"NOTE (optional)"}</span>
+                  <input style={inp} value={newR.note||""} onChange={e=>setNewR(p=>({...p,note:e.target.value}))} placeholder={es?"Ej: Lun, Mie, Vie":"E.g. Mon, Wed, Fri"}/>
+                </div>
+                <div style={{marginBottom:8}}>
+                  <span style={lbl}>{es?"ALUMNO (opcional)":"CLIENT (optional)"}</span>
+                  <input style={inp} value={newR.alumno||""} onChange={e=>setNewR(p=>({...p,alumno:e.target.value}))} placeholder={es?"Asigná también desde la tarjeta del alumno":"Or assign from client card"}/>
+                </div>
+                <span style={lbl}>{es?"NOMBRE DE CADA DÍA":"NAME EACH DAY"}</span>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:6}}>
+                  {(newR.days||[]).map(function(d,di){return(
+                    <div key={di} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:13,fontWeight:700,color:textMuted,width:52,flexShrink:0}}>{es?"Día":"Day"} {di+1}</span>
+                      <input style={{...inp,marginBottom:0,flex:1}} value={d.label||""} onChange={function(e){
+                        var val=e.target.value;
+                        setNewR(function(p){return{...p,days:p.days.map(function(dd,ddi){return ddi===di?{...dd,label:val}:dd})}});
+                      }} placeholder={es?"Ej: Empuje, Pierna…":"E.g. Push, Legs…"}/>
+                    </div>
+                  )})}
+                </div>
+              </div>
+            )}
             <div style={{display:"flex",gap:8}}>
-              <button className="hov" style={{...btn(),flex:1,padding:"8px"}} onClick={()=>setNewR(null)}>CANCELAR</button>
-              <button className="hov" style={{...btn("#2563EB"),flex:2,padding:"8px",fontSize:18}} onClick={()=>{
-                if(!newR.name.trim()){toast2("Pon un nombre");return;}
-                setRoutines(p=>[...p,{...newR,id:uid(),created:new Date().toLocaleDateString("es-AR")}]);
-                setNewR(null); toast2("Rutina creada ✓");
-              }}>CREAR</button>
+              <button type="button" className="hov" style={{...btn(),flex:1,padding:"10px"}} onClick={()=>setNewR(null)}>{es?"CANCELAR":"CANCEL"}</button>
+              <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"10px",fontSize:17,fontWeight:800}} onClick={()=>{
+                if(!newR.name.trim()){toast2(es?"Pon un nombre":"Add a name");return;}
+                var payload={name:newR.name,numDays:newR.numDays,days:newR.days,note:newR.note||"",alumno:newR.alumno||"",collapsed:false};
+                var newId=uid();
+                setRoutines(p=>[...p,{...payload,id:newId,created:new Date().toLocaleDateString("es-AR")}]);
+                setAssignRoutineId(newId);
+                setNewR(null);
+                toast2(es?"Rutina creada ✓":"Routine created ✓");
+              }}>{es?"CREAR":"CREATE"}</button>
             </div>
           </div>
         </div>
@@ -3813,21 +3949,28 @@ function GymApp() {
         </div>
       )}
       {addExModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"flex-end"}} onClick={()=>setAddExModal(null)}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"flex-end"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>
           <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxHeight:"85vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-              <span style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"AGREGAR EJERCICIO":"ADD EXERCISE"}</span>
-              <button className="hov" style={{...btn(),fontSize:18,padding:"4px 8px"}} onClick={()=>setAddExModal(null)}>x</button>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
+              <div>
+                <div style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"Agregar ejercicios":"Add exercises"}</div>
+                <div style={{fontSize:13,color:textMuted,marginTop:4,maxWidth:320}}>
+                  {(addExModal.bloque||"exercises")==="warmup"
+                    ? (es?"Tocá para marcar varios en entrada en calor; confirmá abajo.":"Tap to select warm-up exercises, then confirm.")
+                    : (es?"Tocá para marcar varios en bloque principal; confirmá abajo.":"Tap to select main exercises, then confirm.")}
+                </div>
+              </div>
+              <button type="button" className="hov" style={{...btn(),padding:"6px"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}} aria-label={es?"Cerrar":"Close"}><Ic name="x" size={20}/></button>
             </div>
             <input style={{...inp,marginBottom:8}} placeholder={es?"Buscar...":"Search..."} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
               {Object.entries(PATS).map(([k,p])=>(
-                <button key={k} className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
+                <button key={k} type="button" className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
                   {p.icon} {es?p.label:p.labelEn}
                 </button>
               ))}
             </div>
-            <div style={{overflowY:"auto",flex:1}}>
+            <div style={{overflowY:"auto",flex:1,minHeight:120}}>
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
@@ -3835,33 +3978,60 @@ function GymApp() {
                 return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||(e.muscle||"").toLowerCase().includes(q);
               }).map(ex=>{
                 const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
+                const sel=addExSelectedIds.includes(ex.id);
                 return(
-                  <div key={ex.id} className="hov" style={{display:"flex",alignItems:"center",gap:12,padding:"16px 10px",borderRadius:12,marginBottom:8,background:darkMode?"#162234":"#E2E8F0",cursor:"pointer"}} onClick={async()=>{
-                    const blk=addExModal.bloque||"exercises";
-                    const newEx={id:ex.id,sets:"3",reps:"8-10",kg:"",pause:0,note:"",weeks:[]};
-                    // Actualizar routines locales
-                    setRoutines(p=>p.map(r=>r.id===addExModal.rId?{...r,days:r.days.map((d,i)=>i===addExModal.dIdx?{...d,[blk]:[...(d[blk]||[]),newEx]}:d)}:r));
-                    // Si es rutina de rutinasSB, guardar en Supabase
-                    const rSB = rutinasSB.find(x=>x.id===addExModal.rId);
-                    if(rSB) {
-                      try {
-                        const diasAct = (rSB.datos?.days||[]).map((d,i)=>i===addExModal.dIdx?{...d,[blk]:[...(d[blk]||[]),newEx]}:d);
-                        await sb.updateRutina(rSB.id, {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:"entrenador_principal"});
-                        setRutinasSB(prev=>prev.map(r=>r.id===rSB.id?{...r,datos:{...r.datos,days:diasAct}}:r));
-                      } catch(e){ console.error("Add ex save error:",e); }
-                    }
-                    toast2((es?"Agregado":"Added")+": "+(es?ex.name:ex.nameEn));
-                    setAddExModal(null);
-                  }}>
-                    <div style={{width:52,height:52,borderRadius:12,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>{pat.icon}</div>
+                  <div key={ex.id} className="hov" role="button" tabIndex={0} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 10px",borderRadius:12,marginBottom:8,background:darkMode?"#162234":"#E2E8F0",cursor:"pointer",border:sel?"2px solid "+(pat.color||"#2563EB"):"2px solid transparent"}} onClick={()=>setAddExSelectedIds(function(prev){return prev.includes(ex.id)?prev.filter(function(x){return x!==ex.id;}):[...prev,ex.id];})}>
+                    <div style={{width:52,height:52,borderRadius:12,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:800,color:pat.color,flexShrink:0}}>{pat.icon}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:18,fontWeight:700}}>{es?ex.name:ex.nameEn}</div>
                       <div style={{fontSize:15,color:textMuted}}>{ex.muscle} · {ex.equip}</div>
                     </div>
-                    <div style={{color:pat.color,fontSize:28,fontWeight:700}}>+</div>
+                    <div style={{width:28,height:28,borderRadius:"50%",border:sel?"2px solid "+pat.color:"2px solid "+border,background:sel?pat.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                      {sel ? <Ic name="check-sm" size={16} color={pat.color}/> : null}
+                    </div>
                   </div>
                 );
               })}
+            </div>
+            <div style={{display:"flex",gap:8,paddingTop:12,borderTop:"1px solid "+border,flexShrink:0}}>
+              <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"Cancelar":"Cancel"}</button>
+              <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5}} disabled={!addExSelectedIds.length} onClick={async function(){
+                if(!addExModal||addExSelectedIds.length===0) return;
+                var blk=addExModal.bloque||"exercises";
+                var rId=addExModal.rId;
+                var dIdx=addExModal.dIdx;
+                var r=routines.find(function(rr){return rr.id===rId;});
+                var day=r&&r.days?r.days[dIdx]:null;
+                var existing=new Set((day&&day[blk]?day[blk]:[]).map(function(e){return e.id;}));
+                var ids=addExSelectedIds.filter(function(id){return !existing.has(id);});
+                if(ids.length===0){toast2(es?"Ya están en ese bloque":"Already in that block");return;}
+                var newExs=ids.map(function(id){
+                  var ex=allEx.find(function(e){return e.id===id;});
+                  if(!ex) return null;
+                  return {id:ex.id,sets:"3",reps:"8-10",kg:"",pause:0,note:"",weeks:[]};
+                }).filter(Boolean);
+                setRoutines(function(p){return p.map(function(rr){
+                  if(rr.id!==rId) return rr;
+                  return {...rr,days:rr.days.map(function(d,i){
+                    if(i!==dIdx) return d;
+                    return {...d,[blk]:[...(d[blk]||[]),...newExs]};
+                  })};
+                });});
+                var rSB=rutinasSB.find(function(x){return x.id===rId;});
+                if(rSB){
+                  try{
+                    var diasAct=(rSB.datos&&rSB.datos.days?rSB.datos.days:[]).map(function(d,i){
+                      if(i!==dIdx) return d;
+                      return {...d,[blk]:[...(d[blk]||[]),...newExs]};
+                    });
+                    await sb.updateRutina(rSB.id,{nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:"entrenador_principal"});
+                    setRutinasSB(function(prev){return prev.map(function(rw){return rw.id===rSB.id?{...rw,datos:{...rw.datos,days:diasAct}}:rw;});});
+                  }catch(e){console.error("Add batch save error:",e);}
+                }
+                toast2((es?"Agregados ":"Added ")+newExs.length+(es?" ejercicios":" exercises"));
+                setAddExModal(null);
+                setAddExSelectedIds([]);
+              }}>{es?"Añadir seleccionados":"Add selected"}{addExSelectedIds.length?" ("+addExSelectedIds.length+")":""}</button>
             </div>
           </div>
         </div>
@@ -5268,7 +5438,14 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
           <button key={i} onClick={()=>setTab(i)} style={{flex:1,padding:"16px",border:"none",background:"none",
             fontFamily:"inherit",fontSize:18,fontWeight:800,cursor:"pointer",
             color:tab===i?"#2563EB":"#8B9AB2",borderBottom:tab===i?"2px solid #3B82F6":"2px solid transparent"}}>
-            {t}{i===0&&dupCount>0?<span style={{marginLeft:8,background:"#2563EB",color:"#fff",borderRadius:12,padding:"1px 7px",fontSize:13}}>{dupCount}</span>:null}
+            {t}{i===0&&dupCount>0?(
+              <span
+                title={es?`Hay ${dupCount} nombres de ejercicio duplicados`:`There are ${dupCount} duplicate exercise names`}
+                style={{marginLeft:8,background:"#2563EB",color:"#fff",borderRadius:12,padding:"1px 7px",fontSize:13,display:"inline-flex",alignItems:"center",justifyContent:"center"}}
+              >
+                <Ic name="alert-triangle" size={12} color="#fff"/>
+              </span>
+            ):null}
           </button>
         ))}
       </div>
