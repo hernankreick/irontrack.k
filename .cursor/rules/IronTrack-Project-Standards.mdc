@@ -1,0 +1,54 @@
+---
+alwaysApply: true
+---
+
+Proyecto: IronTrack (React + Vite + Supabase)
+
+OBJETIVO:
+Mantener una app escalable, modular y sin romper funcionalidades existentes.
+
+REGLAS GENERALES:
+- No romper código existente
+- Hacer cambios mínimos y específicos
+- No modificar partes no relacionadas
+- Priorizar claridad y reutilización
+
+ARQUITECTURA:
+- App.jsx es un archivo grande (+7000 líneas)
+- NO reescribir el archivo completo
+- Identificar primero la sección a modificar
+- Proponer división en componentes cuando sea posible
+
+ESTRUCTURA:
+- Componentes → /components
+- Hooks → /hooks
+- Servicios (Supabase) → /services
+
+ESTILO DE CÓDIGO:
+- Componentes en PascalCase (Ej: RoutineCard.jsx)
+- Funciones en camelCase
+- Hooks con prefijo "use" (useRoutines)
+
+UI:
+- No modificar diseño sin que se pida explícitamente
+- Mantener consistencia visual
+
+SUPABASE:
+- No cambiar queries sin necesidad
+- No romper autenticación
+- Reutilizar funciones existentes
+
+PERFORMANCE:
+- Evitar renders innecesarios
+- No traer datos de más
+- Optimizar listas largas
+
+FLUJO DE TRABAJO:
+- Antes de hacer cambios grandes → explicar qué va a hacer
+- Mostrar solo código relevante
+- Sugerir mejoras pero no aplicarlas sin permiso
+
+CONTEXTO CRÍTICO:
+- La app está en crecimiento constante
+- Hay features como rutinas, alumnos, chat
+- Priorizar estabilidad sobre refactors grandes
