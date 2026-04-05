@@ -3581,13 +3581,14 @@ function GymApp() {
               <button type="button" className="hov" style={{...btn(),padding:"6px"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}} aria-label={es?"Cerrar":"Close"}><Ic name="x" size={20}/></button>
             </div>
             <input style={{...inp,marginBottom:8}} placeholder={es?"Buscar...":"Search..."} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
+ <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:8,paddingBottom:4,scrollbarWidth:"none",msOverflowStyle:"none"}}>
               {Object.entries(PATS).map(([k,p])=>(
-                <button key={k} type="button" className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
+                <button key={k} type="button" className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,textTransform:"uppercase",letterSpacing:".5px"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
                   {p.icon} {es?p.label:p.labelEn}
                 </button>
               ))}
             </div>
+
             <div style={{overflowY:"auto",flex:1,minHeight:120}}>
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
@@ -3612,8 +3613,8 @@ function GymApp() {
               })}
             </div>
             <div style={{display:"flex",gap:8,paddingTop:12,borderTop:"1px solid "+border,flexShrink:0}}>
-              <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"Cancelar":"Cancel"}</button>
-              <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5}} disabled={!addExSelectedIds.length} onClick={async function(){
+              <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"CANCELAR":"CANCEL"}</button>
+              <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} disabled={!addExSelectedIds.length} onClick={async function(){
                 if(!addExModal||addExSelectedIds.length===0) return;
                 var blk=addExModal.bloque||"exercises";
                 var rId=addExModal.rId;
@@ -3649,7 +3650,7 @@ function GymApp() {
                 toast2((es?"Agregados ":"Added ")+newExs.length+(es?" ejercicios":" exercises"));
                 setAddExModal(null);
                 setAddExSelectedIds([]);
-              }}>{es?"Añadir seleccionados":"Add selected"}{addExSelectedIds.length?" ("+addExSelectedIds.length+")":""}</button>
+              }}>{es?"AÑADIR SELECCIONADOS":"ADD SELECTED"}{addExSelectedIds.length?" ("+addExSelectedIds.length+")":""}</button>
             </div>
           </div>
         </div>
