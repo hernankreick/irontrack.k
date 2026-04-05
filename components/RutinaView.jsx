@@ -106,18 +106,24 @@ function DayAccordion({ r, d, di, es, darkMode, border, textMain, textMuted, bgS
               {d.label || `${es ? "Día" : "Day"} ${di + 1}`}
             </div>
             {/* Resumen compacto */}
-            <div style={{ display: "flex", gap: 8, marginTop: 2, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 2, flexWrap: "wrap", alignItems: "center" }}>
               {warmupCount > 0 && (
-                <span style={{ fontSize: 11, color: accentWarmup, fontWeight: 700 }}>
-                  🔥 {warmupCount} {es ? "calent." : "warm-up"}{warmupMin > 0 ? ` · ${warmupMin} min` : ""}
+                <span style={{ fontSize: 11, color: accentWarmup, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4,
+                  background: accentWarmup + "18", border: `1px solid ${accentWarmup}33`,
+                  borderRadius: 6, padding: "2px 7px" }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={accentWarmup} strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  WARMUP · {warmupCount}{warmupMin > 0 ? ` · ${warmupMin} MIN` : ""}
                 </span>
               )}
-              <span style={{ fontSize: 11, color: accentMain, fontWeight: 700 }}>
-                💪 {mainCount} {es ? "ejerc." : "ex."}
+              <span style={{ fontSize: 11, color: accentMain, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4,
+                background: accentMain + "18", border: `1px solid ${accentMain}33`,
+                borderRadius: 6, padding: "2px 7px" }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={accentMain} strokeWidth="2"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M7 7V5a2 2 0 0 1 4 0v2M13 7V5a2 2 0 0 1 4 0v2"/></svg>
+                BLOQUE PRINCIPAL · {mainCount}
               </span>
               {totalEx === 0 && (
                 <span style={{ fontSize: 11, color: textMuted }}>
-                  {es ? "Sin ejercicios" : "No exercises"}
+                  SIN EJERCICIOS
                 </span>
               )}
             </div>
@@ -137,10 +143,11 @@ function DayAccordion({ r, d, di, es, darkMode, border, textMain, textMuted, bgS
               border: "none", borderRadius: 8, padding: "5px 8px",
               cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
               fontSize: 11, fontWeight: 700, color: textMuted,
+              textTransform: "uppercase", letterSpacing: ".5px",
             }}
           >
             <Ic name="copy" size={12} color={textMuted} />
-            {es ? "Dupl." : "Dup."}
+            {es ? "DUPL." : "DUP."}
           </button>
           <div style={{
             width: 28, height: 28, borderRadius: 6,
@@ -205,7 +212,7 @@ function DayAccordion({ r, d, di, es, darkMode, border, textMain, textMuted, bgS
                 }}
               >
                 <Ic name="plus" size={13} color={accentWarmup} />
-                {es ? "Añadir" : "Add"}
+                {es ? "AÑADIR" : "ADD"}
               </button>
             </div>
             {warmupCount > 0
@@ -241,7 +248,7 @@ function DayAccordion({ r, d, di, es, darkMode, border, textMain, textMuted, bgS
                 }}
               >
                 <Ic name="plus" size={13} color={accentMain} />
-                {es ? "Añadir" : "Add"}
+                {es ? "AÑADIR" : "ADD"}
               </button>
             </div>
             {mainCount > 0
@@ -313,8 +320,8 @@ function RutinaCard({ r, es, darkMode, border, textMain, textMuted, bgCard, bgSu
                 </span>
               )}
               {r.saved && (
-                <span style={{ background: "#22C55E15", color: "#22C55E", borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>
-                  ✓ {es ? "Guardada" : "Saved"}
+                <span style={{ background: "#22C55E15", color: "#22C55E", borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px" }}>
+                  ✓ {es ? "GUARDADA" : "SAVED"}
                 </span>
               )}
             </div>
@@ -356,6 +363,7 @@ function RutinaCard({ r, es, darkMode, border, textMain, textMuted, bgCard, bgSu
               borderRadius: 8, padding: "7px 10px", cursor: "pointer",
               display: "flex", alignItems: "center", gap: 4,
               fontSize: 12, fontWeight: 700, color: textMuted,
+              textTransform: "uppercase", letterSpacing: ".5px",
             }}>
               <Ic name={collapsed ? "chevron-down" : "chevron-up"} size={15} color={textMuted} />
               {collapsed ? (es ? "VER" : "VIEW") : (es ? "CERRAR" : "CLOSE")}
@@ -387,9 +395,10 @@ function RutinaCard({ r, es, darkMode, border, textMain, textMuted, bgCard, bgSu
             borderRadius: 10, padding: "8px 16px", fontSize: 14, fontWeight: 700,
             cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit",
             display: "flex", alignItems: "center", gap: 6, opacity: saving ? 0.7 : 1,
+            textTransform: "uppercase", letterSpacing: ".5px", fontSize: 13,
           }}>
             <Ic name="save" size={15} color="#fff" />
-            {saving ? (es ? "Guardando…" : "Saving…") : (es ? "Guardar" : "Save")}
+            {saving ? (es ? "GUARDANDO…" : "SAVING…") : (es ? "GUARDAR" : "SAVE")}
           </button>
         </div>
 
@@ -441,9 +450,10 @@ export function RutinaView(props) {
         borderRadius: 12, color: textMuted, fontSize: 14, fontWeight: 700,
         cursor: "pointer", fontFamily: "inherit",
         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        textTransform: "uppercase", letterSpacing: ".5px",
       }}>
         <Ic name="camera" size={16} />
-        {es ? "Escanear rutina existente" : "Scan existing routine"}
+        {es ? "ESCANEAR RUTINA EXISTENTE" : "SCAN EXISTING ROUTINE"}
       </button>
 
       {/* ── Botón nueva rutina ── */}
