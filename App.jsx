@@ -1108,7 +1108,7 @@ function GymApp() {
   );
 
   if(!sharedParam && loginScreen) return (
-    <div style={{maxWidth:480,margin:"0 auto",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
+    <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
       <div style={{marginBottom:40,textAlign:"center"}}>
         <IronTrackLogo size={32} color="#2563EB" showBar={false}/>
         <div style={{fontSize:13,color:textMuted,marginTop:8,letterSpacing:1.5,fontWeight:500}}>
@@ -1191,7 +1191,7 @@ function GymApp() {
   );
 
   return (
-    <div style={{minHeight:"100vh",background:bg,color:textMain,fontFamily:"Inter,sans-serif","--sk1":darkMode?"#1E2D40":"#E8EEF4","--sk2":darkMode?"#2D4057":"#D1DCE8",paddingBottom:72,position:"relative"}}>
+    <div style={{minHeight:"100dvh",background:bg,color:textMain,fontFamily:"Inter,sans-serif","--sk1":darkMode?"#1E2D40":"#E8EEF4","--sk2":darkMode?"#2D4057":"#D1DCE8",paddingBottom:72,position:"relative"}}>
       <style dangerouslySetInnerHTML={{__html:
         "@import url(https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap);" +
         "*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased}input,textarea,select{outline:none!important}" +
@@ -1328,7 +1328,7 @@ function GymApp() {
           if(!dir && y < 20 && headerCollapsed) setHeaderCollapsed(false);
           lastScrollY.current = y;
         }}
-        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100vh - 130px)",paddingBottom:100,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth"}}>
+        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100dvh - 130px)",paddingBottom:100,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth"}}>
         {tab==="plan"&&esAlumno&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&(
           <div>
@@ -1352,7 +1352,7 @@ function GymApp() {
               // pero aqui lo hacemos directamente inline
 
               return (
-                <div style={{minHeight:"calc(100vh - 280px)"}}>
+                <div style={{minHeight:"calc(100dvh - 280px)"}}>
                   <div style={{background:bgCard,borderRadius:20,padding:"20px 16px",marginBottom:12,border:"1px solid "+curPat.color+"33",boxShadow:"0 4px 24px "+curPat.color+"11"}}>
                     <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
                       <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:curPat.color,flexShrink:0,minHeight:60}}/>
@@ -3082,7 +3082,7 @@ function GymApp() {
       )}
       {detailEx&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:100,display:"flex",alignItems:"flex-end"}} onClick={()=>setDetailEx(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxHeight:"80dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
               <span style={{fontSize:36}}>{PATS[detailEx.pattern]?.icon}</span>
               <div>
@@ -3176,7 +3176,7 @@ function GymApp() {
       )}
       {newR&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:120,overflowY:"auto"}} onClick={()=>setNewR(null)}>
-          <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:22,fontWeight:800,letterSpacing:1,marginBottom:4}}>{es?"Nueva rutina":"New routine"}</div>
             <div style={{fontSize:13,color:textMuted,marginBottom:14}}>{es?"Elegí una plantilla o en blanco. Podés afinar después.":"Pick a template or start blank. Refine anytime."}</div>
             <span style={lbl}>{es?"INICIO RÁPIDO":"QUICK START"}</span>
@@ -3354,7 +3354,7 @@ function GymApp() {
             {/* ── Modal chat entrenador ── */}
       {chatModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setChatModal(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxWidth:480,border:"1px solid "+border,maxHeight:"80vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxWidth:480,border:"1px solid "+border,maxHeight:"80dvh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:32,height:32,borderRadius:"50%",background:"#2563EB22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#2563EB"}}>
@@ -3421,7 +3421,7 @@ function GymApp() {
       )}
       {aliasModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-end"}} onClick={()=>setAliasModal(false)}>
-          <div style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:20,width:"100%",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:20,width:"100%",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>💰 {es?"Datos de Pago":"Payment Info"}</div>
             <div style={{fontSize:13,color:textMuted,marginBottom:16}}>{es?"Configurá tu alias o CBU para recibir pagos":"Set up your alias or CBU to receive payments"}</div>
             {(()=>{
@@ -3567,29 +3567,29 @@ function GymApp() {
         </div>
       )}
       {addExModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"flex-end"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxHeight:"85vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
-              <div>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"flex-end",justifyContent:"center",height:"100dvh",maxHeight:"100dvh",overflow:"hidden",boxSizing:"border-box"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",width:"100%",maxHeight:"85dvh",minHeight:0,display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",flexShrink:0}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10,flexShrink:0}}>
+              <div style={{minWidth:0,paddingRight:8}}>
                 <div style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"Agregar ejercicios":"Add exercises"}</div>
-                <div style={{fontSize:13,color:textMuted,marginTop:4,maxWidth:320}}>
+                <div style={{fontSize:13,color:textMuted,marginTop:4,maxWidth:320,lineHeight:1.4,wordBreak:"break-word"}}>
                   {(addExModal.bloque||"exercises")==="warmup"
                     ? (es?"Tocá para marcar varios en entrada en calor; confirmá abajo.":"Tap to select warm-up exercises, then confirm.")
                     : (es?"Tocá para marcar varios en bloque principal; confirmá abajo.":"Tap to select main exercises, then confirm.")}
                 </div>
               </div>
-              <button type="button" className="hov" style={{...btn(),padding:"6px"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}} aria-label={es?"Cerrar":"Close"}><Ic name="x" size={20}/></button>
+              <button type="button" className="hov" style={{...btn(),padding:"6px",flexShrink:0}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}} aria-label={es?"Cerrar":"Close"}><Ic name="x" size={20}/></button>
             </div>
-            <input style={{...inp,marginBottom:8}} placeholder={es?"Buscar...":"Search..."} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
- <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:8,paddingBottom:4,scrollbarWidth:"none",msOverflowStyle:"none"}}>
+            <input style={{...inp,marginBottom:8,flexShrink:0,width:"100%",boxSizing:"border-box"}} placeholder={es?"Buscar...":"Search..."} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
+            <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:8,paddingBottom:4,flexShrink:0,minHeight:44,alignItems:"center",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",msOverflowStyle:"none"}}>
               {Object.entries(PATS).map(([k,p])=>(
-                <button key={k} type="button" className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,textTransform:"uppercase",letterSpacing:".5px"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
+                <button key={k} type="button" className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:".5px"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
                   {p.icon} {es?p.label:p.labelEn}
                 </button>
               ))}
             </div>
 
-            <div style={{overflowY:"auto",flex:1,minHeight:0,maxHeight:"100%"}}>
+            <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",flex:1,minHeight:120,overscrollBehavior:"contain"}}>
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
@@ -3599,13 +3599,14 @@ function GymApp() {
                 const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
                 const sel=addExSelectedIds.includes(ex.id);
                 return(
-                  <div key={ex.id} className="hov" role="button" tabIndex={0} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 10px",borderRadius:12,marginBottom:8,background:darkMode?"#162234":"#E2E8F0",cursor:"pointer",border:sel?"2px solid "+(pat.color||"#2563EB"):"2px solid transparent"}} onClick={()=>setAddExSelectedIds(function(prev){return prev.includes(ex.id)?prev.filter(function(x){return x!==ex.id;}):[...prev,ex.id];})}>
-                    <div style={{width:52,height:52,borderRadius:12,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:800,color:pat.color,flexShrink:0}}>{pat.icon}</div>
+                  <div key={ex.id} className="hov" role="button" tabIndex={0} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 10px",borderRadius:12,marginBottom:8,background:darkMode?"#162234":"#E2E8F0",cursor:"pointer",border:sel?"2px solid "+(pat.color||"#2563EB"):"2px solid transparent"}} onClick={()=>setAddExSelectedIds(function(prev){return prev.includes(ex.id)?prev.filter(function(x){return x!==ex.id;}):[...prev,ex.id];})}>
+                    <div style={{width:52,height:52,borderRadius:12,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:800,color:pat.color,flexShrink:0,marginTop:2}}>{pat.icon}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:18,fontWeight:700}}>{es?ex.name:ex.nameEn}</div>
-                      <div style={{fontSize:15,color:textMuted}}>{ex.muscle} · {ex.equip}</div>
+                      <div style={{fontSize:18,fontWeight:700,lineHeight:1.25,wordBreak:"break-word"}}>{es?ex.name:ex.nameEn}</div>
+                      <div style={{fontSize:12,fontWeight:700,color:pat.color,textTransform:"uppercase",letterSpacing:.4,marginTop:4,lineHeight:1.3}}>{es?pat.label:pat.labelEn}</div>
+                      {(ex.muscle||ex.equip)&&<div style={{fontSize:14,color:textMuted,marginTop:2,lineHeight:1.35,wordBreak:"break-word"}}>{[ex.muscle,ex.equip].filter(Boolean).join(" · ")}</div>}
                     </div>
-                    <div style={{width:28,height:28,borderRadius:"50%",border:sel?"2px solid "+pat.color:"2px solid "+border,background:sel?pat.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    <div style={{width:28,height:28,borderRadius:"50%",border:sel?"2px solid "+pat.color:"2px solid "+border,background:sel?pat.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:4}}>
                       {sel ? <Ic name="check-sm" size={16} color={pat.color}/> : null}
                     </div>
                   </div>
@@ -4063,7 +4064,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
       </div>
       {fotoGrande&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.95)",zIndex:300,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setFotoGrande(null)}>
-          <img src={fotoGrande.imagen} style={{maxWidth:"100%",maxHeight:"80vh",objectFit:"contain",borderRadius:12}}/>
+          <img src={fotoGrande.imagen} style={{maxWidth:"100%",maxHeight:"80dvh",objectFit:"contain",borderRadius:12}}/>
           <div style={{color:textMuted,marginTop:12,fontSize:15}}>{fotoGrande.fecha}</div>
           <button style={{marginTop:12,background:_dm?"#162234":"#E2E8F0",color:textMain,border:"1px solid "+border,borderRadius:8,padding:"8px 20px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>setFotoGrande(null)}>Cerrar</button>
         </div>
@@ -4330,7 +4331,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
 
       {editModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setEditModal(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",width:"100%",height:"80vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",width:"100%",maxHeight:"80dvh",minHeight:0,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:18,fontWeight:800,marginBottom:16}}>{es?"Editar ejercicio":"Edit exercise"}</div>
             <div style={{marginBottom:12}}>
               <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{es?"NOMBRE":"NAME"}</div>
@@ -5250,7 +5251,7 @@ function OnboardingScreen({es, darkMode, onDone}) {
   // Animación de step
   return (
     <div style={{
-      minHeight:"100vh", background:bg, display:"flex", flexDirection:"column",
+      minHeight:"100dvh", background:bg, display:"flex", flexDirection:"column",
       alignItems:"center", justifyContent:"center", padding:"24px 20px",
       fontFamily:"Inter,sans-serif"
     }}>
@@ -5483,7 +5484,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:125,overflowY:"auto"}} onClick={onClose}>
-      <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <div style={{width:36,height:36,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:color,flexShrink:0}}>{pat?.icon||"·"}</div>
           <div style={{fontSize:22,fontWeight:800,flex:1}}>{es?info?.name:info?.nameEn}</div>
