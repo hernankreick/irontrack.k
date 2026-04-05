@@ -2336,12 +2336,12 @@ function GymApp() {
 
             {alumnos.map(a=>(
               <div key={a.id} style={{background:bgCard,borderRadius:12,padding:"16px",marginBottom:8,border:alumnoActivo?.id===a.id?"1px solid #2563EB":"1px solid "+border}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:alumnoActivo?.id===a.id?8:0}}>
-                  <div>
-                    <div style={{fontSize:18,fontWeight:700,color:textMain}}>{a.nombre}</div>
-                    <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:4}}>{a.email}</div>
-                  </div>
-                  <div style={{display:"flex",gap:8}}>
+ <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:alumnoActivo?.id===a.id?8:0,gap:8}}>
+  <div style={{flex:1,minWidth:0}}>
+    <div style={{fontSize:18,fontWeight:700,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.nombre}</div>
+    <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
+  </div>
+  <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
                     <button
                       className="hov"
                       style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center"}}
