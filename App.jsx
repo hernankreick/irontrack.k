@@ -3589,7 +3589,7 @@ function GymApp() {
               ))}
             </div>
 
-            <div style={{overflowY:"auto",flex:1,minHeight:120}}>
+            <div style={{overflowY:"auto",flex:1,minHeight:0,maxHeight:"100%"}}>
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
