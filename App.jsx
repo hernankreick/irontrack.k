@@ -1366,7 +1366,7 @@ function GymApp() {
         {tab==="plan"&&(
           <div>
             {!esAlumno&&(
-              <DashboardEntrenador sb={sb} routines={routines} alumnos={alumnos}
+              <DashboardEntrenador sb={sb} routines={routines} alumnos={alumnos} customEx={customEx}
                 sesiones={sesionesGlobales}
                 progresoGlobal={progresoGlobal}
                 es={es}
@@ -3131,7 +3131,7 @@ function GymApp() {
       )}
       {addExModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"flex-end",justifyContent:"center",height:"100dvh",maxHeight:"100dvh",overflow:"hidden",boxSizing:"border-box"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",width:"100%",maxHeight:"85dvh",minHeight:0,display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",flexShrink:0}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px 16px 0 16px",width:"100%",maxHeight:"90dvh",minHeight:0,display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",flexShrink:0}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10,flexShrink:0}}>
               <div style={{minWidth:0,paddingRight:8}}>
                 <div style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"Agregar ejercicios":"Add exercises"}</div>
@@ -3152,7 +3152,7 @@ function GymApp() {
               ))}
             </div>
 
-            <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",flex:1,minHeight:120,overscrollBehavior:"contain"}}>
+            <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",flex:1,minHeight:0,overscrollBehavior:"contain",paddingBottom:8}}>
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
@@ -3176,7 +3176,7 @@ function GymApp() {
                 );
               })}
             </div>
-            <div style={{display:"flex",gap:8,paddingTop:12,borderTop:"1px solid "+border,flexShrink:0}}>
+            <div style={{display:"flex",gap:8,paddingTop:12,paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",borderTop:"1px solid "+border,flexShrink:0,background:bgCard}}>
               <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"CANCELAR":"CANCEL"}</button>
               <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} disabled={!addExSelectedIds.length} onClick={async function(){
                 if(!addExModal||addExSelectedIds.length===0) return;
@@ -4242,7 +4242,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
 }
 
 
-function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, progresoGlobal={}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}}) {
+function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, progresoGlobal={}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}, customEx=[]}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#1E2D40":"#FFFFFF";
@@ -4421,7 +4421,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                 .sort(function(a2,b2){return b2[1].kg-a2[1].kg})
                 .slice(0,3)
                 .map(function(entry){
-                  var exInfo = EX.find(function(e){return e.id===entry[0]});
+                  var exInfo = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
                   return {id:entry[0], nombre:exInfo?exInfo.name:entry[0], kg:entry[1].kg};
                 });
 
@@ -4631,7 +4631,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                       {Object.keys(ultimosPesos).length>0&&(
                         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                           {Object.entries(ultimosPesos).slice(0,4).map(function(entry){
-                            var exInfo = EX.find(function(e){return e.id===entry[0]});
+                            var exInfo = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
                             var nombre = exInfo?exInfo.name:entry[0];
                             return(
                               <span key={entry[0]} style={{background:bgSub,borderRadius:6,padding:"2px 6px",fontSize:9,color:textMuted,fontWeight:600}}>
