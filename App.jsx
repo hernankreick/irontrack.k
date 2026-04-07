@@ -10,6 +10,7 @@ import { ROUTINE_TEMPLATES, instantiateTemplate, emptyDays, getTemplateById } fr
 import { getYTVideoId } from './lib/getYTVideoId.js';
 import { fmt, fmtP } from './lib/timeFormat.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
+import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 
 
 const PATS = {
@@ -3130,29 +3131,30 @@ function GymApp() {
         </div>
       )}
       {addExModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"flex-end",justifyContent:"center",height:"100dvh",maxHeight:"100dvh",overflow:"hidden",boxSizing:"border-box"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px 16px 0 16px",width:"100%",maxHeight:"90dvh",minHeight:0,display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",flexShrink:0}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10,flexShrink:0}}>
-              <div style={{minWidth:0,paddingRight:8}}>
-                <div style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"Agregar ejercicios":"Add exercises"}</div>
-                <div style={{fontSize:13,color:textMuted,marginTop:4,maxWidth:320,lineHeight:1.4,wordBreak:"break-word"}}>
-                  {(addExModal.bloque||"exercises")==="warmup"
-                    ? (es?"Tocá para marcar varios en entrada en calor; confirmá abajo.":"Tap to select warm-up exercises, then confirm.")
-                    : (es?"Tocá para marcar varios en bloque principal; confirmá abajo.":"Tap to select main exercises, then confirm.")}
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end",alignItems:"stretch",height:"100dvh",maxHeight:"100dvh",minHeight:0,overflow:"hidden",boxSizing:"border-box"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:0,width:"100%",maxHeight:"90dvh",minHeight:0,flex:"0 1 auto",display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box"}} onClick={e=>e.stopPropagation()}>
+            <div style={{flexShrink:0,padding:"16px 16px 0 16px",background:bgCard}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{minWidth:0,paddingRight:8}}>
+                  <div style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"Agregar ejercicios":"Add exercises"}</div>
+                  <div style={{fontSize:13,color:textMuted,marginTop:4,maxWidth:320,lineHeight:1.4,wordBreak:"break-word"}}>
+                    {(addExModal.bloque||"exercises")==="warmup"
+                      ? (es?"Tocá para marcar varios en entrada en calor; confirmá abajo.":"Tap to select warm-up exercises, then confirm.")
+                      : (es?"Tocá para marcar varios en bloque principal; confirmá abajo.":"Tap to select main exercises, then confirm.")}
+                  </div>
                 </div>
+                <button type="button" className="hov" style={{...btn(),padding:"6px",flexShrink:0}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}} aria-label={es?"Cerrar":"Close"}><Ic name="x" size={20}/></button>
               </div>
-              <button type="button" className="hov" style={{...btn(),padding:"6px",flexShrink:0}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}} aria-label={es?"Cerrar":"Close"}><Ic name="x" size={20}/></button>
+              <input style={{...inp,marginBottom:8,width:"100%",boxSizing:"border-box"}} placeholder={es?"Buscar...":"Search..."} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
+              <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:12,paddingBottom:4,minHeight:44,alignItems:"center",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",msOverflowStyle:"none"}}>
+                {Object.entries(PATS).map(([k,p])=>(
+                  <button key={k} type="button" className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:".5px"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
+                    {p.icon} {es?p.label:p.labelEn}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input style={{...inp,marginBottom:8,flexShrink:0,width:"100%",boxSizing:"border-box"}} placeholder={es?"Buscar...":"Search..."} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
-            <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:8,paddingBottom:4,flexShrink:0,minHeight:44,alignItems:"center",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",msOverflowStyle:"none"}}>
-              {Object.entries(PATS).map(([k,p])=>(
-                <button key={k} type="button" className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:".5px"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
-                  {p.icon} {es?p.label:p.labelEn}
-                </button>
-              ))}
-            </div>
-
-            <div style={{overflowY:"auto",WebkitOverflowScrolling:"touch",flex:1,minHeight:0,overscrollBehavior:"contain",paddingBottom:8}}>
+            <div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"8px 16px",boxSizing:"border-box"}}>
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
@@ -3176,7 +3178,7 @@ function GymApp() {
                 );
               })}
             </div>
-            <div style={{display:"flex",gap:8,paddingTop:12,paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",borderTop:"1px solid "+border,flexShrink:0,background:bgCard}}>
+            <div style={{flexShrink:0,flexGrow:0,position:"sticky",bottom:0,display:"flex",gap:8,padding:"12px 16px calc(16px + env(safe-area-inset-bottom, 0px)) 16px",borderTop:"1px solid "+border,background:bgCard}}>
               <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"CANCELAR":"CANCEL"}</button>
               <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} disabled={!addExSelectedIds.length} onClick={async function(){
                 if(!addExModal||addExSelectedIds.length===0) return;
@@ -4318,6 +4320,26 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
           </div>
         </div>
       )}
+      <AtencionHoy
+  alumnos={alumnos.map(a => {
+    const ulS = sesiones?.filter(s => s.alumno_id === a.id)
+      .sort((x,y) => new Date(y.created_at||y.fecha) - new Date(x.created_at||x.fecha))[0];
+    const diasSinEntrenar = ulS
+      ? Math.floor((new Date() - new Date(ulS.created_at||ulS.fecha)) / 86400000)
+      : 99;
+    return {
+      id: a.id,
+      nombre: a.nombre || a.email,
+      diasSinEntrenar,
+      pagoVencidoDias: pagosEstado[a.id] === "vencido" ? 5 : 0,
+      tieneRutina: routines?.some(r => r.alumno_id === a.id) ?? true,
+      tieneNuevoPR: false,
+      descripcion: diasSinEntrenar >= 5 ? `${diasSinEntrenar} días sin entrenar` : "",
+    };
+  })}
+  onVerProgreso={(a) => onVerAlumno?.({ id: a.id })}
+  onAccion={(a) => onChatAlumno?.({ id: a.id })}
+/>
       <div style={{...sec}}>{es?"ESTA SEMANA":"THIS WEEK"}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:20}}>
         {[
