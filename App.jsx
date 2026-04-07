@@ -2361,63 +2361,122 @@ function GymApp() {
             action:()=>setShowWelcome(false)
           }
         ] : [{
-          icon:"E",title:es?"¡Bienvenido/a!":"Welcome!",
-          subtitle:es?"A IRON TRACK":"To IRON TRACK",
+          icon:null,title:es?"BIENVENIDO":"WELCOME",
+          subtitle:es?"Cada sesión, nivel élite.":"Every session, elite level.",
           body:null,
+          eliteAlumno:true,
           items:[
-            {n:1,text:es?"Deslizá → para completar cada set":"Swipe → to complete each set",done:false},
-            {n:2,text:es?"Seguí tu progreso y PRs":"Track your progress & PRs",done:false},
-            {n:3,text:es?"Rompé tus récords 🏆":"Break your records 🏆",done:false},
+            {sym:"⚡",line:es?"RENDIMIENTO":"PERFORMANCE"},
+            {sym:"📈",line:"DATA"},
+            {sym:"🏆",line:"ELITE"},
           ],
-          cta:es?"EMPEZAR 💪":"LET'S GO 💪",action:()=>setShowWelcome(false)
+          cta:es?"COMENZAR ENTRENAMIENTO":"START TRAINING",action:()=>setShowWelcome(false)
         }];
         const step = steps[Math.min(obStep,steps.length-1)];
+        const eliteBlue = "#3b82f6";
+        const coachPanel = isCoach ? {
+          background:"rgba(24,24,27,0.94)",
+          border:"1px solid #27272a",
+          borderRadius:20,
+          padding:"28px 22px 32px",
+          width:"100%",
+          maxWidth:440,
+          boxSizing:"border-box",
+        } : {};
         return(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.93)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
-            <div style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:"28px 24px 40px",width:"100%",maxWidth:480,animation:"slideUpFade 0.35s ease"}}
-              onClick={e=>e.stopPropagation()}>
-              <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:24}}>
+          <div style={{
+            position:"fixed",inset:0,zIndex:200,
+            width:"100%",minHeight:"100dvh",height:"100%",
+            backgroundColor:"#000",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            padding:"max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px))",
+            boxSizing:"border-box",
+            overflowY:"auto",
+            WebkitOverflowScrolling:"touch"
+          }}>
+            <div
+              style={isCoach ? coachPanel : {
+                width:"100%",maxWidth:400,padding:"0 4px",boxSizing:"border-box"
+              }}
+              onClick={e=>e.stopPropagation()}
+            >
+              {isCoach && (
+              <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:22}}>
                 {steps.map((_,i)=>(
                   <div key={(isCoach?"coach":"alumno")+"-welcome-dot-"+i} style={{height:4,borderRadius:2,transition:"all .35s ease",
                     width:i===obStep?32:8,
-                    background:i<obStep?"#22C55E":i===obStep?"#2563EB":border}}/>
+                    background:i<obStep?"#22C55E":i===obStep?eliteBlue:"#3f3f46"}}/>
                 ))}
               </div>
+              )}
+              {step.eliteAlumno ? (
+                <>
+                  <div style={{
+                    textAlign:"center",
+                    fontSize:13,
+                    fontWeight:900,
+                    letterSpacing:"0.3em",
+                    color:eliteBlue,
+                    marginBottom:20,
+                    textTransform:"uppercase"
+                  }}>IRON TRACK</div>
+                  <div style={{textAlign:"center",marginBottom:28}}>
+                    <div style={{fontSize:11,fontWeight:700,letterSpacing:"0.2em",color:"#a1a1aa",marginBottom:10,textTransform:"uppercase"}}>{step.title}</div>
+                    <div style={{fontSize:15,fontWeight:500,color:"#d4d4d8",lineHeight:1.55,maxWidth:320,margin:"0 auto"}}>{step.subtitle}</div>
+                  </div>
+                </>
+              ) : (
               <div style={{textAlign:"center",marginBottom:24}}>
-                <div style={{fontSize:48,marginBottom:8}}>{step.icon}</div>
-                <div style={{fontSize:11,fontWeight:800,letterSpacing:2,color:"#2563EB",marginBottom:4,textTransform:"uppercase"}}>{step.subtitle}</div>
-                <div style={{fontSize:28,fontWeight:900,color:textMain,marginBottom:step.body?8:0}}>{step.title}</div>
-                {step.body&&<div style={{fontSize:15,color:textMuted,lineHeight:1.6,marginTop:8}}>{step.body}</div>}
+                {step.icon!=null&&step.icon!==""&&<div style={{fontSize:48,marginBottom:8}}>{step.icon}</div>}
+                <div style={{fontSize:11,fontWeight:800,letterSpacing:2,color:eliteBlue,marginBottom:4,textTransform:"uppercase"}}>{step.subtitle}</div>
+                <div style={{fontSize:28,fontWeight:900,color:isCoach?"#fafafa":textMain,marginBottom:step.body?8:0}}>{step.title}</div>
+                {step.body&&<div style={{fontSize:15,color:isCoach?"#a1a1aa":textMuted,lineHeight:1.6,marginTop:8}}>{step.body}</div>}
               </div>
+              )}
               {step.items&&(
-                <div style={{marginBottom:24}}>
-                  {step.items.map((item,i)=>(
+                <div style={{marginBottom:28}}>
+                  {step.eliteAlumno ? step.items.map((item,i)=>(
+                    <div key={"welcome-pillar-"+i} style={{
+                      display:"flex",alignItems:"center",gap:16,
+                      padding:"14px 0",
+                      borderBottom:i<step.items.length-1?"1px solid #27272a":"none"
+                    }}>
+                      <span style={{fontSize:22,lineHeight:1,flexShrink:0,width:36,textAlign:"center"}} aria-hidden>{item.sym}</span>
+                      <span style={{
+                        fontSize:15,fontWeight:800,letterSpacing:"0.16em",color:"#fafafa",textTransform:"uppercase"
+                      }}>{item.line}</span>
+                    </div>
+                  )) : step.items.map((item,i)=>(
                     <div key={"welcome-item-"+(item.n ?? i)} style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,opacity:item.done?0.6:1}}>
                       <div style={{width:36,height:36,borderRadius:"50%",flexShrink:0,
-                        background:item.done?"#22C55E22":"#2563EB22",
-                        border:"2px solid "+(item.done?"#22C55E":"#2563EB"),
-                        color:item.done?"#22C55E":"#2563EB",
+                        background:item.done?"#22C55E22":(eliteBlue+"22"),
+                        border:"2px solid "+(item.done?"#22C55E":eliteBlue),
+                        color:item.done?"#22C55E":eliteBlue,
                         display:"flex",alignItems:"center",justifyContent:"center",
                         fontSize:item.done?18:15,fontWeight:900,
                         animation:item.done?"checkPop 0.4s ease":undefined}}>
                         {item.done?"✓":item.n}
                       </div>
-                      <div style={{fontSize:18,fontWeight:700,color:item.done?textMuted:textMain}}>{item.text}</div>
+                      <div style={{fontSize:17,fontWeight:700,color:item.done?"#a1a1aa":"#fafafa"}}>{item.text}</div>
                     </div>
                   ))}
                 </div>
               )}
-              <button className="hov" onClick={step.action}
-                style={{width:"100%",padding:"16px",background:"#2563EB",color:"#fff",
-                  border:"none",borderRadius:12,fontSize:18,fontWeight:900,cursor:"pointer",
-                  fontFamily:"inherit",letterSpacing:1,boxShadow:"0 4px 20px rgba(37,99,235,0.35)",
-                  marginBottom:step.skip?8:0}}>
+              <button className="hov" type="button" onClick={step.action}
+                style={{
+                  width:"100%",padding:"16px 18px",background:eliteBlue,color:"#fff",
+                  border:"none",borderRadius:12,fontSize:14,fontWeight:900,cursor:"pointer",
+                  fontFamily:"Barlow Condensed, Inter, sans-serif",letterSpacing:"0.14em",textTransform:"uppercase",
+                  boxShadow:"0 8px 32px rgba(59,130,246,0.45)",
+                  textShadow:"0 1px 2px rgba(0,0,0,0.35)",
+                  marginBottom:step.skip?8:0
+                }}>
                 {step.cta}
               </button>
               {step.skip&&(
-                <button className="hov" onClick={step.skip}
-                  style={{width:"100%",padding:"12px",background:"transparent",color:textMuted,
-                    border:"none",fontSize:15,cursor:"pointer",fontFamily:"inherit"}}>
+                <button type="button" className="hov" onClick={step.skip}
+                  style={{width:"100%",padding:"12px",background:"transparent",color:isCoach?"#a1a1aa":textMuted,
+                    border:"none",fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
                   {es?"Saltar este paso":"Skip this step"}
                 </button>
               )}
