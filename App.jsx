@@ -3131,6 +3131,7 @@ function GymApp() {
         </div>
       )}
       {addExModal&&(
+        <>
         <div
           role="presentation"
           style={{
@@ -3149,7 +3150,7 @@ function GymApp() {
             aria-labelledby="add-ex-modal-title"
             style={{
               flex:"0 1 auto",
-              width:"100%",maxHeight:"90dvh",minHeight:0,
+              width:"100%",maxHeight:"80dvh",minHeight:0,
               display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",
               background:bgCard,borderRadius:"16px 16px 0 0",
             }}
@@ -3176,7 +3177,7 @@ function GymApp() {
                 ))}
               </div>
             </div>
-            <div style={{flex:1,minHeight:0,minWidth:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"8px 16px",boxSizing:"border-box",touchAction:"pan-y"}}>
+            <div style={{flex:1,minHeight:0,minWidth:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"8px 16px 100px 16px",boxSizing:"border-box",touchAction:"pan-y"}}>
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
@@ -3200,55 +3201,61 @@ function GymApp() {
                 );
               })}
             </div>
-            <div style={{
-              flex:"none",flexGrow:0,flexShrink:0,
-              display:"flex",gap:8,
-              padding:"1rem",
-              paddingBottom:"max(1rem, env(safe-area-inset-bottom, 1.5rem))",
-              borderTop:"1px solid "+border,
-              background:bgCard,
-            }}>
-              <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"CANCELAR":"CANCEL"}</button>
-              <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} disabled={!addExSelectedIds.length} onClick={async function(){
-                if(!addExModal||addExSelectedIds.length===0) return;
-                var blk=addExModal.bloque||"exercises";
-                var rId=addExModal.rId;
-                var dIdx=addExModal.dIdx;
-                var r=routines.find(function(rr){return rr.id===rId;});
-                var day=r&&r.days?r.days[dIdx]:null;
-                var existing=new Set((day&&day[blk]?day[blk]:[]).map(function(e){return e.id;}));
-                var ids=addExSelectedIds.filter(function(id){return !existing.has(id);});
-                if(ids.length===0){toast2(es?"Ya están en ese bloque":"Already in that block");return;}
-                var newExs=ids.map(function(id){
-                  var ex=allEx.find(function(e){return e.id===id;});
-                  if(!ex) return null;
-                  return {id:ex.id,sets:"3",reps:"8-10",kg:"",pause:0,note:"",weeks:[]};
-                }).filter(Boolean);
-                setRoutines(function(p){return p.map(function(rr){
-                  if(rr.id!==rId) return rr;
-                  return {...rr,days:rr.days.map(function(d,i){
-                    if(i!==dIdx) return d;
-                    return {...d,[blk]:[...(d[blk]||[]),...newExs]};
-                  })};
-                });});
-                var rSB=rutinasSB.find(function(x){return x.id===rId;});
-                if(rSB){
-                  try{
-                    var diasAct=(rSB.datos&&rSB.datos.days?rSB.datos.days:[]).map(function(d,i){
-                      if(i!==dIdx) return d;
-                      return {...d,[blk]:[...(d[blk]||[]),...newExs]};
-                    });
-                    await sb.updateRutina(rSB.id,{nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:"entrenador_principal"});
-                    setRutinasSB(function(prev){return prev.map(function(rw){return rw.id===rSB.id?{...rw,datos:{...rw.datos,days:diasAct}}:rw;});});
-                  }catch(e){console.error("Add batch save error:",e);}
-                }
-                toast2((es?"Agregados ":"Added ")+newExs.length+(es?" ejercicios":" exercises"));
-                setAddExModal(null);
-                setAddExSelectedIds([]);
-              }}>{es?"AÑADIR SELECCIONADOS":"ADD SELECTED"}{addExSelectedIds.length?" ("+addExSelectedIds.length+")":""}</button>
-            </div>
           </div>
         </div>
+        <div
+          style={{
+            position:"fixed",bottom:20,left:20,right:20,zIndex:9999,
+            display:"flex",gap:8,
+            background:darkMode?"#111":"#FFFFFF",
+            padding:"12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) 16px",
+            borderRadius:12,
+            border:darkMode?"1px solid #2a2a2a":"1px solid "+border,
+            boxSizing:"border-box",
+            boxShadow:darkMode?"0 8px 32px rgba(0,0,0,.55)":"0 8px 24px rgba(15,25,35,.12)",
+          }}
+          onClick={e=>e.stopPropagation()}
+        >
+          <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"CANCELAR":"CANCEL"}</button>
+          <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} disabled={!addExSelectedIds.length} onClick={async function(){
+            if(!addExModal||addExSelectedIds.length===0) return;
+            var blk=addExModal.bloque||"exercises";
+            var rId=addExModal.rId;
+            var dIdx=addExModal.dIdx;
+            var r=routines.find(function(rr){return rr.id===rId;});
+            var day=r&&r.days?r.days[dIdx]:null;
+            var existing=new Set((day&&day[blk]?day[blk]:[]).map(function(e){return e.id;}));
+            var ids=addExSelectedIds.filter(function(id){return !existing.has(id);});
+            if(ids.length===0){toast2(es?"Ya están en ese bloque":"Already in that block");return;}
+            var newExs=ids.map(function(id){
+              var ex=allEx.find(function(e){return e.id===id;});
+              if(!ex) return null;
+              return {id:ex.id,sets:"3",reps:"8-10",kg:"",pause:0,note:"",weeks:[]};
+            }).filter(Boolean);
+            setRoutines(function(p){return p.map(function(rr){
+              if(rr.id!==rId) return rr;
+              return {...rr,days:rr.days.map(function(d,i){
+                if(i!==dIdx) return d;
+                return {...d,[blk]:[...(d[blk]||[]),...newExs]};
+              })};
+            });});
+            var rSB=rutinasSB.find(function(x){return x.id===rId;});
+            if(rSB){
+              try{
+                var diasAct=(rSB.datos&&rSB.datos.days?rSB.datos.days:[]).map(function(d,i){
+                  if(i!==dIdx) return d;
+                  return {...d,[blk]:[...(d[blk]||[]),...newExs]};
+                });
+                await sb.updateRutina(rSB.id,{nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:"entrenador_principal"});
+                setRutinasSB(function(prev){return prev.map(function(rw){return rw.id===rSB.id?{...rw,datos:{...rw.datos,days:diasAct}}:rw;});});
+              }catch(e){console.error("Add batch save error:",e);}
+            }
+            toast2((es?"Agregados ":"Added ")+newExs.length+(es?" ejercicios":" exercises"));
+            setAddExModal(null);
+            setAddExSelectedIds([]);
+          }}>{es?"AÑADIR SELECCIONADOS":"ADD SELECTED"}{addExSelectedIds.length?" ("+addExSelectedIds.length+")":""}</button>
+        </div>
+        </>
       )}
       {toast&&(()=>{
         const isSuccess = toast.includes("✓")||toast.includes("💪")||toast.includes("✅")||toast.includes("listo")||toast.includes("done")||toast.includes("enviada")||toast.includes("copiado")||toast.includes("creado")||toast.includes("sent")||toast.includes("saved");
