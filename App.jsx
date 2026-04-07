@@ -3205,14 +3205,14 @@ function GymApp() {
         </div>
         <div
           style={{
-            position:"fixed",bottom:20,left:20,right:20,zIndex:9999,
+            position:"fixed",bottom:80,left:20,right:20,zIndex:9999,
             display:"flex",gap:8,
             background:darkMode?"#111":"#FFFFFF",
             padding:"12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) 16px",
             borderRadius:12,
-            border:darkMode?"1px solid #2a2a2a":"1px solid "+border,
+            border:darkMode?"1px solid #222":"1px solid "+border,
             boxSizing:"border-box",
-            boxShadow:darkMode?"0 8px 32px rgba(0,0,0,.55)":"0 8px 24px rgba(15,25,35,.12)",
+            boxShadow:"0 -10px 15px -3px rgba(0,0,0,0.5), 0 -4px 6px -2px rgba(0,0,0,0.3)",
           }}
           onClick={e=>e.stopPropagation()}
         >
