@@ -3131,12 +3131,34 @@ function GymApp() {
         </div>
       )}
       {addExModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",flexDirection:"column",justifyContent:"flex-end",alignItems:"stretch",height:"100dvh",maxHeight:"100dvh",minHeight:0,overflow:"hidden",boxSizing:"border-box"}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:0,width:"100%",maxHeight:"90dvh",minHeight:0,flex:"0 1 auto",display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box"}} onClick={e=>e.stopPropagation()}>
-            <div style={{flexShrink:0,padding:"16px 16px 0 16px",background:bgCard}}>
+        <div
+          role="presentation"
+          style={{
+            position:"fixed",inset:0,zIndex:150,
+            display:"flex",flexDirection:"column",
+            height:"100dvh",maxHeight:"100dvh",minHeight:0,
+            overflow:"hidden",boxSizing:"border-box",
+            background:"rgba(0,0,0,.92)",
+          }}
+          onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}
+        >
+          <div style={{flex:"1 1 0%",minHeight:0,minWidth:0}} aria-hidden />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-ex-modal-title"
+            style={{
+              flex:"0 1 auto",
+              width:"100%",maxHeight:"90dvh",minHeight:0,
+              display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",
+              background:bgCard,borderRadius:"16px 16px 0 0",
+            }}
+            onClick={e=>e.stopPropagation()}
+          >
+            <div style={{flex:"none",padding:"16px 16px 0 16px",background:bgCard}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
                 <div style={{minWidth:0,paddingRight:8}}>
-                  <div style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"Agregar ejercicios":"Add exercises"}</div>
+                  <div id="add-ex-modal-title" style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"Agregar ejercicios":"Add exercises"}</div>
                   <div style={{fontSize:13,color:textMuted,marginTop:4,maxWidth:320,lineHeight:1.4,wordBreak:"break-word"}}>
                     {(addExModal.bloque||"exercises")==="warmup"
                       ? (es?"Tocá para marcar varios en entrada en calor; confirmá abajo.":"Tap to select warm-up exercises, then confirm.")
@@ -3154,7 +3176,7 @@ function GymApp() {
                 ))}
               </div>
             </div>
-            <div style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"8px 16px",boxSizing:"border-box"}}>
+            <div style={{flex:1,minHeight:0,minWidth:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"8px 16px",boxSizing:"border-box",touchAction:"pan-y"}}>
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
@@ -3178,7 +3200,14 @@ function GymApp() {
                 );
               })}
             </div>
-            <div style={{flexShrink:0,flexGrow:0,position:"sticky",bottom:0,display:"flex",gap:8,padding:"12px 16px calc(16px + env(safe-area-inset-bottom, 0px)) 16px",borderTop:"1px solid "+border,background:bgCard}}>
+            <div style={{
+              flex:"none",flexGrow:0,flexShrink:0,
+              display:"flex",gap:8,
+              padding:"1rem",
+              paddingBottom:"max(1rem, env(safe-area-inset-bottom, 1.5rem))",
+              borderTop:"1px solid "+border,
+              background:bgCard,
+            }}>
               <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"CANCELAR":"CANCEL"}</button>
               <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} disabled={!addExSelectedIds.length} onClick={async function(){
                 if(!addExModal||addExSelectedIds.length===0) return;

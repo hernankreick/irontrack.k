@@ -1,69 +1,140 @@
 import { priorizarAlumnos } from "./priorizarAlumnos";
 
-// ─── Subcomponente: badge de prioridad ───────────────────────────────────────
+// ─── Punto de color ───────────────────────────────────────────────────────────
 
-function PrioridadBadge({ prioridad }) {
+function Dot({ color }) {
   return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: 10,
-        fontWeight: 500,
-        padding: "2px 8px",
-        borderRadius: 4,
-        color: prioridad.color,
-        background: prioridad.fondo,
-        letterSpacing: "0.04em",
-        textTransform: "uppercase",
-        flexShrink: 0,
-      }}
-    >
-      {prioridad.etiqueta}
-    </span>
+    <span style={{
+      display: "inline-block",
+      width: 6, height: 6,
+      borderRadius: "50%",
+      background: color,
+      flexShrink: 0,
+      marginTop: 1,
+    }} />
   );
 }
 
-// ─── Subcomponente: card individual de alumno ─────────────────────────────────
+// ─── Card principal — único alumno de máxima prioridad ───────────────────────
 
-function AlumnoCard({ alumno, onVerProgreso, onAccion }) {
+function CardPrincipal({ alumno, onVerProgreso, onAccion }) {
   const { nombre, descripcion, prioridad } = alumno;
 
-  // Texto y color del botón de acción según prioridad
-  const accionConfig = {
-    Inactivo:    { label: "ENVIAR MSG",    bg: "#2563eb" },
-    Pago:        { label: "RECORDAR",      bg: "#d97706" },
-    "Sin rutina":{ label: "ASIGNAR RUTINA",bg: "#7c3aed" },
-    Revisión:    { label: "EDITAR RUTINA", bg: "#2563eb" },
-  };
-  const accion = accionConfig[prioridad.etiqueta] ?? { label: "ACCIÓN", bg: "#2563eb" };
+  const accionLabel = {
+    "Inactivo":   "Enviar mensaje",
+    "Pago":       "Recordar pago",
+    "Sin rutina": "Asignar rutina",
+    "Revisión":   "Editar rutina",
+  }[prioridad.etiqueta] ?? "Acción";
+
+  // El botón de acción nunca es rojo — rojo solo para indicadores pasivos
+  const accionColor = prioridad.color === "#ef4444" ? "#2563eb" : prioridad.color;
 
   return (
-    <div style={styles.card(prioridad.fondo)}>
-      {/* Encabezado */}
-      <div style={styles.cardHeader}>
-        <div style={styles.dot(prioridad.color)} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={styles.nombre}>{nombre}</p>
-          {descripcion && <p style={styles.descripcion}>{descripcion}</p>}
-        </div>
-        <PrioridadBadge prioridad={prioridad} />
+    <div style={{
+      background: "#181c22",
+      border: "0.5px solid #2a2d32",
+      borderLeft: `2px solid ${prioridad.color}`,
+      borderRadius: 10,
+      padding: "12px 14px",
+      marginBottom: 8,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <Dot color={prioridad.color} />
+        <span style={{
+          fontSize: 10, fontWeight: 500,
+          color: prioridad.color,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+        }}>
+          {prioridad.etiqueta}
+        </span>
       </div>
 
-      {/* Acciones */}
-      <div style={styles.actionRow}>
-        <button
-          style={styles.btnGhost}
-          onClick={() => onVerProgreso(alumno)}
-        >
-          VER PROGRESO
+      <p style={{ fontSize: 14, fontWeight: 500, color: "#f1f1f1", margin: "0 0 2px" }}>
+        {nombre}
+      </p>
+      {descripcion && (
+        <p style={{ fontSize: 11, color: "#636870", margin: "0 0 10px" }}>
+          {descripcion}
+        </p>
+      )}
+
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={() => onVerProgreso(alumno)} style={styles.btnSecondary}>
+          VER
         </button>
         <button
-          style={{ ...styles.btnPrimary, background: accion.bg }}
           onClick={() => onAccion(alumno)}
+          style={{ ...styles.btnPrimary, background: accionColor }}
         >
-          {accion.label}
+          {accionLabel.toUpperCase()}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Fila compacta — alumnos secundarios ─────────────────────────────────────
+
+function FilaCompacta({ alumno, onClick }) {
+  const { nombre, descripcion, prioridad } = alumno;
+
+  return (
+    <div
+      onClick={() => onClick(alumno)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 4px",
+        borderBottom: "0.5px solid #1e2228",
+        cursor: "pointer",
+      }}
+    >
+      <Dot color={prioridad.color} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 12, color: "#c8cdd6", fontWeight: 500 }}>
+          {nombre}
+        </span>
+        {descripcion && (
+          <span style={{ fontSize: 11, color: "#636870", marginLeft: 6 }}>
+            · {descripcion}
+          </span>
+        )}
+      </div>
+      <span style={{ fontSize: 10, color: prioridad.color, fontWeight: 500, flexShrink: 0 }}>
+        {prioridad.etiqueta}
+      </span>
+    </div>
+  );
+}
+
+// ─── Header de sección ────────────────────────────────────────────────────────
+
+function SectionHeader({ count }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+      <span style={{
+        fontSize: 11, fontWeight: 500,
+        letterSpacing: "0.08em",
+        color: "#636870",
+        textTransform: "uppercase",
+      }}>
+        Atención hoy
+      </span>
+      {count > 0 && (
+        <span style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 17, height: 17,
+          borderRadius: "50%",
+          background: "#ef4444",
+          color: "#fff",
+          fontSize: 9, fontWeight: 600,
+        }}>
+          {count}
+        </span>
+      )}
     </div>
   );
 }
@@ -71,11 +142,11 @@ function AlumnoCard({ alumno, onVerProgreso, onAccion }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 /**
- * Props:
- *   alumnos        — array con todos los alumnos (ver estructura en priorizarAlumnos.js)
- *   limite         — máximo de alumnos a mostrar (default 5)
- *   onVerProgreso  — fn(alumno) al presionar "VER PROGRESO"
- *   onAccion       — fn(alumno) al presionar el botón de acción principal
+ * Props — idénticas a v1, sin breaking changes:
+ *   alumnos        — array de alumnos mapeados (ver priorizarAlumnos.js)
+ *   limite         — máximo total a mostrar (default 5)
+ *   onVerProgreso  — fn(alumno) → botón VER y click en filas compactas
+ *   onAccion       — fn(alumno) → botón de acción del card principal
  */
 export default function AtencionHoy({
   alumnos = [],
@@ -85,29 +156,38 @@ export default function AtencionHoy({
 }) {
   const priorizados = priorizarAlumnos(alumnos, limite);
 
-  return (
-    <div style={styles.container}>
-      {/* Header de sección */}
-      <div style={styles.sectionHeader}>
-        <span style={styles.sectionTitle}>ATENCIÓN HOY</span>
-        {priorizados.length > 0 && (
-          <span style={styles.badge}>{priorizados.length}</span>
-        )}
+  if (priorizados.length === 0) {
+    return (
+      <div style={{ padding: "16px 0 8px" }}>
+        <SectionHeader count={0} />
+        <p style={{ fontSize: 12, color: "#636870", margin: 0, paddingTop: 8 }}>
+          Todos los alumnos están al día.
+        </p>
       </div>
+    );
+  }
 
-      {/* Lista o estado vacío */}
-      {priorizados.length === 0 ? (
-        <div style={styles.empty}>
-          <p style={styles.emptyText}>Todos los alumnos están al día.</p>
-        </div>
-      ) : (
-        <div style={styles.list}>
-          {priorizados.map((alumno) => (
-            <AlumnoCard
-              key={alumno.id}
-              alumno={alumno}
-              onVerProgreso={onVerProgreso}
-              onAccion={onAccion}
+  const [principal, ...resto] = priorizados;
+
+  return (
+    <div style={{ padding: "16px 0 8px" }}>
+      <SectionHeader count={priorizados.length} />
+
+      {/* Card destacada — prioridad máxima */}
+      <CardPrincipal
+        alumno={principal}
+        onVerProgreso={onVerProgreso}
+        onAccion={onAccion}
+      />
+
+      {/* Lista compacta — el resto sin botones */}
+      {resto.length > 0 && (
+        <div style={{ paddingLeft: 2 }}>
+          {resto.map(a => (
+            <FilaCompacta
+              key={a.id}
+              alumno={a}
+              onClick={onVerProgreso}
             />
           ))}
         </div>
@@ -116,110 +196,29 @@ export default function AtencionHoy({
   );
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
-// Inline styles para mantener el componente completamente aislado
-// (sin riesgo de colisión con clases CSS del proyecto actual).
+// ─── Estilos compartidos ──────────────────────────────────────────────────────
 
 const styles = {
-  container: {
-    padding: "12px 0",
-  },
-  sectionHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: 500,
-    letterSpacing: "0.08em",
-    color: "#636870",
-  },
-  badge: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 18,
-    height: 18,
-    borderRadius: "50%",
-    background: "#ef4444",
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: 500,
-  },
-  list: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-  },
-  card: (fondoColor) => ({
-    background: fondoColor,
-    border: "0.5px solid #2a2d32",
-    borderRadius: 10,
-    padding: "10px 12px",
-  }),
-  cardHeader: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 8,
-    marginBottom: 8,
-  },
-  dot: (color) => ({
-    width: 6,
-    height: 6,
-    borderRadius: "50%",
-    background: color,
-    flexShrink: 0,
-    marginTop: 4,
-  }),
-  nombre: {
-    fontSize: 12,
-    fontWeight: 500,
-    color: "#f1f1f1",
-    margin: 0,
-  },
-  descripcion: {
-    fontSize: 10,
-    color: "#636870",
-    margin: "2px 0 0",
-  },
-  actionRow: {
-    display: "flex",
-    gap: 6,
-  },
-  btnGhost: {
-    flex: 1,
-    background: "#1e2228",
+  btnSecondary: {
+    background: "transparent",
     color: "#8a8f98",
     border: "0.5px solid #2a2d32",
-    borderRadius: 7,
-    padding: "6px 4px",
-    fontSize: 10,
-    fontWeight: 500,
-    letterSpacing: "0.03em",
+    borderRadius: 6,
+    padding: "4px 10px",
+    fontSize: 10, fontWeight: 500,
+    letterSpacing: "0.04em",
     cursor: "pointer",
     textTransform: "uppercase",
   },
   btnPrimary: {
-    flex: 1,
+    background: "#2563eb",
     color: "#fff",
     border: "none",
-    borderRadius: 7,
-    padding: "6px 4px",
-    fontSize: 10,
-    fontWeight: 500,
-    letterSpacing: "0.03em",
+    borderRadius: 6,
+    padding: "4px 12px",
+    fontSize: 10, fontWeight: 500,
+    letterSpacing: "0.04em",
     cursor: "pointer",
     textTransform: "uppercase",
-  },
-  empty: {
-    padding: "20px 0",
-    textAlign: "center",
-  },
-  emptyText: {
-    fontSize: 12,
-    color: "#636870",
-    margin: 0,
   },
 };
