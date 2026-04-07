@@ -10,6 +10,8 @@ import { ROUTINE_TEMPLATES, instantiateTemplate, emptyDays, getTemplateById } fr
 import { getYTVideoId } from './lib/getYTVideoId.js';
 import { fmt, fmtP } from './lib/timeFormat.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
+import DashboardEntrenadorV2 from "./components/DashboardEntrenadorV2";
+import PerfilAlumno from "./components/PerfilAlumno";
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 
 
@@ -1367,7 +1369,7 @@ function GymApp() {
         {tab==="plan"&&(
           <div>
             {!esAlumno&&(
-              <DashboardEntrenador sb={sb} routines={routines} alumnos={alumnos} customEx={customEx}
+              <DashboardEntrenadorV2 sb={sb} routines={routines} alumnos={alumnos} customEx={customEx}
                 sesiones={sesionesGlobales}
                 progresoGlobal={progresoGlobal}
                 es={es}
@@ -2014,39 +2016,61 @@ function GymApp() {
     <div style={{fontSize:18,fontWeight:700,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.nombre}</div>
     <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
   </div>
-  <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+  <div style={{display:"flex",gap:10,alignItems:"center",flexShrink:0}}>
+                    <div style={{display:"flex",gap:8,alignItems:"center"}}>
                     <button
                       className="hov"
-                      style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center"}}
+                      type="button"
+                      style={{background:"transparent",color:textMain,border:"1px solid #475569",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6}}
                       onClick={()=>{if(!confirm(es?"¿Editar alumno?":"Edit athlete?")) return; setEditAlumnoModal(a);setEditAlumnoEmail(a.email);setEditAlumnoPass("");}}
                       aria-label={es?"Editar alumno":"Edit athlete"}
                     >
-                      <Ic name="edit-2" size={16} color={textMuted}/>
+                      <Ic name="edit-2" size={16} color={textMain}/>{es?" Editar":" Edit"}
                     </button>
                     <button
                       className="hov"
-                      style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center"}}
+                      type="button"
+                      style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:10,padding:"7px 12px",fontSize:12,fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",gap:6,boxShadow:"0 2px 8px rgba(37,99,235,0.35)"}}
                       onClick={function(e){e.stopPropagation();console.log("[CHAT] abriendo para",a.id,a.nombre);setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}
                       aria-label={es?"Abrir chat":"Open chat"}
                     >
-                      <Ic name="message-circle" size={16} color="#2563EB"/>
+                      <Ic name="message-circle" size={16} color="#fff"/>{es?" Mensaje":" Message"}
                     </button>
-                    <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={async()=>{
+                    </div>
+                    <div style={{width:1,height:22,background:border,opacity:0.45,flexShrink:0}} aria-hidden />
+                    <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                    <button className="hov" type="button" style={alumnoActivo?.id===a.id
+                      ? {background:"transparent",color:textMuted,border:"none",borderRadius:8,padding:6,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",opacity:0.85}
+                      : {background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"5px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+                      onClick={async()=>{
                       if(alumnoActivo?.id===a.id){setAlumnoActivo(null);return;}
                       setAlumnoActivo(a);setRegistrosSubTab(0);setLoadingSB(true);
                       const ruts=await sb.getRutinas(a.id);setRutinasSB(ruts||[]);
                       const prog=await sb.getProgreso(a.id);setAlumnoProgreso(prog||[]);
                       const ses=await sb.getSesiones(a.id);setAlumnoSesiones(ses||[]);
                       setLoadingSB(false);
-                    }}>{alumnoActivo?.id===a.id?"CERRAR":"VER"}</button>
-                    <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={async()=>{
+                    }} aria-label={alumnoActivo?.id===a.id?(es?"Cerrar":"Close"):(es?"Ver perfil":"View profile")}>
+                      {alumnoActivo?.id===a.id?<Ic name="x" size={18} color={textMuted}/>:(es?"VER":"VIEW")}
+                    </button>
+                    <button className="hov" type="button" style={{background:"transparent",color:textMuted,border:"none",borderRadius:8,padding:6,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center",opacity:0.65}} onClick={async()=>{
                       if(!confirm("Eliminar a "+a.nombre+"?")) return;
                       await sb.deleteAlumno?.(a.id);setAlumnos(prev=>prev.filter(x=>x.id!==a.id));toast2("Alumno eliminado");
-                    }}><Ic name="trash-2" size={15}/></button>
+                    }} aria-label={es?"Eliminar alumno":"Delete athlete"}><Ic name="trash-2" size={16} color={textMuted}/></button>
+                    </div>
                   </div>
                 </div>
                 {alumnoActivo?.id===a.id&&(
                   <div>
+                    <PerfilAlumno
+                      alumno={alumnoActivo}
+                      sesiones={alumnoSesiones}
+                      progreso={alumnoProgreso}
+                      routines={rutinasSB}
+                      customEx={customEx}
+                      onVolver={() => setAlumnoActivo(null)}
+                      onMensaje={(a) => setChatModal({ alumnoId: a.id, alumnoNombre: a.nombre || a.email || "Alumno" })}
+                      onEditarRutina={(a) => { setAlumnoActivo(a); }}
+                    />
                     {(()=>{
                       const rutinaActiva=rutinasSB.find(r=>r.alumno_id===a.id);
                       if(!rutinaActiva) return <div style={{background:bgSub,borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid "+border}}><div style={{fontSize:13,color:textMuted}}>{es?"Sin rutina asignada":"No routine assigned"}</div></div>;
@@ -4815,9 +4839,10 @@ function OnboardingScreen({es, darkMode, onDone}) {
   const bg      = _dm?"#0F1923":"#F0F4F8";
   const bgCard  = _dm?"#1E2D40":"#FFFFFF";
   const bgSub   = _dm?"#162234":"#EEF2F7";
-  const border  = _dm?"#2D4057":"#E2E8F0";
   const textMain= _dm?"#FFFFFF":"#0F1923";
   const textMuted=_dm?"#8B9AB2":"#64748B";
+  const cardBorder = "#333";
+  const primary = "#2563EB";
 
   const [step, setStep] = React.useState(0);
   const [role, setRole] = React.useState(null); // "entrenador" | "alumno"
@@ -4825,29 +4850,31 @@ function OnboardingScreen({es, darkMode, onDone}) {
   const STEPS = [
     {
       id: "welcome",
-      icon: <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>,
-      title: es?"Bienvenido a IRON TRACK":"Welcome to IRON TRACK",
-      subtitle: es?"La herramienta de entrenamiento que se adapta a tu método, no al revés.":"The training tool that adapts to your method, not the other way around.",
+      title: es?"IRON TRACK":"IRON TRACK",
+      subtitle: es?"Entrenamiento con método y métricas claras.":"Training with method and clear metrics.",
       content: null,
     },
     {
       id: "role",
-      icon: <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-      title: es?"¿Cómo vas a usar la app?":"How will you use the app?",
-      subtitle: es?"Esto ajusta la experiencia para vos.":"This customizes the experience for you.",
+      title: es?"PERFIL":"PROFILE",
+      subtitle: es?"Elegí cómo usás la app.":"Choose how you use the app.",
       content: "role",
     },
     {
       id: "features",
-      icon: <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
-      title: es?"Todo listo":"You're all set",
-      subtitle: es?"Empezá a entrenar con sistema.":"Start training with a system.",
+      title: role==="alumno"
+        ? (es?"ALTO RENDIMIENTO":"HIGH PERFORMANCE")
+        : (es?"TODO LISTO":"YOU'RE SET"),
+      subtitle: role==="alumno"
+        ? (es?"Tres pilares para tu plan semanal.":"Three pillars for your weekly plan.")
+        : (es?"Herramientas pensadas para coaches.":"Tools built for coaches."),
       content: "features",
     },
   ];
 
   const cur = STEPS[step];
   const canNext = step !== 1 || role !== null;
+  const isLastAlumno = step === STEPS.length - 1 && role === "alumno";
 
   const FEATURES_COACH = [
     {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
@@ -4858,176 +4885,242 @@ function OnboardingScreen({es, darkMode, onDone}) {
      text: es?"Chat integrado dentro del entrenamiento":"Chat integrated into the workout flow"},
   ];
 
-  const FEATURES_ALUMNO = [
-    {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
-     text: es?"Sabés exactamente qué levantar cada semana":"Know exactly what to lift each week"},
-    {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
-     text: es?"Ve tu progreso en palabras, no solo números":"See your progress in words, not just numbers"},
-    {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>,
-     text: es?"Célébrate tus récords personales automáticamente":"Celebrate your PRs automatically"},
+  const FEATURES_ALUMNO_HP = [
+    {sym:"⚡", label: es?"Energía":"Energy", text: es?"Sesiones definidas: sabés qué hacer cada día.":"Defined sessions: you know what to do each day."},
+    {sym:"📈", label: es?"Progreso":"Progress", text: es?"Carga y volumen por semana, sin perder el hilo.":"Load and volume by week, without losing the thread."},
+    {sym:"🔥", label: es?"Rendimiento":"Performance", text: es?"Récords y resultados cuando los concretás.":"PRs and outcomes when you earn them."},
   ];
 
-  const features = role === "alumno" ? FEATURES_ALUMNO : FEATURES_COACH;
-
-  // Animación de step
   return (
     <div style={{
-      minHeight:"100dvh", background:bg, display:"flex", flexDirection:"column",
-      alignItems:"center", justifyContent:"center", padding:"24px 20px",
+      minHeight:"100dvh", width:"100%", background:bg,
+      display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+      padding:"24px 20px", boxSizing:"border-box",
       fontFamily:"Inter,sans-serif"
     }}>
-      {/* Logo */}
-      <div style={{marginBottom:32}}>
-        <IronTrackLogo size={24} color="#2563EB" showBar={true}/>
-      </div>
-
-      {/* Indicador de pasos */}
-      <div style={{display:"flex",gap:8,marginBottom:40}}>
-        {STEPS.map((st,i)=>(
-          <div key={"onboard-dot-"+st.id} style={{
-            height:4, borderRadius:2, transition:"all .3s",
-            width: i===step ? 28 : 12,
-            background: i<=step ? "#2563EB" : border,
-          }}/>
-        ))}
-      </div>
-
-      {/* Card principal */}
-      <div style={{
-        width:"100%", maxWidth:400,
-        background:bgCard, borderRadius:20, padding:"32px 24px",
-        border:"1px solid "+border,
-      }}>
-        {/* Ícono */}
-        <div style={{display:"flex",justifyContent:"center",marginBottom:24}}>
-          <div style={{
-            width:88, height:88, borderRadius:24,
-            background:"#2563EB12", border:"1px solid #2563EB22",
-            display:"flex",alignItems:"center",justifyContent:"center"
-          }}>
-            {cur.icon}
-          </div>
+      <div style={{width:"100%",maxWidth:400,display:"flex",flexDirection:"column",alignItems:"stretch"}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+          <IronTrackLogo size={22} color={primary} showBar={true}/>
         </div>
 
-        {/* Texto */}
-        <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{fontSize:22,fontWeight:800,color:textMain,lineHeight:1.3,marginBottom:10}}>
-            {cur.title}
-          </div>
-          <div style={{fontSize:14,color:textMuted,lineHeight:1.7}}>
-            {cur.subtitle}
-          </div>
+        <div style={{display:"flex",gap:6,marginBottom:20,justifyContent:"center"}}>
+          {STEPS.map((st,i)=>(
+            <div key={"onboard-dot-"+st.id} style={{
+              height:3, borderRadius:2, transition:"all .25s",
+              width: i===step ? 24 : 8,
+              background: i<=step ? primary : cardBorder,
+              opacity: i<=step ? 1 : 0.35
+            }}/>
+          ))}
         </div>
 
-        {/* Contenido dinámico por paso */}
-        {cur.content==="role"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:8}}>
-            {[
-              {id:"entrenador",
-               icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-               label: es?"Soy entrenador / coach":"I'm a coach",
-               desc:  es?"Gestiono alumnos y armo rutinas":"I manage athletes and build routines"},
-              {id:"alumno",
-               icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-               label: es?"Soy atleta / alumno":"I'm an athlete",
-               desc:  es?"Sigo el plan de mi entrenador":"I follow my coach's program"},
-            ].map(opt=>(
-              <button key={opt.id} onClick={()=>setRole(opt.id)}
-                style={{
-                  display:"flex",alignItems:"center",gap:14,
-                  padding:"14px 16px",borderRadius:12,cursor:"pointer",
-                  fontFamily:"inherit",textAlign:"left",
-                  background: role===opt.id ? "#2563EB18" : bgSub,
-                  border:"2px solid "+(role===opt.id?"#2563EB":border),
-                  transition:"all .15s"
-                }}>
-                <div style={{
-                  width:40,height:40,borderRadius:10,flexShrink:0,
-                  background: role===opt.id?"#2563EB":"#2D405788",
-                  display:"flex",alignItems:"center",justifyContent:"center",
-                  color: role===opt.id?"#fff":textMuted,
-                }}>
-                  {opt.icon}
-                </div>
-                <div>
-                  <div style={{fontSize:14,fontWeight:700,color:textMain}}>{opt.label}</div>
-                  <div style={{fontSize:12,color:textMuted,marginTop:2}}>{opt.desc}</div>
-                </div>
-                {role===opt.id&&(
-                  <div style={{marginLeft:"auto",flexShrink:0}}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 11 4 6"/>
-                    </svg>
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {cur.content==="features"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:8}}>
-            {features.map((f,i)=>(
-              <div key={(role||"u")+"-onboard-feat-"+i} style={{
-                display:"flex",alignItems:"center",gap:12,
-                padding:"12px 14px",borderRadius:10,
-                background:bgSub,border:"1px solid "+border
-              }}>
-                <div style={{
-                  width:34,height:34,borderRadius:8,flexShrink:0,
-                  background:"#2563EB12",
-                  display:"flex",alignItems:"center",justifyContent:"center"
-                }}>{f.icon}</div>
-                <div style={{fontSize:13,color:textMuted,lineHeight:1.5}}>{f.text}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Botones de navegación */}
-      <div style={{width:"100%",maxWidth:400,marginTop:16,display:"flex",gap:10}}>
-        {step > 0 && (
-          <button onClick={()=>setStep(s=>s-1)}
-            style={{
-              flex:1,padding:"14px",borderRadius:12,
-              background:"transparent",border:"1px solid "+border,
-              color:textMuted,fontSize:14,fontWeight:600,
-              cursor:"pointer",fontFamily:"inherit"
+        <div style={{
+          width:"100%", background:bgCard, borderRadius:16, padding:"28px 22px",
+          border:"1px solid "+cardBorder, boxSizing:"border-box"
+        }}>
+          {step===0 && (
+            <div style={{
+              display:"flex", justifyContent:"center", alignItems:"center", gap:20,
+              marginBottom:22, userSelect:"none"
             }}>
-            {es?"Atrás":"Back"}
+              <span style={{fontSize:26,lineHeight:1,opacity:0.92}} aria-hidden>⚡</span>
+              <span style={{fontSize:26,lineHeight:1,opacity:0.92}} aria-hidden>📈</span>
+              <span style={{fontSize:26,lineHeight:1,opacity:0.92}} aria-hidden>🔥</span>
+            </div>
+          )}
+          {step===1 && (
+            <div style={{
+              display:"flex", justifyContent:"center", marginBottom:20
+            }}>
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+          )}
+          {step===2 && role==="alumno" && (
+            <div style={{
+              display:"flex", justifyContent:"center", alignItems:"center", gap:18,
+              marginBottom:20, userSelect:"none"
+            }}>
+              <span style={{fontSize:24,lineHeight:1,opacity:0.9}} aria-hidden>⚡</span>
+              <span style={{fontSize:24,lineHeight:1,opacity:0.9}} aria-hidden>📈</span>
+              <span style={{fontSize:24,lineHeight:1,opacity:0.9}} aria-hidden>🔥</span>
+            </div>
+          )}
+          {step===2 && role==="entrenador" && (
+            <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            </div>
+          )}
+
+          <div style={{textAlign:"center",marginBottom: step===1 || (step===2 && role) ? 22 : 18}}>
+            <div style={{
+              fontSize: step===0 ? 24 : 20,
+              fontWeight:800,
+              color:textMain,
+              lineHeight:1.2,
+              marginBottom:10,
+              letterSpacing:"0.08em",
+              textTransform:"uppercase"
+            }}>
+              {cur.title}
+            </div>
+            <div style={{fontSize:13,color:textMuted,lineHeight:1.65,letterSpacing:"0.02em"}}>
+              {cur.subtitle}
+            </div>
+          </div>
+
+          {cur.content==="role"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {[
+                {id:"entrenador",
+                 icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+                 label: es?"Soy entrenador / coach":"I'm a coach",
+                 desc:  es?"Gestiono alumnos y armo rutinas":"I manage athletes and build routines"},
+                {id:"alumno",
+                 icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+                 label: es?"Soy atleta / alumno":"I'm an athlete",
+                 desc:  es?"Sigo el plan de mi entrenador":"I follow my coach's program"},
+              ].map(opt=>(
+                <button key={opt.id} type="button" onClick={()=>setRole(opt.id)}
+                  style={{
+                    display:"flex",alignItems:"center",gap:14,
+                    padding:"14px 16px",borderRadius:10,cursor:"pointer",
+                    fontFamily:"inherit",textAlign:"left",
+                    background: role===opt.id ? primary+"18" : bgSub,
+                    border:"1px solid "+(role===opt.id?primary:cardBorder),
+                    transition:"background .15s, border-color .15s"
+                  }}>
+                  <div style={{
+                    width:40,height:40,borderRadius:8,flexShrink:0,
+                    background: role===opt.id?primary:"transparent",
+                    border:"1px solid "+(role===opt.id?primary:cardBorder),
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    color: role===opt.id?"#fff":textMuted,
+                  }}>
+                    {opt.icon}
+                  </div>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:700,color:textMain,letterSpacing:"0.02em"}}>{opt.label}</div>
+                    <div style={{fontSize:12,color:textMuted,marginTop:2}}>{opt.desc}</div>
+                  </div>
+                  {role===opt.id&&(
+                    <div style={{marginLeft:"auto",flexShrink:0,color:primary}}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <polyline points="20 6 9 11 4 6"/>
+                      </svg>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {cur.content==="features"&& role==="alumno" && (
+            <div style={{display:"flex",flexDirection:"column"}}>
+              {FEATURES_ALUMNO_HP.map((row,i)=>(
+                <div
+                  key={"alumno-hp-"+i}
+                  style={{
+                    display:"flex",alignItems:"flex-start",gap:14,
+                    padding:"14px 0",
+                    borderBottom: i < FEATURES_ALUMNO_HP.length-1 ? "1px solid "+cardBorder : "none"
+                  }}
+                >
+                  <span style={{fontSize:22,lineHeight:1.2,flexShrink:0,width:32,textAlign:"center"}} aria-hidden>{row.sym}</span>
+                  <div style={{minWidth:0}}>
+                    <div style={{
+                      fontSize:11, fontWeight:800, color:textMain,
+                      letterSpacing:"0.14em", textTransform:"uppercase", marginBottom:4
+                    }}>{row.label}</div>
+                    <div style={{fontSize:13,color:textMuted,lineHeight:1.55}}>{row.text}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {cur.content==="features"&& role==="entrenador" && (
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {FEATURES_COACH.map((f,i)=>(
+                <div key={"coach-feat-"+i} style={{
+                  display:"flex",alignItems:"center",gap:12,
+                  padding:"12px 14px",borderRadius:8,
+                  background:bgSub,border:"1px solid "+cardBorder
+                }}>
+                  <div style={{
+                    width:34,height:34,borderRadius:6,flexShrink:0,
+                    background:_dm?"#0F192340":"#F1F5F9",
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    border:"1px solid "+cardBorder
+                  }}>{f.icon}</div>
+                  <div style={{fontSize:13,color:textMuted,lineHeight:1.5}}>{f.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{
+          width:"100%", marginTop:18,
+          display:"flex", flexDirection: isLastAlumno ? "column" : "row",
+          gap:10, alignItems:"stretch"
+        }}>
+          {step > 0 && (
+            <button type="button" onClick={()=>setStep(s=>s-1)}
+              style={{
+                ...(isLastAlumno ? {width:"100%",order:2} : {flex:1}),
+                padding:"14px 16px",borderRadius:10,
+                background:"transparent",border:"1px solid "+cardBorder,
+                color:textMuted,fontSize:13,fontWeight:600,
+                cursor:"pointer",fontFamily:"inherit",letterSpacing:"0.04em"
+              }}>
+              {es?"ATRÁS":"BACK"}
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={!canNext}
+            onClick={()=>{ step < STEPS.length-1 ? setStep(s=>s+1) : onDone(); }}
+            style={{
+              ...(isLastAlumno || step===0 ? {width:"100%"} : {flex:2.2,minWidth:0}),
+              ...(isLastAlumno ? {order:1} : {}),
+              padding:"16px 16px",borderRadius:10,
+              background: canNext?primary:(_dm?"#2D4057":"#CBD5E1"),
+              color: canNext?"#fff":textMuted,
+              border:"none",
+              fontSize: isLastAlumno ? 14 : 14,
+              fontWeight:800,
+              letterSpacing: isLastAlumno ? "0.12em" : "0.06em",
+              textTransform:"uppercase",
+              cursor: canNext?"pointer":"not-allowed",
+              fontFamily:"Barlow Condensed, Inter, sans-serif",
+              transition:"background .2s, opacity .2s",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:8
+            }}>
+            {step < STEPS.length-1 ? (
+              <>{es?"CONTINUAR":"CONTINUE"}</>
+            ) : isLastAlumno ? (
+              es?"EMPEZAR ENTRENAMIENTO":"START TRAINING"
+            ) : (
+              <>{es?"INGRESAR":"ENTER APP"}</>
+            )}
+          </button>
+        </div>
+
+        {step < STEPS.length-1 && (
+          <button type="button" onClick={onDone}
+            style={{
+              marginTop:14,alignSelf:"center",background:"transparent",border:"none",
+              color:textMuted,fontSize:11,cursor:"pointer",
+              fontFamily:"inherit",letterSpacing:"0.06em",textTransform:"uppercase"
+            }}>
+            {es?"Saltar":"Skip"}
           </button>
         )}
-        <button
-          disabled={!canNext}
-          onClick={()=>{ step < STEPS.length-1 ? setStep(s=>s+1) : onDone(); }}
-          style={{
-            flex:3,padding:"14px",borderRadius:12,
-            background: canNext?"#2563EB":"#2D4057",
-            color: canNext?"#fff":textMuted,
-            border:"none",fontSize:15,fontWeight:700,
-            cursor: canNext?"pointer":"default",
-            fontFamily:"inherit",transition:"all .2s",
-            display:"flex",alignItems:"center",justifyContent:"center",gap:8
-          }}>
-          {step < STEPS.length-1
-            ? <>{es?"Continuar":"Continue"} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></>
-            : <>{es?"Ingresar a la app":"Enter the app"} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 11 4 6"/></svg></>
-          }
-        </button>
       </div>
-
-      {/* Skip */}
-      {step < STEPS.length-1 && (
-        <button onClick={onDone}
-          style={{
-            marginTop:16,background:"transparent",border:"none",
-            color:textMuted,fontSize:12,cursor:"pointer",
-            fontFamily:"inherit",textDecoration:"underline"
-          }}>
-          {es?"Saltar introducción":"Skip intro"}
-        </button>
-      )}
     </div>
   );
 }
