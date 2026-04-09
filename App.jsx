@@ -4810,224 +4810,777 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
 });
 
 
-function OnboardingScreen({es, darkMode, onDone}) {
-  const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg      = _dm?"#0F1923":"#F0F4F8";
-  const bgCard  = _dm?"#1E2D40":"#FFFFFF";
-  const bgSub   = _dm?"#162234":"#EEF2F7";
-  const border  = _dm?"#2D4057":"#E2E8F0";
-  const textMain= _dm?"#FFFFFF":"#0F1923";
-  const textMuted=_dm?"#8B9AB2":"#64748B";
 
-  const [step, setStep] = React.useState(0);
-  const [role, setRole] = React.useState(null); // "entrenador" | "alumno"
 
-  const STEPS = [
-    {
-      id: "welcome",
-      icon: <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>,
-      title: es?"Bienvenido a IRON TRACK":"Welcome to IRON TRACK",
-      subtitle: es?"La herramienta de entrenamiento que se adapta a tu método, no al revés.":"The training tool that adapts to your method, not the other way around.",
-      content: null,
-    },
-    {
-      id: "role",
-      icon: <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-      title: es?"¿Cómo vas a usar la app?":"How will you use the app?",
-      subtitle: es?"Esto ajusta la experiencia para vos.":"This customizes the experience for you.",
-      content: "role",
-    },
-    {
-      id: "features",
-      icon: <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
-      title: es?"Todo listo":"You're all set",
-      subtitle: es?"Empezá a entrenar con sistema.":"Start training with a system.",
-      content: "features",
-    },
-  ];
+/* ─── TOKENS ─────────────────────────────────────────────── */
+const C = {
+  blue:"#2563EB", blueL:"#3B82F6", blueD:"#1E40AF",
+  green:"#22C55E", greenD:"#16A34A",
+  bg:"#0A1120", bg2:"#0F1A2E", bg3:"#162035",
+  border:"rgba(59,130,246,0.15)", borderSub:"rgba(255,255,255,0.06)",
+  text:"#FFFFFF", sub:"#94A3B8", muted:"#4B6480",
+};
+const BLUE_GRAD  = "linear-gradient(135deg,#1E40AF 0%,#2563EB 55%,#3B82F6 100%)";
+const GREEN_GRAD = "linear-gradient(135deg,#16A34A,#22C55E)";
+const GLOW       = "0 0 36px rgba(37,99,235,0.5),0 8px 24px rgba(0,0,0,0.4)";
+const GLOW_G     = "0 0 32px rgba(34,197,94,0.4)";
 
-  const cur = STEPS[step];
-  const canNext = step !== 1 || role !== null;
+/*
+  FLUJO COMPLETO:
+  ─────────────────────────────────────────────────
+  Paso 0 → Landing (splash)
+  Paso 1 → Rol (entrenador / atleta)
+  Paso 2 → Nombre (TODOS)
+  Paso 3 → Alumnos (SOLO entrenador) ← condicional
+  Paso 4 → Final / dashboard preview
+  ─────────────────────────────────────────────────
+  Entrenador: 0 → 1 → 2 → 3 → 4
+  Atleta:     0 → 1 → 2 → 4  (salta paso 3)
+*/
 
-  const FEATURES_COACH = [
-    {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
-     text: es?"Armá rutinas con progresión automática de carga":"Build routines with auto load progression"},
-    {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>,
-     text: es?"Seguí el progreso de cada alumno en tiempo real":"Track each athlete's progress in real time"},
-    {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-     text: es?"Chat integrado dentro del entrenamiento":"Chat integrated into the workout flow"},
-  ];
+/* ═══════════════════════ SVG ICONS ═══════════════════════ */
+const BarSVG = ({w=56}) => (
+  <svg width={w} height={Math.round(w*0.56)} viewBox="0 0 78 44" fill="none">
+    <rect x="20" y="19" width="38" height="6" rx="3" fill="white"/>
+    <rect x="20" y="19" width="38" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
+    <rect x="4"  y="16" width="4"  height="12" rx="1.5" fill="rgba(255,255,255,0.45)"/>
+    <rect x="8"  y="10" width="6"  height="24" rx="2.5" fill="white"/>
+    <rect x="14" y="10" width="6"  height="24" rx="2.5" fill="rgba(255,255,255,0.75)"/>
+    <rect x="19" y="17" width="3"  height="10" rx="1.5" fill="#93C5FD"/>
+    <rect x="56" y="17" width="3"  height="10" rx="1.5" fill="#93C5FD"/>
+    <rect x="58" y="10" width="6"  height="24" rx="2.5" fill="rgba(255,255,255,0.75)"/>
+    <rect x="64" y="10" width="6"  height="24" rx="2.5" fill="white"/>
+    <rect x="70" y="16" width="4"  height="12" rx="1.5" fill="rgba(255,255,255,0.45)"/>
+  </svg>
+);
 
-  const FEATURES_ALUMNO = [
-    {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
-     text: es?"Sabés exactamente qué levantar cada semana":"Know exactly what to lift each week"},
-    {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
-     text: es?"Ve tu progreso en palabras, no solo números":"See your progress in words, not just numbers"},
-    {icon:<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>,
-     text: es?"Célébrate tus récords personales automáticamente":"Celebrate your PRs automatically"},
-  ];
+const CoachSVG = ({color="#64748B",size=26}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+);
 
-  const features = role === "alumno" ? FEATURES_ALUMNO : FEATURES_COACH;
+const AthleteSVG = ({color="#64748B",size=26}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </svg>
+);
 
-  // Animación de step
-  return (
+const UserOneSVG = ({color,size=32}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4"/>
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+  </svg>
+);
+
+const UserGroupSVG = ({color,size=32}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="9"  cy="7" r="3.5"/>
+    <circle cx="16" cy="8" r="2.5"/>
+    <path d="M1 20c0-3.3 3.1-6 8-6s8 2.7 8 6"/>
+    <path d="M18 14c2.5.5 4 2 4 4"/>
+  </svg>
+);
+
+const UserTeamSVG = ({color,size=32}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="5"  cy="8" r="2.5"/>
+    <circle cx="12" cy="6" r="3"/>
+    <circle cx="19" cy="8" r="2.5"/>
+    <path d="M1 20c0-2.5 1.8-4.5 4-5"/>
+    <path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6"/>
+    <path d="M19 15c2.2.5 4 2.5 4 5"/>
+  </svg>
+);
+
+const ChartSVG = ({color="#3B82F6",size=16}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+  </svg>
+);
+
+const CalSVG = ({color="#22C55E",size=16}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/>
+    <line x1="16" y1="2" x2="16" y2="6"/>
+    <line x1="8"  y1="2" x2="8"  y2="6"/>
+    <line x1="3"  y1="10" x2="21" y2="10"/>
+  </svg>
+);
+
+const CheckSVG = ({color="white",size=18}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+
+const ArrowSVG = ({size=16}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12h14M12 5l7 7-7 7"/>
+  </svg>
+);
+
+const InfoSVG = ({color="#3B82F6",size=13}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+);
+
+const TrendSVG = ({color="#22C55E",size=16}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+    <polyline points="17 6 23 6 23 12"/>
+  </svg>
+);
+
+const PersonSVG = ({color="#3B82F6",size=22}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4"/>
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+  </svg>
+);
+
+const BackArrowSVG = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 12H5M12 5l-7 7 7 7"/>
+  </svg>
+);
+
+/* ═══════════════════════ SHARED UI ════════════════════════ */
+
+/* Dots — total visible según rol */
+const Dots = ({total,current}) => (
+  <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:18}}>
+    {Array.from({length:total}).map((_,i)=>(
+      <div key={i} style={{
+        height:4,borderRadius:2,transition:"all .35s",
+        width:i===current?28:6,
+        background:i===current?C.blue:i<current?"rgba(37,99,235,0.45)":"rgba(255,255,255,0.12)",
+      }}/>
+    ))}
+  </div>
+);
+
+const Tag = ({children,color}) => (
+  <div style={{display:"inline-flex",alignItems:"center",gap:6,fontSize:9,fontWeight:700,
+    letterSpacing:"2.5px",color:color||C.blueL,textTransform:"uppercase",marginBottom:12}}>
+    <div style={{width:3,height:10,background:color||C.blue,borderRadius:2}}/>
+    {children}
+  </div>
+);
+
+/* Altura fija compartida — única fuente de verdad */
+const BTN_H = 58;
+
+const BtnPrimary = ({children,onClick,done=false,disabled=false}) => (
+  <button onClick={onClick} disabled={disabled} style={{
+    flex:1,                       /* ocupa el espacio restante */
+    height:BTN_H,
+    minWidth:0,                   /* permite shrink si hace falta */
+    background:done?GREEN_GRAD:disabled?"rgba(255,255,255,0.05)":BLUE_GRAD,
+    border:"none",borderRadius:16,color:disabled?C.muted:C.text,
+    fontFamily:"system-ui,sans-serif",
+    fontSize:13,fontWeight:800,letterSpacing:"1px",
+    textTransform:"uppercase",
+    whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",
+    cursor:disabled?"not-allowed":"pointer",
+    boxShadow:done?GLOW_G:disabled?"none":GLOW,
+    transition:"all .35s cubic-bezier(.16,1,.3,1)",
+    display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+  }}>
+    {done && <CheckSVG size={18}/>}
+    {!done && !disabled && <ArrowSVG size={16}/>}
+    {children}
+  </button>
+);
+
+const BtnBack = ({onClick}) => (
+  <button onClick={onClick} style={{
+    flexShrink:0,                 /* nunca se achica */
+    height:BTN_H,                 /* idéntico al BtnPrimary */
+    width:100,                    /* ancho fijo */
+    background:"none",
+    border:`1px solid ${C.borderSub}`,
+    borderRadius:12,color:C.sub,
+    fontSize:13,fontWeight:600,
+    cursor:"pointer",
+    display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+    fontFamily:"system-ui,sans-serif",
+    whiteSpace:"nowrap",
+  }}>
+    <BackArrowSVG/> Atrás
+  </button>
+);
+
+/* Contenedor de botones — siempre perfecto */
+const BtnRow = ({dots,total,current,children}) => (
+  <div style={{padding:"14px 24px 36px",flexShrink:0,background:C.bg}}>
+    <Dots total={total} current={current}/>
     <div style={{
-      minHeight:"100dvh", background:bg, display:"flex", flexDirection:"column",
-      alignItems:"center", justifyContent:"center", padding:"24px 20px",
-      fontFamily:"Inter,sans-serif"
+      display:"flex",flexDirection:"row",
+      gap:10,
+      height:BTN_H,              /* altura fija del row = altura de los botones */
     }}>
-      {/* Logo */}
-      <div style={{marginBottom:32}}>
-        <IronTrackLogo size={24} color="#2563EB" showBar={true}/>
-      </div>
+      {children}
+    </div>
+  </div>
+);
 
-      {/* Indicador de pasos */}
-      <div style={{display:"flex",gap:8,marginBottom:40}}>
-        {STEPS.map((st,i)=>(
-          <div key={"onboard-dot-"+st.id} style={{
-            height:4, borderRadius:2, transition:"all .3s",
-            width: i===step ? 28 : 12,
-            background: i<=step ? "#2563EB" : border,
-          }}/>
-        ))}
-      </div>
+/* ═══════════════════════════════════════════
+   PASO 0 — LANDING
+═══════════════════════════════════════════ */
+const Step0 = ({onNext, onYaTengoCuenta}) => {
+  const [vis,setVis] = React.useState(false);
+  React.useEffect(()=>{const t=setTimeout(()=>setVis(true),100);return()=>clearTimeout(t);},[]);
+  const a = (d=0) => ({
+    opacity:vis?1:0,
+    transform:vis?"translateY(0)":"translateY(16px)",
+    transition:`all .6s cubic-bezier(.16,1,.3,1) ${d}ms`,
+  });
 
-      {/* Card principal */}
-      <div style={{
-        width:"100%", maxWidth:400,
-        background:bgCard, borderRadius:20, padding:"32px 24px",
-        border:"1px solid "+border,
-      }}>
-        {/* Ícono */}
-        <div style={{display:"flex",justifyContent:"center",marginBottom:24}}>
-          <div style={{
-            width:88, height:88, borderRadius:24,
-            background:"#2563EB12", border:"1px solid #2563EB22",
-            display:"flex",alignItems:"center",justifyContent:"center"
-          }}>
-            {cur.icon}
+  return (
+    <div style={{flex:1,display:"flex",flexDirection:"column",position:"relative",overflow:"hidden",minHeight:780}}>
+      {/* Foto gym */}
+      <div style={{position:"absolute",inset:0,backgroundImage:"url(https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80)",backgroundSize:"cover",backgroundPosition:"center 25%",filter:"brightness(0.27) saturate(0.55)",backgroundColor:"#050C18"}}/>
+      <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(5,12,24,0.4) 0%,rgba(5,12,24,0.05) 20%,rgba(5,12,24,0.68) 56%,rgba(5,12,24,1) 86%)"}}/>
+      <div style={{position:"absolute",top:-80,left:"50%",transform:"translateX(-50%)",width:440,height:440,borderRadius:"50%",background:"radial-gradient(circle,rgba(37,99,235,0.2) 0%,transparent 70%)",pointerEvents:"none"}}/>
+
+      <div style={{position:"relative",zIndex:5,flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"68px 28px 36px",boxSizing:"border-box"}}>
+
+        {/* Logo */}
+        <div style={{...a(0),display:"flex",flexDirection:"column",alignItems:"center",gap:16,marginBottom:18}}>
+          <div style={{width:92,height:92,borderRadius:24,background:BLUE_GRAD,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:GLOW,position:"relative",overflow:"hidden"}}>
+            <div style={{position:"absolute",top:0,left:0,right:0,height:"45%",borderRadius:"24px 24px 50% 50%",background:"linear-gradient(to bottom,rgba(255,255,255,0.14),transparent)",pointerEvents:"none"}}/>
+            <BarSVG w={58}/>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:3,height:58,background:C.blue,borderRadius:2,boxShadow:`0 0 12px ${C.blue}`}}/>
+            <div>
+              <div style={{fontSize:58,fontWeight:900,color:C.text,letterSpacing:4,lineHeight:.93,textShadow:"0 2px 20px rgba(0,0,0,0.9)"}}>IRON</div>
+              <div style={{fontSize:58,fontWeight:900,color:C.blue,letterSpacing:4,lineHeight:.93,textShadow:`0 0 28px rgba(37,99,235,0.85)`}}>TRACK</div>
+            </div>
           </div>
         </div>
 
-        {/* Texto */}
-        <div style={{textAlign:"center",marginBottom:28}}>
-          <div style={{fontSize:22,fontWeight:800,color:textMain,lineHeight:1.3,marginBottom:10}}>
-            {cur.title}
+        {/* Propuesta de valor */}
+        <div style={{...a(130),textAlign:"center",marginBottom:28}}>
+          <div style={{fontSize:20,fontWeight:800,color:"rgba(255,255,255,0.92)",lineHeight:1.35,marginBottom:6}}>
+            Todo lo que necesitás<br/>para entrenar mejor.
           </div>
-          <div style={{fontSize:14,color:textMuted,lineHeight:1.7}}>
-            {cur.subtitle}
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.38)",letterSpacing:"0.4px"}}>
+            Rutinas, alumnos y progresión — en un solo lugar
           </div>
         </div>
 
-        {/* Contenido dinámico por paso */}
-        {cur.content==="role"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:8}}>
-            {[
-              {id:"entrenador",
-               icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-               label: es?"Soy entrenador / coach":"I'm a coach",
-               desc:  es?"Gestiono alumnos y armo rutinas":"I manage athletes and build routines"},
-              {id:"alumno",
-               icon:<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-               label: es?"Soy atleta / alumno":"I'm an athlete",
-               desc:  es?"Sigo el plan de mi entrenador":"I follow my coach's program"},
-            ].map(opt=>(
-              <button key={opt.id} onClick={()=>setRole(opt.id)}
-                style={{
-                  display:"flex",alignItems:"center",gap:14,
-                  padding:"14px 16px",borderRadius:12,cursor:"pointer",
-                  fontFamily:"inherit",textAlign:"left",
-                  background: role===opt.id ? "#2563EB18" : bgSub,
-                  border:"2px solid "+(role===opt.id?"#2563EB":border),
-                  transition:"all .15s"
-                }}>
-                <div style={{
-                  width:40,height:40,borderRadius:10,flexShrink:0,
-                  background: role===opt.id?"#2563EB":"#2D405788",
-                  display:"flex",alignItems:"center",justifyContent:"center",
-                  color: role===opt.id?"#fff":textMuted,
-                }}>
-                  {opt.icon}
-                </div>
-                <div>
-                  <div style={{fontSize:14,fontWeight:700,color:textMain}}>{opt.label}</div>
-                  <div style={{fontSize:12,color:textMuted,marginTop:2}}>{opt.desc}</div>
-                </div>
-                {role===opt.id&&(
-                  <div style={{marginLeft:"auto",flexShrink:0}}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 11 4 6"/>
-                    </svg>
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Feature pills */}
+        <div style={{...a(210),width:"100%",display:"flex",flexDirection:"column",gap:10,marginBottom:"auto"}}>
+          {[
+            {icon:<CoachSVG  color="#3B82F6" size={16}/>, text:"Panel de alumnos con seguimiento en tiempo real"},
+            {icon:<ChartSVG  color="#60A5FA" size={16}/>, text:"Progresión de cargas y PRs automáticos"},
+            {icon:<CalSVG    color="#22C55E" size={16}/>, text:"Planificación por bloques y semanas"},
+          ].map((f,i)=>(
+            <div key={i} style={{height:52,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14,backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:12,padding:"0 16px"}}>
+              <div style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {f.icon}
+              </div>
+              <span style={{fontSize:13,color:"rgba(255,255,255,0.5)",fontWeight:500}}>{f.text}</span>
+            </div>
+          ))}
+        </div>
 
-        {cur.content==="features"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:8}}>
-            {features.map((f,i)=>(
-              <div key={(role||"u")+"-onboard-feat-"+i} style={{
-                display:"flex",alignItems:"center",gap:12,
-                padding:"12px 14px",borderRadius:10,
-                background:bgSub,border:"1px solid "+border
-              }}>
-                <div style={{
-                  width:34,height:34,borderRadius:8,flexShrink:0,
-                  background:"#2563EB12",
-                  display:"flex",alignItems:"center",justifyContent:"center"
-                }}>{f.icon}</div>
-                <div style={{fontSize:13,color:textMuted,lineHeight:1.5}}>{f.text}</div>
+        {/* CTA */}
+        <div style={{...a(300),width:"100%",display:"flex",flexDirection:"column",gap:8,marginTop:28}}>
+          <Dots total={5} current={0}/>
+          <BtnPrimary onClick={onNext}>Empezar gratis</BtnPrimary>
+          {/* ✅ Botón "ya tengo cuenta" funcional */}
+          <button
+            onClick={onYaTengoCuenta}
+            style={{
+              background:"none",border:"none",
+              color:"rgba(255,255,255,0.35)",
+              fontFamily:"system-ui,sans-serif",fontSize:12,fontWeight:600,
+              letterSpacing:"1.5px",textTransform:"uppercase",
+              cursor:"pointer",height:40,
+              transition:"color .2s",
+            }}
+            onMouseEnter={e=>e.target.style.color="rgba(255,255,255,0.65)"}
+            onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.35)"}
+          >
+            Ya tengo cuenta — ingresar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   PASO 1 — ROL
+═══════════════════════════════════════════ */
+const Step1 = ({onNext,onBack,role,setRole}) => {
+  const roles = [
+    {
+      id:"entrenador",label:"Entrenador",
+      desc:"Creás rutinas, asignás planes y seguís el progreso de cada alumno.",
+      color:C.blue,selBg:"rgba(37,99,235,0.1)",selBorder:C.blue,
+      chipBg:"rgba(59,130,246,0.12)",chipColor:"#93C5FD",
+      chips:["Rutinas","Alumnos","Progresión","Chat"],
+      icon:(sel)=><CoachSVG color={sel?"#3B82F6":"#64748B"} size={26}/>,
+      preview:(
+        <div style={{marginTop:14,background:"rgba(0,0,0,0.28)",borderRadius:12,padding:"14px"}}>
+          <div style={{fontSize:9,fontWeight:700,letterSpacing:"2px",color:"#3B82F6",textTransform:"uppercase",marginBottom:10}}>Vista previa del panel</div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+            <span style={{fontSize:12,color:C.sub}}>Alumnos activos</span>
+            <span style={{fontSize:15,fontWeight:900,color:"#3B82F6"}}>—</span>
+          </div>
+          <div style={{height:3,background:"rgba(255,255,255,0.06)",borderRadius:2,marginBottom:10}}/>
+          {[{icon:<CoachSVG color="#3B82F6" size={13}/>,text:"Agregar primer alumno"},{icon:<CalSVG color="#22C55E" size={13}/>,text:"Crear primera rutina"}].map((s,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:i===0?"1px solid rgba(255,255,255,0.05)":"none"}}>
+              {s.icon}
+              <span style={{fontSize:11,color:C.sub,flex:1}}>{s.text}</span>
+              <div style={{width:6,height:6,borderRadius:"50%",background:"#3B82F6",opacity:.7}}/>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id:"atleta",label:"Atleta",
+      desc:"Seguís el plan de tu entrenador y registrás cada sesión con orden.",
+      color:C.green,selBg:"rgba(34,197,94,0.08)",selBorder:C.green,
+      chipBg:"rgba(34,197,94,0.1)",chipColor:"#86EFAC",
+      chips:["Mi plan","Sesiones","Historial","PRs"],
+      icon:(sel)=><AthleteSVG color={sel?"#22C55E":"#64748B"} size={26}/>,
+      preview:(
+        <div style={{marginTop:14,background:"rgba(0,0,0,0.28)",borderRadius:12,padding:"14px"}}>
+          <div style={{fontSize:9,fontWeight:700,letterSpacing:"2px",color:"#22C55E",textTransform:"uppercase",marginBottom:10}}>Vista previa de tu semana</div>
+          <div style={{display:"flex",gap:6,marginBottom:10}}>
+            {[{d:"LUN",ok:true},{d:"MIÉ",ok:true},{d:"VIE",ok:false}].map(day=>(
+              <div key={day.d} style={{flex:1,background:day.ok?"rgba(34,197,94,0.1)":"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 4px",textAlign:"center",border:`1px solid ${day.ok?"rgba(34,197,94,0.25)":"rgba(255,255,255,0.05)"}`}}>
+                <div style={{fontSize:9,color:day.ok?"#22C55E":C.muted,fontWeight:700,marginBottom:4}}>{day.d}</div>
+                {day.ok?<CheckSVG color="#22C55E" size={12}/>:<div style={{width:6,height:6,borderRadius:"50%",background:"rgba(255,255,255,0.1)",margin:"0 auto"}}/>}
               </div>
             ))}
           </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:10,color:C.muted}}>Próximo entrenamiento</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.text}}>Pierna A — hoy</div>
+            </div>
+            <div style={{background:"rgba(34,197,94,0.12)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:5}}>
+              <TrendSVG color="#22C55E" size={12}/>
+              <span style={{fontSize:11,fontWeight:700,color:"#22C55E"}}>PR activo</span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div style={{flex:1,display:"flex",flexDirection:"column",background:C.bg,boxSizing:"border-box",overflow:"hidden"}}>
+      {/* Header fijo */}
+      <div style={{padding:"52px 24px 0",flexShrink:0}}>
+        <Tag>Tu perfil</Tag>
+        <div style={{fontSize:32,fontWeight:900,color:C.text,lineHeight:1.05,letterSpacing:"-0.5px",marginBottom:8}}>¿CÓMO USÁS<br/>LA APP?</div>
+        <div style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:16}}>Elegí tu perfil. Podés cambiarlo después en ajustes.</div>
+      </div>
+
+      {/* Cards — scrollable cuando la preview se expande */}
+      <div style={{flex:1,overflowY:"auto",padding:"0 24px",paddingBottom:8}}>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {roles.map(r=>{
+          const sel=role===r.id;
+          return (
+            <div key={r.id} onClick={()=>setRole(r.id)} style={{
+              background:sel?r.selBg:C.bg2,
+              border:`2px solid ${sel?r.selBorder:C.borderSub}`,
+              borderRadius:18,padding:"16px 18px",cursor:"pointer",
+              transition:"all .25s",boxShadow:sel?`0 0 24px ${r.selBorder}22`:"none",
+            }}>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
+                <div style={{width:52,height:52,borderRadius:14,flexShrink:0,background:sel?`${r.color}18`:"rgba(255,255,255,0.04)",border:`1px solid ${sel?`${r.color}28`:C.borderSub}`,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .25s"}}>
+                  {r.icon(sel)}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:3}}>{r.label}</div>
+                  <div style={{fontSize:12,color:C.sub,lineHeight:1.45}}>{r.desc}</div>
+                </div>
+                <div style={{width:22,height:22,borderRadius:"50%",border:`2px solid ${sel?r.selBorder:C.muted}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
+                  <div style={{width:10,height:10,borderRadius:"50%",background:r.color,opacity:sel?1:0,transform:sel?"scale(1)":"scale(0)",transition:"all .25s"}}/>
+                </div>
+              </div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {r.chips.map(c=><span key={c} style={{fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20,background:r.chipBg,color:r.chipColor}}>{c}</span>)}
+              </div>
+              <div style={{maxHeight:sel?"220px":"0",overflow:"hidden",transition:"max-height .45s cubic-bezier(.16,1,.3,1)"}}>
+                {r.preview}
+              </div>
+            </div>
+          );
+        })}
+        </div>
+      </div>
+
+      {/* Botones — siempre visibles, pegados al fondo */}
+      <BtnRow total={5} current={1}>
+        <BtnBack onClick={onBack}/>
+        <BtnPrimary onClick={onNext} disabled={!role}>
+          {role==="entrenador"?"Soy entrenador":role==="atleta"?"Soy atleta":"Elegí tu perfil"}
+        </BtnPrimary>
+      </BtnRow>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   PASO 2 — NOMBRE (TODOS los usuarios)
+═══════════════════════════════════════════ */
+const Step2Name = ({onNext,onBack,role,name,setName}) => {
+  const isCoach = role==="entrenador";
+  const inputRef = React.useRef(null);
+  const [vis,setVis] = React.useState(false);
+
+  React.useEffect(()=>{
+    const t1=setTimeout(()=>setVis(true),60);
+    const t2=setTimeout(()=>inputRef.current?.focus(),300);
+    return()=>{clearTimeout(t1);clearTimeout(t2);};
+  },[]);
+
+  /* Dots: coach ve 5 pasos, atleta ve 4 */
+  const totalDots = isCoach ? 5 : 4;
+  const currentDot = 2;
+
+  return (
+    <div style={{
+      flex:1,display:"flex",flexDirection:"column",
+      padding:"52px 24px 0",background:C.bg,
+      minHeight:780,boxSizing:"border-box",
+      opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(18px)",
+      transition:"all .5s cubic-bezier(.16,1,.3,1)",
+    }}>
+      <Tag>{isCoach?"Tu identidad profesional":"Sobre vos"}</Tag>
+      <div style={{fontSize:32,fontWeight:900,color:C.text,lineHeight:1.05,letterSpacing:"-0.5px",marginBottom:8}}>
+        ¿CÓMO TE<br/>LLAMÁS?
+      </div>
+      <div style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:32}}>
+        {isCoach
+          ?"Tus alumnos van a ver tu nombre en la app."
+          :"Tu coach va a ver tu perfil con este nombre."}
+      </div>
+
+      {/* Input con feedback visual */}
+      <div style={{position:"relative",marginBottom:24}}>
+        <div style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}>
+          <PersonSVG color={name?C.blue:"#4B6480"} size={20}/>
+        </div>
+        <input
+          ref={inputRef}
+          value={name}
+          onChange={e=>setName(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&name.trim()&&onNext()}
+          placeholder={isCoach?"ej. Carlos Méndez":"ej. Julieta Ros"}
+          style={{
+            width:"100%",height:60,
+            background:name?"rgba(37,99,235,0.08)":C.bg2,
+            border:`1.5px solid ${name?C.blue:C.borderSub}`,
+            borderRadius:16,color:C.text,fontSize:18,fontWeight:600,
+            padding:"0 52px 0 48px",outline:"none",
+            fontFamily:"system-ui,sans-serif",boxSizing:"border-box",
+            transition:"all .2s",
+          }}
+        />
+        {/* Check cuando hay nombre */}
+        {name.trim() && (
+          <div style={{
+            position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
+            width:28,height:28,borderRadius:"50%",background:C.blue,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            boxShadow:"0 0 12px rgba(37,99,235,0.5)",
+          }}>
+            <CheckSVG size={14}/>
+          </div>
         )}
       </div>
 
-      {/* Botones de navegación */}
-      <div style={{width:"100%",maxWidth:400,marginTop:16,display:"flex",gap:10}}>
-        {step > 0 && (
-          <button onClick={()=>setStep(s=>s-1)}
-            style={{
-              flex:1,padding:"14px",borderRadius:12,
-              background:"transparent",border:"1px solid "+border,
-              color:textMuted,fontSize:14,fontWeight:600,
-              cursor:"pointer",fontFamily:"inherit"
-            }}>
-            {es?"Atrás":"Back"}
+      {/* Preview personalizada en tiempo real */}
+      <div style={{
+        background:C.bg2,border:`1px solid ${C.border}`,borderRadius:18,
+        padding:"18px",flex:1,
+        opacity:name.trim()?1:0.25,transition:"opacity .35s",
+      }}>
+        <div style={{fontSize:9,fontWeight:700,letterSpacing:"2px",color:C.muted,textTransform:"uppercase",marginBottom:14}}>
+          Así va a aparecer tu perfil
+        </div>
+
+        {/* Header del panel */}
+        <div style={{background:C.bg3,borderRadius:12,padding:"14px",marginBottom:10}}>
+          <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Buenos días,</div>
+          <div style={{fontSize:20,fontWeight:900,color:C.text,marginBottom:10}}>
+            {name.trim()||"Tu nombre"}
+          </div>
+          {isCoach ? (
+            <>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                <span style={{fontSize:11,color:C.sub}}>Alumnos activos</span>
+                <span style={{fontSize:13,fontWeight:900,color:C.blueL}}>0 / 0</span>
+              </div>
+              <div style={{height:3,background:"rgba(255,255,255,0.07)",borderRadius:2}}/>
+            </>
+          ) : (
+            <div style={{display:"flex",gap:6}}>
+              {["LUN","MIÉ","VIE"].map((d,i)=>(
+                <div key={d} style={{flex:1,background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"7px 4px",textAlign:"center",border:"1px solid rgba(255,255,255,0.06)"}}>
+                  <div style={{fontSize:9,color:C.muted,fontWeight:700,marginBottom:3}}>{d}</div>
+                  <div style={{width:5,height:5,borderRadius:"50%",background:"rgba(255,255,255,0.1)",margin:"0 auto"}}/>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Confirmación */}
+        <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(34,197,94,0.07)",borderRadius:10,padding:"9px 12px",border:"1px solid rgba(34,197,94,0.14)"}}>
+          <CheckSVG color={C.green} size={12}/>
+          <span style={{fontSize:11,color:"#4ADE80"}}>
+            {isCoach?"Tu cuenta de entrenador está lista.":"Tu perfil de atleta está listo."}
+          </span>
+        </div>
+      </div>
+
+      <BtnRow total={totalDots} current={currentDot}>
+        <BtnBack onClick={onBack}/>
+        <BtnPrimary onClick={onNext} disabled={!name.trim()}>
+          {name.trim()?"Continuar":"Ingresá tu nombre"}
+        </BtnPrimary>
+      </BtnRow>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   PASO 3 — ALUMNOS (solo entrenadores)
+═══════════════════════════════════════════ */
+const Step3Alumnos = ({onNext,onBack,alumnosRange,setAlumnosRange}) => {
+  const [vis,setVis] = React.useState(false);
+  React.useEffect(()=>{const t=setTimeout(()=>setVis(true),60);return()=>clearTimeout(t);},[]);
+
+  const options = [
+    {id:"1-5",  label:"1 — 5 alumnos",     desc:"Trabajo personalizado o estás empezando",  tag:"Personalizado",  icon:(s)=><UserOneSVG  color={s?"#3B82F6":"#64748B"} size={32}/>},
+    {id:"5-10", label:"5 — 10 alumnos",    desc:"Grupo consolidado, buscás más organización", tag:"En crecimiento", icon:(s)=><UserGroupSVG color={s?"#3B82F6":"#64748B"} size={32}/>},
+    {id:"10+",  label:"Más de 10 alumnos", desc:"Cartera amplia, necesitás escalar el sistema",tag:"Escala",         icon:(s)=><UserTeamSVG  color={s?"#3B82F6":"#64748B"} size={32}/>},
+  ];
+
+  return (
+    <div style={{
+      flex:1,display:"flex",flexDirection:"column",
+      padding:"52px 24px 0",background:C.bg,
+      minHeight:780,boxSizing:"border-box",
+      opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(20px)",
+      transition:"all .5s cubic-bezier(.16,1,.3,1)",
+    }}>
+      <Tag>Tu situación actual</Tag>
+      <div style={{fontSize:32,fontWeight:900,color:C.text,lineHeight:1.05,letterSpacing:"-0.5px",marginBottom:8}}>
+        ¿CUÁNTOS ALUMNOS<br/>TENÉS AHORA?
+      </div>
+      <div style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:28}}>
+        Esto nos ayuda a mostrarte las funciones más útiles para tu situación.
+      </div>
+
+      <div style={{display:"flex",flexDirection:"column",gap:14,flex:1}}>
+        {options.map((opt,i)=>{
+          const sel = alumnosRange===opt.id;
+          return (
+            <div
+              key={opt.id}
+              onClick={()=>setAlumnosRange(opt.id)}
+              style={{
+                background:sel?"rgba(37,99,235,0.1)":C.bg2,
+                border:`2px solid ${sel?C.blue:C.borderSub}`,
+                borderRadius:20,padding:"18px 20px",cursor:"pointer",
+                transition:"all .25s cubic-bezier(.16,1,.3,1)",
+                boxShadow:sel?"0 0 0 1px rgba(37,99,235,0.3),0 0 28px rgba(37,99,235,0.22),0 0 52px rgba(37,99,235,0.08)":"none",
+                position:"relative",overflow:"hidden",
+                opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(10px)",
+                transitionDelay:`${60+i*55}ms`,
+              }}
+            >
+              {/* Línea acento izquierda */}
+              <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,borderRadius:"2px 0 0 2px",background:sel?BLUE_GRAD:"transparent",transition:"background .25s"}}/>
+
+              <div style={{display:"flex",alignItems:"center",gap:16}}>
+                {/* Ícono SVG */}
+                <div style={{width:60,height:60,borderRadius:16,flexShrink:0,background:sel?"rgba(37,99,235,0.14)":"rgba(255,255,255,0.04)",border:`1.5px solid ${sel?"rgba(37,99,235,0.3)":C.borderSub}`,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .25s"}}>
+                  {opt.icon(sel)}
+                </div>
+
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,flexWrap:"wrap"}}>
+                    <span style={{fontSize:16,fontWeight:800,color:C.text}}>{opt.label}</span>
+                    <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:20,letterSpacing:"0.8px",textTransform:"uppercase",background:sel?"rgba(37,99,235,0.18)":"rgba(255,255,255,0.06)",color:sel?"#93C5FD":C.muted,transition:"all .25s"}}>
+                      {opt.tag}
+                    </span>
+                  </div>
+                  <div style={{fontSize:12,color:C.sub,lineHeight:1.5}}>{opt.desc}</div>
+                </div>
+
+                {/* Radio */}
+                <div style={{width:24,height:24,borderRadius:"50%",flexShrink:0,border:`2px solid ${sel?C.blue:C.muted}`,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .25s",boxShadow:sel?"0 0 10px rgba(37,99,235,0.4)":"none"}}>
+                  <div style={{width:11,height:11,borderRadius:"50%",background:C.blue,opacity:sel?1:0,transform:sel?"scale(1)":"scale(0)",transition:"all .25s cubic-bezier(.16,1,.3,1)"}}/>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Nota privacidad */}
+      <div style={{display:"flex",alignItems:"center",gap:8,background:"rgba(37,99,235,0.06)",border:"1px solid rgba(37,99,235,0.12)",borderRadius:12,padding:"10px 14px",marginTop:16}}>
+        <InfoSVG color="#3B82F6" size={13}/>
+        <span style={{fontSize:11,color:C.muted,lineHeight:1.45}}>Solo usamos esto para personalizar tu experiencia inicial.</span>
+      </div>
+
+      <BtnRow total={5} current={3}>
+        <BtnBack onClick={onBack}/>
+        <BtnPrimary onClick={onNext} disabled={!alumnosRange}>
+          {alumnosRange?"Continuar":"Seleccioná una opción"}
+        </BtnPrimary>
+      </BtnRow>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   PASO FINAL — Dashboard preview
+═══════════════════════════════════════════ */
+const StepFinal = ({onDone,onBack,role,name,alumnosRange}) => {
+  const isCoach = role==="entrenador";
+  const [done,setDone] = React.useState(false);
+  const finish = ()=>{ setDone(true); setTimeout(onDone,950); };
+
+  const rangeLabel = alumnosRange==="1-5"?"1 a 5":alumnosRange==="5-10"?"5 a 10":"más de 10";
+  const totalDots  = isCoach ? 5 : 4;
+  const currentDot = isCoach ? 4 : 3;
+
+  const steps = isCoach
+    ? [
+        {icon:<CoachSVG  color="#3B82F6" size={14}/>, label:"Agregar tu primer alumno",  status:"pendiente",  c:"#3B82F6"},
+        {icon:<CalSVG    color="#22C55E" size={14}/>, label:"Crear tu primera rutina",    status:"pendiente",  c:"#22C55E"},
+        {icon:<ChartSVG  color="#94A3B8" size={14}/>, label:"Ver el panel de progreso",   status:"disponible", c:"#94A3B8"},
+      ]
+    : [
+        {icon:<CalSVG    color="#3B82F6" size={14}/>, label:"Tu plan ya está disponible", status:"listo",      c:"#3B82F6"},
+        {icon:<ChartSVG  color="#22C55E" size={14}/>, label:"Registrá tu primera sesión", status:"pendiente",  c:"#22C55E"},
+        {icon:<TrendSVG  color="#94A3B8" size={14}/>, label:"Ver tu historial de PRs",    status:"disponible", c:"#94A3B8"},
+      ];
+
+  return (
+    <div style={{flex:1,display:"flex",flexDirection:"column",background:C.bg,minHeight:780,boxSizing:"border-box",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:-80,left:"50%",transform:"translateX(-50%)",width:420,height:420,borderRadius:"50%",background:done?"radial-gradient(circle,rgba(34,197,94,0.14) 0%,transparent 65%)":"radial-gradient(circle,rgba(37,99,235,0.12) 0%,transparent 65%)",pointerEvents:"none",transition:"background .6s"}}/>
+
+      <div style={{position:"relative",zIndex:5,flex:1,display:"flex",flexDirection:"column",padding:"52px 24px 0"}}>
+
+        {/* Checkmark */}
+        <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+          <div style={{width:68,height:68,borderRadius:20,background:done?GREEN_GRAD:BLUE_GRAD,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:done?GLOW_G:GLOW,transition:"all .5s"}}>
+            <CheckSVG size={30}/>
+          </div>
+        </div>
+
+        <div style={{textAlign:"center",marginBottom:22}}>
+          <div style={{fontSize:34,fontWeight:900,color:C.text,lineHeight:1.1,marginBottom:8}}>
+            Todo listo,<br/>{name||"Hernan"}
+          </div>
+          <div style={{fontSize:14,color:C.sub,lineHeight:1.6}}>
+            {isCoach?"Tu cuenta está lista. Empezá agregando tu primer alumno.":"Tu perfil está activo. Tu coach puede asignarte rutinas."}
+          </div>
+        </div>
+
+        {/* Dashboard preview */}
+        <div style={{background:C.bg2,borderRadius:18,padding:"16px",marginBottom:12,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:9,fontWeight:700,letterSpacing:"2px",color:C.muted,textTransform:"uppercase",marginBottom:12}}>Tu panel en IronTrack</div>
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,color:C.muted,marginBottom:2}}>Buenos días,</div>
+            <div style={{fontSize:20,fontWeight:900,color:C.text}}>{name||"Hernan"}</div>
+          </div>
+
+          {/* Chip con dato de alumnos capturado */}
+          {isCoach && alumnosRange && (
+            <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(37,99,235,0.1)",border:"1px solid rgba(37,99,235,0.2)",borderRadius:20,padding:"4px 12px",marginBottom:12}}>
+              <CoachSVG color="#3B82F6" size={11}/>
+              <span style={{fontSize:11,fontWeight:600,color:"#93C5FD"}}>{rangeLabel} alumnos</span>
+            </div>
+          )}
+
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+            {steps.map((s,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",background:C.bg3,borderRadius:10,border:"1px solid rgba(255,255,255,0.04)"}}>
+                <div style={{width:28,height:28,borderRadius:8,background:`${s.c}12`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{s.icon}</div>
+                <span style={{fontSize:12,color:C.sub,flex:1}}>{s.label}</span>
+                <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",borderRadius:20,background:`${s.c}14`,color:s.c,letterSpacing:"0.5px",textTransform:"uppercase"}}>{s.status}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(37,99,235,0.07)",borderRadius:10,padding:"8px 12px",border:"1px solid rgba(37,99,235,0.14)"}}>
+            <InfoSVG color="#3B82F6" size={12}/>
+            <span style={{fontSize:11,color:"#60A5FA"}}>Así va a verse tu panel. Todo listo para empezar.</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{padding:"0 24px 36px",position:"relative",zIndex:5}}>
+        <Dots total={totalDots} current={currentDot}/>
+        <BtnPrimary onClick={finish} done={done}>
+          {done?"Redirigiendo...":"Ir a mi panel"}
+        </BtnPrimary>
+        {!done&&(
+          <button onClick={onBack} style={{display:"block",width:"100%",marginTop:10,background:"none",border:"none",color:C.muted,fontSize:12,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",cursor:"pointer",fontFamily:"system-ui,sans-serif",height:32}}>
+            Atrás
           </button>
         )}
-        <button
-          disabled={!canNext}
-          onClick={()=>{ step < STEPS.length-1 ? setStep(s=>s+1) : onDone(); }}
-          style={{
-            flex:3,padding:"14px",borderRadius:12,
-            background: canNext?"#2563EB":"#2D4057",
-            color: canNext?"#fff":textMuted,
-            border:"none",fontSize:15,fontWeight:700,
-            cursor: canNext?"pointer":"default",
-            fontFamily:"inherit",transition:"all .2s",
-            display:"flex",alignItems:"center",justifyContent:"center",gap:8
-          }}>
-          {step < STEPS.length-1
-            ? <>{es?"Continuar":"Continue"} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></>
-            : <>{es?"Ingresar a la app":"Enter the app"} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 11 4 6"/></svg></>
-          }
-        </button>
       </div>
+    </div>
+  );
+};
 
-      {/* Skip */}
-      {step < STEPS.length-1 && (
-        <button onClick={onDone}
-          style={{
-            marginTop:16,background:"transparent",border:"none",
-            color:textMuted,fontSize:12,cursor:"pointer",
-            fontFamily:"inherit",textDecoration:"underline"
-          }}>
-          {es?"Saltar introducción":"Skip intro"}
-        </button>
-      )}
+function OnboardingScreen({es, darkMode, onDone}) {
+
+  const [step, setStep]                 = React.useState(0);
+  const [role, setRole]                 = React.useState(null);
+  const [name, setName]                 = React.useState("");
+  const [alumnosRange, setAlumnosRange] = React.useState(null);
+
+  const isCoach = role === "entrenador";
+
+  const next = () => {
+    if (step === 2 && !isCoach) setStep(4);
+    else setStep(s => s + 1);
+  };
+
+  const back = () => {
+    if (step === 4 && !isCoach) setStep(2);
+    else setStep(s => s - 1);
+  };
+
+  const restart = () => { setStep(0); setRole(null); setName(""); setAlumnosRange(null); };
+
+  const screens = {
+    0: <Step0        onNext={next}    onYaTengoCuenta={onDone}/>,
+    1: <Step1        onNext={next}    onBack={back} role={role} setRole={setRole}/>,
+    2: <Step2Name    onNext={next}    onBack={back} role={role} name={name} setName={setName}/>,
+    3: <Step3Alumnos onNext={next}    onBack={back} alumnosRange={alumnosRange} setAlumnosRange={setAlumnosRange}/>,
+    4: <StepFinal    onDone={onDone}  onBack={back} role={role} name={name} alumnosRange={alumnosRange}/>,
+  };
+
+  return (
+    <div style={{minHeight:"100dvh",width:"100%",background:"#0A1120",fontFamily:"system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
+      {screens[step]}
     </div>
   );
 }
