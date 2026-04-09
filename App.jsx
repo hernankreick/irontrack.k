@@ -1281,17 +1281,14 @@ function GymApp() {
         highlightedBorder: level === "pos",
       });
     });
-    var coachNameGreet = sessionData?.name || "Coach";
-    var coachInitialsGreet = (sessionData?.name || "C")
+    var coachNameGreet = sessionData?.name || sessionData?.email?.split("@")[0] || "Coach";
+    var coachInitialsGreet = coachNameGreet
       .split(" ")
       .map(function(w) { return w[0]; })
       .join("")
       .slice(0, 2)
       .toUpperCase();
     return {
-      header: {
-        avatarInitials: coachInitialsGreet,
-      },
       greeting: {
         name: coachNameGreet,
         coachName: coachNameGreet,

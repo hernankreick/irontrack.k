@@ -140,15 +140,6 @@ function StreakBolt() {
   );
 }
 
-function BellIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.text2} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  );
-}
-
 const secTitleBase = {
   fontSize: 10,
   fontWeight: 600,
@@ -166,7 +157,11 @@ const secTitleBase = {
  * Pasá objetos vacíos o listas vacías para secciones sin datos todavía.
  */
 export default function CoachDashboard({
-  header = {},
+  onViewBusinessDetail,
+  onViewAllAlerts,
+  onViewMessageHistory,
+  onViewFullWeek,
+  onViewAllStudents,
   greeting = {},
   businessMetrics = {},
   aiAlerts: aiAlertsProp = {},
@@ -181,24 +176,20 @@ export default function CoachDashboard({
   const [barsReady, setBarsReady] = useState(false);
 
   const {
-    modeTag = "Coach",
-    avatarInitials = "",
-    showNotificationDot = false,
-    onBellClick,
-    onAvatarClick,
-  } = header;
-
-  const {
     periodLabel = "",
     coachName = "",
+    name: greetingName,
     streakDays = null,
     streakLabelSuffix = "días de racha",
   } = greeting;
 
+  const rawGreetingName = greetingName ?? coachName ?? "";
+  const displayGreetingName =
+    !String(rawGreetingName).trim() || rawGreetingName === "Entrenador" ? "Coach" : rawGreetingName;
+
   const {
     title: metricsTitle = "Métricas del negocio",
     detailLabel = "Ver detalle",
-    onDetailClick,
     cards: metricCards = [],
     projection: projectionProp = null,
   } = businessMetrics;
@@ -213,21 +204,18 @@ export default function CoachDashboard({
   const {
     title: agendaTitle = "Agenda de hoy",
     weekLinkLabel = "Semana completa",
-    onWeekLink,
     sessions: agendaSessions = [],
   } = todayAgenda;
 
   const {
     title: studentsTitle = "Alumnos",
     viewAllLabel: studentsViewAll = "Ver todos",
-    onStudentsViewAll,
     students: studentRows = [],
   } = studentsProp;
 
   const {
     title: msgTitle = "Centro de mensajes",
     historyLabel = "Historial",
-    onHistory,
     categories = [],
     selectedCategoryId = null,
     onSelectCategory,
@@ -282,104 +270,9 @@ export default function CoachDashboard({
           boxSizing: "border-box",
         }}
       >
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "14px 20px 12px",
-            position: "sticky",
-            top: 0,
-            zIndex: 100,
-            background: "rgba(11,14,17,0.88)",
-            backdropFilter: "blur(18px)",
-            WebkitBackdropFilter: "blur(18px)",
-            borderBottom: `1px solid ${T.border}`,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
-            <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 21, letterSpacing: "0.5px", color: T.text }}>IRON</span>
-            <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 21, letterSpacing: "0.5px", color: T.blue2 }}>TRACK</span>
-            <span
-              style={{
-                marginLeft: 8,
-                fontSize: 9,
-                fontWeight: 600,
-                letterSpacing: "1.8px",
-                textTransform: "uppercase",
-                color: T.blue2,
-                background: T.blueDim,
-                border: "1px solid rgba(59,130,246,.18)",
-                borderRadius: 20,
-                padding: "2px 7px",
-              }}
-            >
-              {modeTag}
-            </span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button
-              type="button"
-              onClick={onBellClick}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: "50%",
-                background: T.card,
-                border: `1px solid ${T.border}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: onBellClick ? "pointer" : "default",
-                position: "relative",
-                padding: 0,
-              }}
-              aria-label="Notificaciones"
-            >
-              <BellIcon />
-              {showNotificationDot ? (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 9,
-                    right: 9,
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: T.red,
-                    border: `1.5px solid ${T.bg}`,
-                  }}
-                />
-              ) : null}
-            </button>
-            <button
-              type="button"
-              onClick={onAvatarClick}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg,#1d4ed8,#2563EB)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 13,
-                fontWeight: 700,
-                color: "#fff",
-                cursor: onAvatarClick ? "pointer" : "default",
-                border: "none",
-                padding: 0,
-              }}
-              aria-label="Perfil"
-            >
-              {avatarInitials}
-            </button>
-          </div>
-        </header>
-
         <div style={{ padding: "20px 20px 0" }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "1.5px", textTransform: "uppercase", color: T.text3 }}>{periodLabel}</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: T.text, marginTop: 3, lineHeight: 1.15 }}>{coachName}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: T.text, marginTop: 3, lineHeight: 1.15 }}>{displayGreetingName}</div>
           {streakDays != null ? (
             <div
               style={{
@@ -410,10 +303,10 @@ export default function CoachDashboard({
                 <IconBarChartTiny />
                 {metricsTitle}
               </div>
-              {onDetailClick ? (
+              {onViewBusinessDetail ? (
                 <button
                   type="button"
-                  onClick={onDetailClick}
+                  onClick={() => onViewBusinessDetail()}
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
@@ -521,7 +414,7 @@ export default function CoachDashboard({
             </div>
           </section>
 
-          <AIAlerts {...aiAlertsProp} />
+          <AIAlerts {...aiAlertsProp} onViewAll={onViewAllAlerts ?? aiAlertsProp.onViewAll} />
 
           {/* Actividad semanal */}
           <section style={{ marginTop: 24, animation: "coachDashFadeUp .4s ease both", animationDelay: "0.12s" }}>
@@ -593,10 +486,10 @@ export default function CoachDashboard({
                 <IconClockTiny />
                 {agendaTitle}
               </div>
-              {onWeekLink ? (
+              {onViewFullWeek ? (
                 <button
                   type="button"
-                  onClick={onWeekLink}
+                  onClick={() => onViewFullWeek()}
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
@@ -674,10 +567,10 @@ export default function CoachDashboard({
                 <IconUsersTiny />
                 {studentsTitle}
               </div>
-              {onStudentsViewAll ? (
+              {onViewAllStudents ? (
                 <button
                   type="button"
-                  onClick={onStudentsViewAll}
+                  onClick={() => onViewAllStudents()}
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
@@ -837,10 +730,10 @@ export default function CoachDashboard({
                 <IconMessageCenter />
                 {msgTitle}
               </div>
-              {onHistory ? (
+              {onViewMessageHistory ? (
                 <button
                   type="button"
-                  onClick={onHistory}
+                  onClick={() => onViewMessageHistory()}
                   style={{
                     fontSize: 11,
                     fontWeight: 600,
