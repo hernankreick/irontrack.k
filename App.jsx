@@ -1288,6 +1288,8 @@ function GymApp() {
       .join("")
       .slice(0, 2)
       .toUpperCase();
+    console.log("[CoachDash] sesionesGlobales:", sesionesGlobales?.length, sesionesGlobales?.[0]);
+    console.log("[CoachDash] sessionData:", JSON.stringify(sessionData));
     return {
       greeting: {
         name: coachNameGreet,
