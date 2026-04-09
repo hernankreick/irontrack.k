@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { Ic } from './components/Ic.jsx';
 import { LogForm } from './components/LogForm.jsx';
 import { RutinaView } from './components/RutinaView.jsx';
@@ -989,7 +989,10 @@ function GymApp() {
     }).catch(function(){});
   }, []);
 
-  const toast2 = msg => { setToast(msg); setTimeout(()=>setToast(null),2200); };
+  const toast2 = useCallback((msg, type) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  }, []);
 
 
   const R = 26; const circ = 2*Math.PI*R;
@@ -1161,7 +1164,7 @@ function GymApp() {
     we.setDate(we.getDate() + 7);
     var counts = [0, 0, 0, 0, 0, 0, 0];
     ses.forEach(function(s) {
-      var d = new Date(s.created_at || s.fecha);
+      var d = new Date(s.fecha || s.created_at);
       if (isNaN(d.getTime())) return;
       if (d < ws || d >= we) return;
       var idx = (d.getDay() + 6) % 7;
@@ -1183,7 +1186,7 @@ function GymApp() {
     var completionPercent = Math.min(100, Math.round((weekTotal / weekGoalTarget) * 100));
     var dateSet = {};
     ses.forEach(function(s) {
-      var d = new Date(s.created_at || s.fecha);
+      var d = new Date(s.fecha || s.created_at);
       if (isNaN(d.getTime())) return;
       d.setHours(0, 0, 0, 0);
       dateSet[d.getTime()] = true;
@@ -1199,7 +1202,7 @@ function GymApp() {
       var t0 = Date.now() - 7 * 86400000;
       return ses.filter(function(s) {
         if (s.alumno_id !== alumnoId) return false;
-        var t = new Date(s.created_at || s.fecha).getTime();
+        var t = new Date(s.fecha || s.created_at).getTime();
         return t >= t0;
       }).length;
     }
@@ -1278,7 +1281,22 @@ function GymApp() {
         highlightedBorder: level === "pos",
       });
     });
+    var coachNameGreet = sessionData?.name || "Coach";
+    var coachInitialsGreet = (sessionData?.name || "C")
+      .split(" ")
+      .map(function(w) { return w[0]; })
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
     return {
+      header: {
+        avatarInitials: coachInitialsGreet,
+      },
+      greeting: {
+        name: coachNameGreet,
+        coachName: coachNameGreet,
+        initials: coachInitialsGreet,
+      },
       businessMetrics: {
         cards: [
           {
@@ -1340,7 +1358,7 @@ function GymApp() {
         achievements: [],
       },
     };
-  }, [alumnos, sesionesGlobales, progresoGlobal, es, notifyAlumno, toast2, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones]);
+  }, [alumnos, sesionesGlobales, progresoGlobal, es, notifyAlumno, toast2, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones, sessionData]);
 
   // Pantalla de login
 
@@ -1594,23 +1612,30 @@ function GymApp() {
                   }),
                 }}
                 todayAgenda={{
-                  sessions: (sesionesGlobales || []).map((s, i) => {
-                    const d = new Date(s.created_at || s.fecha || 0);
-                    const alumno = alumnos.find((x) => x.id === s.alumno_id);
-                    const h = d.getHours();
-                    const m = d.getMinutes();
-                    return {
-                      id: s.id ?? i,
-                      time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
-                      ampm: h < 12 ? "AM" : "PM",
-                      studentName: alumno?.nombre || alumno?.email || "—",
-                      detail: es ? "Sesión" : "Session",
-                      statusLabel: es ? "Registrada" : "Logged",
-                      statusVariant: "done",
-                      timeTone: "muted",
-                      sessionTypeIcon: "presencial",
-                    };
-                  }),
+                  sessions: (() => {
+                    const hoyStr = new Date().toISOString().slice(0, 10);
+                    const sessionesHoy = (sesionesGlobales || []).filter((s) => {
+                      const campo = s.fecha || s.created_at || "";
+                      return campo.slice(0, 10) === hoyStr;
+                    });
+                    return sessionesHoy.map((s, i) => {
+                      const d = new Date(s.fecha || s.created_at || 0);
+                      const alumno = alumnos.find((x) => x.id === s.alumno_id);
+                      const h = d.getHours();
+                      const m = d.getMinutes();
+                      return {
+                        id: s.id ?? i,
+                        time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+                        ampm: h < 12 ? "AM" : "PM",
+                        studentName: alumno?.nombre || alumno?.email || "—",
+                        detail: es ? "Sesión" : "Session",
+                        statusLabel: es ? "Registrada" : "Logged",
+                        statusVariant: "done",
+                        timeTone: "muted",
+                        sessionTypeIcon: "presencial",
+                      };
+                    });
+                  })(),
                 }}
               />
             )}
