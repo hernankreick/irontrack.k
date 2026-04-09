@@ -1625,11 +1625,11 @@ function GymApp() {
                   sessions: (() => {
                     const hoyStr = new Date().toISOString().slice(0, 10);
                     const sessionesHoy = (sesionesGlobales || []).filter((s) => {
-                      const campo = s.fecha || s.created_at || "";
+                      const campo = s.created_at || "";
                       return campo.slice(0, 10) === hoyStr;
                     });
                     return sessionesHoy.map((s, i) => {
-                      const d = new Date(s.fecha || s.created_at || 0);
+                      const d = new Date(s.created_at || 0);
                       const alumno = alumnos.find((x) => x.id === s.alumno_id);
                       const h = d.getHours();
                       const m = d.getMinutes();
@@ -3537,6 +3537,38 @@ function GymApp() {
       })()}
 
       </div>
+      {session&&activeDay&&(
+        <WorkoutScreen
+          session={session}
+          activeDay={activeDay}
+          activeR={activeR}
+          allEx={allEx}
+          progress={progress}
+          logSet={logSet}
+          startTimer={startTimer}
+          timer={timer}
+          setSession={setSession}
+          setCompletedDays={setCompletedDays}
+          completedDays={completedDays}
+          currentWeek={currentWeek}
+          setCurrentWeek={setCurrentWeek}
+          preSessionPRs={preSessionPRs}
+          setResumenSesion={setResumenSesion}
+          readOnly={readOnly}
+          sharedParam={sharedParam}
+          sb={sb}
+          es={es}
+          darkMode={darkMode}
+          prCelebration={prCelebration}
+          setPrCelebration={setPrCelebration}
+          activeExIdx={activeExIdx}
+          setActiveExIdx={setActiveExIdx}
+          sessionData={sessionData}
+          sessionPRList={sessionPRList}
+          videoOverrides={videoOverrides}
+          setVideoModal={setVideoModal}
+        />
+      )}
       <nav style={{
         position:"fixed",bottom:0,left:0,right:0,
         background:darkMode?"rgba(15,25,35,0.96)":"rgba(255,255,255,0.96)",
