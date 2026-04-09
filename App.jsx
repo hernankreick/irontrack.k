@@ -1149,6 +1149,11 @@ function GymApp() {
   };
 
   const coachDashboardData = useMemo(function() {
+    function parsearFechaSesion(s) {
+      var raw = s.created_at || "";
+      if (raw) return raw.slice(0, 10); // "2026-04-01"
+      return "";
+    }
     const COACH_TOTAL_SLOTS = 12;
     var totalSlots = COACH_TOTAL_SLOTS;
     var activeStudents = (alumnos || []).length;
@@ -1164,7 +1169,7 @@ function GymApp() {
     we.setDate(we.getDate() + 7);
     var counts = [0, 0, 0, 0, 0, 0, 0];
     ses.forEach(function(s) {
-      var d = new Date(s.fecha || s.created_at);
+      var d = new Date(parsearFechaSesion(s));
       if (isNaN(d.getTime())) return;
       if (d < ws || d >= we) return;
       var idx = (d.getDay() + 6) % 7;
@@ -1184,12 +1189,9 @@ function GymApp() {
     var weekTotal = counts.reduce(function(a, b) { return a + b; }, 0);
     var weekGoalTarget = 24;
     var completionPercent = Math.min(100, Math.round((weekTotal / weekGoalTarget) * 100));
-    console.log("[week] sesiones recibidas:", sesionesGlobales.length,
-      "primer created_at:", sesionesGlobales[0]?.created_at,
-      "primer fecha:", sesionesGlobales[0]?.fecha);
     var dateSet = {};
     ses.forEach(function(s) {
-      var d = new Date(s.fecha || s.created_at);
+      var d = new Date(parsearFechaSesion(s));
       if (isNaN(d.getTime())) return;
       d.setHours(0, 0, 0, 0);
       dateSet[d.getTime()] = true;
@@ -1205,7 +1207,7 @@ function GymApp() {
       var t0 = Date.now() - 7 * 86400000;
       return ses.filter(function(s) {
         if (s.alumno_id !== alumnoId) return false;
-        var t = new Date(s.fecha || s.created_at).getTime();
+        var t = new Date(parsearFechaSesion(s)).getTime();
         return t >= t0;
       }).length;
     }
