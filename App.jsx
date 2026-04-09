@@ -1184,6 +1184,9 @@ function GymApp() {
     var weekTotal = counts.reduce(function(a, b) { return a + b; }, 0);
     var weekGoalTarget = 24;
     var completionPercent = Math.min(100, Math.round((weekTotal / weekGoalTarget) * 100));
+    console.log("[week] sesiones recibidas:", sesionesGlobales.length,
+      "primer created_at:", sesionesGlobales[0]?.created_at,
+      "primer fecha:", sesionesGlobales[0]?.fecha);
     var dateSet = {};
     ses.forEach(function(s) {
       var d = new Date(s.fecha || s.created_at);
@@ -1360,7 +1363,7 @@ function GymApp() {
         achievements: [],
       },
     };
-  }, [alumnos, sesionesGlobales, progresoGlobal, es, notifyAlumno, toast2, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones, sessionData]);
+  }, [alumnos, sesionesGlobales, sesionesGlobales.length, progresoGlobal, es, notifyAlumno, toast2, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones, sessionData]);
 
   // Pantalla de login
 
