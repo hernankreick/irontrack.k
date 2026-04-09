@@ -1281,19 +1281,22 @@ function GymApp() {
         highlightedBorder: level === "pos",
       });
     });
-    var coachNameGreet = sessionData?.name || sessionData?.email?.split("@")[0] || "Coach";
-    var coachInitialsGreet = coachNameGreet
+    const NOMBRES_GENERICOS = ["entrenador","coach","admin",""];
+    const nombreCoach = sessionData?.name || "";
+    const esGenerico = NOMBRES_GENERICOS.includes(nombreCoach.toLowerCase().trim());
+    const displayName = esGenerico
+      ? (sessionData?.email?.split("@")[0] || "Coach")
+      : nombreCoach;
+    var coachInitialsGreet = displayName
       .split(" ")
       .map(function(w) { return w[0]; })
       .join("")
       .slice(0, 2)
       .toUpperCase();
-    console.log("[CoachDash] sesionesGlobales:", sesionesGlobales?.length, sesionesGlobales?.[0]);
-    console.log("[CoachDash] sessionData:", JSON.stringify(sessionData));
     return {
       greeting: {
-        name: coachNameGreet,
-        coachName: coachNameGreet,
+        name: displayName,
+        coachName: displayName,
         initials: coachInitialsGreet,
       },
       businessMetrics: {
