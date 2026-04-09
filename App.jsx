@@ -1,4 +1,16 @@
+import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
+import { Ic } from './components/Ic.jsx';
+import { LogForm } from './components/LogForm.jsx';
+import { RutinaView } from './components/RutinaView.jsx';
+import { WorkoutScreen } from './components/WorkoutScreen.jsx';
+import { Chat } from './components/Chat.jsx';
+import { ChatFlotante } from './components/ChatFlotante.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
+import { ROUTINE_TEMPLATES, instantiateTemplate, emptyDays, getTemplateById } from './lib/routineTemplates.js';
+import { getYTVideoId } from './lib/getYTVideoId.js';
+import { fmt, fmtP } from './lib/timeFormat.js';
+import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
+import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 
 
 const PATS = {
@@ -278,20 +290,40 @@ const sb = {
   saveConfig: (data) => sbFetch("config?id=eq.pagos", "PATCH", data),
   getMensajes: (alumnoId) => sbFetch("mensajes?alumno_id=eq."+alumnoId+"&select=*&order=created_at.asc&limit=50"),
   addMensaje: (data) => sbFetch("mensajes", "POST", data),
+  marcarMensajesLeidos: async (alumnoId, esEntrenador) => {
+  const deQuien = esEntrenador ? "false" : "true";
+  const url = "mensajes?alumno_id=eq."+alumnoId+"&de_entrenador=eq."+deQuien+"&leido=eq.false";
+  const r = await fetch(SB_URL+"/rest/v1/"+url, {
+    method: "PATCH",
+    headers: {
+      "apikey": SB_KEY,
+      "Authorization": "Bearer "+SB_KEY,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal"
+    },
+    body: JSON.stringify({ leido: true })
+  });
+  if (!r.ok) {
+    const err = await r.text();
+    console.error("marcarMensajesLeidos falló:", r.status, err);
+  }
+},
+  getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
+  setNota: (data) => sbFetch("notas", "POST", data),
+  getVideoOverrides: () => sbFetch("video_overrides?select=ejercicio_id,youtube_url"),
+  getCustomEx: () => sbFetch("ejercicios_custom?entrenador_id=eq.entrenador_principal&select=*"),
+  addCustomEx: (data) => sbFetch("ejercicios_custom", "POST", data),
+  deleteCustomEx: (id) => sbFetch("ejercicios_custom?id=eq."+id, "DELETE"),
+  updateCustomEx: (id, data) => sbFetch("ejercicios_custom?id=eq."+id, "PATCH", data),
+  setVideoOverride: async (ejercicioId, url) => {
+    try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
+    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
+  },
 };
 
 
 
 const uid = () => Math.random().toString(36).slice(2,9);
-// FIX 4: normalizar fechas para comparaciones (evitar "22/3/2026" vs "22/03/2026")
-const normalizeFecha = (f) => {
-  if (!f) return '';
-  const parts = f.split('/');
-  if (parts.length === 3) return parts.map(p => p.padStart(2, '0')).join('/');
-  return f;
-};
-const fmt = s => String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
-const fmtP = s => { const n=parseInt(s)||0; if(!n) return "No"; if(n<60) return n+"s"; const m=Math.floor(n/60),r=n%60; return r===0?(m+"min"):(m+"m"+r+"s"); };
 
 
 function PagoAlumno({aliasData, es, toast2, darkMode}) {
@@ -438,7 +470,7 @@ return(
     </div>
     <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
       {DIAS.map((d,i)=>(
-        <button key={i} onClick={()=>toggleDia(i)}
+        <button key={"it-notif-dow-"+i} onClick={()=>toggleDia(i)}
           style={{flex:1,minWidth:36,padding:"8px 4px",borderRadius:8,border:"1px solid "+
             (notifDias.includes(i)?"#2563EB":"#2D4057"),
             background:notifDias.includes(i)?"#2563EB":"transparent",
@@ -503,57 +535,6 @@ const IronTrackLogo = ({size=28, color="#2563EB", showBar=true, mode=null, modeC
   </div>
 );
 
-// ── Icon system — Feather Icons ─────────────────────────────────────────
-const Ic = ({name, size=18, color="currentColor", strokeWidth=2, style={}}) => {
-  const p = {
-    "activity":      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>,
-    "alert-triangle":<><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
-    "arrow-left":    <><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></>,
-    "award":         <><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></>,
-    "bar-chart-2":   <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
-    "bell":          <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>,
-    "bookmark":      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>,
-    "calendar":      <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
-    "camera":        <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></>,
-    "check-circle":  <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
-    "check-sm":      <polyline points="5 12 10 17 19 7"/>,
-    "chevron-right": <polyline points="9 18 15 12 9 6"/>,
-    "chevron-left":  <polyline points="15 18 9 12 15 6"/>,
-    "copy":          <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>,
-    "edit-2":        <><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></>,
-    "eye":           <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
-    "file-text":     <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>,
-    "image":         <><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>,
-    "info":          <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
-    "link":          <><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></>,
-    "lock":          <><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
-    "log-out":       <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
-    "message-circle":<><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></>,
-    "moon":          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>,
-    "plus":          <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
-    "save":          <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>,
-    "settings":      <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
-    "share":         <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></>,
-    "sun":           <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>,
-    "trash-2":       <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
-    "trending-up":   <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
-    "upload":        <><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></>,
-    "user":          <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
-    "users":         <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
-    "x":             <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
-    "zap":           <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
-    "zoom-in":       <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></>,
-  };
-  const icon = p[name] || p["x"];
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth={strokeWidth}
-      strokeLinecap="round" strokeLinejoin="round" style={{display:"inline-block",verticalAlign:"middle",...style}}>
-      {icon}
-    </svg>
-  );
-};
-
 const IconPlan = ({size=20, color="currentColor"}) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/>
@@ -610,9 +591,6 @@ function GymApp() {
   const [sharedLoaded, setSharedLoaded] = useState(false);
   // Login
   const [sessionData, setSessionData] = useState(()=>{ try{return JSON.parse(localStorage.getItem("it_session")||"null")}catch(e){return null} });
-  // FIX 0A: ref para que logSet siempre tenga el sessionData actual
-  const sessionDataRef = useRef(sessionData);
-  useEffect(() => { sessionDataRef.current = sessionData; }, [sessionData]);
   const [loginScreen, setLoginScreen] = useState(()=>{ try{return !localStorage.getItem("it_session")}catch(e){return true} });
   const [loginRole, setLoginRole] = useState("entrenador");
   const [loginEmail, setLoginEmail] = useState("");
@@ -647,6 +625,60 @@ function GymApp() {
     cargarAlumnos,
     notifyAlumno,
   } = useAlumnos({ sb });
+  const [rutinasSB, setRutinasSB] = useState([]);
+  const [registrosSubTab, setRegistrosSubTab] = useState(0);
+  const [sesionesGlobales, setSesionesGlobales] = useState([]);
+  const [progresoGlobal, setProgresoGlobal] = useState({});
+  const [sugerencias, setSugerencias] = useState({});
+  // Estado del dropdown de sugerencias por alumno (para no mostrar listas interminables).
+  const [sugsOpen, setSugsOpen] = useState({});
+  const [rutinasSBEntrenador, setRutinasSBEntrenador] = useState([]);
+  const [filtroRut, setFiltroRut] = useState("todas");
+
+  
+
+  const cargarSesionesGlobales = React.useCallback(async function(alumnosActuales) {
+    var lista = alumnosActuales || alumnos;
+    if(!lista || lista.length === 0) {
+      try {
+        var sbAlumnos = await sb.getAlumnos('entrenador_principal');
+        if(sbAlumnos && sbAlumnos.length > 0) { setAlumnos(sbAlumnos); lista = sbAlumnos; }
+        else return;
+      } catch(e) { return; }
+    }
+    try {
+      var ids = lista.map(function(a){return a.id}).filter(function(id){return id && typeof id === 'string'});
+      if(ids.length === 0) return;
+      var idsStr = ids.join(',');
+      var results = await Promise.all([
+        sbFetch('sesiones?alumno_id=in.(' + idsStr + ')&select=*&order=created_at.desc&limit=500'),
+        sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=alumno_id,ejercicio_id,kg,reps,fecha&order=created_at.desc&limit=3000'),
+      ]);
+      if(results[0] && Array.isArray(results[0])) setSesionesGlobales(results[0]);
+      if(results[1] && Array.isArray(results[1])) {
+        var idx2 = {};
+        results[1].forEach(function(reg) {
+          if(!idx2[reg.alumno_id]) idx2[reg.alumno_id] = [];
+          idx2[reg.alumno_id].push(reg);
+        });
+        setProgresoGlobal(idx2);
+      }
+    } catch(e) { console.error('[cargarSesionesGlobales]', e); }
+  }, [alumnos]);
+
+  useEffect(function() {
+    if(sessionData && sessionData.role==='entrenador') {
+      var init = async function() {
+        var sbAlumnos = await sb.getAlumnos('entrenador_principal') || [];
+        setAlumnos(sbAlumnos);
+        if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
+        try { var rutsDB = await sb.getRutinasByEntrenador(); if(rutsDB && Array.isArray(rutsDB)) setRutinasSBEntrenador(rutsDB); } catch(e) {}
+      };
+      init();
+      var intervalo = setInterval(function() { cargarSesionesGlobales(); }, 30000);
+      return function() { clearInterval(intervalo); };
+    }
+  }, [sessionData]);
 
   const es = lang==="es";
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
@@ -663,14 +695,26 @@ function GymApp() {
   const [addExModal, setAddExModal] = useState(null); // {rId, dIdx}
   const [addExSearch, setAddExSearch] = useState("");
   const [addExPat, setAddExPat] = useState(null);
+  const [addExSelectedIds, setAddExSelectedIds] = useState([]);
   const [newR, setNewR] = useState(null);
+  /** Rutina local usada al pulsar "Asignar rutina" en cada alumno (explícita si hay varias). */
+  const [assignRoutineId, setAssignRoutineId] = useState(null);
+  const routineForAssign = useMemo(function(){
+    if(!routines.length) return null;
+    var id = assignRoutineId && routines.some(function(r){return r.id===assignRoutineId;}) ? assignRoutineId : routines[routines.length-1].id;
+    return routines.find(function(r){return r.id===id;}) || null;
+  }, [routines, assignRoutineId]);
+  const [dupDayModal, setDupDayModal] = useState(null); // {rId, dIdx, days}
+  const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
+  const [videoOverrides, setVideoOverrides] = useState({}); // {ejercicioId: url}
+  const [videoModal, setVideoModal] = useState(null); // {url, nombre}
+  const [expandedPlanDay, setExpandedPlanDay] = useState(null); // "rutId-dayIdx"
   const [editEx, setEditEx] = useState(null);
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
   const [preSessionPRs, setPreSessionPRs] = useState({});
-  const [prCelebration, setPrCelebration] = useState(null); // {ejercicio, kg}
-  const [swipeState, setSwipeState] = useState({});
-  const [btnFlash, setBtnFlash] = useState(false); // {[setKey]: {x, swiping}}
+  const [prCelebration, setPrCelebration] = useState(null); // {ejercicio, kg, prevKg, diff, exId}
+  const [sessionPRList, setSessionPRList] = useState([]); // [{exId, ejercicio, kg, prevKg, diff}]
   const [notaDia, setNotaDia] = useState(""); // nota del entrenador al alumno
   const [notaDiaInput, setNotaDiaInput] = useState(""); // input del entrenador
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
@@ -679,6 +723,7 @@ function GymApp() {
   const [resumenSesion, setResumenSesion] = useState(null);
   const [chatOpenId, setChatOpenId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(()=>{ try{ const v=localStorage.getItem("it_show_welcome"); if(v){localStorage.removeItem("it_show_welcome");return true;} return false; }catch(e){return false;} });
   const [currentWeek, setCurrentWeek] = useState(() => { try{return parseInt(localStorage.getItem("it_week")||"0")}catch(e){return 0} });
   const [completedDays, setCompletedDays] = useState(() => { try{return JSON.parse(localStorage.getItem("it_cd")||"[]")}catch(e){return []} });
@@ -712,6 +757,54 @@ function GymApp() {
   const [timer, setTimer] = useState(null);
   const timerRef = useRef(null);
 
+  /** Después de login/logout (localStorage ya actualizado): sincroniza sesión y datos persistidos sin recargar. */
+  function syncStateWithLocalStorage() {
+    var sess = null;
+    try { sess = JSON.parse(localStorage.getItem("it_session") || "null"); } catch (e) { sess = null; }
+    setSessionData(sess);
+    try { setLoginScreen(!localStorage.getItem("it_session")); } catch (e) { setLoginScreen(true); }
+    try { setRoutines(JSON.parse(localStorage.getItem("it_rt") || "[]")); } catch (e) { setRoutines([]); }
+    try { setProgress(JSON.parse(localStorage.getItem("it_pg") || "{}")); } catch (e) { setProgress({}); }
+    try { setUser(JSON.parse(localStorage.getItem("it_u") || "null")); } catch (e) { setUser(null); }
+    var welcome = false;
+    try {
+      if (localStorage.getItem("it_show_welcome")) {
+        localStorage.removeItem("it_show_welcome");
+        welcome = true;
+      }
+    } catch (e) {}
+    setShowWelcome(welcome);
+    try { setCurrentWeek(parseInt(localStorage.getItem("it_week") || "0", 10) || 0); } catch (e) { setCurrentWeek(0); }
+    try { setCompletedDays(JSON.parse(localStorage.getItem("it_cd") || "[]")); } catch (e) { setCompletedDays([]); }
+    try { setCustomEx(JSON.parse(localStorage.getItem("it_cex") || "[]")); } catch (e) { setCustomEx([]); }
+    try { setPendingSync(JSON.parse(localStorage.getItem("it_pending_sync") || "[]")); } catch (e) { setPendingSync([]); }
+    try { setPagosEstado(JSON.parse(localStorage.getItem("it_pagos_estado") || "{}")); } catch (e) { setPagosEstado({}); }
+    try { setOnboardDone(!!localStorage.getItem("it_onboard_done")); } catch (e) { setOnboardDone(false); }
+    setTab("plan");
+    setSession(null);
+    setAlumnos([]);
+    setSesiones([]);
+    setAlumnoActivo(null);
+    setAlumnoSesiones([]);
+    setAlumnoProgreso([]);
+    setSesionesGlobales([]);
+    setProgresoGlobal({});
+    setRutinasSBEntrenador([]);
+    setRutinasSB([]);
+    setLoadingSB(false);
+    setUserMenuOpen(false);
+    setSettingsOpen(false);
+    setLoginModal(false);
+    setPreSessionPRs({});
+    setSessionPRList([]);
+    setPrCelebration(null);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setTimer(null);
+  }
+
   // OneSignal Web Push
 
   // ── Escuchar cambios de tema del SO ─────────────────────────────────────
@@ -732,11 +825,11 @@ function GymApp() {
       // Sincronizar sets pendientes
       const pending = JSON.parse(localStorage.getItem('it_pending_sync')||'[]');
       if(pending.length === 0) return;
-      const alumnoIdSync = sessionData?.alumnoId;
+      const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
       if(!alumnoIdSync) return;
       pending.forEach(item => {
         try {
-          sb.addProgreso({
+          console.log("[PROGRESO] enviando a supabase...");sb.addProgreso({
             alumno_id: alumnoIdSync,
             ejercicio_id: item.exId,
             kg: item.kg, reps: item.reps,
@@ -841,14 +934,28 @@ function GymApp() {
         try {
           const ruts = await sbFetch("rutinas?alumno_id=eq."+sessionData.alumnoId+"&select=*&order=created_at.desc&limit=1");
           if(ruts && ruts[0] && ruts[0].datos) {
-            setRoutines([{...ruts[0].datos, alumnoId: sessionData.alumnoId}]);
+            const rSB = ruts[0];
+            const rutLocal = {
+              id: rSB.id,
+              name: rSB.nombre || "Rutina",
+              days: rSB.datos?.days || [],
+              alumno: rSB.datos?.alumno || sessionData.name || "",
+              note: rSB.datos?.note || "",
+              alumno_id: sessionData.alumnoId,
+              saved: true
+            };
+            setRoutines(function(prev) {
+              // No duplicar si ya existe
+              var existe = prev.find(function(r) { return r.id === rSB.id; });
+              if(existe) return prev.map(function(r) { return r.id === rSB.id ? rutLocal : r; });
+              return [rutLocal];
+            });
           }
-        
-      // Cargar nota del día
-      sb.getNota(sessionData.alumnoId).then(res=>{
-        if(res && res[0]) setNotaDia(res[0].contenido||res[0].texto||"");
-      }).catch(()=>{});
-    } catch(e) {}
+          // Cargar nota del día
+          sb.getNota(sessionData.alumnoId).then(function(res) {
+            if(res && res[0]) setNotaDia(res[0].contenido||res[0].texto||"");
+          }).catch(function(){});
+        } catch(e) { console.error('[cargarRutinaAlumno]', e); }
       })();
     }
   }, [sessionData?.alumnoId]);
@@ -859,6 +966,26 @@ function GymApp() {
     sb.getConfig().then(res => {
       if(res && res[0]) setAliasData(res[0]);
     }).catch(()=>{});
+    // Cargar video overrides
+    sb.getVideoOverrides().then(function(res){
+      if(res && Array.isArray(res)) {
+        var map = {};
+        res.forEach(function(r){ map[r.ejercicio_id] = r.youtube_url; });
+        setVideoOverrides(map);
+      }
+    }).catch(function(){});
+    // Cargar ejercicios custom desde Supabase
+    sb.getCustomEx().then(function(res){
+      if(res && Array.isArray(res) && res.length > 0) {
+        var exs = res.map(function(e){ return {id:e.id, name:e.name, nameEn:e.name_en||e.name, pattern:e.pattern||"empuje", muscle:e.muscle||"", equip:e.equip||"Libre", youtube:e.youtube||""}; });
+        setCustomEx(function(prev){
+          // Merge: Supabase tiene prioridad, agregar locales que no estén
+          var ids = new Set(exs.map(function(e){return e.id}));
+          var locales = (prev||[]).filter(function(e){return !ids.has(e.id)});
+          return [...exs, ...locales];
+        });
+      }
+    }).catch(function(){});
   }, []);
 
   const toast2 = msg => { setToast(msg); setTimeout(()=>setToast(null),2200); };
@@ -884,7 +1011,7 @@ function GymApp() {
     }, 500); // cada 500ms para mayor precisión
   };
 
-  const logSet = (exId, kg, reps, note, rpe) => {
+  const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe) => {
     const d = new Date().toLocaleDateString("es-AR");
     setProgress(prev=>{
       const ex = {...(prev[exId]||{sets:[],max:0})};
@@ -893,38 +1020,39 @@ function GymApp() {
       return {...prev,[exId]:ex};
     });
     // Guardar en Supabase — si offline, guardar en cola local
-    // FIX 0B: usar ref para evitar closure stale
-    const alumnoIdSync = sessionDataRef.current?.alumnoId || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
+    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     if(alumnoIdSync) {
-      try {
-        const rutData = JSON.parse(atob(sharedParam));
-        if(alumnoIdSync) {
-          if(!isOnline) {
-            // Guardar en cola local para sincronizar después
-            const item = {exId, kg:parseFloat(kg)||0, reps:parseInt(reps)||0, note:note||'', date:d};
-            const updated = [...pendingSync, item];
-            setPendingSync(updated);
-            try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
-          } else {
-            sb.addProgreso({
-              alumno_id: alumnoId,
-              ejercicio_id: exId,
-              kg: parseFloat(kg)||0,
-              reps: parseInt(reps)||0,
-              nota: note||"",
-              fecha: d
-            });
-          }
-        }
-      } catch(e) {}
+      if(!isOnline) {
+        const item = {exId, kg:parseFloat(kg)||0, reps:parseInt(reps)||0, note:note||'', date:d};
+        const updated = [...pendingSync, item];
+        setPendingSync(updated);
+        try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
+      } else {
+        sb.addProgreso({
+          alumno_id: alumnoIdSync,
+          ejercicio_id: exId,
+          kg: parseFloat(kg)||0,
+          reps: parseInt(reps)||0,
+          nota: note||"",
+          fecha: d
+        }).then(function(r){console.log("[PROGRESO] OK",r)}).catch(function(e){console.error("[PROGRESO] ERR",e)});
+      }
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
     const exPrevData = progress[exId]||{sets:[],max:0};
     const newKgVal = parseFloat(kg)||0;
     if(newKgVal > (exPrevData.max||0) && (exPrevData.max||0) > 0) {
       const exInfoCel = [...EX,...(customEx||[])].find(e=>e.id===exId);
-      setPrCelebration({ejercicio: exInfoCel?.name||exId, kg: newKgVal});
-      setTimeout(()=>setPrCelebration(null), 2500);
+      const prevMax = exPrevData.max||0;
+      const diff = Math.round((newKgVal - prevMax)*10)/10;
+      setPrCelebration({ejercicio: exInfoCel?.name||exId, kg: newKgVal, prevKg: prevMax, diff: diff, exId: exId});
+      // Guardar PR en lista de la sesión
+      setSessionPRList(function(prev){
+        var existe = prev.find(function(p){return p.exId===exId && p.kg===newKgVal});
+        if(existe) return prev;
+        return [...prev, {exId:exId, ejercicio:exInfoCel?.name||exId, kg:newKgVal, prevKg:prevMax, diff:diff}];
+      });
+      setTimeout(()=>setPrCelebration(null), 3000);
     }
     if(!isOnline) {
       toast2(es?'Set guardado localmente':'Set saved locally');
@@ -955,7 +1083,7 @@ function GymApp() {
   const btn=(col,txt)=>({background:col||(darkMode?"#2D4057":"#E2E8F0"),color:txt||(darkMode?"#FFFFFF":"#0F1923"),border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",letterSpacing:1});
   const tag=(col)=>({background:"#162234",color:"#8B9AB2",border:"1px solid #2D4057",borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700});
 
-  const allEx = [...EX, ...customEx];
+  const allEx = React.useMemo(function(){ return [...EX, ...(customEx||[])]; }, [customEx]);
   const filteredEx = allEx.filter(e=>{
     const q=search.toLowerCase();
     if(filterPat && e.pattern!==filterPat) return false;
@@ -1027,7 +1155,7 @@ function GymApp() {
   );
 
   if(!sharedParam && loginScreen) return (
-    <div style={{maxWidth:480,margin:"0 auto",height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
+    <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
       <div style={{marginBottom:40,textAlign:"center"}}>
         <IronTrackLogo size={32} color="#2563EB" showBar={false}/>
         <div style={{fontSize:13,color:textMuted,marginTop:8,letterSpacing:1.5,fontWeight:500}}>
@@ -1047,38 +1175,41 @@ function GymApp() {
         {loginError&&<div style={{color:"#2563EB",fontSize:13,marginBottom:12,textAlign:"center"}}>{loginError}</div>}
         <button style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:"pointer",letterSpacing:1}} onClick={async ()=>{
           setLoginLoading(true); setLoginError("");
-          const sp = typeof window!=="undefined"?(localStorage.getItem("it_tpass")||"irontrack2024"):"irontrack2024";
-          const isEntrenador = loginEmail.trim().toLowerCase()==="entrenador@irontrack.app";
-          if(isEntrenador){
-            if(loginEmail==="entrenador@irontrack.app"&&loginPass===sp){
-              localStorage.clear();
-              const s={role:"entrenador",name:"Entrenador"};
-              localStorage.setItem("it_session",JSON.stringify(s));
-              window.location.reload();
-            } else setLoginError("Email o contraseña incorrectos");
-          } else {
-            const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmail)+"&password=eq."+encodeURIComponent(loginPass)+"&select=*");
-            if(res&&res.length>0){
-              const alumno=res[0];
-              const ruts=await sbFetch("rutinas?alumno_id=eq."+alumno.id+"&select=*&order=created_at.desc&limit=1");
-              localStorage.clear();
-              const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id};
-              localStorage.setItem("it_session",JSON.stringify(s));
-              localStorage.setItem("it_show_welcome","1");
-              if(ruts&&ruts[0]) localStorage.setItem("it_rt",JSON.stringify([{...ruts[0].datos,alumnoId:alumno.id}]));
-              // Registrar OneSignal
-              try {
-                window.OneSignalDeferred = window.OneSignalDeferred || [];
-                window.OneSignalDeferred.push(async function(OS) {
-                  await OS.init({ appId: "8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7", allowLocalhostAsSecureOrigin: true });
-                  const pid = OS.User?.PushSubscription?.id;
-                  if(pid) await sbFetch("alumnos?id=eq."+alumno.id,"PATCH",{onesignal_id:pid});
-                });
-              } catch(e) {}
-              window.location.reload();
-            } else setLoginError("Email o contraseña incorrectos");
+          try {
+            const sp = typeof window!=="undefined"?(localStorage.getItem("it_tpass")||"irontrack2024"):"irontrack2024";
+            const isEntrenador = loginEmail.trim().toLowerCase()==="entrenador@irontrack.app";
+            if(isEntrenador){
+              if(loginEmail==="entrenador@irontrack.app"&&loginPass===sp){
+                localStorage.clear();
+                const s={role:"entrenador",name:"Entrenador"};
+                localStorage.setItem("it_session",JSON.stringify(s));
+                syncStateWithLocalStorage();
+              } else setLoginError("Email o contraseña incorrectos");
+            } else {
+              const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmail)+"&password=eq."+encodeURIComponent(loginPass)+"&select=*");
+              if(res&&res.length>0){
+                const alumno=res[0];
+                const ruts=await sbFetch("rutinas?alumno_id=eq."+alumno.id+"&select=*&order=created_at.desc&limit=1");
+                localStorage.clear();
+                const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id};
+                localStorage.setItem("it_session",JSON.stringify(s));
+                localStorage.setItem("it_show_welcome","1");
+                if(ruts&&ruts[0]) localStorage.setItem("it_rt",JSON.stringify([{...ruts[0].datos,alumnoId:alumno.id}]));
+                // Registrar OneSignal
+                try {
+                  window.OneSignalDeferred = window.OneSignalDeferred || [];
+                  window.OneSignalDeferred.push(async function(OS) {
+                    await OS.init({ appId: "8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7", allowLocalhostAsSecureOrigin: true });
+                    const pid = OS.User?.PushSubscription?.id;
+                    if(pid) await sbFetch("alumnos?id=eq."+alumno.id,"PATCH",{onesignal_id:pid});
+                  });
+                } catch(e) {}
+                syncStateWithLocalStorage();
+              } else setLoginError("Email o contraseña incorrectos");
+            }
+          } finally {
+            setLoginLoading(false);
           }
-          setLoginLoading(false);
         }}>
           {loginLoading?"INGRESANDO...":"INGRESAR"}
         </button>
@@ -1095,7 +1226,14 @@ function GymApp() {
                 }});
                 if(cred) {
                   const saved = JSON.parse(localStorage.getItem("it_biometric_user")||"null");
-                  if(saved) { setLoginLoading(true); setTimeout(()=>{ localStorage.setItem("it_session",JSON.stringify(saved)); window.location.reload(); },500); }
+                  if(saved) {
+                    setLoginLoading(true);
+                    setTimeout(function(){
+                      try { localStorage.setItem("it_session", JSON.stringify(saved)); } catch(e) {}
+                      syncStateWithLocalStorage();
+                      setLoginLoading(false);
+                    }, 500);
+                  }
                 }
               } catch(e){ toast2(es?"Error de biometría":"Biometric error"); }
             }}>
@@ -1110,18 +1248,20 @@ function GymApp() {
   );
 
   return (
-    <div style={{minHeight:"100vh",background:bg,color:textMain,fontFamily:"Inter,sans-serif","--sk1":darkMode?"#1E2D40":"#E8EEF4","--sk2":darkMode?"#2D4057":"#D1DCE8",paddingBottom:72,position:"relative"}}>
+    <div style={{minHeight:"100dvh",background:bg,color:textMain,fontFamily:"Inter,sans-serif","--sk1":darkMode?"#1E2D40":"#E8EEF4","--sk2":darkMode?"#2D4057":"#D1DCE8",paddingBottom:72,position:"relative"}}>
       <style dangerouslySetInnerHTML={{__html:
         "@import url(https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap);" +
         "*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased}input,textarea,select{outline:none!important}" +
         "::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:"+(darkMode?"#162234":"#8B9AB2")+";border-radius:2px}" +
         ".hov{transition:all .15s ease;cursor:pointer}.hov:hover{filter:brightness(1.15)}" +
         "@keyframes successPulse{0%{transform:scale(1)}30%{transform:scale(0.94)}60%{transform:scale(1.06)}100%{transform:scale(1)}}" +
+        "@keyframes pillBounce{0%{transform:scale(1)}30%{transform:scale(1.25)}50%{transform:scale(0.9)}70%{transform:scale(1.1)}100%{transform:scale(1)}}" +
         "@keyframes greenFlash{0%{filter:brightness(1)}40%{filter:brightness(1.5) saturate(1.3)}100%{filter:brightness(1)}}" +
         "@keyframes bounceIn{0%{transform:scale(0) rotate(-10deg);opacity:0}50%{transform:scale(1.2) rotate(5deg)}70%{transform:scale(0.92) rotate(-2deg)}100%{transform:scale(1) rotate(0);opacity:1}}" +
         "@keyframes rippleOut{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)}100%{box-shadow:0 0 0 20px rgba(34,197,94,0)}}" +
 
         ".num{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}" +
+        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}.card-ex{will-change:transform;contain:layout style paint}" +
         "@keyframes checkPop{0%{transform:scale(0.3) rotate(-15deg);opacity:0}60%{transform:scale(1.3) rotate(5deg);opacity:1}80%{transform:scale(0.9) rotate(-3deg)}100%{transform:scale(1) rotate(0deg);opacity:1}}@keyframes slideUpFade{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}@keyframes prGlow{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.6);transform:scale(1)}50%{box-shadow:0 0 0 12px rgba(34,197,94,0);transform:scale(1.05)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0);transform:scale(1)}}@keyframes rowComplete{0%{background:rgba(34,197,94,0.0)}15%{background:rgba(34,197,94,0.3)}100%{background:transparent}}" +
         "select{background:"+bgSub+";color:"+textMain+";border:1px solid "+border+";border-radius:8px;padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;width:100%}" +
         ".app-inner{max-width:1200px;margin:0 auto;width:100%}" +
@@ -1164,13 +1304,38 @@ function GymApp() {
             modeColor={(readOnly||esAlumno)?"#22C55E":"#2563EB"}
           />
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div style={{display:"flex",gap:8,alignItems:"center",position:"relative"}}>
           {session&&<span style={{...tag("#22C55E"),fontSize:13}}>✓ Sesion activa</span>}
-          {sessionData&&<span style={{fontSize:13,color:textMuted,fontWeight:500,maxWidth:80,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sessionData.name}</span>}
           <button className="hov" style={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSettingsOpen(true)}><Ic name="settings" size={18} color={textMuted}/></button>
-          {sessionData
-            ? <button className="hov" style={{background:esAlumno?"#2563EB":"#2563EB22",color:esAlumno?"#fff":"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit",letterSpacing:.5}} onClick={()=>{localStorage.clear();window.location.reload();}}>{esAlumno?(es?"FINALIZAR SESIÓN":"END SESSION"):"SALIR"}</button>
-            : <button className="hov" style={{...btn(),padding:"4px 8px",fontSize:13}} onClick={()=>setLoginModal(true)}><Ic name="user" size={18}/></button>
+          {sessionData&&esAlumno
+            ? <>
+              <button className="hov" style={{width:36,height:36,background:"linear-gradient(135deg,#1E3A5F,#2563EB)",border:"none",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff"}} onClick={()=>setUserMenuOpen(!userMenuOpen)}>
+                {(sessionData.name||"U").slice(0,2).toUpperCase()}
+              </button>
+              {userMenuOpen&&(
+                <>
+                <div style={{position:"fixed",inset:0,zIndex:40}} onClick={()=>setUserMenuOpen(false)}/>
+                <div style={{position:"absolute",top:44,right:0,background:"#111827",border:"1px solid #1E3A5F",borderRadius:12,width:220,overflow:"hidden",zIndex:50,boxShadow:"0 8px 32px rgba(0,0,0,.5)",animation:"fadeIn .2s ease"}}>
+                  <div style={{padding:"12px 14px",background:"#0D1520",borderBottom:"1px solid #1a2535"}}>
+                    <div style={{fontSize:14,fontWeight:800,color:"#fff"}}>{sessionData.name}</div>
+                    <div style={{fontSize:11,color:"#475569",marginTop:1}}>{sessionData.email||""}</div>
+                  </div>
+                  <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",borderBottom:"1px solid #1a2535",fontSize:13,fontWeight:600,color:"#94A3B8"}} onClick={()=>{setUserMenuOpen(false);setSettingsOpen(true)}}>
+                    <Ic name="user" size={15} color="#94A3B8"/> {es?"Mi perfil":"My profile"}
+                  </div>
+                  <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",borderBottom:"1px solid #1a2535",fontSize:13,fontWeight:600,color:"#94A3B8"}} onClick={()=>{setUserMenuOpen(false);setSettingsOpen(true)}}>
+                    <Ic name="settings" size={15} color="#94A3B8"/> {es?"Configuración":"Settings"}
+                  </div>
+                  <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,fontWeight:600,color:"#EF4444"}} onClick={()=>{setUserMenuOpen(false);if(confirm(es?"¿Cerrar sesión?":"Log out?")){localStorage.clear();syncStateWithLocalStorage();}}}>
+                    <Ic name="log-out" size={15} color="#EF4444"/> {es?"Cerrar sesión":"Log out"}
+                  </div>
+                </div>
+                </>
+              )}
+              </>
+            : sessionData
+              ? <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{localStorage.clear();syncStateWithLocalStorage();}}>SALIR</button>
+              : <button className="hov" style={{...btn(),padding:"4px 8px",fontSize:13}} onClick={()=>setLoginModal(true)}><Ic name="user" size={18}/></button>
           }
         </div>
       </div>
@@ -1187,29 +1352,6 @@ function GymApp() {
           <button className="hov" style={{...btn("#2563EB33"),color:"#2563EB",padding:"4px 8px",fontSize:15}} onClick={()=>{clearInterval(timerRef.current);setTimer(null);}}>Cancelar</button>
         </div>
       )}
-      {session&&activeDay&&(
-        <WorkoutScreen allEx={allEx}           session={session}
-          activeDay={activeDay}
-          activeR={activeR}
-          progress={progress}
-          logSet={logSet}
-          startTimer={startTimer}
-          timer={timer}
-          setSession={setSession}
-          setCompletedDays={setCompletedDays}
-          completedDays={completedDays}
-          currentWeek={currentWeek}
-          setCurrentWeek={setCurrentWeek}
-          preSessionPRs={preSessionPRs}
-          setResumenSesion={setResumenSesion}
-          readOnly={readOnly}
-          sharedParam={sharedParam}
-          sb={sb}
-          es={es}
-          darkMode={darkMode}
-          prCelebration={prCelebration}
-          setPrCelebration={setPrCelebration} activeExIdx={activeExIdx} setActiveExIdx={setActiveExIdx}/>
-      )}
 
       <div
         ref={scrollRef}
@@ -1220,346 +1362,29 @@ function GymApp() {
           if(!dir && y < 20 && headerCollapsed) setHeaderCollapsed(false);
           lastScrollY.current = y;
         }}
-        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100vh - 130px)",paddingBottom:100,paddingTop:12,display:session&&activeDay?"none":"block"}}>
+        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100dvh - 130px)",paddingBottom:100,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth"}}>
         {tab==="plan"&&esAlumno&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&(
           <div>
-            {session&&activeDay&&esAlumno&&(()=>{
-              const hoy = new Date().toLocaleDateString("es-AR");
-              const exs = activeDay.exercises||[];
-              const curEx = exs[activeExIdx]||exs[0];
-              const curInfo = curEx ? allEx.find(e=>e.id===curEx.id) : null;
-              const curPat = curInfo ? (PATS[curInfo.pattern]||{icon:"E",color:"#8B9AB2"}) : {icon:"E",color:"#8B9AB2"};
-              const setsHoy = curEx ? (progress[curEx.id]?.sets||[]).filter(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeek)) : [];
-              const totalSets = curEx ? (parseInt(curEx.sets)||3) : 3;
-              const targetReps = curEx ? (parseInt((curEx.reps||"8").toString().split(/[-x]/)[0])||8) : 8;
-              const lastKg = setsHoy.length>0 ? setsHoy[0].kg : (progress[curEx?.id]?.sets?.[0]?.kg||parseFloat(curEx?.kg)||0);
-              const isPR = lastKg > 0 && lastKg > (progress[curEx?.id]?.max||0);
-              const nextEx = exs[activeExIdx+1];
-              const nextInfo = nextEx ? allEx.find(e=>e.id===nextEx.id) : null;
-              const allDone = exs.every(ex=>(progress[ex.id]?.sets||[]).filter(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeek)).length >= (parseInt(ex.sets)||3));
-
-              // kg y reps locales para quick-log inline
-              // Usamos un truco: el estado de kg/reps se maneja por logModal
-              // pero aqui lo hacemos directamente inline
-
-              return (
-                <div style={{minHeight:"calc(100vh - 280px)"}}>
-                  <div style={{background:bgCard,borderRadius:20,padding:"20px 16px",marginBottom:12,border:"1px solid "+curPat.color+"33",boxShadow:"0 4px 24px "+curPat.color+"11"}}>
-                    <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
-                      <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:curPat.color,flexShrink:0,minHeight:60}}/>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:11,fontWeight:800,color:curPat.color,letterSpacing:2,marginBottom:4,textTransform:"uppercase"}}>
-                          {es?"EJERCICIO "+(activeExIdx+1)+" DE "+exs.length:"EXERCISE "+(activeExIdx+1)+" OF "+exs.length}
-                        </div>
-                        <div style={{fontSize:28,fontWeight:900,color:textMain,lineHeight:1.1,marginBottom:4}}>
-                          {es?curInfo?.name:curInfo?.nameEn||curInfo?.name||curEx?.id}
-                        </div>
-                        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                          <span style={{fontSize:13,color:curPat.color,fontWeight:700}}>{es?curPat.label:curPat.labelEn}</span>
-                          <span style={{fontSize:13,color:textMuted}}>·</span>
-                          <span style={{fontSize:13,color:textMuted,fontWeight:500}}>{totalSets} sets × {targetReps} reps</span>
-                          {curInfo?.youtube&&(
-                            <a href={curInfo.youtube} target="_blank" rel="noreferrer"
-                              style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #243040",borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:700,textDecoration:"none"}}>
-                              ▶ VIDEO
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    {progress[curEx?.id]?.max>0&&(
-                      <div style={{background:bgSub,borderRadius:12,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <div style={{fontSize:13,color:textMuted,fontWeight:500}}><Ic name="award" size={14} color="#fbbf24"/> PR</div>
-                        <div style={{fontSize:15,fontWeight:900,color:"#60A5FA"}}>{progress[curEx.id].max} kg</div>
-                        <div style={{fontSize:13,color:textMuted,fontWeight:500}}>{es?"Último":"Last"}</div>
-                        <div style={{fontSize:15,fontWeight:900,color:textMain}}>
-                          {progress[curEx.id]?.sets?.[0]?.kg||"-"} kg × {progress[curEx.id]?.sets?.[0]?.reps||"-"}
-                        </div>
-                      </div>
-                    )}
-                    <div style={{marginBottom:16}}>
-                      <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8,display:"flex",justifyContent:"space-between"}}>
-                        <span>#</span><span>PESO (kg)</span><span>REPS</span><span></span>
-                      </div>
-                      {Array.from({length:totalSets},(_,si)=>{
-                        const isDone = si < setsHoy.length;
-                        const isActive = si === setsHoy.length;
-                        const swKey = curEx.id+"-"+si;
-                        const swX = swipeState[swKey]?.x||0;
-                        const isSwiping = swipeState[swKey]?.swiping;
-                        const THRESHOLD = 90;
-                        const swProgress = Math.min(Math.abs(swX)/THRESHOLD,1);
-                        return(
-                          <div key={si} style={{
-                            position:"relative",overflow:"hidden",
-                            borderBottom:si<totalSets-1?"1px solid "+border:"none",
-                            borderRadius:8,marginBottom:4,
-                            animation:isDone?"rowComplete 0.6s ease both":"slideUpFade 0.3s ease both",
-                            animationDelay:isDone?"0ms":(si*60)+"ms"
-                          }}>
-                            {!isDone&&isActive&&(
-                              <div style={{
-                                position:"absolute",inset:0,background:"#22C55E",
-                                display:"flex",alignItems:"center",paddingLeft:16,
-                                opacity:swProgress,borderRadius:8
-                              }}>
-                                <span style={{fontSize:22,color:"#fff",fontWeight:900}}>✓</span>
-                                <span style={{fontSize:13,color:"rgba(255,255,255,0.9)",fontWeight:700,marginLeft:8}}>
-                                  {swProgress>=1?(es?"¡Listo!":"Done!"):(es?"Completar set":"Complete set")}
-                                </span>
-                              </div>
-                            )}
-                            <div
-                              style={{
-                                display:"flex",alignItems:"center",justifyContent:"space-between",
-                                padding:"8px 4px",
-                                opacity:isDone?0.75:1,
-                                transform:(!isDone&&isActive&&swX>0)?`translateX(${swX}px)`:"none",
-                                transition:isSwiping?"none":"transform 0.25s cubic-bezier(.25,.46,.45,.94)",
-                                background:bgCard,
-                                userSelect:"none", touchAction:"pan-y"
-                              }}
-                              onTouchStart={(!isDone&&isActive)?(e)=>{
-                                setSwipeState(p=>({...p,[swKey]:{x:0,swiping:true,startX:e.touches[0].clientX}}));
-                              }:undefined}
-                              onTouchMove={(!isDone&&isActive)?(e)=>{
-                                const dx=e.touches[0].clientX-(swipeState[swKey]?.startX||e.touches[0].clientX);
-                                if(dx>0) setSwipeState(p=>({...p,[swKey]:{...p[swKey],x:Math.min(dx,THRESHOLD*1.2)}}));
-                              }:undefined}
-                              onTouchEnd={(!isDone&&isActive)?(e)=>{
-                                const dx=swipeState[swKey]?.x||0;
-                                if(dx>=THRESHOLD){
-                                  const kgInp=document.getElementById("kg-inp-"+activeExIdx);
-                                  const rpInp=document.getElementById("rp-inp-"+activeExIdx);
-                                  const kgVal=parseFloat(kgInp?.value)||lastKg||0;
-                                  const rpVal=parseInt(rpInp?.value)||targetReps;
-                                  if(kgVal>0){
-                                    logSet(curEx.id,kgVal,rpVal,"",null);
-                                    const pauseSec=parseInt(curEx?.pause)||90;
-                                    if(pauseSec>0) startTimer(pauseSec,"#22C55E");
-                                    const newCnt=setsHoy.length+1;
-                                    if(newCnt>=totalSets&&activeExIdx+1<exs.length) setTimeout(()=>setActiveExIdx(activeExIdx+1),350);
-                                  }
-                                }
-                                setSwipeState(p=>({...p,[swKey]:{x:0,swiping:false}}));
-                              }:undefined}
-                            >
-                              <div style={{width:28,height:28,borderRadius:8,
-                                background:isDone?"#22C55E20":isActive?"#22C55E18":bgSub,
-                                border:"1px solid "+(isDone?"#22C55E44":isActive?"#22C55E44":"transparent"),
-                                display:"flex",alignItems:"center",justifyContent:"center",
-                                fontSize:isDone?16:13,fontWeight:900,
-                                color:isDone?"#22C55E":isActive?"#22C55E":textMuted,
-                                animation:isDone?"checkPop 0.4s cubic-bezier(.36,.07,.19,.97) both":undefined,
-                                transition:"all .2s ease"}}>
-                                {isDone?"✓":si+1}
-                              </div>
-                              <div style={{fontSize:18,fontWeight:900,color:isDone?textMuted:textMain,minWidth:60,textAlign:"center"}}>
-                                {isDone?(setsHoy[totalSets-1-si]||setsHoy[si])?.kg||"-":(si===0?lastKg||"—":setsHoy[si-1]?.kg||"—")}
-                              </div>
-                              <div style={{fontSize:18,fontWeight:900,color:isDone?textMuted:textMain,minWidth:60,textAlign:"center"}}>
-                                {isDone?(setsHoy[totalSets-1-si]||setsHoy[si])?.reps||"-":(targetReps)}
-                              </div>
-                              <div style={{fontSize:13,fontWeight:700,color:isDone?"#22C55E":isActive?"#22C55E":textMuted,minWidth:64,textAlign:"right"}}>
-                                {isDone?es?"hecho ✓":"done ✓":isActive?es?"deslizá →":"swipe →":es?"pendiente":"pending"}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {setsHoy.length < totalSets && (
-                      <div style={{background:bgSub,borderRadius:16,padding:"16px",border:"1px solid "+curPat.color+"33"}}>
-                        <div style={{fontSize:11,fontWeight:800,color:curPat.color,letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>
-                          {es?"REGISTRAR SET "+(setsHoy.length+1):"LOG SET "+(setsHoy.length+1)}
-                        </div>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                          <div style={{background:bgSub,borderRadius:12,padding:"8px 6px",textAlign:"center",border:"1px solid "+border}}>
-                            <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>PESO (KG)</div>
-                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
-                              <button className="hov" id={"kg-minus-"+activeExIdx}
-                                style={{width:44,height:44,background:bgCard,border:"1px solid "+border,borderRadius:12,
-                                  fontSize:22,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
-                                  display:"flex",alignItems:"center",justifyContent:"center"}}
-                                onClick={()=>{
-                                  const el=document.getElementById("kg-inp-"+activeExIdx);
-                                  if(el) el.value=String(Math.max(0,(parseFloat(el.value)||0)-2.5));
-                                }}>−</button>
-                              <input id={"kg-inp-"+activeExIdx}
-                                type="number" defaultValue={lastKg||""}
-                                placeholder={lastKg||"0"}
-                                style={{...inp,textAlign:"center",fontSize:26,fontWeight:900,color:textMain,
-                                  width:0,flex:1,height:44,padding:"0 2px",minWidth:0}}/>
-                              <button className="hov" id={"kg-plus-"+activeExIdx}
-                                style={{width:44,height:44,background:bgCard,border:"1px solid "+border,borderRadius:12,
-                                  fontSize:22,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
-                                  display:"flex",alignItems:"center",justifyContent:"center"}}
-                                onClick={()=>{
-                                  const el=document.getElementById("kg-inp-"+activeExIdx);
-                                  if(el) el.value=String((parseFloat(el.value)||0)+2.5);
-                                }}>+</button>
-                            </div>
-                          </div>
-                          <div style={{background:bgSub,borderRadius:12,padding:"8px 6px",textAlign:"center",border:"1px solid "+border}}>
-                            <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>REPS</div>
-                            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4}}>
-                              <button className="hov" id={"rp-minus-"+activeExIdx}
-                                style={{width:44,height:44,background:bgCard,border:"1px solid "+border,borderRadius:12,
-                                  fontSize:22,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
-                                  display:"flex",alignItems:"center",justifyContent:"center"}}
-                                onClick={()=>{
-                                  const el=document.getElementById("rp-inp-"+activeExIdx);
-                                  if(el) el.value=String(Math.max(1,(parseInt(el.value)||0)-1));
-                                }}>−</button>
-                              <input id={"rp-inp-"+activeExIdx}
-                                type="number" defaultValue={targetReps}
-                                style={{...inp,textAlign:"center",fontSize:26,fontWeight:900,color:textMain,
-                                  width:0,flex:1,height:44,padding:"0 2px",minWidth:0}}/>
-                              <button className="hov" id={"rp-plus-"+activeExIdx}
-                                style={{width:44,height:44,background:bgCard,border:"1px solid "+border,borderRadius:12,
-                                  fontSize:22,fontWeight:900,color:textMain,cursor:"pointer",flexShrink:0,
-                                  display:"flex",alignItems:"center",justifyContent:"center"}}
-                                onClick={()=>{
-                                  const el=document.getElementById("rp-inp-"+activeExIdx);
-                                  if(el) el.value=String((parseInt(el.value)||0)+1);
-                                }}>+</button>
-                            </div>
-                          </div>
-                        </div>
-                        <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-                          {[targetReps-2,targetReps-1,targetReps,targetReps+1,targetReps+2].filter(n=>n>0).map(n=>(
-                            <button key={n} className="hov"
-                              style={{padding:"8px 12px",border:"1px solid "+(n===targetReps?curPat.color:border),
-                                borderRadius:8,background:n===targetReps?curPat.color+"22":"transparent",
-                                color:n===targetReps?curPat.color:textMuted,fontSize:15,fontWeight:800,
-                                cursor:"pointer",fontFamily:"inherit"}}
-                              onClick={()=>{
-                                const inp=document.getElementById("rp-inp-"+activeExIdx);
-                                if(inp) inp.value=String(n);
-                              }}>{n}</button>
-                          ))}
-                        </div>
-                                                <button className="hov"
-                          style={{width:"100%",padding:"16px",
-                            background:btnFlash?"#22C55E":(curPat.color==="#22C55E"?green:curPat.color),
-                            color:"#fff",
-                            borderRadius:12,fontSize:22,fontWeight:900,
-                            cursor:"pointer",fontFamily:"inherit",letterSpacing:1,
-                            transition:"background 0.2s ease, transform 0.15s ease",
-                            animation:btnFlash?"successPulse 0.4s ease":"none",
-                            boxShadow:btnFlash?"0 4px 20px rgba(34,197,94,0.5)":"0 4px 14px rgba(59,130,246,0.4)"}}                          onClick={()=>{
-                            const kgInp = document.getElementById("kg-inp-"+activeExIdx);
-                            const rpInp = document.getElementById("rp-inp-"+activeExIdx);
-                            const kgVal = parseFloat(kgInp?.value)||0;
-                            const rpVal = parseInt(rpInp?.value)||targetReps;
-                            if(kgVal<=0){kgInp?.focus();return;}
-                            // Flash del botón
-                            setBtnFlash(true);
-                            setTimeout(()=>setBtnFlash(false), 500);
-                            logSet(curEx.id, kgVal, rpVal, "", null);
-                            const newSetsCount = setsHoy.length + 1;
-                            if(newSetsCount >= totalSets) {
-                              const nextIdx = activeExIdx + 1;
-                              if(nextIdx < exs.length) {
-                                setTimeout(()=>setActiveExIdx(nextIdx), 350);
-                              }
-                            }
-                            const pauseDefault = parseInt(curEx?.pause)||90;
-                            if(pauseDefault>0) startTimer(pauseDefault, curPat.color);
-                          }}>
-                          {btnFlash?<Ic name="check-circle" size={18} color="#22C55E"/>:<Ic name="check-sm" size={18} color="currentColor"/>} {es?(btnFlash?"¡SET LISTO!":"REGISTRAR SET "+(setsHoy.length+1)):(btnFlash?"SET DONE!":"LOG SET "+(setsHoy.length+1))}
-                        </button>
-                      </div>
-                    )}
-                    {setsHoy.length >= totalSets && (
-                      <div style={{background:"#22C55E12",border:"1px solid #22c55e33",borderRadius:12,padding:"16px",textAlign:"center"}}>
-                        <div style={{fontSize:22,marginBottom:4}}><Ic name="check-circle" size={22} color="#22C55E"/></div>
-                        <div style={{fontSize:15,fontWeight:900,color:"#22C55E"}}>{es?"¡Ejercicio completado!":"Exercise complete!"}</div>
-                        {nextEx&&(
-                          <button className="hov"
-                            style={{marginTop:8,padding:"8px 20px",background:green,color:darkMode?"#fff":"#fff",border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
-                            onClick={()=>setActiveExIdx(activeExIdx+1)}>
-                            {es?"→ Siguiente ejercicio":"→ Next exercise"}
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {timer&&(
-                    <div style={{background:timer.remaining<10?"#2563EB18":"#22C55E18",border:"1px solid "+(timer.remaining<10?"#2563EB33":"#22C55E30"),borderRadius:16,padding:"16px",marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{position:"relative",width:56,height:56,flexShrink:0}}>
-                        <svg width="56" height="56" style={{position:"absolute",top:0,left:0,transform:"rotate(-90deg)"}}>
-                          <circle cx="28" cy="28" r="24" fill="none" stroke={darkMode?"#2D4057":"#E2E8F0"} strokeWidth="4"/>
-                          <circle cx="28" cy="28" r="24" fill="none"
-                            stroke={timer.remaining<10?"#2563EB":"#22C55E"} strokeWidth="4"
-                            strokeDasharray={`${2*Math.PI*24}`}
-                            strokeDashoffset={`${2*Math.PI*24*(1-timer.remaining/timer.total)}`}
-                            strokeLinecap="round"
-                            style={{transition:"stroke-dashoffset 1s linear"}}/>
-                        </svg>
-                        <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:900,color:timer.remaining<10?"#2563EB":"#22C55E"}}>
-                          {timer.remaining}
-                        </div>
-                      </div>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:15,fontWeight:900,color:textMain}}>{es?"DESCANSANDO":"RESTING"}</div>
-                        <div style={{fontSize:13,color:textMuted}}>{es?"El próximo set en":"Next set in"} {timer.remaining}s</div>
-                      </div>
-                      <button className="hov" onClick={()=>startTimer(0)}
-                        style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"8px 14px",color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                        {es?"Saltar":"Skip"}
-                      </button>
-                    </div>
-                  )}
-                  <div style={{display:"flex",gap:8,marginBottom:12}}>
-                    {activeExIdx>0&&(
-                      <button className="hov" onClick={()=>setActiveExIdx(activeExIdx-1)}
-                        style={{flex:1,padding:"8px",background:bgCard,border:"1px solid "+border,borderRadius:12,color:textMuted,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                        ← {es?"Anterior":"Prev"}
-                      </button>
-                    )}
-                    {activeExIdx<exs.length-1&&(
-                      <button className="hov" onClick={()=>setActiveExIdx(activeExIdx+1)}
-                        style={{flex:2,padding:"8px",background:bgCard,border:"1px solid "+border,borderRadius:12,color:textMain,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                        {es?"Siguiente":"Next"} → {((es?nextInfo?.name:nextInfo?.nameEn||nextInfo?.name)||"").slice(0,18)}
-                      </button>
-                    )}
-                  </div>
-                  {nextEx&&(
-                    <div style={{background:bgCard,borderRadius:12,padding:"12px 16px",border:"1px solid "+border,display:"flex",alignItems:"center",gap:12}}>
-                      <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,minWidth:60}}>{es?"PRÓXIMO":"NEXT UP"}</div>
-                      <div style={{width:1,height:30,background:border}}/>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:15,fontWeight:800,color:textMain}}>{es?nextInfo?.name:nextInfo?.nameEn||nextInfo?.name}</div>
-                        <div style={{fontSize:13,color:textMuted}}>{nextEx.sets}×{nextEx.reps} {nextEx.kg?("· "+nextEx.kg+"kg"):""}</div>
-                      </div>
-                      <div style={{fontSize:22}}>{PATS[nextInfo?.pattern]?.icon||"💪"}</div>
-                    </div>
-                  )}
-                  {allDone&&(
-                    <div style={{background:"#22C55E12",border:"1px solid #22c55e33",borderRadius:16,padding:"16px",textAlign:"center",marginTop:12}}>
-                      <div style={{fontSize:36,marginBottom:8}}><Ic name="check-circle" size={40} color="#22C55E"/></div>
-                      <div style={{fontSize:22,fontWeight:900,color:"#22C55E",marginBottom:4}}>{es?"¡Todos los ejercicios!":"All exercises done!"}</div>
-                      <div style={{fontSize:15,color:textMuted,marginBottom:12}}>{es?"Finalizá el entrenamiento":"Finish your workout"}</div>
-                    </div>
-                  )}
-
-                </div>
-              );
-            })()}
-
             {!esAlumno&&(
-              <DashboardEntrenador sb={sb} routines={routines} alumnos={alumnos}
-                sesiones={alumnoSesiones}
+              <DashboardEntrenador sb={sb} routines={routines} alumnos={alumnos} customEx={customEx}
+                sesiones={sesionesGlobales}
+                progresoGlobal={progresoGlobal}
                 es={es}
                 darkMode={darkMode}
                 progress={progress}
                 session={session}
                 pagosEstado={pagosEstado}
                 togglePago={togglePago}
-                onVerAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
-                onChatAlumno={(a)=>{setAlumnoActivo(a); setTab("alumnos");}}
+                onVerAlumno={async(a)=>{
+                  setAlumnoActivo(a);setTab("alumnos");setLoadingSB(true);
+                  try{
+                    const [ruts,prog,ses]=await Promise.all([sb.getRutinas(a.id),sb.getProgreso(a.id),sb.getSesiones(a.id)]);
+                    setRutinasSB(ruts||[]);setAlumnoProgreso(prog||[]);setAlumnoSesiones(ses||[]);
+                  }catch(e){console.error("[onVerAlumno]",e);}
+                  setLoadingSB(false);
+                }}
+                onChatAlumno={(a)=>{setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}
                 onNotificar={(alumnoId, msg)=>notifyAlumno(alumnoId, msg).then(()=>toast2(es?"Notificación enviada":"Notification sent")).catch(()=>toast2("Error al notificar"))}
               />
             )}
@@ -1630,8 +1455,11 @@ function GymApp() {
                     </div>
                   )}
                   <div style={{background:bgCard,borderRadius:12,padding:"12px 16px",marginBottom:8,border:"1px solid "+border}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
                       <span style={{fontSize:13,fontWeight:800,color:textMuted,letterSpacing:0.3}}>{es?"ESTA SEMANA":"THIS WEEK"}</span>
+                      <span style={{fontSize:12,fontWeight:700,color:"#2563EB"}}>{es?"Semana":"Week"} {currentWeek+1} {es?"de":"of"} 4</span>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
                       <span style={{fontSize:13,fontWeight:900,color:"#2563EB"}}>{daysCompletedThisWeek}/{totalDays} {es?"días":"days"}</span>
                     </div>
                     <div style={{display:"flex",gap:8}}>
@@ -1639,10 +1467,10 @@ function GymApp() {
                         const done = completedDays.includes((r0?.id||"")+"-"+i+"-w"+currentWeek);
                         const isNext = i===nextDayIdx;
                         return (
-                          <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                          <div key={(r0?.id||"rut")+"-sem-pill-d"+i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
                             <div style={{width:"100%",height:7,borderRadius:4,background:done?"#22C55E":isNext?"#2563EB":border}}/>
                             <div style={{fontSize:11,fontWeight:700,color:done?"#22C55E":isNext?"#2563EB":textMuted,textTransform:"uppercase"}}>
-                              {(d.label||("D"+(i+1))).slice(0,3)}
+                              {(d.label||("D"+(i+1))).slice(0,6)}
                             </div>
                           </div>
                         );
@@ -1653,13 +1481,13 @@ function GymApp() {
                     <div style={{background:"#2563EB11",borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid #243040"}}>
                       <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:4}}>{es?"HOY":"TODAY"}</div>
                       <div style={{fontSize:22,fontWeight:900,color:textMain,marginBottom:4}}>{todayDay.label||("Día "+(nextDayIdx+1))}</div>
-                      <div style={{fontSize:13,color:textMuted,marginBottom:12}}>{(todayDay.exercises||[]).length} {es?"ejercicios":"exercises"} · {r0?.name}</div>
+                      <div style={{fontSize:13,color:textMuted,marginBottom:12}}>{((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {es?"ejercicios":"exercises"} · {r0?.name}</div>
                       <button className="hov" style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}
                         onClick={()=>{
                           const snap={};
                           [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                           setPreSessionPRs({...snap});
-                          setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
+                          setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                         }}>
                         <Ic name="zap" size={16}/> {es?"EMPEZAR AHORA":"START NOW"}
                       </button>
@@ -1690,7 +1518,7 @@ function GymApp() {
                             const snap={};
                             [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                             setPreSessionPRs({...snap});
-                            setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
+                            setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                           }}>
                           ⚡ {es?"Entrenar":"Train"}
                         </button>
@@ -1711,166 +1539,121 @@ function GymApp() {
               </div>
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
-              const diasJSX = r.days.map((d,di)=>{ return (
-                <div key={di} style={{marginBottom:24}}>
-                  <div style={{fontSize:18,fontWeight:700,letterSpacing:1,color:textMuted,marginBottom:8,paddingBottom:8,borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057")}}>
-                    {es?"Dia ":"Day "}{di+1}
-                  </div>
-                  {(d.warmup||[]).length>0&&(
-                    <div style={{marginBottom:12}}>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",background:bgSub,border:"1px solid "+border,borderRadius:12,marginBottom:8,cursor:"pointer"}}
-                        onClick={()=>setRoutines(p=>p.map(r2=>r2.id===r.id?{...r2,days:r2.days.map((dd,ddi)=>ddi===di?{...dd,showWarmup:!dd.showWarmup}:dd)}:r2))}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <span>🔥</span>
-                          <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"ENTRADA EN CALOR":"WARM UP"}</span>
-                          <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({(d.warmup||[]).length} {es?"ejercicios":"exercises"})</span>
-                        </div>
-                        <span style={{fontSize:13,color:textMuted}}>{d.showWarmup?"▲":"▼"}</span>
-                      </div>
-                      <div>
-                      {d.showWarmup&&(d.warmup||[]).map((ex,ei)=>{
-                        const info=allEx.find(e=>e.id===ex.id);
-                        const pat=PATS[info?.pattern]||PATS["core"]||Object.values(PATS)[0]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
-                        return(
-                          <div key={ei} style={{background:"#3B82F608",border:"1px solid "+border,borderRadius:12,padding:"8px 12px",marginBottom:4,display:"flex",alignItems:"center",gap:8}}>
-                            <div style={{width:3,alignSelf:"stretch",borderRadius:2,background:"#8B9AB2",flexShrink:0,marginRight:4}}/>
-                            <div style={{flex:1}}>
-                              <div style={{fontSize:15,fontWeight:700}}>{es?info?.name:info?.nameEn||info?.name}</div>
-                             {info?.youtube&&<a href={info.youtube} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:4,background:"#2563EB22",color:"#8B9AB2",border:"1px solid #243040",borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:700,textDecoration:"none",marginTop:4}}>▶ VER</a>}
-                              {(()=>{
-                                const weeks4=Array.from({length:4},(_,wi)=>(ex.weeks||[])[wi]||{});
-                                const s0=ex.sets||"-"; const r0=ex.reps||"-";
-                                return(
-                                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginTop:8}}>
-                                    {weeks4.map((w,wi)=>{
-                                      const active=wi===currentWeek;
-                                      const s=w.sets||s0; const r=w.reps||r0;
-                                      const kg2=w.kg||ex.kg||"";
-                                      const metodo=ex.progresion||"manual";
-                                      const pausa2=w.pausa||ex.pause||"";
-                                      const filled=!!(w.sets||w.reps||w.kg);
-                                      const objLabel = active ? (
-                                        metodo==="carga"&&kg2 ? kg2+"kg" :
-                                        metodo==="reps" ? (w.reps||ex.reps||"")+" reps" :
-                                        metodo==="series" ? (w.sets||ex.sets||"")+" series" :
-                                        metodo==="pausa"&&pausa2 ? pausa2+"s pausa" :
-                                        null
-                                      ) : null;
-                                      return(
-                                        <div key={wi} style={{background:active?"#2563EB":"#162234",borderRadius:12,padding:active?"12px 6px":"9px 5px",textAlign:"center",border:active?"2px solid #2563EB":filled?"1px solid #243040":"1px solid "+border,transition:"all .2s"}}>
-                                          <div style={{fontSize:active?11:9,fontWeight:700,letterSpacing:1,color:active?"#FFFFFF":"#8B9AB2",marginBottom:active?6:4}}>{active?"→ ":" "}SEM {wi+1}</div>
-                                          <div style={{fontSize:active?18:14,fontWeight:800,color:active?"#FFFFFF":filled?"#FFFFFF":"#8B9AB2"}}>{s}×{r}</div>
-                                          {active&&objLabel?(<div style={{fontSize:14,fontWeight:800,color:"#FFFFFF",marginTop:4}}>{objLabel}</div>):(kg2?<div style={{fontSize:active?12:10,fontWeight:700,color:active?"#FFFFFF":"#8B9AB2",marginTop:4}}>{kg2}kg</div>:null)}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      </div>
-                    </div>
-                  )}
-                  {d.exercises.length>0&&(
-                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:bgSub,border:"1px solid "+border,borderRadius:12,marginBottom:8}}>
-                      <span>💪</span>
-                      <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
-                      <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({d.exercises.length} {es?"ejercicios":"exercises"})</span>
-                    </div>
-                  )}
-                  {d.exercises.length===0&&(d.warmup||[]).length===0&&<div style={{color:"#8B9AB2",fontSize:15,padding:"8px 0"}}>Sin ejercicios</div>}
-                  {d.exercises.map((ex,ei)=>{
-                    const info=allEx.find(e=>e.id===ex.id);
-                    const pat=PATS[info?.pattern]||PATS["core"]||Object.values(PATS)[0]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
-                    const col="#2563EB"; // paleta fija - sin colores de patrón
-                    const weeks=Array.from({length:4},(_,wi)=>(ex.weeks||[])[wi]||{});
-                    return(
-                      <div key={ei} style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"16px",marginBottom:8}}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-                          <div style={{width:3,alignSelf:"stretch",borderRadius:2,background:border,flexShrink:0,minHeight:54}}/>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:28,fontWeight:800,color:textMain,letterSpacing:0.5}}>{es?info?.name:info?.nameEn||info?.name}</div>
-                            {info?.youtube&&<a href={info.youtube} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:4,background:"#162234",color:"#8B9AB2",border:"1px solid #243040",borderRadius:6,padding:"4px 9px",fontSize:13,fontWeight:700,textDecoration:"none",marginTop:4}}>▶ VER VIDEO</a>}
-                            <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
-                              {ex.kg&&<span style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:6,padding:"4px 8px",fontSize:15,fontWeight:700,color:textMain}}>{ex.kg} kg</span>}
-                              {ex.pause&&<span style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:6,padding:"4px 8px",fontSize:15,color:textMuted}}>⏱ {fmtP(ex.pause)}</span>}
-                            </div>
-                          </div>
-                          <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:"pointer",flexShrink:0}} onClick={()=>setLogModal({...info,...ex})}>Registrar</button>
-                        </div>
-                        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
-                          {weeks.map((w,wi)=>{
-                            const active=wi===currentWeek;
-                            const s=w.sets||ex.sets||"-";
-                            const rp=w.reps||ex.reps||"-";
-                            const kg2=w.kg||ex.kg||"";
-                            const metodo=ex.progresion||"manual";
-                            const pausa2=w.pausa||ex.pause||"";
-                            const filled=w.sets||w.reps||w.kg;
-                            const objLabel = active ? (
-                              metodo==="carga"&&kg2 ? kg2+"kg" :
-                              metodo==="reps" ? (w.reps||ex.reps||"")+" reps" :
-                              metodo==="series" ? (w.sets||ex.sets||"")+" series" :
-                              metodo==="pausa"&&pausa2 ? pausa2+"s pausa" :
-                              null
-                            ) : null;
-                            return(
-                              <div key={wi} style={{background:active?"#2563EB":"#162234",borderRadius:12,padding:active?"12px 6px":"9px 5px",textAlign:"center",border:active?"2px solid #2563EB":filled?"1px solid #243040":"1px solid "+border,transition:"all .2s"}}>
-                                <div style={{fontSize:active?11:9,fontWeight:700,letterSpacing:1,color:active?"#FFFFFF":filled?"#8B9AB2":"#8B9AB2",marginBottom:active?6:4}}>{active?"→ ":""}SEM {wi+1}</div>
-                                <div style={{fontSize:active?18:14,fontWeight:800,color:active?"#FFFFFF":filled?"#FFFFFF":"#8B9AB2"}}>{s}x{rp}</div>
-                                {active&&objLabel?(<div style={{fontSize:15,fontWeight:800,color:"#FFFFFF",marginTop:4}}>{objLabel}</div>):(kg2?<div style={{fontSize:active?14:12,fontWeight:700,color:active?"#FFFFFF":"#8B9AB2",marginTop:4}}>{kg2}kg</div>:null)}
-                                {w.note&&<div style={{fontSize:11,color:active?"#8B9AB2":"#8B9AB2",marginTop:4,lineHeight:1.2}}>{w.note}</div>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {(()=>{
-                    const dayKey=r.id+"-"+di+"-w"+currentWeek;
-                    const isDayDone=completedDays.includes(dayKey);
-                    // Calcular nextDayIdx localmente para esta rutina r
-                    const daysCompletedR=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length;
-                    const localNextDayIdx=daysCompletedR < r.days.length ? daysCompletedR : null;
-                    const isNextDay=di===localNextDayIdx;
-                    const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
-                    if(isDayDone) return(
-                      <div style={{textAlign:"center",padding:"8px",color:"#22C55E",fontSize:15,fontWeight:700}}>
-                        ✅ {es?"Día completado esta semana":"Day completed this week"}
-                      </div>
-                    );
-                    if(isNextDay) return(
-                      <button className="hov" style={{...btn("#2563EB"),color:"#fff",width:"100%",marginTop:4,padding:"12px",fontSize:15,fontWeight:900,letterSpacing:1}} onClick={()=>{
-                        const snap={};
-                        [...(r.days[di]?.warmup||[]),...(r.days[di]?.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
-                        setPreSessionPRs({...snap});
-                        setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
-                      }}>⚡ {es?"INICIAR ENTRENAMIENTO":"START WORKOUT"}</button>
-                    );
-                    if(isFuture) return(
-                      <div style={{textAlign:"center",padding:"8px",color:textMuted,fontSize:13,fontWeight:700,background:bgSub,borderRadius:12,marginTop:4}}>
-                        <Ic name="lock" size={14}/> {es?`Completá el Día ${localNextDayIdx+1} primero`:`Complete Day ${localNextDayIdx+1} first`}
-                      </div>
-                    );
-                    return null;
-                  })()}
-                </div>
-              );
-              });
               return (<div key={r.id} style={{marginBottom:16}}>
                   <div style={{fontSize:28,fontWeight:800,letterSpacing:1,marginBottom:4}}>{r.name}</div>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                    <div style={{fontSize:15,color:textMuted}}>{r.created} · {r.days.length} {es?es?"dias":"days":"days"}{r.note?" · "+r.note:""}</div>
+                    <div style={{fontSize:15,color:textMuted}}>{r.created} · {r.days.length} {es?"dias":"days"}{r.note?" · "+r.note:""}</div>
                     <div style={{display:"flex",gap:8}}>
                       <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",border:"1px solid "+border,color:textMain,borderRadius:8,padding:"8px 12px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onClick={()=>generatePDF(r)}>
                         <Ic name="file-text" size={14}/> PDF
                       </button>
                     </div>
-                  <div>{diasJSX}</div>
+                  </div>
+                  {r.days.map((d,di)=>{
+                    const dayKey=r.id+"-"+di+"-w"+currentWeek;
+                    const isDayDone=completedDays.includes(dayKey);
+                    const daysCompletedR=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length;
+                    const localNextDayIdx=daysCompletedR < r.days.length ? daysCompletedR : null;
+                    const isNextDay=di===localNextDayIdx;
+                    const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
+                    const totalEj=((d.warmup||[]).length+(d.exercises||[]).length);
+                    const isOpen=expandedPlanDay===r.id+"-"+di;
+                    const exNames=(d.exercises||[]).slice(0,3).map(function(ex){var inf=allEx.find(function(e){return e.id===ex.id});return inf?(es?inf.name:(inf.nameEn||inf.name)):ex.id}).join(", ");
+
+                    return(
+                      <div key={r.id+"-plan-day-"+di} style={{background:bgCard,border:"1px solid "+(isNextDay?"#2563EB":isDayDone?"#22C55E44":border),borderRadius:12,marginBottom:8,overflow:"hidden"}}>
+                        {/* Header del día - siempre visible */}
+                        <div onClick={function(){setExpandedPlanDay(isOpen?null:r.id+"-"+di)}} style={{padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+                          <div style={{width:36,height:36,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0,
+                            background:isDayDone?"#22C55E22":isNextDay?"#2563EB22":bgSub,
+                            color:isDayDone?"#22C55E":isNextDay?"#2563EB":textMuted,
+                            border:"1px solid "+(isDayDone?"#22C55E44":isNextDay?"#2563EB44":border)}}>
+                            {isDayDone?"✓":(di+1)}
+                          </div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:15,fontWeight:700,color:textMain}}>{d.label||((es?"Día ":"Day ")+(di+1))}</div>
+                            <div style={{fontSize:12,color:textMuted,marginTop:1}}>
+                              {totalEj} {es?"ejercicios":"exercises"}{!isOpen&&exNames?" · "+exNames:""}
+                            </div>
+                          </div>
+                          {isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#22C55E",flexShrink:0}}>{es?"Listo":"Done"}</span>}
+                          {isNextDay&&!isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#2563EB",flexShrink:0}}>{es?"Siguiente":"Next"}</span>}
+                          <span style={{fontSize:13,color:textMuted,flexShrink:0}}>{isOpen?"▲":"▼"}</span>
+                        </div>
+
+                        {/* Contenido expandido */}
+                        {isOpen&&(
+                          <div style={{padding:"0 14px 14px",borderTop:"1px solid "+border}}>
+                            {(d.warmup||[]).length>0&&(
+                              <div style={{marginTop:8,marginBottom:8}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                  <span style={{width:3,height:12,borderRadius:2,background:"#F59E0B"}}/>
+                                  <span style={{fontSize:11,fontWeight:700,color:"#F59E0B",letterSpacing:1}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</span>
+                                </div>
+                                {(d.warmup||[]).map(function(ex,ei){
+                                  var inf=allEx.find(function(e){return e.id===ex.id});
+                                  var vUrl=(videoOverrides&&videoOverrides[ex.id])||inf?.youtube||"";
+                                  return(
+                                    <div key={r.id+"-d"+di+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
+                                      <div style={{width:3,height:20,borderRadius:2,background:"#F59E0B44",flexShrink:0}}/>
+                                      <div style={{flex:1,fontSize:16,fontWeight:700,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
+                                      <span style={{fontSize:13,color:"#A3B4CC",fontWeight:600}}>{ex.sets||"-"}×{ex.reps||"-"}</span>
+                                      {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:es?inf?.name:(inf?.nameEn||inf?.name)});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <div style={{marginBottom:8}}>
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                                <span style={{width:3,height:12,borderRadius:2,background:"#2563EB"}}/>
+                                <span style={{fontSize:11,fontWeight:700,color:"#2563EB",letterSpacing:1}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
+                              </div>
+                              {d.exercises.map(function(ex,ei){
+                                var inf=allEx.find(function(e){return e.id===ex.id});
+                                var vUrl=(videoOverrides&&videoOverrides[ex.id])||inf?.youtube||"";
+                                var w=((ex.weeks||[])[currentWeek])||{};
+                                var s=w.sets||ex.sets||"-";
+                                var rp=w.reps||ex.reps||"-";
+                                var kg2=w.kg||ex.kg||"";
+                                return(
+                                  <div key={r.id+"-d"+di+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 0",borderBottom:ei<d.exercises.length-1?"1px solid "+border:"none"}}>
+                                    <div style={{width:3,height:24,borderRadius:2,background:border,flexShrink:0}}/>
+                                    <div style={{flex:1,minWidth:0}}>
+                                      <div style={{fontSize:17,fontWeight:800,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
+                                      <div style={{fontSize:13,color:"#A3B4CC",fontWeight:500,marginTop:2,display:"flex",gap:6,flexWrap:"wrap"}}>
+                                        <span style={{fontWeight:700}}>{s}×{rp}</span>{kg2&&<span>{kg2}kg</span>}{ex.pause&&<span>⏱ {fmtP(ex.pause)}</span>}
+                                      </div>
+                                    </div>
+                                    {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:es?inf?.name:(inf?.nameEn||inf?.name)});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {/* Botón iniciar/estado del día */}
+                            {isDayDone&&(
+                              <div style={{textAlign:"center",padding:"8px",color:"#22C55E",fontSize:13,fontWeight:700}}>
+                                ✅ {es?"Día completado esta semana":"Day completed this week"}
+                              </div>
+                            )}
+                            {isNextDay&&!isDayDone&&(
+                              <button className="hov" style={{width:"100%",marginTop:4,padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:900,letterSpacing:1,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
+                                var snap={};
+                                [].concat(d.warmup||[],d.exercises||[]).forEach(function(ex){snap[ex.id]=progress[ex.id]?.max||0});
+                                setPreSessionPRs(snap);
+                                setSessionPRList([]);setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
+                              }}>{es?"INICIAR ENTRENAMIENTO":"START WORKOUT"}</button>
+                            )}
+                            {isFuture&&(
+                              <div style={{textAlign:"center",padding:"8px",color:textMuted,fontSize:12,fontWeight:700,background:bgSub,borderRadius:8,marginTop:4}}>
+                                <Ic name="lock" size={13}/> {es?"Completá el Día "+(localNextDayIdx+1)+" primero":"Complete Day "+(localNextDayIdx+1)+" first"}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
                     background:bgCard,borderRadius:12,padding:"8px 16px",border:"1px solid "+border,
                     marginBottom:4}}>
@@ -1902,7 +1685,6 @@ function GymApp() {
                       </div>
                     </div>
 
-                    </div>
                     <button className="hov"
                       onClick={()=>currentWeek<3&&setCurrentWeek(w=>w+1)}
                       style={{width:36,height:36,borderRadius:8,border:"1px solid "+border,
@@ -1912,9 +1694,9 @@ function GymApp() {
                         display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>›</button>
                   </div>
 
-                {/* Sparkline de tendencia 30 días */}
+                  {/* Sparkline de tendencia 30 días */}
                 {(()=>{
-                  const setsAlu = Object.values(a.progress||{})
+                  const setsAlu = Object.values(progress||{})
                     .flatMap(pg => (pg.sets||[]))
                     .filter(s => s.kg > 0)
                     .sort((x,y) => new Date(x.date||0) - new Date(y.date||0));
@@ -1978,214 +1760,39 @@ function GymApp() {
         )}
         {tab==="library"&&(
           <div>
-            {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es}/>}
-            {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab}/>}
+            {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal}/>}
+            {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>}
           </div>
         )}
         {tab==="routines"&&!esAlumno&&(
-          <div>
-            <button className="hov" onClick={()=>setTab("scanner")}
-              style={{width:"100%",marginBottom:12,padding:"8px 16px",
-                background:"transparent",border:"1px solid "+border,
-                borderRadius:12,color:textMuted,fontSize:15,fontWeight:700,
-                cursor:"pointer",fontFamily:"inherit",display:"flex",
-                alignItems:"center",justifyContent:"center",gap:8}}>
-              <Ic name="camera" size={16}/> {es?"Escanear rutina existente":"Scan existing routine"}
-            </button>
-            <div style={{overflowX:"auto",paddingBottom:8,marginBottom:12}}>
-              <div style={{display:"flex",gap:8,width:"max-content"}}>
-                {["todas","app","scan"].map(f=>(
-                  <button key={f} className="hov" onClick={()=>setFiltroRut&&setFiltroRut(f)} style={{padding:"8px 16px",borderRadius:20,fontSize:13,fontWeight:700,cursor:"pointer",border:"1px solid",fontFamily:"Barlow Condensed,sans-serif",background:bgCard,borderColor:"#2D4057",color:textMuted}}>
-                    {f==="todas"?"TODAS":f==="app"?"✏️ APP":"📷 ESCANEADAS"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button className="hov" style={{...btn("#2563EB"),width:"100%",marginBottom:12,padding:"8px",fontSize:18}} onClick={()=>setNewR({name:"",numDays:3,days:Array.from({length:3},(_,i)=>({label:"Dia "+(i+1),warmup:[],exercises:[],showWarmup:false,showMain:true})),note:""})}>
-              {es?"+ NUEVA RUTINA":"+ NEW ROUTINE"}
-            </button>
-            {routines.map(r=>{
-              const daysJSX = !r.collapsed ? r.days.map((d,di)=>{
-                const moveEx = (bloque, fromIdx, toIdx) => {
-                  setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,days:rr.days.map((dd,ddi)=>{
-                    if(ddi!==di) return dd;
-                    const arr=[...(dd[bloque]||[])];
-                    const [item]=arr.splice(fromIdx,1);
-                    arr.splice(toIdx,0,item);
-                    return {...dd,[bloque]:arr};
-                  })}:rr));
-                };
-                const renderExList = (exList, bloque) => exList.map((ex,ei)=>{
-                  const info=allEx.find(e=>e.id===ex.id);
-                  const pat=PATS[info?.pattern]||PATS["core"]||Object.values(PATS)[0]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
-                  const removeEx = () => setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,days:rr.days.map((dd,ddi)=>ddi===di?{...dd,[bloque]:dd[bloque].filter((_,eei)=>eei!==ei)}:dd)}:rr));
-                  const canUp = ei>0;
-                  const canDown = ei<exList.length-1;
-                  return(
-                    <div key={ei} style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:12,padding:"16px 18px",marginBottom:4,border:"1px solid "+border}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                        <div style={{display:"flex",flexDirection:"column",gap:1,flexShrink:0}}>
-                          <button className="hov" style={{background:canUp?"#2D4057":"#162234",border:"none",borderRadius:4,padding:"2px 5px",fontSize:11,color:canUp?"#8B9AB2":"#2D4057",cursor:canUp?"pointer":"default",lineHeight:1}} onClick={()=>canUp&&moveEx(bloque,ei,ei-1)}>▲</button>
-                          <button className="hov" style={{background:canDown?"#2D4057":"#162234",border:"none",borderRadius:4,padding:"2px 5px",fontSize:11,color:canDown?"#8B9AB2":"#2D4057",cursor:canDown?"pointer":"default",lineHeight:1}} onClick={()=>canDown&&moveEx(bloque,ei,ei+1)}>▼</button>
-                        </div>
-                        <div style={{width:3,alignSelf:"stretch",borderRadius:2,background:border,flexShrink:0,minHeight:32}}/>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:22,fontWeight:900,color:textMain,lineHeight:1.2}}>{es?info?.name:info?.nameEn||info?.name}</div>
-                          {(ex.sets||ex.reps)&&(
-                            <div style={{display:"flex",gap:8,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
-                              {(ex.sets||ex.reps) ? (
-                                <span style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:800,letterSpacing:0.5}}>
-                                  {ex.sets||"—"}×{ex.reps||"—"}
-                                </span>
-                              ) : (
-                                <span style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700}}>
-                                  {es?"Sin series":"No sets"}
-                                </span>
-                              )}
-                              {ex.kg&&(
-                                <span style={{background:bgSub,color:textMuted,borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700}}>
-                                  {ex.kg}kg
-                                </span>
-                              )}
-                              {ex.pause&&parseInt(ex.pause)>0&&(
-                                <span style={{background:bgSub,color:textMuted,borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700}}>
-                                  ⏱{fmtP(ex.pause)}
-                                </span>
-                              )}
-                              {ex.progresion&&ex.progresion!=="manual"&&(
-                                <span style={{
-                                  background:ex.progresion==="carga"?"#1a3a5c":ex.progresion==="reps"?"#0c2a1a":ex.progresion==="series"?"#1e1040":"#2a1f0a",
-                                  color:ex.progresion==="carga"?"#60a5fa":ex.progresion==="reps"?"#4ade80":ex.progresion==="series"?"#a78bfa":"#fbbf24",
-                                  borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:700,border:"none"
-                                }}>
-                                  {ex.progresion==="carga"?"↑ CARGA":ex.progresion==="reps"?"↑ REPS":ex.progresion==="series"?"↑ SERIES":"↓ PAUSA"}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",border:"none",borderRadius:8,padding:"4px 8px",fontSize:13,color:textMuted,cursor:"pointer"}} onClick={()=>setEditEx({rId:r.id,dIdx:di,eIdx:ei,bloque,ex:{...ex}})}><Ic name="edit-2" size={15}/></button>
-                        <button className="hov" style={{background:"#2563EB22",border:"none",borderRadius:6,padding:"4px 9px",fontSize:13,color:"#2563EB",cursor:"pointer",fontWeight:700}} onClick={removeEx}><Ic name="trash-2" size={15}/></button>
-                      </div>
-                      {info?.youtube&&(
-                        <div style={{paddingLeft:40,marginTop:4}}>
-                          <a href={info.youtube} target="_blank" rel="noreferrer"
-                            style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700,textDecoration:"none"}}>
-                            ▶ VIDEO
-                          </a>
-                        </div>
-                      )}
-                      {(ex.weeks||[]).length>0&&(
-                        <div style={{marginTop:8,paddingLeft:34}}>
-                          <div style={{display:"flex",gap:4,overflowX:"auto"}}>
-                            {ex.weeks.map((w,wi)=>{
-                              const prev = wi>0?ex.weeks[wi-1]:null;
-                              const m = ex.progresion||"manual";
-                              let delta = null;
-                              if(prev&&m==="carga"&&w.kg&&prev.kg) delta=(parseFloat(w.kg)-parseFloat(prev.kg)>0?"+":"")+Math.round((parseFloat(w.kg)-parseFloat(prev.kg))*10)/10+"kg";
-                              if(prev&&m==="reps"&&w.reps&&prev.reps) delta=(parseInt(w.reps)-parseInt(prev.reps)>0?"+":"")+(parseInt(w.reps)-parseInt(prev.reps))+"r";
-                              if(prev&&m==="series"&&w.sets&&prev.sets) delta=(parseInt(w.sets)-parseInt(prev.sets)>0?"+":"")+(parseInt(w.sets)-parseInt(prev.sets))+"s";
-                              if(prev&&m==="pausa"&&w.pausa&&prev.pausa) delta=(parseInt(w.pausa)-parseInt(prev.pausa)>0?"+":"")+(parseInt(w.pausa)-parseInt(prev.pausa))+"s";
-                              return(
-                                <div key={wi} style={{background:bgSub,borderRadius:8,padding:"8px 8px",fontSize:12,color:textMuted,flexShrink:0,minWidth:56,textAlign:"center",border:"1px solid "+border}}>
-                                  <div style={{fontWeight:700,color:textMain,marginBottom:2}}>S{wi+1}</div>
-                                  <div style={{fontSize:11}}>{w.sets||ex.sets||"—"}×{w.reps||ex.reps||"—"}</div>
-                                  {(w.kg||ex.kg)&&<div style={{fontSize:11,color:"#60a5fa"}}>{w.kg||ex.kg}kg</div>}
-                                  {w.pausa&&<div style={{fontSize:10,color:textMuted}}>⏱{w.pausa}s</div>}
-                                  {delta&&<div style={{fontSize:10,color:"#4ade80",fontWeight:700,marginTop:2}}>{delta}</div>}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                });
-                const toggleBlock = (blk) => setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,days:rr.days.map((dd,ddi)=>ddi===di?{...dd,[blk]:!dd[blk]}:dd)}:rr));
-                const hasWarmup = (d.warmup||[]).length>0;
-                return(
-                <div key={di+"-"+d.exercises.length+"-"+(d.warmup||[]).length} style={{borderLeft:"2px solid #1a1d2e",paddingLeft:8,marginBottom:8}}>
-                  <div style={{fontSize:22,fontWeight:700,color:textMuted,marginBottom:8,letterSpacing:1}}>{es?"DIA ":"DAY "}{di+1}</div>
-                  <div style={{marginBottom:8}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:hasWarmup||d.showWarmup?6:0}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:15}}>🔥</span>
-                        <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"ENTRADA EN CALOR":"WARM UP"}</span>
-                        {hasWarmup&&<span style={{fontSize:15,color:textMuted,fontWeight:700}}>({(d.warmup||[]).length})</span>}
-                      </div>
-                      <div style={{display:"flex",gap:4}}>
-                        <button className="hov" style={{...btn("#2563EB22"),color:"#8B9AB2",fontSize:13,padding:"4px 9px"}} onClick={()=>{setAddExModal({rId:r.id,dIdx:di,bloque:"warmup"});setAddExSearch("");setAddExPat(null);}}>+ add</button>
-                        {hasWarmup&&<button className="hov" style={{...btn(),fontSize:13,padding:"4px 9px",background:darkMode?"#162234":"#E2E8F0",color:textMuted}} onClick={()=>toggleBlock("showWarmup")}>{d.showWarmup?"▲":"▼"}</button>}
-                      </div>
-                    </div>
-                    {(d.showWarmup||false)&&hasWarmup&&renderExList(d.warmup||[],"warmup")}
-                    {!hasWarmup&&<div style={{fontSize:13,color:"#8B9AB2",padding:"8px 0"}}>Sin ejercicios - tocá + add para agregar</div>}
-                  </div>
-                  <div>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8}}>
-                        <span style={{fontSize:15}}>💪</span>
-                        <span style={{fontSize:15,fontWeight:800,color:textMain,letterSpacing:.5}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
-                        <span style={{fontSize:15,color:textMuted,fontWeight:700}}>({d.exercises.length})</span>
-                      </div>
-                      <div style={{display:"flex",gap:4}}>
-                        <button className="hov" style={{...btn("#22C55E20"),color:"#22C55E",fontSize:13,padding:"4px 9px"}} onClick={()=>{setAddExModal({rId:r.id,dIdx:di,bloque:"exercises"});setAddExSearch("");setAddExPat(null);}}>+ add</button>
-                        {d.exercises.length>0&&<button className="hov" style={{...btn(),fontSize:13,padding:"4px 9px",background:darkMode?"#162234":"#E2E8F0",color:textMuted}} onClick={()=>toggleBlock("showMain")}>{d.showMain!==false?"▲":"▼"}</button>}
-                      </div>
-                    </div>
-                    {d.showMain!==false&&renderExList(d.exercises,"exercises")}
-                    {d.exercises.length===0&&<div style={{fontSize:13,color:"#8B9AB2",padding:"8px 0"}}>Sin ejercicios - tocá + add para agregar</div>}
-                  </div>
-                </div>
-                );
-              }) : null;
-              return (<div key={r.id} style={card}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                  <div>
-                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-                      <div style={{fontSize:28,fontWeight:800}}>{r.name}</div>
-                      {r.scanned&&<span style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #60a5fa33",borderRadius:6,padding:"1px 7px",fontSize:11,fontWeight:700}}>📷 Escaneada</span>}
-                    </div>
-                    {r.alumno&&<div style={{fontSize:15,fontWeight:700,color:textMuted,marginTop:4}}>👤 {r.alumno}</div>}
-                    <div style={{fontSize:18,color:textMuted,fontWeight:700}}>{r.days.length} {es?"dias":"days"}</div>
-                  </div>
-                  <div style={{display:"flex",gap:8}}>
-                    <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",border:"none",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:500,color:textMuted,cursor:"pointer",fontFamily:"inherit"}}
-                      onClick={()=>setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,collapsed:!rr.collapsed}:rr))}>
-                      {r.collapsed?("▼ "+(es?"VER":"VIEW")):("▲ "+(es?"CERRAR":"CLOSE"))}
-                    </button>
-                    <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setRoutines(p=>p.filter(x=>x.id!==r.id));toast2((es?"Rutina eliminada":"Routine deleted")+" ✓");}}><Ic name="trash-2" size={15}/></button>
-                  </div>
-                </div>
-                <div style={{display:"flex",gap:8,marginBottom:8,flexWrap:"wrap"}}>
-                  <select style={{flex:1,minWidth:120}} value={r.alumno_id||""} onChange={e=>{
-                    const v=e.target.value;
-                    setRoutines(p=>p.map(rr=>rr.id===r.id?{...rr,alumno_id:v,alumno:alumnos.find(a=>a.id===v)?.nombre||""}:rr));
-                  }}>
-                    <option value="">👤 Sin asignar</option>
-                    {alumnos.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}
-                  </select>
-                  <button className="hov" style={{...btn(),padding:"8px 14px",fontSize:15,fontWeight:700}} onClick={async()=>{
-                    try{
-                      // Leer siempre la versión más reciente del estado para evitar closures viejos
-                      const rActual = routines.find(x=>x.id===r.id)||r;
-                      const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:rActual.days,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
-                      if(rActual.saved){
-                        await sb.updateRutina(rActual.id,payload);
-                      } else {
-                        await sb.createRutina({...payload,id:rActual.id});
-                        setRoutines(p=>p.map(rr=>rr.id===rActual.id?{...rr,saved:true}:rr));
-                      }
-                      toast2(es?"Rutina guardada ✓":"Routine saved ✓");
-                    }catch(e){toast2("Error al guardar");}
-                  }}><Ic name="save" size={15}/> {es?"Guardar":"Save"}</button>
-                </div>
-                {daysJSX}
-              </div>
-              );
-            })}
-          </div>
+          <RutinaView
+            setTab={setTab}
+            border={border}
+            textMuted={textMuted}
+            bgCard={bgCard}
+            textMain={textMain}
+            darkMode={darkMode}
+            bgSub={bgSub}
+            es={es}
+            setFiltroRut={setFiltroRut}
+            btn={btn}
+            card={card}
+            setNewR={setNewR}
+            routines={routines}
+            setRoutines={setRoutines}
+            allEx={allEx}
+            PATS={PATS}
+            setEditEx={setEditEx}
+            toast2={toast2}
+            setAddExModal={setAddExModal}
+            setAddExSearch={setAddExSearch}
+            setAddExPat={setAddExPat}
+            setAddExSelectedIds={setAddExSelectedIds}
+            setDupDayModal={setDupDayModal}
+            alumnos={alumnos}
+            sb={sb}
+            setAssignRoutineId={setAssignRoutineId}
+          />
         )}
         {tab==="scanner"&&!esAlumno&&(
           <div>
@@ -2194,7 +1801,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
           </div>
         )}
         {tab==="progress"&&(readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId)&&(
@@ -2214,7 +1821,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
           </div>
         )}
         {tab==="progress"&&(
@@ -2230,7 +1837,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
           </div>
         )}
         {tab==="progress"&&(
@@ -2249,7 +1856,7 @@ function GymApp() {
                   </div>
                   <div style={{display:"flex",gap:4,overflowX:"auto"}}>
                     {(pg.sets||[]).slice(0,5).map((s2,i)=>(
-                      <div key={i} style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:6,padding:"4px 8px",flexShrink:0,fontSize:13}}>
+                      <div key={ex.id+"-pg-mini-"+(s2.date||"")+"-"+(s2.kg??"")+"-"+(s2.reps??"")+"-"+i} style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:6,padding:"4px 8px",flexShrink:0,fontSize:13}}>
                         <div style={{fontWeight:700}}>{s2.kg}kg x {s2.reps}</div>
                         <div style={{color:textMuted,fontSize:13}}>{s2.date}</div>
                       </div>
@@ -2258,6 +1865,31 @@ function GymApp() {
                 </div>
               );
             })}
+            {/* ── Rutinas asignadas (Supabase) ── */}
+            {rutinasSBEntrenador.length>0&&(<div style={{marginTop:16}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#22C55E",letterSpacing:2,marginBottom:8,textTransform:"uppercase",borderLeft:"3px solid #22C55E",paddingLeft:8}}>{es?"RUTINAS ASIGNADAS":"ASSIGNED ROUTINES"} ({rutinasSBEntrenador.length})</div>
+              {rutinasSBEntrenador.map(function(rSB,ri){
+                var alumnoInfo=alumnos.find(function(al){return al.id===rSB.alumno_id});
+                var diasSB=rSB.datos?.days||[];
+                return(<div key={rSB.id||ri} style={{background:bgCard,borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid "+border}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <div style={{fontSize:18,fontWeight:800,color:textMain}}>{rSB.nombre}</div>
+                        <span style={{background:"#22C55E22",color:"#22C55E",borderRadius:6,padding:"1px 7px",fontSize:10,fontWeight:700}}>☁️</span>
+                      </div>
+                      {alumnoInfo&&<div style={{fontSize:13,fontWeight:700,color:textMuted,marginTop:2}}>👤 {alumnoInfo.nombre||alumnoInfo.email}</div>}
+                      <div style={{fontSize:13,color:textMuted}}>{diasSB.length} {es?"días":"days"}</div>
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var rutLocal={id:rSB.id,...(rSB.datos||{}),name:rSB.nombre,saved:true,alumno_id:rSB.alumno_id,alumno:alumnoInfo?.nombre||""};setRoutines(function(p){var ex=p.find(function(x){return x.id===rSB.id});return ex?p:[rutLocal,...p]});toast2(es?"Abierta para editar":"Opened for editing");}}>{es?"Editar":"Edit"}</button>
+                      <button className="hov" style={{background:"#22C55E22",color:"#22C55E",border:"none",borderRadius:8,padding:"8px 10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var newId=uid();var copia={id:newId,name:rSB.nombre+" (copia)",days:(rSB.datos?.days||[]).map(function(d){return{...d,warmup:(d.warmup||[]).map(function(e){return{...e}}),exercises:(d.exercises||[]).map(function(e){return{...e}})}}),collapsed:false,saved:false};setRoutines(function(p){return[...p,copia]});setAssignRoutineId(newId);toast2(es?"Duplicada":"Duplicated");}}><Ic name="copy" size={14}/></button>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>{diasSB.map(function(d,di){return(<span key={(rSB.id||"rut")+"-dchip-"+di} style={{background:bgSub,borderRadius:6,padding:"2px 8px",fontSize:11,color:textMuted,fontWeight:600}}>{d.label||("Día "+(di+1))} · {((d.warmup||[]).length+(d.exercises||[]).length)} ej.</span>)})}</div>
+                </div>);
+              })}
+            </div>)}
             {Object.keys(progress).length===0&&(
               <div style={{textAlign:"center",padding:"60px 0",color:textMuted}}>
                 <div style={{fontSize:48,marginBottom:12}}>📊</div>
@@ -2271,11 +1903,30 @@ function GymApp() {
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:textMain}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
               <div style={{display:"flex",gap:8}}>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)}>💰</button>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos}>↺</button>
+                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={es?"Datos de pago":"Payment info"}><Ic name="share" size={16}/></button>
+                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={es?"Actualizar":"Refresh"}><Ic name="refresh-cw" size={16}/></button>
                 <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {es?"Nuevo":"New"}</button>
               </div>
             </div>
+
+            {routines.length>0&&(
+              <div style={{marginBottom:12,padding:"12px 14px",background:bgSub,borderRadius:12,border:"1px solid "+border}}>
+                <div style={{fontSize:11,fontWeight:800,letterSpacing:0.8,color:"#2563EB",marginBottom:8}}>{es?"RUTINA QUE SE ASIGNA AL TOCAR «ASIGNAR»":"ROUTINE USED WHEN YOU TAP «ASSIGN»"}</div>
+                {routines.length===1 ? (
+                  <div style={{fontSize:16,fontWeight:700,color:textMain}}>{routines[0].name}</div>
+                ) : (
+                  <select
+                    style={{width:"100%",background:bgCard,color:textMain,border:"1px solid "+border,borderRadius:10,padding:"10px 12px",fontSize:15,fontWeight:600,fontFamily:"inherit",cursor:"pointer",outline:"none"}}
+                    value={routineForAssign?.id||""}
+                    onChange={function(e){setAssignRoutineId(e.target.value);}}>
+                    {routines.map(function(r){
+                      return <option key={r.id} value={r.id}>{r.name||"—"} · {(r.days||[]).length} {es?"días":"days"}</option>;
+                    })}
+                  </select>
+                )}
+                <div style={{fontSize:12,color:textMuted,marginTop:6}}>{es?"Creá o editá rutinas en RUTINAS. Con varias listas, elegí cuál mandar acá.":"Create or edit routines under ROUTINES. If you have several, pick which one to send."}</div>
+              </div>
+            )}
 
             {newAlumnoForm&&(
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>{setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}}>
@@ -2331,7 +1982,7 @@ function GymApp() {
             {loadingSB&&(
               <div>
                 {[1,2,3].map(i=>(
-                  <div key={i} style={{background:bgCard,borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid "+border}}>
+                  <div key={"alumno-list-skel-"+i} style={{background:bgCard,borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid "+border}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                       <div style={{flex:1}}>
                         <div className="sk" style={{height:16,width:"55%",marginBottom:8}}/>
@@ -2349,20 +2000,37 @@ function GymApp() {
             )}
             {alumnos.length===0&&!loadingSB&&(
               <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
-                <div style={{fontSize:36,marginBottom:8}}>👥</div>
+                <div style={{fontSize:36,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <Ic name="users" size={34} color={textMuted}/>
+                </div>
                 <div style={{fontSize:15,fontWeight:700}}>{es?"Sin alumnos aún":"No athletes yet"}</div>
               </div>
             )}
 
             {alumnos.map(a=>(
               <div key={a.id} style={{background:bgCard,borderRadius:12,padding:"16px",marginBottom:8,border:alumnoActivo?.id===a.id?"1px solid #2563EB":"1px solid "+border}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:alumnoActivo?.id===a.id?8:0}}>
-                  <div>
-                    <div style={{fontSize:18,fontWeight:700,color:textMain}}>{a.nombre}</div>
-                    <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:4}}>{a.email}</div>
-                  </div>
-                  <div style={{display:"flex",gap:8}}>
-                    <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>{setEditAlumnoModal(a);setEditAlumnoEmail(a.email);setEditAlumnoPass("");}}>✏️</button>
+ <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:alumnoActivo?.id===a.id?8:0,gap:8}}>
+  <div style={{flex:1,minWidth:0}}>
+    <div style={{fontSize:18,fontWeight:700,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.nombre}</div>
+    <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
+  </div>
+  <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                    <button
+                      className="hov"
+                      style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center"}}
+                      onClick={()=>{if(!confirm(es?"¿Editar alumno?":"Edit athlete?")) return; setEditAlumnoModal(a);setEditAlumnoEmail(a.email);setEditAlumnoPass("");}}
+                      aria-label={es?"Editar alumno":"Edit athlete"}
+                    >
+                      <Ic name="edit-2" size={16} color={textMuted}/>
+                    </button>
+                    <button
+                      className="hov"
+                      style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center"}}
+                      onClick={function(e){e.stopPropagation();console.log("[CHAT] abriendo para",a.id,a.nombre);setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}
+                      aria-label={es?"Abrir chat":"Open chat"}
+                    >
+                      <Ic name="message-circle" size={16} color="#2563EB"/>
+                    </button>
                     <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={async()=>{
                       if(alumnoActivo?.id===a.id){setAlumnoActivo(null);return;}
                       setAlumnoActivo(a);setRegistrosSubTab(0);setLoadingSB(true);
@@ -2389,47 +2057,210 @@ function GymApp() {
                             <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:4,textTransform:"uppercase"}}>{es?"RUTINA ACTIVA":"ACTIVE ROUTINE"}</div>
                             <div style={{fontSize:22,fontWeight:900,color:textMain}}>{rutinaActiva.nombre}</div>
                             <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:4}}>{dias.length} {es?"días":"days"}</div>
+                            {/* ── Info de semana ── */}
+                            {(()=>{
+                              // Usar currentWeek global (sincronizado con el alumno)
+                              const semanaCiclo = currentWeek + 1;
+                              // Días completados esta semana desde completedDays
+                              const rId = rutinaActiva.id;
+                              const diasCompletados = completedDays.filter(function(k){return k.startsWith(rId+"-") && k.endsWith("-w"+currentWeek)}).length;
+                              // Semana calendario (corregido para fin de mes)
+                              const hoyDate = new Date();
+                              const inicioSemana = new Date(hoyDate);
+                              inicioSemana.setDate(hoyDate.getDate() - ((hoyDate.getDay()+6)%7));
+                              const finSemana = new Date(inicioSemana);
+                              finSemana.setDate(inicioSemana.getDate() + 6);
+                              const semCalLabel = inicioSemana.getDate() + "/" + (inicioSemana.getMonth()+1) + " — " + finSemana.getDate() + "/" + (finSemana.getMonth()+1);
+                              return (
+                                <>
+                                <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
+                                  <div style={{background:"#2563EB15",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
+                                    <Ic name="calendar" size={14} color="#2563EB"/>
+                                    <span style={{fontSize:12,fontWeight:800,color:"#2563EB"}}>{es?"Semana":"Week"} {semanaCiclo} {es?"de":"of"} 4</span>
+                                  </div>
+                                  <div style={{background:bgSub,border:"1px solid "+border,borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
+                                    <span style={{fontSize:12,fontWeight:700,color:textMuted}}>{diasCompletados}/{dias.length} {es?"días":"days"}</span>
+                                  </div>
+                                  <div style={{background:bgSub,border:"1px solid "+border,borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
+                                    <span style={{fontSize:11,color:textMuted}}>{es?"Sem. cal:":"Cal. wk:"} {semCalLabel}</span>
+                                  </div>
+                                </div>
+                                <div style={{marginTop:8,background:"#2563EB08",border:"1px solid #2563EB22",borderRadius:8,padding:"8px 10px",display:"flex",alignItems:"center",gap:6}}>
+                                  <Ic name="chevron-right" size={14} color={textMain}/>
+                                  <span style={{fontSize:13,fontWeight:700,color:textMain}}>
+                                    {es?"Próxima sesión:":"Next session:"} {(()=>{
+                                      var proxDia, proxSemana;
+                                      if(diasCompletados >= dias.length) { proxDia = 1; proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1; }
+                                      else { proxDia = diasCompletados + 1; proxSemana = semanaCiclo; }
+                                      var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
+                                      return proxLabel + " · " + (es?"Semana ":"Week ") + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (es?" (nuevo ciclo)":" (new cycle)") : "");
+                                    })()}
+                                  </span>
+                                </div>
+                                <div style={{display:"flex",gap:8,marginTop:8}}>
+                                  <button className="hov" onClick={()=>{
+                                    if(!confirm(es?"¿Reiniciar semana actual? El alumno volverá a Día 1 de la semana "+semanaCiclo+".":"Reset current week? Athlete will restart at Day 1 of week "+semanaCiclo+".")) return;
+                                    setCompletedDays(function(prev){return prev.filter(function(k){return !k.endsWith("-w"+(semanaCiclo-1))})});
+                                    toast2(es?"Semana reiniciada ✓":"Week reset ✓");
+                                  }} style={{flex:1,padding:"6px",background:"transparent",border:"1px solid #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit"}}>
+                                    <Ic name="refresh-cw" size={14} color="#F59E0B"/> {es?"Reiniciar semana":"Reset week"}
+                                  </button>
+                                  <button className="hov" onClick={()=>{
+                                    if(!confirm(es?"¿Reiniciar rutina completa? Volverá a Semana 1, Día 1. El historial de progreso se mantiene.":"Reset entire routine? Will go back to Week 1, Day 1. Progress history is kept.")) return;
+                                    setCompletedDays([]);
+                                    setCurrentWeek(0);
+                                    localStorage.removeItem('it_last_week_advance_date');
+                                    toast2(es?"Rutina reiniciada ✓":"Routine reset ✓");
+                                  }} style={{flex:1,padding:"6px",background:"transparent",border:"1px solid #EF444444",borderRadius:8,fontSize:11,fontWeight:700,color:"#EF4444",cursor:"pointer",fontFamily:"inherit"}}>
+                                    <Ic name="refresh-cw" size={14} color="#EF4444"/> {es?"Reiniciar rutina":"Reset routine"}
+                                  </button>
+                                </div>
+                                </>
+                              );
+                            })()}
                             {dias.map((d,di)=>(
-                              <div key={di} style={{background:bgSub,borderRadius:12,padding:"8px 12px",marginBottom:8,marginTop:8,border:"1px solid "+border}}>
-                                <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{d.label||("Día "+(di+1))} · {(d.exercises||[]).length} ej.</div>
+                              <div key={(rutinaActiva?.id||"rut")+"-coach-day-"+di} style={{background:bgSub,borderRadius:12,padding:"8px 12px",marginBottom:8,marginTop:8,border:"1px solid "+border}}>
+                                <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{d.label||("Día "+(di+1))} · {((d.warmup||[]).length+(d.exercises||[]).length)} ej.</div>
+                                {(d.warmup||[]).length>0&&(
+                                  <div style={{marginBottom:8}}>
+                                    <div style={{fontSize:10,fontWeight:700,color:"#F59E0B",letterSpacing:1,marginBottom:4}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</div>
+                                    {(d.warmup||[]).map((ex,ei)=>{
+                                      const exInfo=allEx.find(e=>e.id===ex.id);
+                                      return <div key={(rutinaActiva?.id||"rut")+"-d"+di+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
+                                        <div style={{width:3,height:16,borderRadius:2,background:"#F59E0B44",flexShrink:0,marginTop:0}}/>
+                                        <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{es?exInfo?.name:exInfo?.nameEn||exInfo?.name||ex.id}</div>
+                                        <div style={{fontSize:11,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
+                                        <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
+                                      </div>;
+                                    })}
+                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:4,padding:"6px",background:"transparent",border:"1px dashed #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#F59E0B"/>{es?"Añadir entrada en calor":"Add warm-up"}</button>
+                                  </div>
+                                )}
+                                <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1,marginBottom:4}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</div>
                                 {(d.exercises||[]).map((ex,ei)=>{
                                   const exInfo=allEx.find(e=>e.id===ex.id);
-                                  return <div key={ei} style={{display:"flex",gap:8,padding:"4px 0",borderBottom:ei<(d.exercises||[]).length-1?"1px solid "+border:"none"}}>
-                                    <div style={{width:3,height:16,borderRadius:2,background:border,flexShrink:0,marginTop:4}}/>
+                                  return <div key={(rutinaActiva?.id||"rut")+"-d"+di+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.exercises||[]).length-1?"1px solid "+border:"none"}}>
+                                    <div style={{width:3,height:16,borderRadius:2,background:border,flexShrink:0,marginTop:0}}/>
                                     <div style={{flex:1,fontSize:15,fontWeight:700,color:textMain}}>{es?exInfo?.name:exInfo?.nameEn||exInfo?.name||ex.id}</div>
-                                    <div style={{fontSize:11,color:textMuted}}>{ex.sets}×{ex.reps}</div>
+                                    <div style={{fontSize:11,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
+                                    <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
                                   </div>;
                                 })}
+                                <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed "+border,borderRadius:8,fontSize:13,fontWeight:700,color:"#2563EB",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#2563EB"/>{es?"Añadir bloque principal":"Add main block"}</button>
                               </div>
                             ))}
                             <div style={{display:"flex",gap:8,marginTop:8}}>
-                              <button className="hov" style={{flex:2,padding:"8px",background:bgSub,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(es?"Abierta en RUTINAS":"Opened in ROUTINES");}}>✏️ {es?"Editar":"Edit"}</button>
+                              <button className="hov" style={{flex:2,padding:"8px",background:bgSub,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(es?"¿Editar esta rutina?":"Edit this routine?")) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(es?"Abierta en RUTINAS":"Opened in ROUTINES");}}><Ic name="edit-2" size={16} color={textMuted}/>{es?"Editar":"Edit"}</button>
                               <button className="hov" style={{padding:"8px 16px",background:bgSub,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(es?"¿Quitar rutina?":"Remove?")) return;await sb.deleteRutina(rutinaActiva.id);setRutinasSB(prev=>prev.filter(x=>x.id!==rutinaActiva.id));toast2(es?"Quitada":"Removed");}}><Ic name="trash-2" size={15}/></button>
                             </div>
                           </div>
                         </div>
                       );
                     })()}
-                    <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8}} onClick={async()=>{
-                      const rutinaLocal=routines[0];if(!rutinaLocal){toast2("Creá una rutina en RUTINAS");return;}
+                    <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={async()=>{
+                      const rutinaLocal=routineForAssign;if(!rutinaLocal){toast2(es?"Creá una rutina en RUTINAS":"Create a routine in ROUTINES");return;}
                       const ex=rutinasSB.find(r=>r.alumno_id===a.id);
-                      if(ex&&!confirm((es?"Ya tiene: ":"Has: ")+ex.nombre+(es?"\n¿Reemplazar?":"\nReplace?"))) return;
+                      const rutinaNombre=rutinaLocal.name||"Rutina";
+                      var msg = ex
+                        ? (es?("Ya tiene: "+ex.nombre+"\n¿Reemplazar por: "+rutinaNombre+"?"):("Has: "+ex.nombre+"\nReplace with: "+rutinaNombre+"?"))
+                        : (es?("¿Asignar rutina: "+rutinaNombre+" a "+a.nombre+"?"):("Assign routine: "+rutinaNombre+" to "+a.nombre+"?"));
+                      if(!confirm(msg)) return;
                       if(ex){await sb.deleteRutina(ex.id);setRutinasSB(prev=>prev.filter(x=>x.id!==ex.id));}
                       setLoadingSB(true);
                       const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:rutinaLocal.days,alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
                       setLoadingSB(false);
-                    }}>{es?"+ Asignar rutina actual":"+ Assign current routine"}</button>
-                    {alumnoSesiones.length>0&&alumnoSesiones.slice(0,3).map((s,i)=>(
-                      <div key={i} style={{background:bgSub,borderRadius:8,padding:"8px 10px",marginBottom:4,display:"flex",justifyContent:"space-between"}}>
-                        <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✅ {s.dia_label}</div>
-                        <div style={{fontSize:11,color:textMuted}}>{s.fecha}</div>
-                      </div>
-                    ))}
+                    }}>{rutinasSB.find(r=>r.alumno_id===a.id)?(<><Ic name="refresh-cw" size={16}/>{es?"Cambiar rutina":"Change routine"}</>):(<><Ic name="plus" size={16}/>{es?"Asignar rutina":"Assign routine"}</>)}</button>
+                    {/* ── SUGERENCIAS ── */}
+                    {(()=>{
+                      const rutSB = rutinasSB.find(r=>r.alumno_id===a.id);
+                      const regsAlu = alumnoProgreso || [];
+                      if(!rutSB || regsAlu.length < 2) return null;
+                      const sugs = generarSugerenciasAlumno(regsAlu, rutSB.datos, EX);
+                      if(sugs.length === 0) return null;
+                      var open = !!sugsOpen[a.id];
+                      const colores = {
+                        subir: {icon:(<Ic name="trending-up" size={16} color="#22C55E"/>),bg:"#22C55E12",border:"#22C55E33",color:"#22C55E",btnBg:"#22C55E"},
+                        bajar: {icon:(<Ic name="trending-up" size={16} color="#EF4444" style={{transform:"rotate(180deg)"}}/>),bg:"#EF444412",border:"#EF444433",color:"#EF4444",btnBg:"#EF4444"},
+                        ajustar: {icon:(<Ic name="zap" size={16} color="#F59E0B"/>),bg:"#F59E0B12",border:"#F59E0B33",color:"#F59E0B",btnBg:"#F59E0B"},
+                        cambiar: {icon:(<Ic name="refresh-cw" size={16} color="#2563EB"/>),bg:"#2563EB12",border:"#2563EB33",color:"#2563EB",btnBg:"#2563EB"},
+                        mantener: {icon:(<Ic name="chevron-right" size={16} color={textMuted}/>),bg:bgSub,border:border,color:textMuted,btnBg:"#2563EB"}
+                      };
+                      return (
+                        <div style={{marginTop:12,marginBottom:8}}>
+                          <button
+                            type="button"
+                            className="hov"
+                            onClick={function(){ setSugsOpen(function(prev){ return {...prev, [a.id]: !prev[a.id]}; }); }}
+                            style={{
+                              width:"100%",
+                              background:bgSub,
+                              border:"1px solid "+border,
+                              borderRadius:12,
+                              padding:"10px 12px",
+                              cursor:"pointer",
+                              display:"flex",
+                              alignItems:"center",
+                              justifyContent:"space-between",
+                              gap:10
+                            }}
+                          >
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              <Ic name="info" size={16} color="#F59E0B"/>
+                              <div style={{fontSize:11,fontWeight:800,color:"#F59E0B",letterSpacing:2,textTransform:"uppercase"}}>{es?"SUGERENCIAS":"SUGGESTIONS"}</div>
+                              <span style={{fontSize:12,fontWeight:800,color:textMuted,background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:999,padding:"2px 8px"}}>{sugs.length}</span>
+                            </div>
+                            <Ic
+                              name="chevron-right"
+                              size={18}
+                              color={textMuted}
+                              style={{transition:"transform .18s ease", transform: open ? "rotate(90deg)" : "rotate(0deg)"}}
+                            />
+                          </button>
+                          {open && (
+                            <div style={{marginTop:10,maxHeight:260,overflowY:"auto",paddingRight:4}}>
+                              {sugs.map(function(sug,si){
+                                var c = colores[sug.tipo] || colores.mantener;
+                                var sugKey = a.id+"-sug-"+(sug.exId||"ex")+"-"+sug.dIdx+"-"+sug.eIdx+"-"+sug.tipo;
+                                return (
+                                  <div key={sugKey} id={sugKey} style={{background:c.bg,border:"1px solid "+c.border,borderRadius:12,padding:"12px",marginBottom:8}}>
+                                    <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+                                      <div style={{flexShrink:0,marginTop:1}}>{c.icon}</div>
+                                      <div style={{flex:1,minWidth:0}}>
+                                        <div style={{fontSize:13,fontWeight:800,color:c.color,marginBottom:2}}>{sug.nombre}</div>
+                                        <div style={{fontSize:14,fontWeight:700,color:textMain}}>{sug.accion}</div>
+                                        <div style={{fontSize:12,color:textMuted,marginTop:2,display:"flex",alignItems:"center",gap:4}}>
+                                          <Ic name="chevron-right" size={12} color={textMuted}/>
+                                          {sug.ajuste}
+                                        </div>
+                                        <div style={{display:"flex",gap:8,marginTop:8}}>
+                                          <button className="hov" onClick={function(){
+                                            var exConSug = {...sug.exData};
+                                            if(sug.sugKg) exConSug.kg = sug.sugKg;
+                                            if(sug.sugReps) exConSug.reps = sug.sugReps;
+                                            if(sug.sugSets) exConSug.sets = sug.sugSets;
+                                            if(sug.sugPause) exConSug.pause = sug.sugPause;
+                                            setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:exConSug});
+                                          }} style={{padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{es?"APLICAR":"APPLY"}</button>
+                                          <button className="hov" onClick={function(){
+                                            var el=document.getElementById(sugKey);
+                                            if(el){el.style.opacity="0";el.style.height="0";el.style.padding="0";el.style.margin="0";el.style.overflow="hidden";el.style.transition="all .3s ease";}
+                                          }} style={{padding:"5px 14px",background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"IGNORAR":"IGNORE"}</button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     <div style={{marginTop:12,borderTop:"1px solid "+border,paddingTop:12}}>
                       <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,
                         textTransform:"uppercase",marginBottom:8}}>
-                        📌 {es?"Nota del día":"Daily note"}
+                        <Ic name="bookmark" size={14} color={textMuted}/> {es?"Nota del día":"Daily note"}
                       </div>
                       <textarea
                         style={{width:"100%",background:bgSub,color:textMain,border:"1px solid "+border,
@@ -2467,118 +2298,7 @@ function GymApp() {
           </div>
         )}
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
-        <ChatFlotante darkMode={darkMode} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
-      )}
-      {false&&session&&activeDay&&(
-        <div style={{
-          position:"fixed",top:0,left:0,right:0,zIndex:95,
-          background:darkMode?"rgba(30,41,59,0.97)":"rgba(240,240,240,0.97)",
-          backdropFilter:"blur(12px)",
-          borderBottom:"2px solid #3B82F6",
-          padding:"8px 16px",
-        }}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-            <div style={{flex:1}}>
-              <div style={{fontSize:11,fontWeight:700,color:"#2563EB",letterSpacing:2,textTransform:"uppercase"}}>
-                {es?"ENTRENANDO":"TRAINING"}
-              </div>
-              <div style={{fontSize:18,fontWeight:900,color:textMain,letterSpacing:0.5}}>
-                {activeR?.name} — {activeDay.label||("Dia "+(session.dIdx+1))}
-              </div>
-            </div>
-            <div style={{textAlign:"center",padding:"4px 8px",background:"#2563EB22",borderRadius:20,border:"1px solid #243040"}}>
-              <div style={{fontSize:15,fontWeight:900,color:"#2563EB"}}>
-                {(()=>{
-                  const done = activeDay.exercises.filter((ex,i)=>{
-                    const hoy=new Date().toLocaleDateString("es-AR");
-                    return (progress[ex.id]?.sets||[]).some(s=>s.date===hoy);
-                  }).length;
-                  return done+"/"+activeDay.exercises.length;
-                })()}
-              </div>
-              <div style={{fontSize:11,color:"#2563EB",fontWeight:700}}>{es?"EJERC":"EXER"}</div>
-            </div>
-            <button className="hov"
-              style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"8px 8px",color:textMuted,cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"inherit"}}
-              onClick={()=>{
-              if(window.confirm(es?"¿Salir del entrenamiento?":"Exit workout?")) setSession(null);
-            }}><Ic name="x" size={16}/></button>
-          </div>
-          <div>
-          {(()=>{
-            const total = activeDay.exercises.length;
-            const hoy = new Date().toLocaleDateString("es-AR");
-            const done = activeDay.exercises.filter(ex=>(progress[ex.id]?.sets||[]).some(s=>s.date===hoy)).length;
-            const pct = total>0 ? (done/total)*100 : 0;
-            return (
-              <div style={{height:4,background:darkMode?"#2D4057":"#E2E8F0",borderRadius:2,marginBottom:8,overflow:"hidden"}}>
-                <div style={{height:"100%",width:pct+"%",background:"#2563EB",borderRadius:2,transition:"width .4s ease"}}/>
-              </div>
-            );
-          })()}
-          </div>
-          <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:2}}>
-            {activeDay.exercises.map((ex,i)=>{
-              const hoy=new Date().toLocaleDateString("es-AR");
-              const setsHoy=(progress[ex.id]?.sets||[]).filter(s=>s.date===hoy).length;
-              const totalSets=parseInt(ex.sets)||3;
-              const done=setsHoy>=totalSets;
-              const active=i===activeExIdx;
-              return(
-                <div key={i} onClick={()=>setActiveExIdx(i)}
-                  style={{
-                    flexShrink:0,width:active?28:10,height:10,
-                    borderRadius:6,cursor:"pointer",
-                    transition:"all .3s ease",
-                    background:done?"#22C55E":active?"#2563EB":(darkMode?"#2D4057":"#2D4057"),
-                  }}/>
-              );
-            })}
-          </div>
-          <button className="hov" style={{
-            width:"100%",marginTop:8,padding:"8px",
-            background:"#2563EB",color:"#fff",border:"none",
-            borderRadius:12,fontSize:15,fontWeight:900,
-            cursor:"pointer",fontFamily:"inherit",letterSpacing:1
-          }}
-          onClick={()=>{
-              const r=activeR;
-              const dayKey=session.rId+"-"+session.dIdx+"-w"+currentWeek;
-              const newCompleted=completedDays.includes(dayKey)?completedDays:[...completedDays,dayKey];
-              const totalDays=r?r.days.length:1;
-              const daysThisWeek=newCompleted.filter(k=>k.startsWith(session.rId+"-")&&k.endsWith("-w"+currentWeek)).length;
-              setCompletedDays(newCompleted);
-              const durMin=Math.round((Date.now()-(session.startTime||Date.now()))/60000)||1;
-              const exsCompleted=[...(activeDay.warmup||[]),...(activeDay.exercises||[])];
-              const hoyFin=new Date().toLocaleDateString("es-AR");
-              const volTotal=exsCompleted.reduce((acc,ex)=>{
-                const setsHoy=(progress[ex.id]?.sets||[]).filter(s=>s.date===hoyFin);
-                return acc+setsHoy.reduce((a,s)=>a+(s.kg||0)*(s.reps||0),0);
-              },0);
-              const prsNuevos=exsCompleted.filter(ex=>{
-                const pg=progress[ex.id];
-                if(!pg) return false;
-                const setsHoy=(pg.sets||[]).filter(s=>s.date===hoyFin);
-                if(setsHoy.length===0) return false;
-                const maxHoy=Math.max(...setsHoy.map(s=>s.kg||0));
-                const maxAntes=preSessionPRs[ex.id]||0;
-                // Solo PR si habia registro previo Y supero el maximo
-                return maxAntes>0 && maxHoy>maxAntes;
-              }).length;
-              setResumenSesion({durMin,ejercicios:exsCompleted.length,totalSets:exsCompleted.reduce((a,e)=>a+(parseInt(e.sets)||3),0),volTotal:Math.round(volTotal),prsNuevos,diaLabel:activeDay.label||("Dia "+(session.dIdx+1)),rutinaName:r?.name||"Entrenamiento",fecha:new Date().toLocaleDateString("es-AR")});
-              setSession(null);
-              if(readOnly&&sharedParam){try{const rutData=JSON.parse(atob(sharedParam));const alumnoId=rutData.alumnoId;if(alumnoId){sb.addSesion({alumno_id:alumnoId,rutina_nombre:r?.name||"",dia_label:activeDay.label||("Dia "+(session.dIdx+1)),dia_idx:session.dIdx,semana:currentWeek+1,ejercicios:exsCompleted.map(e=>e.id).join(","),fecha:new Date().toLocaleDateString("es-AR"),hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})});}}catch(e){}}
-              // Avanzar SIEMPRE a la semana siguiente al terminar cada sesión
-              if(currentWeek < 3){
-                setCurrentWeek(currentWeek + 1);
-                toast2((es?"Sesión lista! Arrancás semana":"Session done! Starting week ")+(currentWeek+2)+" 💪");
-              } else {
-                toast2(es?"Semana 4 terminada! Ciclo completo 🏆":"Week 4 done! Cycle complete 🏆");
-              }
-            }}>
-          ✅ {es?"FINALIZAR ENTRENAMIENTO":"FINISH WORKOUT"}
-          </button>
-        </div>
+        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
       )}
 {showWelcome&&(()=>{
         const isCoach = sessionData?.role==="entrenador";
@@ -2634,7 +2354,7 @@ function GymApp() {
               onClick={e=>e.stopPropagation()}>
               <div style={{display:"flex",gap:8,justifyContent:"center",marginBottom:24}}>
                 {steps.map((_,i)=>(
-                  <div key={i} style={{height:4,borderRadius:2,transition:"all .35s ease",
+                  <div key={(isCoach?"coach":"alumno")+"-welcome-dot-"+i} style={{height:4,borderRadius:2,transition:"all .35s ease",
                     width:i===obStep?32:8,
                     background:i<obStep?"#22C55E":i===obStep?"#2563EB":border}}/>
                 ))}
@@ -2648,7 +2368,7 @@ function GymApp() {
               {step.items&&(
                 <div style={{marginBottom:24}}>
                   {step.items.map((item,i)=>(
-                    <div key={i} style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,opacity:item.done?0.6:1}}>
+                    <div key={"welcome-item-"+(item.n ?? i)} style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,opacity:item.done?0.6:1}}>
                       <div style={{width:36,height:36,borderRadius:"50%",flexShrink:0,
                         background:item.done?"#22C55E22":"#2563EB22",
                         border:"2px solid "+(item.done?"#22C55E":"#2563EB"),
@@ -2741,31 +2461,42 @@ function GymApp() {
         </div>
       )}
       {prCelebration&&(
-        <div style={{
+        <div onClick={()=>setPrCelebration(null)} style={{
           position:"fixed",inset:0,zIndex:500,
           display:"flex",alignItems:"center",justifyContent:"center",
-          background:"rgba(0,0,0,0.85)",
-          animation:"fadeIn .2s ease"
+          background:"rgba(0,0,0,0.92)",
+          animation:"fadeIn .2s ease",cursor:"pointer"
         }}>
           <div style={{
-            textAlign:"center",padding:"40px 32px",
+            textAlign:"center",padding:"48px 32px",
             background:"linear-gradient(135deg,#1a1a1a,#2a1f00)",
             borderRadius:28,border:"2px solid #f59e0b55",
-            maxWidth:320,width:"90%",
-            boxShadow:"0 0 60px #f59e0b33"
+            maxWidth:340,width:"90%",
+            boxShadow:"0 0 80px #f59e0b44",
+            animation:"fadeIn .3s ease"
           }}>
-            <div style={{fontSize:48,marginBottom:8,filter:"drop-shadow(0 0 20px #f59e0b)"}}>🏆</div>
-            <div style={{fontSize:13,fontWeight:800,color:"#60A5FA",letterSpacing:3,marginBottom:8,textTransform:"uppercase"}}>
-              {es?"NUEVO RÉCORD":"NEW RECORD"}
+            <div style={{fontSize:64,marginBottom:12,filter:"drop-shadow(0 0 24px #f59e0b)",animation:"pulse 1s infinite"}}>🏆</div>
+            <div style={{fontSize:15,fontWeight:900,color:"#fbbf24",letterSpacing:4,marginBottom:12,textTransform:"uppercase"}}>
+              {es?"¡NUEVO PR!":"NEW PR!"}
             </div>
-            <div style={{fontSize:28,fontWeight:900,color:"#FFFFFF",marginBottom:4,lineHeight:1.1}}>
+            <div style={{fontSize:24,fontWeight:900,color:"#FFFFFF",marginBottom:8,lineHeight:1.2}}>
               {prCelebration.ejercicio}
             </div>
-            <div style={{fontSize:48,fontWeight:900,color:"#60A5FA",letterSpacing:1}}>
+            <div style={{fontSize:56,fontWeight:900,color:"#fbbf24",letterSpacing:1,lineHeight:1}}>
               {prCelebration.kg} kg
             </div>
-            <div style={{fontSize:13,color:"#8B9AB2",marginTop:12}}>
-              {es?"¡Superaste tu máximo personal!":"You beat your personal best!"}
+            {prCelebration.diff>0&&(
+              <div style={{marginTop:12,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                <span style={{background:"#22C55E22",border:"1px solid #22C55E44",borderRadius:8,padding:"4px 12px",fontSize:15,fontWeight:800,color:"#22C55E"}}>
+                  +{prCelebration.diff}kg
+                </span>
+                <span style={{fontSize:13,color:"#8B9AB2"}}>
+                  vs {prCelebration.prevKg}kg
+                </span>
+              </div>
+            )}
+            <div style={{fontSize:12,color:"#8B9AB244",marginTop:16}}>
+              {es?"Tocá para cerrar":"Tap to close"}
             </div>
           </div>
         </div>
@@ -2794,11 +2525,24 @@ function GymApp() {
             </div>
 
             {resumenSesion.prsNuevos>0&&(
-              <div style={{background:"#60A5FA22",border:"1px solid #f59e0b44",borderRadius:12,padding:"12px",marginBottom:16}}>
-                <div style={{fontSize:28}}>🏆</div>
-                <div style={{fontSize:18,fontWeight:800,color:"#60A5FA",marginTop:4}}>
+              <div style={{background:"#fbbf2412",border:"1px solid #fbbf2444",borderRadius:12,padding:"12px",marginBottom:16}}>
+                <div style={{fontSize:28,marginBottom:4}}>🏆</div>
+                <div style={{fontSize:18,fontWeight:800,color:"#fbbf24",marginBottom:8}}>
                   {resumenSesion.prsNuevos} nuevo{resumenSesion.prsNuevos>1?"s":""} PR!
                 </div>
+                {sessionPRList.length>0&&(
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    {sessionPRList.map(function(pr,pi){return(
+                      <div key={pi} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(0,0,0,0.2)",borderRadius:8,padding:"6px 10px"}}>
+                        <span style={{fontSize:13,fontWeight:700,color:textMain}}>{pr.ejercicio}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:6}}>
+                          <span style={{fontSize:15,fontWeight:900,color:"#fbbf24"}}>{pr.kg}kg</span>
+                          <span style={{fontSize:11,fontWeight:700,color:"#22C55E"}}>+{pr.diff}kg</span>
+                        </div>
+                      </div>
+                    )})}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2901,7 +2645,7 @@ function GymApp() {
       )}
       {detailEx&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:100,display:"flex",alignItems:"flex-end"}} onClick={()=>setDetailEx(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxHeight:"80dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
               <span style={{fontSize:36}}>{PATS[detailEx.pattern]?.icon}</span>
               <div>
@@ -2936,7 +2680,7 @@ function GymApp() {
             <span style={lbl}>{es?"HISTORIAL":"HISTORY"}</span>
             {(progress[detailEx.id]?.sets||[]).length===0&&<div style={{color:textMuted,fontSize:15,margin:"8px 0 10px"}}>{es?"Sin registros":"No records"}</div>}
             {(progress[detailEx.id]?.sets||[]).slice(0,10).map((s2,i)=>(
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),fontSize:15}}>
+              <div key={detailEx.id+"-hist-"+(s2.date||"")+"-"+(s2.kg??"")+"-"+(s2.reps??"")+"-"+(s2.week ?? "nw")+"-"+i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),fontSize:15}}>
                 <span>{s2.kg}kg x {s2.reps} reps</span>
                 <span style={{color:textMuted}}>{s2.date}</span>
               </div>
@@ -2995,28 +2739,199 @@ function GymApp() {
       )}
       {newR&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:120,overflowY:"auto"}} onClick={()=>setNewR(null)}>
-          <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:28,fontWeight:800,letterSpacing:2,marginBottom:12}}>NUEVA RUTINA</div>
-            <div style={{marginBottom:8}}><span style={lbl}>NOMBRE DE LA RUTINA</span><input style={inp} value={newR.name} onChange={e=>setNewR(p=>({...p,name:e.target.value}))} placeholder="Ej: PPL Fuerza"/></div>
-            <div style={{marginBottom:8}}><span style={lbl}>NOMBRE DEL ALUMNO</span><input style={inp} value={newR.alumno||""} onChange={e=>setNewR(p=>({...p,alumno:e.target.value}))} placeholder="Ej: Agustin Sevita"/></div>
-            <div style={{marginBottom:8}}>
-              <span style={lbl}>{es?"CANTIDAD DE DIAS":"NUMBER OF DAYS"}</span>
-              <div style={{display:"flex",gap:8}}>
-                {[1,2,3,4,5,6,7].map(n=>(
-                  <button key={n} className="hov" style={{...btn(newR.numDays===n?"#2563EB":undefined),padding:"8px 0",flex:1,fontSize:18}} onClick={()=>setNewR(p=>({...p,numDays:n,days:Array.from({length:n},(_,i)=>({label:"Dia "+(i+1),warmup:[],exercises:[],showWarmup:false,showMain:true}))}))}>
-                    {n}
+          <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:22,fontWeight:800,letterSpacing:1,marginBottom:4}}>{es?"Nueva rutina":"New routine"}</div>
+            <div style={{fontSize:13,color:textMuted,marginBottom:14}}>{es?"Elegí una plantilla o en blanco. Podés afinar después.":"Pick a template or start blank. Refine anytime."}</div>
+            <span style={lbl}>{es?"INICIO RÁPIDO":"QUICK START"}</span>
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14,marginTop:6}}>
+              <button type="button" className="hov" style={{...btn(newR.templateId==="blank"?"#2563EB":undefined),padding:"10px 14px",fontSize:14,fontWeight:700,borderRadius:12}} onClick={()=>setNewR(p=>({...p,templateId:"blank",numDays:p.numDays||3,days:emptyDays(p.numDays||3,es)}))}>
+                {es?"En blanco":"Blank"}
+              </button>
+              {ROUTINE_TEMPLATES.map(function(T){
+                var active=newR.templateId===T.id;
+                return(
+                  <button key={T.id} type="button" className="hov" style={{...btn(active?"#22C55E":undefined),padding:"10px 14px",fontSize:14,fontWeight:700,borderRadius:12,maxWidth:"100%",textAlign:"left"}} onClick={function(){
+                    var tpl=getTemplateById(T.id);
+                    if(!tpl) return;
+                    setNewR(function(p){
+                      return{...p,templateId:T.id,name:es?tpl.nameEs:tpl.nameEn,numDays:tpl.days.length,days:instantiateTemplate(tpl,es)};
+                    });
+                  }}>
+                    {es?T.nameEs:T.nameEn}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-            <div style={{marginBottom:12}}><span style={lbl}>NOTA</span><input style={inp} value={newR.note} onChange={e=>setNewR(p=>({...p,note:e.target.value}))} placeholder="Ej: Lun/Mie/Vie"/></div>
+            <div style={{marginBottom:10}}><span style={lbl}>{es?"NOMBRE":"NAME"}</span><input style={inp} value={newR.name} onChange={e=>setNewR(p=>({...p,name:e.target.value}))} placeholder={es?"Ej: PPL Juan":"E.g: John PPL"}/></div>
+            {newR.templateId==="blank"&&(
+              <div style={{marginBottom:10}}>
+                <span style={lbl}>{es?"DÍAS":"DAYS"}</span>
+                <div style={{display:"flex",gap:8}}>
+                  {[1,2,3,4,5,6,7].map(n=>(
+                    <button key={n} type="button" className="hov" style={{...btn(newR.numDays===n?"#2563EB":undefined),padding:"8px 0",flex:1,fontSize:18}} onClick={()=>setNewR(p=>({...p,numDays:n,days:emptyDays(n,es)}))}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {newR.templateId&&newR.templateId!=="blank"&&(
+              <div style={{fontSize:13,color:textMuted,marginBottom:12,padding:"8px 10px",background:bgSub,borderRadius:10,border:"1px solid "+border}}>
+                {(function(){
+                  var T=getTemplateById(newR.templateId);
+                  if(!T) return null;
+                  var n=(newR.days||[]).length;
+                  var ex=(newR.days||[]).reduce(function(a,d){return a+(d.exercises||[]).length;},0);
+                  return(es?T.hintEs:T.hintEn)+" · "+n+(es?" días · ":" days · ")+ex+(es?" ejercicios":" exercises");
+                })()}
+              </div>
+            )}
+            <button type="button" className="hov" style={{width:"100%",padding:"10px",marginBottom:12,background:"transparent",border:"1px dashed "+border,borderRadius:12,color:textMuted,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>setNewR(p=>({...p,showAdvanced:!p.showAdvanced}))}>
+              {newR.showAdvanced?(es?"▲ Menos opciones":"▲ Fewer options"):(es?"▼ Nota, alumno, nombres de día":"▼ Note, client, day names")}
+            </button>
+            {newR.showAdvanced&&(
+              <div style={{marginBottom:12}}>
+                <div style={{marginBottom:8}}>
+                  <span style={lbl}>{es?"NOTA (opcional)":"NOTE (optional)"}</span>
+                  <input style={inp} value={newR.note||""} onChange={e=>setNewR(p=>({...p,note:e.target.value}))} placeholder={es?"Ej: Lun, Mie, Vie":"E.g. Mon, Wed, Fri"}/>
+                </div>
+                <div style={{marginBottom:8}}>
+                  <span style={lbl}>{es?"ALUMNO (opcional)":"CLIENT (optional)"}</span>
+                  <input style={inp} value={newR.alumno||""} onChange={e=>setNewR(p=>({...p,alumno:e.target.value}))} placeholder={es?"Asigná también desde la tarjeta del alumno":"Or assign from client card"}/>
+                </div>
+                <span style={lbl}>{es?"NOMBRE DE CADA DÍA":"NAME EACH DAY"}</span>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:6}}>
+                  {(newR.days||[]).map(function(d,di){return(
+                    <div key={"new-routine-day-"+di} style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:13,fontWeight:700,color:textMuted,width:52,flexShrink:0}}>{es?"Día":"Day"} {di+1}</span>
+                      <input style={{...inp,marginBottom:0,flex:1}} value={d.label||""} onChange={function(e){
+                        var val=e.target.value;
+                        setNewR(function(p){return{...p,days:p.days.map(function(dd,ddi){return ddi===di?{...dd,label:val}:dd})}});
+                      }} placeholder={es?"Ej: Empuje, Pierna…":"E.g. Push, Legs…"}/>
+                    </div>
+                  )})}
+                </div>
+              </div>
+            )}
             <div style={{display:"flex",gap:8}}>
-              <button className="hov" style={{...btn(),flex:1,padding:"8px"}} onClick={()=>setNewR(null)}>CANCELAR</button>
-              <button className="hov" style={{...btn("#2563EB"),flex:2,padding:"8px",fontSize:18}} onClick={()=>{
-                if(!newR.name.trim()){toast2("Pon un nombre");return;}
-                setRoutines(p=>[...p,{...newR,id:uid(),created:new Date().toLocaleDateString("es-AR")}]);
-                setNewR(null); toast2("Rutina creada ✓");
-              }}>CREAR</button>
+              <button type="button" className="hov" style={{...btn(),flex:1,padding:"10px"}} onClick={()=>setNewR(null)}>{es?"CANCELAR":"CANCEL"}</button>
+              <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"10px",fontSize:17,fontWeight:800}} onClick={()=>{
+                if(!newR.name.trim()){toast2(es?"Pon un nombre":"Add a name");return;}
+                var payload={name:newR.name,numDays:newR.numDays,days:newR.days,note:newR.note||"",alumno:newR.alumno||"",collapsed:false};
+                var newId=uid();
+                setRoutines(p=>[...p,{...payload,id:newId,created:new Date().toLocaleDateString("es-AR")}]);
+                setAssignRoutineId(newId);
+                setNewR(null);
+                toast2(es?"Rutina creada ✓":"Routine created ✓");
+              }}>{es?"CREAR":"CREATE"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+                  {/* ── Modal duplicar día ── */}
+      {dupDayModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setDupDayModal(null)}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,border:"1px solid "+border}} onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:4}}>
+              {es?"Duplicar":"Duplicate"} {dupDayModal.days[dupDayModal.dIdx]?.label||("Día "+(dupDayModal.dIdx+1))}
+            </div>
+            <div style={{fontSize:13,color:textMuted,marginBottom:16}}>
+              {es?"Seleccioná los días destino":"Select destination days"}
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
+              {dupDayModal.days.map(function(d,di){
+                if(di===dupDayModal.dIdx) return (
+                  <div key={"dup-day-src-"+dupDayModal.dIdx+"-mark-"+di} style={{padding:"10px 16px",borderRadius:12,background:"#2563EB22",border:"2px solid #2563EB",opacity:0.5}}>
+                    <div style={{fontSize:13,fontWeight:800,color:"#2563EB"}}>{d.label||("Día "+(di+1))}</div>
+                    <div style={{fontSize:10,color:textMuted}}>{es?"Origen":"Source"}</div>
+                  </div>
+                );
+                var isSelected = dupDayModal.selected.indexOf(di)!==-1;
+                var tieneEj = ((d.warmup||[]).length+(d.exercises||[]).length)>0;
+                return (
+                  <div key={"dup-day-pick-"+dupDayModal.dIdx+"-to-"+di} onClick={function(){
+                    setDupDayModal(function(prev){
+                      var sel = prev.selected.indexOf(di)!==-1
+                        ? prev.selected.filter(function(x){return x!==di})
+                        : [...prev.selected, di];
+                      return {...prev, selected:sel};
+                    });
+                  }} style={{padding:"10px 16px",borderRadius:12,cursor:"pointer",transition:"all .15s",
+                    background:isSelected?"#22C55E22":bgSub,
+                    border:isSelected?"2px solid #22C55E":"2px solid "+border}}>
+                    <div style={{fontSize:13,fontWeight:800,color:isSelected?"#22C55E":textMain}}>{d.label||("Día "+(di+1))}</div>
+                    <div style={{fontSize:10,color:textMuted}}>
+                      {tieneEj?((d.warmup||[]).length+(d.exercises||[]).length)+" ej.":"vacío"}
+                    </div>
+                    {isSelected&&<div style={{fontSize:10,fontWeight:700,color:"#22C55E",marginTop:2}}>✓ {es?"Seleccionado":"Selected"}</div>}
+                  </div>
+                );
+              })}
+            </div>
+            {dupDayModal.selected.some(function(di){return ((dupDayModal.days[di]?.warmup||[]).length+(dupDayModal.days[di]?.exercises||[]).length)>0})&&(
+              <div style={{background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:8,padding:"8px 10px",marginBottom:12,fontSize:12,color:"#F59E0B"}}>
+                ⚠ {es?"Algunos días seleccionados tienen ejercicios. Se reemplazarán.":"Some selected days have exercises. They will be replaced."}
+              </div>
+            )}
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setDupDayModal(null)} style={{flex:1,padding:12,background:bgSub,color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"CANCELAR":"CANCEL"}</button>
+              <button onClick={function(){
+                if(dupDayModal.selected.length===0){toast2(es?"Seleccioná al menos un día":"Select at least one day");return;}
+                var src=dupDayModal.sourceDay;
+                var sel=dupDayModal.selected;
+                setRoutines(function(p){return p.map(function(rr){
+                  if(rr.id!==dupDayModal.rId) return rr;
+                  return {...rr,days:rr.days.map(function(dd,ddi){
+                    if(sel.indexOf(ddi)===-1) return dd;
+                    return {...dd,warmup:(src.warmup||[]).map(function(e){return {...e}}),exercises:(src.exercises||[]).map(function(e){return {...e}})};
+                  })};
+                })});
+                toast2((es?"Duplicado a ":"Duplicated to ")+sel.map(function(i){return dupDayModal.days[i]?.label||("Día "+(i+1))}).join(", ")+" ✓");
+                setDupDayModal(null);
+              }} style={{flex:1,padding:12,background:dupDayModal.selected.length>0?"#2563EB":"#2D4057",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+                {es?"DUPLICAR":"DUPLICATE"} {dupDayModal.selected.length>0&&("("+dupDayModal.selected.length+")")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+            {/* ── Modal video embebido ── */}
+      {videoModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.95)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}} onClick={()=>setVideoModal(null)}>
+          <div style={{width:"100%",maxWidth:480,padding:"0 16px"}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>{videoModal.nombre||""}</div>
+              <button onClick={()=>setVideoModal(null)} style={{background:"none",border:"none",color:"#8B9AB2",fontSize:24,cursor:"pointer"}}>✕</button>
+            </div>
+            <div style={{position:"relative",paddingBottom:"56.25%",height:0,borderRadius:12,overflow:"hidden"}}>
+              <iframe
+                src={"https://www.youtube.com/embed/"+videoModal.videoId+"?autoplay=1&rel=0&modestbranding=1"}
+                style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none"}}
+                allow="autoplay; encrypted-media" allowFullScreen/>
+            </div>
+          </div>
+        </div>
+      )}
+
+            {/* ── Modal chat entrenador ── */}
+      {chatModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setChatModal(null)}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxWidth:480,border:"1px solid "+border,maxHeight:"80dvh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{width:32,height:32,borderRadius:"50%",background:"#2563EB22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#2563EB"}}>
+                  {(chatModal.alumnoNombre||"?").slice(0,2).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{fontSize:15,fontWeight:800,color:textMain}}>{chatModal.alumnoNombre}</div>
+                  <div style={{fontSize:11,color:textMuted}}>{es?"Chat interno":"Internal chat"}</div>
+                </div>
+              </div>
+              <button onClick={()=>setChatModal(null)} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer",padding:"4px"}}><Ic name="x" size={18}/></button>
+            </div>
+            <div style={{flex:1,overflow:"hidden"}}>
+              <Chat darkMode={darkMode} es={es} alumnoId={chatModal.alumnoId} alumnoNombre={chatModal.alumnoNombre} esEntrenador={true} sb={sb}/>
             </div>
           </div>
         </div>
@@ -3025,6 +2940,7 @@ function GymApp() {
         <EditExModal darkMode={darkMode} key={editEx.rId+"-"+editEx.dIdx+"-"+editEx.eIdx} editEx={editEx} btn={btn} inp={inp} allEx={allEx} es={es} PATS={PATS}
           onSave={async(updated)=>{
             const blq = editEx.bloque||"exercises";
+            // Actualizar routines locales
             setRoutines(p=>p.map(r=>r.id===editEx.rId?{...r,days:r.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d)}:r));
             // Auto-guardar en Supabase inmediatamente
             try {
@@ -3033,7 +2949,16 @@ function GymApp() {
                 const updatedDays = rActual.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
                 const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
-                else { await sb.createRutina({...payload,id:rActual.id}); setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,saved:true}:r)); }
+                else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
+              } else {
+                // Buscar en rutinasSB (edición desde vista alumno)
+                const rSB = rutinasSB.find(x=>x.id===editEx.rId);
+                if(rSB) {
+                  const diasActualizados = (rSB.datos?.days||[]).map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
+                  const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:"entrenador_principal"};
+                  await sb.updateRutina(rSB.id, payloadSB);
+                  setRutinasSB(prev=>prev.map(r=>r.id===rSB.id?{...r,datos:{...r.datos,days:diasActualizados}}:r));
+                }
               }
             } catch(e){ console.error("Auto-save error:",e); }
             setEditEx(null);toast2("Guardado ✓");
@@ -3059,7 +2984,7 @@ function GymApp() {
       )}
       {aliasModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-end"}} onClick={()=>setAliasModal(false)}>
-          <div style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:20,width:"100%",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:20,width:"100%",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>💰 {es?"Datos de Pago":"Payment Info"}</div>
             <div style={{fontSize:13,color:textMuted,marginBottom:16}}>{es?"Configurá tu alias o CBU para recibir pagos":"Set up your alias or CBU to receive payments"}</div>
             {(()=>{
@@ -3131,23 +3056,24 @@ function GymApp() {
             <div style={{fontSize:28,fontWeight:900,letterSpacing:1,marginBottom:4}}>{pdfRoutine.r.name}</div>
             <div style={{fontSize:13,color:"#8B9AB2",marginBottom:16}}>{pdfRoutine.r.created} · {pdfRoutine.r.days.length} dias{pdfRoutine.r.note?" · "+pdfRoutine.r.note:""}</div>
             {pdfRoutine.rows.map((row,ri)=>{
+              const pdfRowKey = (pdfRoutine.r?.id||"rut")+"-pdf-"+ri+"-"+row.type+"-"+(row.ex?.id||row.exName||row.label||"");
               if(row.type==="day") return(
-                <div key={ri} style={{fontSize:15,fontWeight:700,color:textMain,letterSpacing:2,borderBottom:"2px solid #243040",paddingBottom:4,margin:"16px 0 8px"}}>
+                <div key={pdfRowKey} style={{fontSize:15,fontWeight:700,color:textMain,letterSpacing:2,borderBottom:"2px solid #243040",paddingBottom:4,margin:"16px 0 8px"}}>
                   {row.label}
                 </div>
               );
               if(row.type==="warmup-header") return(
-                <div key={ri} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",background:"#2563EB11",border:"1px solid #243040",borderRadius:8,marginBottom:8}}>
+                <div key={pdfRowKey} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",background:"#2563EB11",border:"1px solid #243040",borderRadius:8,marginBottom:8}}>
                   <div style={{width:3,height:14,background:"#8B9AB2",borderRadius:2}}/>
                   <span style={{fontSize:15,fontWeight:800,color:"#8B9AB2",letterSpacing:1}}>ENTRADA EN CALOR</span>
                 </div>
               );
               if(row.type==="warmup-ex") return(
-                <div key={ri} style={{background:bgCard,borderRadius:12,padding:"8px 12px",marginBottom:8,border:"1px solid "+border}}>
+                <div key={pdfRowKey} style={{background:bgCard,borderRadius:12,padding:"8px 12px",marginBottom:8,border:"1px solid "+border}}>
                   <div style={{fontSize:15,fontWeight:700,color:textMain,marginBottom:8}}>{row.exName}</div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
                     {(row.wks||[{s:row.ex.sets||"-",r:row.ex.reps||"-",kg:"",filled:false,active:false},{s:row.ex.sets||"-",r:row.ex.reps||"-",kg:"",filled:false,active:false},{s:row.ex.sets||"-",r:row.ex.reps||"-",kg:"",filled:false,active:false},{s:row.ex.sets||"-",r:row.ex.reps||"-",kg:"",filled:false,active:false}]).map((w,wi)=>(
-                      <div key={wi} style={{background:w.active?"#2563EB":"#162234",borderRadius:8,padding:w.active?"10px 4px":"7px 4px",textAlign:"center",border:w.active?"2px solid #2563EB":w.filled?"1px solid #243040":"1px solid "+border}}>
+                      <div key={(row.ex?.id||"ex")+"-pdf-wu-sem-"+wi} style={{background:w.active?"#2563EB":"#162234",borderRadius:8,padding:w.active?"10px 4px":"7px 4px",textAlign:"center",border:w.active?"2px solid #2563EB":w.filled?"1px solid #243040":"1px solid "+border}}>
                         <div style={{fontSize:w.active?10:8,fontWeight:700,letterSpacing:1,color:w.active?"#FFFFFF":"#8B9AB2",marginBottom:w.active?5:3}}>{w.active?"→ ":" "}SEM {wi+1}</div>
                         <div style={{fontSize:w.active?16:13,fontWeight:800,color:w.active?"#FFFFFF":w.filled?"#FFFFFF":"#8B9AB2"}}>{w.s}×{w.r}</div>
                         {w.kg&&<div style={{fontSize:11,fontWeight:700,color:w.active?"#FFFFFF":"#8B9AB2",marginTop:4}}>{w.kg}kg</div>}
@@ -3157,7 +3083,7 @@ function GymApp() {
                 </div>
               );
               if(row.type==="main-header") return(
-                <div key={ri} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",background:"#2563EB11",border:"2px solid #243040",borderRadius:8,marginBottom:8,marginTop:8}}>
+                <div key={pdfRowKey} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",background:"#2563EB11",border:"2px solid #243040",borderRadius:8,marginBottom:8,marginTop:8}}>
                   <div style={{width:3,height:16,background:"#8B9AB2",borderRadius:2}}/>
                   <span style={{fontSize:15,fontWeight:800,color:"#8B9AB2",letterSpacing:1}}>BLOQUE PRINCIPAL</span>
                 </div>
@@ -3165,7 +3091,7 @@ function GymApp() {
               const {exName,col,ex,wks,pat,lastRpe} = row;
               const rpeColors2={6:"#22C55E",7:"#22C55E",8:"#60A5FA",9:"#8B9AB2",10:"#2563EB"};
               return(
-                <div key={ri} style={{background:"#1E2D40",border:"1px solid "+col+"44",borderRadius:12,padding:"12px",marginBottom:8}}>
+                <div key={pdfRowKey} style={{background:"#1E2D40",border:"1px solid "+col+"44",borderRadius:12,padding:"12px",marginBottom:8}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                     <div style={{width:3,alignSelf:"stretch",borderRadius:2,background:col,flexShrink:0}}/>
                     <div style={{flex:1}}>
@@ -3180,7 +3106,7 @@ function GymApp() {
                   </div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
                     {wks.map((w,wi)=>(
-                      <div key={wi} style={{background:w.active?"#2563EB":"#162234",borderRadius:8,padding:"8px 4px",textAlign:"center",border:w.active?"2px solid #2563EB":w.filled?"1px solid #243040":"1px solid "+border}}>
+                      <div key={(ex?.id||"ex")+"-pdf-main-sem-"+wi} style={{background:w.active?"#2563EB":"#162234",borderRadius:8,padding:"8px 4px",textAlign:"center",border:w.active?"2px solid #2563EB":w.filled?"1px solid #243040":"1px solid "+border}}>
                         <div style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:w.active?"#FFFFFF":"#8B9AB2",marginBottom:4}}>{w.active?"→ ":" "}SEM {wi+1}</div>
                         <div style={{fontSize:18,fontWeight:900,color:w.active?"#fff":w.filled?"#FFFFFF":"#8B9AB2"}}>{w.s}x{w.r}</div>
                         {w.kg&&<div style={{fontSize:13,fontWeight:700,color:w.active?"#FFFFFF":"#8B9AB2",marginTop:4}}>{w.kg}kg</div>}
@@ -3205,46 +3131,131 @@ function GymApp() {
         </div>
       )}
       {addExModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"flex-end"}} onClick={()=>setAddExModal(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxHeight:"85vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-              <span style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"AGREGAR EJERCICIO":"ADD EXERCISE"}</span>
-              <button className="hov" style={{...btn(),fontSize:18,padding:"4px 8px"}} onClick={()=>setAddExModal(null)}>x</button>
+        <>
+        <div
+          role="presentation"
+          style={{
+            position:"fixed",inset:0,zIndex:150,
+            display:"flex",flexDirection:"column",
+            height:"100dvh",maxHeight:"100dvh",minHeight:0,
+            overflow:"hidden",boxSizing:"border-box",
+            background:"rgba(0,0,0,.92)",
+          }}
+          onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}
+        >
+          <div style={{flex:"1 1 0%",minHeight:0,minWidth:0}} aria-hidden />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-ex-modal-title"
+            style={{
+              flex:"0 1 auto",
+              width:"100%",maxHeight:"80dvh",minHeight:0,
+              display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",
+              background:bgCard,borderRadius:"16px 16px 0 0",
+            }}
+            onClick={e=>e.stopPropagation()}
+          >
+            <div style={{flex:"none",padding:"16px 16px 0 16px",background:bgCard}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{minWidth:0,paddingRight:8}}>
+                  <div id="add-ex-modal-title" style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"Agregar ejercicios":"Add exercises"}</div>
+                  <div style={{fontSize:13,color:textMuted,marginTop:4,maxWidth:320,lineHeight:1.4,wordBreak:"break-word"}}>
+                    {(addExModal.bloque||"exercises")==="warmup"
+                      ? (es?"Tocá para marcar varios en entrada en calor; confirmá abajo.":"Tap to select warm-up exercises, then confirm.")
+                      : (es?"Tocá para marcar varios en bloque principal; confirmá abajo.":"Tap to select main exercises, then confirm.")}
+                  </div>
+                </div>
+                <button type="button" className="hov" style={{...btn(),padding:"6px",flexShrink:0}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}} aria-label={es?"Cerrar":"Close"}><Ic name="x" size={20}/></button>
+              </div>
+              <input style={{...inp,marginBottom:8,width:"100%",boxSizing:"border-box"}} placeholder={es?"Buscar...":"Search..."} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
+              <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:12,paddingBottom:4,minHeight:44,alignItems:"center",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",msOverflowStyle:"none"}}>
+                {Object.entries(PATS).map(([k,p])=>(
+                  <button key={k} type="button" className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:".5px"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
+                    {p.icon} {es?p.label:p.labelEn}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input style={{...inp,marginBottom:8}} placeholder={es?"Buscar...":"Search..."} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:8}}>
-              {Object.entries(PATS).map(([k,p])=>(
-                <button key={k} className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
-                  {p.icon} {es?p.label:p.labelEn}
-                </button>
-              ))}
-            </div>
-            <div style={{overflowY:"auto",flex:1}}>
-              {EX.filter(e=>{
+            <div style={{flex:1,minHeight:0,minWidth:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"8px 16px 100px 16px",boxSizing:"border-box",touchAction:"pan-y"}}>
+              {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
                 if(!q) return true;
-                return e.name.toLowerCase().includes(q)||e.nameEn.toLowerCase().includes(q)||e.muscle.toLowerCase().includes(q);
+                return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||(e.muscle||"").toLowerCase().includes(q);
               }).map(ex=>{
                 const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
+                const sel=addExSelectedIds.includes(ex.id);
                 return(
-                  <div key={ex.id} className="hov" style={{display:"flex",alignItems:"center",gap:12,padding:"16px 10px",borderRadius:12,marginBottom:8,background:darkMode?"#162234":"#E2E8F0",cursor:"pointer"}} onClick={()=>{
-                    const blk=addExModal.bloque||"exercises"; setRoutines(p=>p.map(r=>r.id===addExModal.rId?{...r,days:r.days.map((d,i)=>i===addExModal.dIdx?{...d,[blk]:[...(d[blk]||[]),{id:ex.id,sets:"",reps:"",kg:"",pause:0,note:"",weeks:[]}]}:d)}:r));
-                    toast2((es?"Agregado":"Added")+": "+(es?ex.name:ex.nameEn));
-                    setAddExModal(null);
-                  }}>
-                    <div style={{width:52,height:52,borderRadius:12,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>{pat.icon}</div>
+                  <div key={ex.id} className="hov" role="button" tabIndex={0} style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 10px",borderRadius:12,marginBottom:8,background:darkMode?"#162234":"#E2E8F0",cursor:"pointer",border:sel?"2px solid "+(pat.color||"#2563EB"):"2px solid transparent"}} onClick={()=>setAddExSelectedIds(function(prev){return prev.includes(ex.id)?prev.filter(function(x){return x!==ex.id;}):[...prev,ex.id];})}>
+                    <div style={{width:52,height:52,borderRadius:12,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:800,color:pat.color,flexShrink:0,marginTop:2}}>{pat.icon}</div>
                     <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:18,fontWeight:700}}>{es?ex.name:ex.nameEn}</div>
-                      <div style={{fontSize:15,color:textMuted}}>{ex.muscle} · {ex.equip}</div>
+                      <div style={{fontSize:18,fontWeight:700,lineHeight:1.25,wordBreak:"break-word"}}>{es?ex.name:ex.nameEn}</div>
+                      <div style={{fontSize:12,fontWeight:700,color:pat.color,textTransform:"uppercase",letterSpacing:.4,marginTop:4,lineHeight:1.3}}>{es?pat.label:pat.labelEn}</div>
+                      {(ex.muscle||ex.equip)&&<div style={{fontSize:14,color:textMuted,marginTop:2,lineHeight:1.35,wordBreak:"break-word"}}>{[ex.muscle,ex.equip].filter(Boolean).join(" · ")}</div>}
                     </div>
-                    <div style={{color:pat.color,fontSize:28,fontWeight:700}}>+</div>
+                    <div style={{width:28,height:28,borderRadius:"50%",border:sel?"2px solid "+pat.color:"2px solid "+border,background:sel?pat.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:4}}>
+                      {sel ? <Ic name="check-sm" size={16} color={pat.color}/> : null}
+                    </div>
                   </div>
                 );
               })}
             </div>
           </div>
         </div>
+        <div
+          style={{
+            position:"fixed",bottom:80,left:20,right:20,zIndex:9999,
+            display:"flex",gap:8,
+            background:darkMode?"#111":"#FFFFFF",
+            padding:"12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) 16px",
+            borderRadius:12,
+            border:darkMode?"1px solid #222":"1px solid "+border,
+            boxSizing:"border-box",
+            boxShadow:"0 -10px 15px -3px rgba(0,0,0,0.5), 0 -4px 6px -2px rgba(0,0,0,0.3)",
+          }}
+          onClick={e=>e.stopPropagation()}
+        >
+          <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"CANCELAR":"CANCEL"}</button>
+          <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} disabled={!addExSelectedIds.length} onClick={async function(){
+            if(!addExModal||addExSelectedIds.length===0) return;
+            var blk=addExModal.bloque||"exercises";
+            var rId=addExModal.rId;
+            var dIdx=addExModal.dIdx;
+            var r=routines.find(function(rr){return rr.id===rId;});
+            var day=r&&r.days?r.days[dIdx]:null;
+            var existing=new Set((day&&day[blk]?day[blk]:[]).map(function(e){return e.id;}));
+            var ids=addExSelectedIds.filter(function(id){return !existing.has(id);});
+            if(ids.length===0){toast2(es?"Ya están en ese bloque":"Already in that block");return;}
+            var newExs=ids.map(function(id){
+              var ex=allEx.find(function(e){return e.id===id;});
+              if(!ex) return null;
+              return {id:ex.id,sets:"3",reps:"8-10",kg:"",pause:0,note:"",weeks:[]};
+            }).filter(Boolean);
+            setRoutines(function(p){return p.map(function(rr){
+              if(rr.id!==rId) return rr;
+              return {...rr,days:rr.days.map(function(d,i){
+                if(i!==dIdx) return d;
+                return {...d,[blk]:[...(d[blk]||[]),...newExs]};
+              })};
+            });});
+            var rSB=rutinasSB.find(function(x){return x.id===rId;});
+            if(rSB){
+              try{
+                var diasAct=(rSB.datos&&rSB.datos.days?rSB.datos.days:[]).map(function(d,i){
+                  if(i!==dIdx) return d;
+                  return {...d,[blk]:[...(d[blk]||[]),...newExs]};
+                });
+                await sb.updateRutina(rSB.id,{nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:"entrenador_principal"});
+                setRutinasSB(function(prev){return prev.map(function(rw){return rw.id===rSB.id?{...rw,datos:{...rw.datos,days:diasAct}}:rw;});});
+              }catch(e){console.error("Add batch save error:",e);}
+            }
+            toast2((es?"Agregados ":"Added ")+newExs.length+(es?" ejercicios":" exercises"));
+            setAddExModal(null);
+            setAddExSelectedIds([]);
+          }}>{es?"AÑADIR SELECCIONADOS":"ADD SELECTED"}{addExSelectedIds.length?" ("+addExSelectedIds.length+")":""}</button>
+        </div>
+        </>
       )}
       {toast&&(()=>{
         const isSuccess = toast.includes("✓")||toast.includes("💪")||toast.includes("✅")||toast.includes("listo")||toast.includes("done")||toast.includes("enviada")||toast.includes("copiado")||toast.includes("creado")||toast.includes("sent")||toast.includes("saved");
@@ -3313,1335 +3324,164 @@ function GymApp() {
   );
 }
 
-function WorkoutScreen({session, activeDay, activeR, allEx, progress, logSet, startTimer, timer, setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek, preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, prCelebration, setPrCelebration, activeExIdx, setActiveExIdx}) {
-
-  const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
-  const bgCard = _dm?"#1E2D40":"#FFFFFF";
-  const bgSub = _dm?"#162234":"#EEF2F7";
-  const border = _dm?"#2D4057":"#E2E8F0";
-  const textMain = _dm?"#FFFFFF":"#0F1923";
-  const textMuted = _dm?"#8B9AB2":"#64748B";
-  const green = _dm?"#22C55E":"#16A34A";
-  const greenSoft = _dm?"rgba(34,197,94,0.12)":"rgba(22,163,74,0.1)";
-  const greenBorder = _dm?"rgba(50,215,75,0.25)":"rgba(26,158,53,0.25)";
-
-  const [kg, setKg] = React.useState("");
-  const [reps, setReps] = React.useState("");
-  const [showAdvanced, setShowAdvanced] = React.useState(false);
-  const [setFlash, setSetFlash] = React.useState(false);
-  const [showCheckAnim, setShowCheckAnim] = React.useState(false);
-  const [swipeDelta, setSwipeDelta] = React.useState(0);
-  const [swiping, setSwiping] = React.useState(false);
-  const swipeStartX = React.useRef(null);
-  const [note, setNote] = React.useState("");
-  const [pause, setPause] = React.useState(90);
-  const [rpe, setRpe] = React.useState(null);
-
-  const hoy = new Date().toLocaleDateString("es-AR");
-  const exercises = activeDay?.exercises||[];
-  const ex = exercises[activeExIdx];
-  const info = ex ? allEx.find(e=>e.id===ex.id) : null;
-  const pat = info ? ({"empuje":{icon:"E",color:"#2563EB"},"traccion":{icon:"🔄",color:"#2563EB"},
-    "rodilla":{icon:"R",color:"#22C55E"},"bisagra":{icon:"B",color:"#8B9AB2"},
-    "core":{icon:"M",color:"#8B9AB2"},"movilidad":{icon:"M",color:"#2563EB"}}[info?.pattern]||{icon:"E",color:"#8B9AB2"}) : {icon:"E",color:"#8B9AB2"};
-
-  // Sets registrados hoy para el ejercicio activo
-  const setsHoy = ex ? (progress[ex.id]?.sets||[]).filter(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeek)) : [];
-  const totalSets = parseInt(ex?.sets)||3;
-  const setsRestantes = Math.max(0, totalSets - setsHoy.length);
-  const setActualNum = setsHoy.length + 1;
-  const ultimoSet = setsHoy[0];
-  const pr = ex ? (progress[ex.id]?.max||0) : 0;
-  const kgNum = parseFloat(kg)||0;
-  const isPR = kgNum > 0 && kgNum > pr && pr > 0;
-
-  // Precargar kg del ultimo set
-  React.useEffect(()=>{
-    if(ex) {
-      const lastKg = setsHoy[0]?.kg || progress[ex.id]?.sets?.[0]?.kg || ex.kg || "";
-      setKg(lastKg ? String(lastKg) : "");
-      setReps(ex.reps ? String(ex.reps) : "");
-      setPause(ex.pause||90);
-      setNote("");
-      setRpe(null);
-    }
-  }, [activeExIdx]);
-
-  const adjustKg = (d) => setKg(v=>String(Math.max(0,(parseFloat(v)||0)+d)));
-  const fmtTime = s => s>=60?Math.floor(s/60)+"m"+(s%60>0?s%60+"s":""):s+"s";
-
-  const handleLogSet = () => {
-    if(!kg || !reps) return;
-    // Haptic feedback — vibración corta al registrar set
-    try { if(navigator.vibrate) navigator.vibrate([40]); } catch(e){}
-    // Micro-feedback: flash + check animation
-    setSetFlash(true);
-    setShowCheckAnim(true);
-    setTimeout(()=>setSetFlash(false), 600);
-    setTimeout(()=>setShowCheckAnim(false), 800);
-    // Detectar PR
-    const newKgVal = parseFloat(kg)||0;
-    if(newKgVal > pr && pr > 0) {
-      // Haptic doble para PR
-      try { if(navigator.vibrate) navigator.vibrate([60,40,120]); } catch(e){}
-      setPrCelebration({ejercicio: es?info?.name:info?.nameEn||info?.name, kg: newKgVal});
-      setTimeout(()=>setPrCelebration(null), 2500);
-    }
-    logSet(ex.id, parseFloat(kg), parseInt(reps), note, rpe);
-    if(pause>0) startTimer(pause, pat.color);
-    setNote("");
-    setRpe(null);
-    // Si completó todos los sets, avanzar al siguiente ejercicio
-    if(setsHoy.length + 1 >= totalSets) {
-      const nextIdx = activeExIdx + 1;
-      if(nextIdx < exercises.length) {
-        setTimeout(()=>setActiveExIdx(nextIdx), 300);
-      }
-    }
-  };
-
-  // Calcular progreso total
-  const totalExDone = exercises.filter(e=>(progress[e.id]?.sets||[]).some(s=>s.date===hoy)).length;
-  const pct = exercises.length>0 ? (totalExDone/exercises.length)*100 : 0;
-
-  // Funcion finalizar (igual que antes)
-  const finalizarSesion = () => {
-    const r = activeR;
-    const dayKey = session.rId+"-"+session.dIdx+"-w"+currentWeek;
-    const newCompleted = completedDays.includes(dayKey)?completedDays:[...completedDays,dayKey];
-    const totalDays = r?r.days.length:1;
-    const daysThisWeek = newCompleted.filter(k=>k.startsWith(session.rId+"-")&&k.endsWith("-w"+currentWeek)).length;
-    setCompletedDays(newCompleted);
-    const durMin = Math.round((Date.now()-(session.startTime||Date.now()))/60000)||1;
-    const exsCompleted = [...(activeDay?.warmup||[]), ...(exercises||[])];
-    const hoyFin = new Date().toLocaleDateString("es-AR");
-    const volTotal = exsCompleted.reduce((acc,ex2)=>{
-      const s=(progress[ex2.id]?.sets||[]).filter(s=>s.date===hoyFin);
-      return acc+s.reduce((a,s2)=>a+(s2.kg||0)*(s2.reps||0),0);
-    },0);
-    const prsNuevos = exsCompleted.filter(ex2=>{
-      const pg=progress[ex2.id];
-      if(!pg) return false;
-      const sHoy=(pg.sets||[]).filter(s=>s.date===hoyFin);
-      if(!sHoy.length) return false;
-      const maxHoy=Math.max(...sHoy.map(s2=>s2.kg||0));
-      if(maxHoy<=0) return false;
-      // PR si supera el máximo previo a la sesión (incluye primer registro)
-      return maxHoy > (preSessionPRs[ex2.id]||0);
-    }).length;
-    setResumenSesion({durMin,ejercicios:exsCompleted.length,
-      totalSets:exsCompleted.reduce((a,e)=>a+(parseInt(e.sets)||3),0),
-      volTotal:Math.round(volTotal),prsNuevos,
-      diaLabel:activeDay.label||("Dia "+(session.dIdx+1)),
-      rutinaName:r?.name||"Entrenamiento",fecha:hoyFin});
-    setSession(null);
-    if(readOnly&&sharedParam){try{
-      const rutData=JSON.parse(atob(sharedParam));
-      if(rutData.alumnoId)sb.addSesion({alumno_id:rutData.alumnoId,rutina_nombre:r?.name||"",
-        dia_label:activeDay.label||("Dia "+(session.dIdx+1)),dia_idx:session.dIdx,
-        semana:currentWeek+1,ejercicios:exercises.map(e=>e.id).join(","),
-        fecha:hoyFin,hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})});
-    }catch(e){}}
-    // FIX 1: solo avanzar semana si pasó al menos 1 día real
-    if(daysThisWeek >= totalDays && currentWeek < 3){
-      const ultimaFechaAvance = localStorage.getItem('it_last_week_advance_date');
-      const hoyDateStr = new Date().toDateString();
-      if(!ultimaFechaAvance || ultimaFechaAvance !== hoyDateStr) {
-        setCompletedDays(prev => prev.filter(k => !k.endsWith("-w" + currentWeek)));
-        setCurrentWeek(currentWeek + 1);
-        localStorage.setItem('it_last_week_advance_date', hoyDateStr);
-      }
-    }
-  };
-
-  const nextEx = exercises[activeExIdx+1];
-  const nextInfo = nextEx ? allEx.find(e=>e.id===nextEx.id) : null;
-
-  return (
-    <div style={{position:"fixed",inset:0,background:bg,zIndex:80,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <div style={{background:bgCard,borderBottom:"2px solid #3B82F6",padding:"8px 16px",flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-          <button className="hov" onClick={()=>{
-            if(window.confirm(es?"¿Salir del entrenamiento? Perderás los sets no guardados.":"Exit workout? Unsaved sets will be lost.")){
-              setSession(null);
-            }
-          }}
-            style={{background:"transparent",border:"none",color:textMuted,fontSize:22,padding:"0 4px",cursor:"pointer"}}>←</button>
-          <div style={{flex:1}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#2563EB",letterSpacing:2}}>{es?"ENTRENANDO":"TRAINING"}</div>
-            <div style={{fontSize:15,fontWeight:900,color:textMain}}>{activeR?.name} — {activeDay.label||("Día "+(session.dIdx+1))}</div>
-          </div>
-          <div style={{fontSize:13,fontWeight:900,color:"#2563EB",background:"#2D4057",borderRadius:20,padding:"4px 12px",border:"1px solid #243040"}}>
-            {totalExDone}/{exercises.length}
-          </div>
-        </div>
-        <div style={{height:4,background:_dm?"#2D4057":"#E2E8F0",borderRadius:2,overflow:"hidden"}}>
-          <div style={{height:"100%",width:pct+"%",background:"#2563EB",borderRadius:2,transition:"width .5s ease"}}/>
-        </div>
-      </div>
-      {timer&&(
-        <div style={{background:"#22C55E18",borderBottom:"1px solid #22c55e33",padding:"8px 16px",
-          display:"flex",alignItems:"center",gap:12,flexShrink:0}}>
-          <div style={{width:36,height:36,borderRadius:"50%",border:"3px solid #22c55e",
-            display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,
-            background:timer.remaining<10?"#2D4057":"transparent",borderColor:timer.remaining<10?"#2563EB":"#22C55E",
-            color:timer.remaining<10?"#2563EB":"#22C55E"}}>
-            {timer.remaining}
-          </div>
-          <div style={{flex:1,fontSize:15,fontWeight:700,color:textMuted}}>{es?"Descansando...":"Resting..."}</div>
-          <button className="hov" onClick={()=>startTimer(0)}
-            style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 12px",
-              color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-            {es?"Saltar":"Skip"}
-          </button>
-        </div>
-      )}
-      <div style={{display:"flex",gap:4,padding:"8px 16px 0",flexShrink:0,overflowX:"auto"}}>
-        {exercises.map((e,i)=>{
-          const done=(progress[e.id]?.sets||[]).filter(s=>s.date===hoy).length>=(parseInt(e.sets)||3);
-          const active=i===activeExIdx;
-          return(
-            <button key={i} onClick={()=>setActiveExIdx(i)}
-              style={{flexShrink:0,width:active?32:10,height:10,borderRadius:6,border:"none",cursor:"pointer",
-                background:done?"#22C55E":active?"#2563EB":(darkMode?"#2D4057":"#2D4057"),
-                transition:"all .25s ease"}}>
-            </button>
-          );
-        })}
-      </div>
-      <div style={{flex:1,overflowY:"auto",padding:"12px 16px 0"}}>
-
-        {ex&&(
-          <>
-            <div style={{marginBottom:12}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                <div style={{width:48,height:48,borderRadius:12,background:pat.color+"22",
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>
-                  {pat.icon}
-                </div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:28,fontWeight:900,color:textMain,lineHeight:1.1}}>
-                    {es?info?.name:info?.nameEn||info?.name}
-                  </div>
-                  <div style={{fontSize:13,color:pat.color,fontWeight:700,marginTop:4}}>
-                    {ex.sets}×{ex.reps} {ex.kg?("· "+ex.kg+"kg"):""} {ex.pause?("· "+fmtTime(ex.pause)+" desc"):""}
-                  </div>
-                </div>
-                {info?.youtube&&(
-                  <a href={info.youtube} target="_blank" rel="noreferrer"
-                    style={{background:"#2D4057",color:"#2563EB",border:"1px solid #243040",
-                      borderRadius:8,padding:"8px 8px",fontSize:13,fontWeight:700,textDecoration:"none",flexShrink:0}}>
-                    ▶
-                  </a>
-                )}
-              </div>
-              {(pr>0||ultimoSet)&&(
-                <div style={{display:"flex",gap:8,marginTop:8}}>
-                  {pr>0&&<span style={{background:"#f59e0b15",border:"1px solid #f59e0b33",borderRadius:6,
-                    padding:"4px 8px",fontSize:13,fontWeight:700,color:"#60A5FA"}}>
-                    🏆 PR {pr}kg
-                  </span>}
-                  {ultimoSet&&<span style={{background:bgSub,borderRadius:6,padding:"4px 8px",
-                    fontSize:13,fontWeight:500,color:textMuted}}>
-                    {es?"Último":"Last"}: {ultimoSet.kg}kg×{ultimoSet.reps}
-                  </span>}
-                </div>
-              )}
-            </div>
-            {setsHoy.length>0&&(
-              <div style={{background:bgCard,borderRadius:12,border:"1px solid "+border,marginBottom:12,overflow:"hidden"}}>
-                <div style={{padding:"8px 14px",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),
-                  fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3}}>
-                  {es?"SETS DE HOY":"TODAY'S SETS"}
-                </div>
-                <div>
-                {setsHoy.slice().reverse().map((s,i)=>(
-                  <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 16px",
-                    borderBottom:i<setsHoy.length-1?"1px solid "+border:"none"}}>
-                    <div style={{width:28,height:28,borderRadius:"50%",background:"#22C55E20",
-                      color:"#22C55E",display:"flex",alignItems:"center",justifyContent:"center",
-                      fontSize:13,fontWeight:900,flexShrink:0}}>✓</div>
-                    <div style={{flex:1,fontSize:18,fontWeight:800,color:textMain}}>
-                      {s.kg}kg × {s.reps} reps
-                    </div>
-                    {s.rpe&&<span style={{fontSize:13,color:textMuted,fontWeight:500}}>RPE {s.rpe}</span>}
-                  </div>
-                ))}
-                </div>
-              </div>
-            )}
-            {setsRestantes>0?(
-              <div
-                style={{background:bgCard,borderRadius:16,border:"1px solid #243040",
-                  marginBottom:12,overflow:"hidden",
-                  transform:swiping?`translateX(${Math.min(swipeDelta,0)}px)`:"translateX(0)",
-                  transition:swiping?"none":"transform .25s cubic-bezier(.34,1.56,.64,1)",
-                  position:"relative",userSelect:"none",
-                  boxShadow:swipeDelta>60?"0 0 0 2px #22C55E44":"none"
-                }}
-                onTouchStart={e=>{
-                  swipeStartX.current = e.touches[0].clientX;
-                  setSwiping(true);
-                  setSwipeDelta(0);
-                }}
-                onTouchMove={e=>{
-                  if(swipeStartX.current===null) return;
-                  const dx = e.touches[0].clientX - swipeStartX.current;
-                  if(dx > 0) { setSwipeDelta(0); return; } // solo swipe izquierda
-                  setSwipeDelta(dx);
-                }}
-                onTouchEnd={()=>{
-                  setSwiping(false);
-                  if(swipeDelta < -80 && kg && reps) {
-                    // Haptic fuerte al completar por swipe
-                    try { if(navigator.vibrate) navigator.vibrate([30,30,60]); } catch(e){}
-                    handleLogSet();
-                  }
-                  setSwipeDelta(0);
-                  swipeStartX.current = null;
-                }}
-              >
-                {/* Fondo verde que aparece al swipear */}
-                <div style={{
-                  position:"absolute",top:0,bottom:0,right:0,
-                  width:Math.max(0,-swipeDelta),
-                  background:"linear-gradient(90deg,transparent,#22C55E33)",
-                  display:"flex",alignItems:"center",justifyContent:"flex-end",
-                  paddingRight:16,pointerEvents:"none",zIndex:0
-                }}>
-                  {-swipeDelta > 50 && <Ic name="check-sm" size={22} color="#22C55E"/>}
-                </div>
-                <div style={{position:"relative",zIndex:1}}>
-                <div style={{padding:"8px 16px",background:"#2D4057",borderBottom:"1px solid #24304022",
-                  display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <div style={{fontSize:13,fontWeight:800,color:"#2563EB",letterSpacing:0.3}}>
-                    {es?"SET":"SET"} {setActualNum} {es?"de":"of"} {totalSets}
-                  </div>
-                  {setActualNum===1&&!swipeDelta&&(
-                    <div style={{fontSize:10,color:"#4A5C72",display:"flex",alignItems:"center",gap:3}}>
-                      <Ic name="arrow-left" size={10} color="#4A5C72"/> deslizá
-                    </div>
-                  )}
-                  {isPR&&(
-                    <div style={{fontSize:13,fontWeight:900,color:"#60A5FA",
-                      background:"#f59e0b15",border:"1px solid #f59e0b44",
-                      borderRadius:20,padding:"2px 10px"}}>
-                      🏆 PR
-                    </div>
-                  )}
-                </div>
-
-                <div style={{padding:"16px"}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                    <div>
-                      <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>KG</div>
-                      <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <button className="hov" onClick={()=>adjustKg(-2.5)}
-                          style={{width:44,height:52,background:bgSub,border:"1px solid "+border,
-                            borderRadius:12,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>−</button>
-                        <input style={{flex:1,background:bgSub,border:"1px solid "+(isPR?"#60A5FA":border),
-                          borderRadius:12,color:isPR?"#60A5FA":textMain,fontSize:28,fontWeight:900,
-                          textAlign:"center",padding:"8px 4px",fontFamily:"inherit",height:52}}
-                          type="number" value={kg} onChange={e=>setKg(e.target.value)}
-                          placeholder="0"/>
-                        <button className="hov" onClick={()=>adjustKg(2.5)}
-                          style={{width:44,height:52,background:bgSub,border:"1px solid "+border,
-                            borderRadius:12,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>+</button>
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>REPS</div>
-                      <div style={{display:"flex",alignItems:"center",gap:4}}>
-                        <button className="hov" onClick={()=>setReps(v=>String(Math.max(1,(parseInt(v)||0)-1)))}
-                          style={{width:44,height:52,background:bgSub,border:"1px solid "+border,
-                            borderRadius:12,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>−</button>
-                        <input style={{flex:1,background:bgSub,border:"1px solid "+border,
-                          borderRadius:12,color:textMain,fontSize:28,fontWeight:900,
-                          textAlign:"center",padding:"8px 4px",fontFamily:"inherit",height:52}}
-                          type="number" value={reps} onChange={e=>setReps(e.target.value)}
-                          placeholder="0"/>
-                        <button className="hov" onClick={()=>setReps(v=>String((parseInt(v)||0)+1))}
-                          style={{width:44,height:52,background:bgSub,border:"1px solid "+border,
-                            borderRadius:12,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>+</button>
-                      </div>
-                    </div>
-                  </div>
-                  {ex.reps&&(
-                    <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-                      {(()=>{
-                        const target=parseInt(ex.reps)||8;
-                        return [target-2,target-1,target,target+1,target+2].filter(v=>v>0).map(v=>(
-                          <button key={v} className="hov"
-                            onClick={()=>setReps(String(v))}
-                            style={{padding:"4px 12px",borderRadius:8,fontSize:13,fontWeight:800,
-                              cursor:"pointer",fontFamily:"inherit",border:"1px solid "+(parseInt(reps)===v?pat.color:border),
-                              background:parseInt(reps)===v?pat.color+"22":"transparent",
-                              color:parseInt(reps)===v?pat.color:textMuted}}>
-                            {v}
-                          </button>
-                        ));
-                      })()}
-                    </div>
-                  )}
-                  <button className={"hov"+(showCheckAnim?" check-pulse":"")} onClick={handleLogSet}
-                    disabled={!kg||!reps}
-                    style={{width:"100%",padding:"16px",
-                      background:(!kg||!reps)?(darkMode?"#2D4057":"#E2E8F0"):showCheckAnim?"#22C55E":(isPR?"#60A5FA":"#2563EB"),
-                      color:(!kg||!reps)?textMuted:"#fff",border:"none",borderRadius:12,
-                      fontSize:22,fontWeight:900,cursor:(!kg||!reps)?"default":"pointer",
-                      fontFamily:"inherit",letterSpacing:1,marginBottom:8,
-                      transition:"background .15s ease",
-                      boxShadow:(!kg||!reps)?"none":(isPR?"0 4px 20px #f59e0b44":"0 4px 20px #243040")}}>
-                    {showCheckAnim
-                      ?(<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="4 12 9 17 20 7"/>
-                          </svg>
-                          {es?"SET REGISTRADO":"SET LOGGED"}
-                        </span>)
-                      :(<span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><Ic name="check-sm" size={20} color="#fff"/>{es?"REGISTRAR SET "+setActualNum:"LOG SET "+setActualNum}</span>)
-                    }
-                  </button>
-                  <button onClick={()=>setShowAdvanced(v=>!v)}
-                    style={{width:"100%",background:"transparent",border:"none",color:textMuted,
-                      fontSize:13,fontWeight:700,cursor:"pointer",padding:"2px",fontFamily:"inherit"}}>
-                    {showAdvanced?"▲":"▼"} {es?"Pausa · Nota · RPE":"Rest · Note · RPE"}
-                  </button>
-                  {showAdvanced&&(
-                    <div style={{marginTop:8}}>
-                      <div style={{fontSize:11,color:textMuted,fontWeight:500,letterSpacing:0.3,marginBottom:8}}>
-                        {es?"PAUSA":"REST"}
-                      </div>
-                      <div style={{display:"flex",gap:8,marginBottom:8}}>
-                        {[0,60,90,120,180].map(p=>(
-                          <button key={p} className="hov" onClick={()=>setPause(p)}
-                            style={{flex:1,padding:"8px 4px",border:"1px solid "+(pause===p?pat.color:border),
-                              borderRadius:8,background:pause===p?pat.color+"22":"transparent",
-                              color:pause===p?pat.color:textMuted,fontSize:13,fontWeight:700,
-                              cursor:"pointer",fontFamily:"inherit"}}>
-                            {p===0?"Off":fmtTime(p)}
-                          </button>
-                        ))}
-                      </div>
-                      <input style={{width:"100%",background:bgSub,border:"1px solid "+border,
-                        borderRadius:8,color:textMain,padding:"8px 10px",fontSize:13,fontFamily:"inherit",marginBottom:8}}
-                        value={note} onChange={e=>setNote(e.target.value)}
-                        placeholder={es?"Nota del set...":"Set note..."}/>
-                      <div style={{display:"flex",gap:4}}>
-                        {[6,7,8,9,10].map(v=>(
-                          <button key={v} className="hov" onClick={()=>setRpe(rpe===v?null:v)}
-                            style={{flex:1,padding:"8px 2px",border:"1px solid "+(rpe===v?"#2563EB":border),
-                              borderRadius:8,background:rpe===v?"#2563EB22":"transparent",
-                              color:rpe===v?"#2563EB":textMuted,fontSize:13,fontWeight:800,
-                              cursor:"pointer",fontFamily:"inherit"}}>
-                            {v}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              </div>
-            ):(
-              /* Ejercicio completado */
-              <div style={{background:"#22c55e15",border:"1px solid #22c55e33",borderRadius:12,
-                padding:"16px",marginBottom:12,textAlign:"center"}}>
-                <div style={{fontSize:36,marginBottom:4}}><Ic name="check-circle" size={22} color="#22C55E"/></div>
-                <div style={{fontSize:18,fontWeight:900,color:"#22C55E"}}>
-                  {es?"Ejercicio completado":"Exercise complete"}
-                </div>
-                <div style={{fontSize:13,color:textMuted,marginTop:4}}>
-                  {setsHoy.length} sets · {setsHoy.reduce((a,s)=>a+(s.kg||0)*(s.reps||0),0).toLocaleString()} kg
-                </div>
-                {activeExIdx<exercises.length-1&&(
-                  <button className="hov" onClick={()=>setActiveExIdx(activeExIdx+1)}
-                    style={{marginTop:12,padding:"8px 24px",background:"#22C55E",color:"#fff",
-                      border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-                    {es?"Siguiente ejercicio →":"Next exercise →"}
-                  </button>
-                )}
-              </div>
-            )}
-            <div style={{display:"flex",gap:8,marginBottom:12}}>
-              {activeExIdx>0&&(
-                <button className="hov" onClick={()=>setActiveExIdx(activeExIdx-1)}
-                  style={{flex:1,padding:"8px",background:bgSub,border:"1px solid "+border,
-                    borderRadius:12,color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                  ← {es?"Anterior":"Prev"}
-                </button>
-              )}
-              {activeExIdx<exercises.length-1&&(
-                <button className="hov" onClick={()=>setActiveExIdx(activeExIdx+1)}
-                  style={{flex:1,padding:"8px",background:bgSub,border:"1px solid "+border,
-                    borderRadius:12,color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                  {es?"Siguiente":"Next"} →
-                </button>
-              )}
-            </div>
-          </>
-        )}
-        {nextEx&&nextInfo&&(
-          <div style={{background:bgSub,borderRadius:12,padding:"8px 16px",marginBottom:12,
-            border:"1px solid "+border,display:"flex",alignItems:"center",gap:8}}>
-            <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,flexShrink:0}}>
-              {es?"SIGUIENTE":"NEXT"}
-            </div>
-            <div style={{flex:1,fontSize:15,fontWeight:800,color:textMuted}}>
-              {es?nextInfo.name:nextInfo.nameEn||nextInfo.name}
-            </div>
-            <div style={{fontSize:13,color:textMuted,fontWeight:500,flexShrink:0}}>
-              {nextEx.sets}×{nextEx.reps}
-            </div>
-          </div>
-        )}
-      </div>
-      <div style={{padding:"8px 16px 20px",flexShrink:0,background:bgCard,
-        borderTop:"1px solid "+border}}>
-        <button className="hov" onClick={finalizarSesion}
-          style={{width:"100%",padding:"16px",background:"#2563EB",color:"#fff",border:"none",
-            borderRadius:12,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit",letterSpacing:1}}>
-          ✅ {es?"FINALIZAR ENTRENAMIENTO":"FINISH WORKOUT"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-
-function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onClose, darkMode, PATS}) {
-  const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
-  const bgCard = _dm?"#1E2D40":"#FFFFFF";
-  const bgSub = _dm?"#162234":"#EEF2F7";
-  const border = _dm?"#2D4057":"#E2E8F0";
-  const textMain = _dm?"#FFFFFF":"#0F1923";
-  const textMuted = _dm?"#8B9AB2":"#64748B";
-  const green = _dm?"#22C55E":"#16A34A";
-  const greenSoft = _dm?"rgba(34,197,94,0.12)":"rgba(22,163,74,0.1)";
-  const greenBorder = _dm?"rgba(50,215,75,0.25)":"rgba(26,158,53,0.25)";
-
-  const lastKg = progress[ex.id]?.sets?.[0]?.kg;
-  const [kg,setKg]=useState(lastKg?String(lastKg):"");
-  const [reps,setReps]=useState(ex.reps||"");
-  const [note,setNote]=useState("");
-  const [pause,setPause]=useState(ex.pause||90);
-  const [rpe,setRpe]=useState(null);
-  const [showAdvanced,setShowAdvanced]=useState(false);
-  const pat=PATS[ex.pattern]||{icon:"E",color:"#8B9AB2",label:"Otro",labelEn:"Other"};
-  const lastSet=progress[ex.id]?.sets?.[0];
-  const isPR = parseFloat(kg)>0 && parseFloat(kg)>(progress[ex.id]?.max||0);
-  const rpeColors={6:"#22C55E",7:"#22C55E",8:"#60A5FA",9:"#8B9AB2",10:"#2563EB"};
-  const rpeLabels={6:es?"Muy facil":"Easy",7:es?"Controlado":"Moderate",8:es?"Exigente":"Hard",9:es?"Muy duro":"Very Hard",10:es?"Al limite":"Max"};
-  const kgNum = parseFloat(kg)||0;
-  const adjustKg = (delta) => setKg(v=>String(Math.max(0,(parseFloat(v)||0)+delta)));
-
-  return(
-    <div style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:"20px 16px 28px",width:"100%"}} onClick={e=>e.stopPropagation()}>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
-        <div style={{width:44,height:44,borderRadius:12,background:pat.color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,flexShrink:0}}>
-          {pat.icon}
-        </div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:22,fontWeight:900,color:textMain,lineHeight:1.1}}>{es?ex.name:ex.nameEn||ex.name}</div>
-          <div style={{fontSize:13,color:pat.color,fontWeight:700,marginTop:4}}>{es?pat.label:pat.labelEn} · {ex.sets}×{ex.reps}</div>
-        </div>
-        <button className="hov" style={{background:"transparent",border:"none",color:textMuted,fontSize:22,padding:"4px 8px",cursor:"pointer"}} onClick={onClose}><Ic name="x" size={16}/></button>
-      </div>
-      {lastSet&&(
-        <div style={{background:bgSub,borderRadius:12,padding:"8px 12px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <span style={{fontSize:13,color:textMuted}}>{es?"Última vez":"Last time"}</span>
-          <span style={{fontSize:15,fontWeight:800,color:textMain}}>{lastSet.kg}kg × {lastSet.reps} reps</span>
-        </div>
-      )}
-      {isPR&&(
-        <div style={{background:"#60A5FA22",border:"1px solid #f59e0b55",borderRadius:12,padding:"8px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
-          <span style={{fontSize:28}}><Ic name="award" size={28} color="#fbbf24"/></span>
-          <div>
-            <div style={{fontSize:15,fontWeight:900,color:"#60A5FA"}}>{es?"¡NUEVO RÉCORD PERSONAL!":"NEW PERSONAL RECORD!"}</div>
-            <div style={{fontSize:13,color:"#f59e0b88"}}>{kgNum}kg {es?"supera tu máximo anterior":"beats your previous max"}</div>
-          </div>
-        </div>
-      )}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-        <div>
-          <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>KG {isPR?"🏆":""}</div>
-          <div style={{display:"flex",alignItems:"center",gap:4}}>
-            <button className="hov" onClick={()=>adjustKg(-2.5)}
-              style={{width:36,height:44,background:bgSub,border:"1px solid "+border,borderRadius:8,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>−</button>
-            <input
-              style={{...inp,textAlign:"center",fontSize:22,fontWeight:900,color:isPR?"#60A5FA":textMain,
-                borderColor:isPR?"#60A5FA":border,flex:1,height:44,padding:"0"}}
-              type="number" value={kg} onChange={e=>setKg(e.target.value)}
-              placeholder={lastSet?.kg?String(lastSet.kg):"0"}/>
-            <button className="hov" onClick={()=>adjustKg(2.5)}
-              style={{width:36,height:44,background:bgSub,border:"1px solid "+border,borderRadius:8,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>+</button>
-          </div>
-        </div>
-        <div>
-          <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>REPS</div>
-          <div style={{display:"flex",alignItems:"center",gap:4}}>
-            <button className="hov" onClick={()=>setReps(v=>String(Math.max(1,(parseInt(v)||0)-1)))}
-              style={{width:36,height:44,background:bgSub,border:"1px solid "+border,borderRadius:8,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>−</button>
-            <input
-              style={{...inp,textAlign:"center",fontSize:22,fontWeight:900,color:textMain,flex:1,height:44,padding:"0"}}
-              type="number" value={reps} onChange={e=>setReps(e.target.value)}
-              placeholder={ex.reps||"0"}/>
-            <button className="hov" onClick={()=>setReps(v=>String((parseInt(v)||0)+1))}
-              style={{width:36,height:44,background:bgSub,border:"1px solid "+border,borderRadius:8,color:textMain,fontSize:22,fontWeight:700,cursor:"pointer",flexShrink:0}}>+</button>
-          </div>
-        </div>
-      </div>
-      <button className="hov"
-        style={{width:"100%",padding:"16px",background:isPR?"#60A5FA":(pat?.color||"#2563EB"),
-          color:"#fff",border:"none",borderRadius:12,fontSize:22,fontWeight:900,
-          cursor:"pointer",fontFamily:"inherit",letterSpacing:1,marginBottom:8,
-          boxShadow:isPR?"0 4px 20px #f59e0b44":"0 4px 20px "+(pat?.color||"#2563EB")+"44"}}
-        onClick={()=>{
-          if(!kg||!reps) return;
-          onLog(parseFloat(kg),parseInt(reps),note,pause,rpe);
-        }}>
-        {isPR?"":""}{es?"+ REGISTRAR SET":"+ LOG SET"}
-      </button>
-      <button onClick={()=>setShowAdvanced(v=>!v)}
-        style={{width:"100%",background:"transparent",border:"none",color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",padding:"4px",fontFamily:"inherit",marginBottom:showAdvanced?10:0}}>
-        {showAdvanced?"▲ ":(es?"▼ Pausa · Nota · RPE":"▼ Rest · Note · RPE")}
-      </button>
-
-      {showAdvanced&&(
-        <div>
-          <div style={{marginBottom:8}}>
-            <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>
-              {es?"PAUSA":"REST"}: {fmtP(pause)}
-            </div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {[0,60,90,120,180,240].map(p=>(
-                <button key={p} className="hov"
-                  style={{padding:"8px 12px",border:"1px solid "+(pause===p?pat?.color:border),borderRadius:8,
-                    background:pause===p?pat?.color+"22":"transparent",color:pause===p?pat?.color:textMuted,
-                    fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
-                  onClick={()=>setPause(p)}>
-                  {p===0?(es?"No":"Off"):fmtP(p)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{marginBottom:8}}>
-            <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{es?"NOTA":"NOTE"}</div>
-            <input style={{...inp,width:"100%"}} value={note} onChange={e=>setNote(e.target.value)} placeholder={es?"Sensaciones, técnica...":"How did it feel?"}/>
-          </div>
-          <div>
-            <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>
-              RPE {rpe?<span style={{color:rpeColors[rpe]}}>— {rpeLabels[rpe]}</span>:null}
-            </div>
-            <div style={{display:"flex",gap:4}}>
-              {[6,7,8,9,10].map(v=>(
-                <button key={v} className="hov"
-                  style={{flex:1,padding:"8px 2px",border:"1px solid "+(rpe===v?rpeColors[v]:border),
-                    borderRadius:8,background:rpe===v?rpeColors[v]+"33":"transparent",
-                    color:rpe===v?rpeColors[v]:textMuted,fontSize:15,fontWeight:800,
-                    cursor:"pointer",fontFamily:"inherit"}}
-                  onClick={()=>setRpe(v===rpe?null:v)}>{v}</button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es}) {
-  const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
-  const bgCard = _dm?"#162234":"#FFFFFF";
-  const bgSub = _dm?"#162234":"#EEF2F7";
-  const border = _dm?"#2D4057":"#E2E8F0";
-  const textMain = _dm?"#FFFFFF":"#0F1923";
-  const textMuted = _dm?"#8B9AB2":"#64748B";
-
-  const [mensajes, setMensajes] = React.useState([]);
-  const [texto, setTexto] = React.useState("");
-  const [loading, setLoading] = React.useState(true);
-  const [enviando, setEnviando] = React.useState(false);
-  const endRef = React.useRef();
-
-  React.useEffect(()=>{
-    sb.getMensajes(alumnoId).then(m=>{ setMensajes(m||[]); setLoading(false); });
-    // Polling cada 10 segundos
-    const interval = setInterval(()=>{
-      sb.getMensajes(alumnoId).then(m=>{ if(m) setMensajes(m); });
-    }, 10000);
-    return ()=>clearInterval(interval);
-  },[]);
-
-  React.useEffect(()=>{ endRef.current?.scrollIntoView({behavior:"smooth"}); },[mensajes]);
-
-  const enviar = async () => {
-    if(!texto.trim() || enviando) return;
-    setEnviando(true);
-    const msg = {alumno_id:alumnoId, texto:texto.trim(), de_entrenador:esEntrenador, nombre:esEntrenador?"Entrenador":alumnoNombre};
-    const res = await sb.addMensaje(msg);
-    if(res&&res[0]) setMensajes(prev=>[...prev,res[0]]);
-    setTexto("");
-    setEnviando(false);
-  };
-
-  if(loading) return (
-    <div style={{display:"flex",flexDirection:"column",gap:8,padding:"8px 0"}}>
-      {[1,2,3].map(i=>(
-        <div key={i} style={{display:"flex",gap:8,justifyContent:i%2===0?"flex-end":"flex-start"}}>
-          <div className="sk" style={{height:36,width:"65%",borderRadius:12}}/>
-        </div>
-      ))}
-    </div>
-  );
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",height:400}}>
-      <div style={{flex:1,overflowY:"auto",padding:"8px 0",marginBottom:8}}>
-        {mensajes.length===0&&<div style={{textAlign:"center",padding:"30px 0",color:textMuted,fontSize:13}}>Sin mensajes aún. ¡Escribí el primero!</div>}
-        {mensajes.map((m,i)=>{
-          const esMio = esEntrenador ? m.de_entrenador : !m.de_entrenador;
-          return (
-            <div key={i} style={{display:"flex",justifyContent:esMio?"flex-end":"flex-start",marginBottom:8}}>
-              <div style={{maxWidth:"78%",
-                background:m.de_entrenador?"#2563EB":"#16A34A",
-                borderRadius:esMio?"14px 14px 2px 14px":"14px 14px 14px 2px",
-                padding:"8px 16px"}}>
-                <div style={{fontSize:11,fontWeight:800,color:"rgba(255,255,255,0.7)",marginBottom:4,letterSpacing:0.5}}>
-                  {m.de_entrenador?"🏋️ Entrenador":"👤 "+m.nombre}
-                </div>
-                <div style={{fontSize:15,color:textMain,lineHeight:1.4}}>{m.texto}</div>
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:4,textAlign:"right"}}>
-                  {m.created_at ? new Date(m.created_at).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}) : ""}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        <div ref={endRef}/>
-      </div>
-      <div style={{display:"flex",gap:8}}>
-        <input style={{flex:1,background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"12px 14px",fontFamily:"Inter,sans-serif",fontSize:15}} value={texto} onChange={e=>setTexto(e.target.value)} placeholder="Escribí un mensaje..." onKeyDown={e=>e.key==="Enter"&&enviar()}/>
-        <button style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:12,padding:"8px 16px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={enviar}>
-          {enviando?"...":"▶"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode}) {
-  const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
-  const bgCard = _dm?"#162234":"#FFFFFF";
-  const bgSub = _dm?"#162234":"#EEF2F7";
-  const border = _dm?"#2D4057":"#E2E8F0";
-  const textMain = _dm?"#FFFFFF":"#0F1923";
-  const textMuted = _dm?"#8B9AB2":"#64748B";
-
-  const [abierto, setAbierto] = React.useState(false);
-  const [unread, setUnread] = React.useState(0);
-  const [lastCount, setLastCount] = React.useState(0);
-
-  React.useEffect(()=>{
-    if(!alumnoId) return;
-    const check = ()=>sb.getMensajes(alumnoId).then(m=>{
-      if(m && m.length > lastCount && !abierto) { setUnread(m.length-lastCount); }
-      setLastCount(m?.length||0);
-    });
-    check();
-    const interval = setInterval(check, 15000);
-    return ()=>clearInterval(interval);
-  },[alumnoId, abierto]);
-
-  if(!alumnoId) return null;
-
-  return (
-    <div>
-      {abierto&&(
-        <div style={{position:"fixed",bottom:76,right:14,width:290,maxWidth:"calc(100vw - 28px)",background:bgCard,borderRadius:16,border:"1px solid "+border,zIndex:150,padding:16,boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-            <div style={{fontSize:15,fontWeight:800,color:textMain}}><Ic name="message-circle" size={18}/> Chat con Entrenador</div>
-            <button onClick={()=>setAbierto(false)} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer"}}><Ic name="x" size={16}/></button>
-          </div>
-          <Chat darkMode={darkMode} _dm={_dm} alumnoId={alumnoId} alumnoNombre={alumnoNombre} esEntrenador={esEntrenador} sb={sb}
-          es={es}/>
-        </div>
-      )}
-      <button onClick={()=>{setAbierto(a=>!a);setUnread(0);}} style={{position:"fixed",bottom:86,right:14,background:"#2563EB",color:"#fff",border:"none",borderRadius:"50%",width:40,height:40,fontSize:15,cursor:"pointer",zIndex:149,boxShadow:"0 4px 12px rgba(239,68,68,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-        💬
-        {unread>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#22C55E",color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{unread}</span>}
-      </button>
-    </div>
-  );
-}
-
 function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, es, darkMode, sesiones, allEx}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
   const bgSub = _dm?"#162234":"#EEF2F7";
   const border = _dm?"#2D4057":"#E2E8F0";
   const textMain = _dm?"#FFFFFF":"#0F1923";
   const textMuted = _dm?"#8B9AB2":"#64748B";
 
-  const [vista, setVista] = React.useState("ejercicio"); // ejercicio | semanas | volumen
-  const [selEx, setSelEx] = React.useState(null);
   const [sbData, setSbData] = React.useState([]);
-  const [sesionesData, setSesionesData] = React.useState(sesiones||[]);
-  // FIX 3: loading state para el gráfico
   const [loadingGrafico, setLoadingGrafico] = React.useState(true);
-  const canvasRef = React.useRef();
-  const canvasSem = React.useRef();
-  const canvasVol = React.useRef();
+  const [expandedEx, setExpandedEx] = React.useState(null);
 
   React.useEffect(()=>{
     const alumnoId = sessionData?.alumnoId || (sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
-    if(!alumnoId) return;
-    sb.getProgreso(alumnoId).then(d=>{ if(d) setSbData(d); });
-    sb.getSesiones(alumnoId).then(d=>{ if(d) setSesionesLocal(d); });
+    if(!alumnoId) { setLoadingGrafico(false); return; }
+    sb.getProgreso(alumnoId).then(function(prog){
+      if(prog) setSbData(prog);
+      setLoadingGrafico(false);
+    }).catch(function(){setLoadingGrafico(false)});
   },[]);
 
   const getDatos = (exId) => {
     const local = (progress[exId]?.sets||[]).map(s=>({kg:parseFloat(s.kg)||0,reps:parseInt(s.reps)||0,fecha:s.date})).filter(s=>s.kg>0);
     const remote = sbData.filter(d=>d.ejercicio_id===exId&&d.kg>0).map(d=>({kg:parseFloat(d.kg),reps:parseInt(d.reps)||0,fecha:d.fecha}));
-    const todos = [...local,...remote].sort((a,b)=>a.fecha>b.fecha?1:-1);
+    const todos = [...local,...remote].sort(function(a,b){
+      var da=a.fecha?a.fecha.split('/').reverse().join('-'):'';
+      var db=b.fecha?b.fecha.split('/').reverse().join('-'):'';
+      return da>db?1:-1;
+    });
     const seen = new Set();
     return todos.filter(d=>{ const k=d.fecha+d.kg; if(seen.has(k))return false; seen.add(k); return true; }).slice(-20);
   };
 
-  const exConDatos = EX.filter(e=>{
-    const local = (progress[e.id]?.sets||[]).some(s=>parseFloat(s.kg)>0);
-    const remote = sbData.some(d=>d.ejercicio_id===e.id&&d.kg>0);
-    return local || remote;
+  // Ejercicios con datos (de la rutina del alumno + cualquiera con registros)
+  const exConDatos = (allEx||EX||[]).filter(function(e){
+    return (progress[e.id]?.sets||[]).some(function(s){return parseFloat(s.kg)>0}) ||
+           sbData.some(function(d){return d.ejercicio_id===e.id&&parseFloat(d.kg)>0});
   });
 
-  // PR por ejercicio
-  const getPR = (exId) => {
-    const datos = getDatos(exId);
-    if(!datos.length) return null;
-    return Math.max(...datos.map(d=>d.kg));
-  };
-
-  // Grupo muscular por ejercicio
-  const MUSCULOS = {
-    sq:"Piernas",leg:"Piernas",legcurl:"Piernas",legext:"Piernas",
-    bp:"Pecho",inc:"Pecho",fly:"Pecho",
-    row:"Espalda",pull:"Espalda",dead:"Espalda",suppu:"Espalda",
-    press:"Hombros",lateralfly:"Hombros",
-    curl:"Bíceps",hammer:"Bíceps",
-    trico:"Tríceps",
-    plank:"Core",crunch:"Core",ab:"Core"
-  };
-  const getMus = (id) => {
-    for(const k in MUSCULOS) { if(id.includes(k)) return MUSCULOS[k]; }
-    return "Otros";
-  };
-
-  // Datos de volumen semanal
-  const getVolumenSemanal = () => {
-    // Agrupar por s.week (semana de la rutina: 0,1,2,3)
-    // Así funciona aunque el alumno haya entrenado todo en el mismo día
-    const semanas = {};
-    Object.values(progress||{}).forEach(pg=>{
-      (pg.sets||[]).forEach(s=>{
-        const w = s.week !== undefined ? s.week : 0;
-        const key = "sem_"+w;
-        if(!semanas[key]) semanas[key] = {series:0, tonelaje:0, maxKg:0, totalReps:0, semKey:key, week:w};
-        semanas[key].series += 1;
-        semanas[key].tonelaje += (parseFloat(s.kg)||0)*(parseInt(s.reps)||0);
-        semanas[key].maxKg = Math.max(semanas[key].maxKg, parseFloat(s.kg)||0);
-        semanas[key].totalReps += parseInt(s.reps)||0;
-      });
-    });
-    // Ordenar por número de semana
-    const ordenadas = Object.values(semanas).sort((a,b)=>a.week-b.week);
-    return ordenadas.map((s,i)=>({...s, label:"Sem "+(s.week+1)}));
-  };
-
-  // Series por patron de movimiento a lo largo de semanas
-  const getVolumenPorPatron = () => {
-    // Usar progress real: cada set registrado tiene kg, reps, date
-    const semanas = {};
-    Object.entries(progress||{}).forEach(([exId, pg])=>{
-      const exInfo = EX.find(e=>e.id===exId);
-      const patron = exInfo?.pattern||"otros";
-      (pg.sets||[]).forEach(s=>{
-        const fecha = s.date||"";
-        if(!fecha) return;
-        // Convertir fecha a comienzo de semana
-        const parts = fecha.split("/");
-        let d;
-        if(parts.length===3) {
-          // formato dd/mm/yyyy
-          d = new Date(parseInt(parts[2]), parseInt(parts[1])-1, parseInt(parts[0]));
-        } else {
-          d = new Date(fecha);
-        }
-        if(isNaN(d.getTime())) return;
-        const startOfWeek = new Date(d);
-        startOfWeek.setDate(d.getDate() - d.getDay());
-        const semKey = startOfWeek.toISOString().slice(0,10);
-        if(!semanas[semKey]) semanas[semKey] = {semKey, patrones:{}};
-        if(!semanas[semKey].patrones[patron]) semanas[semKey].patrones[patron] = {series:0, reps:0, tonelaje:0};
-        semanas[semKey].patrones[patron].series += 1;
-        semanas[semKey].patrones[patron].reps += parseInt(s.reps)||0;
-        semanas[semKey].patrones[patron].tonelaje += (parseFloat(s.kg)||0)*(parseInt(s.reps)||0);
-      });
-    });
-    const semsOrdenadas = Object.values(semanas).sort((a,b)=>a.semKey>b.semKey?1:-1).slice(-8);
-    const todosPatrones = [...new Set(semsOrdenadas.flatMap(s=>Object.keys(s.patrones)))];
-    return {semanas: semsOrdenadas.map((s,i)=>({...s,label:"Sem "+(i+1)})), patrones: todosPatrones};
-  };
-
-  // Total por musculo (para el tab volumen - resumen)
-  const getVolumenMuscular = () => {
-    const musculos = {};
-    sesionesData.forEach(ses=>{
-      const ejercicios = Array.isArray(ses.ejercicios) ? ses.ejercicios : [];
-      ejercicios.forEach(ex=>{
-        const mus = getMus(ex.id||"");
-        const sets = (ex.sets||[]).filter(s=>parseFloat(s.kg)>0);
-        if(!musculos[mus]) musculos[mus] = {series:0, tonelaje:0};
-        musculos[mus].series += sets.length;
-        sets.forEach(s=>{ musculos[mus].tonelaje += (parseFloat(s.kg)||0)*(parseInt(s.reps)||0); });
-      });
-    });
-    return Object.entries(musculos).map(([k,v])=>({nombre:k,...v})).sort((a,b)=>b.series-a.series);
-  };
-
-  // CANVAS: curva de progreso por ejercicio
-  React.useEffect(()=>{
-    try {
-    if(vista!=="ejercicio"||!selEx||!canvasRef.current) return;
-    const datos = getDatos(selEx);
-    if(datos.length<2) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const W=canvas.width, H=canvas.height;
-    const pad={top:30,right:20,bottom:44,left:50};
-    const maxKg = Math.max(...datos.map(d=>d.kg));
-    const minKg = Math.min(...datos.map(d=>d.kg));
-    const range = maxKg-minKg||1;
-    ctx.clearRect(0,0,W,H);
-    ctx.fillStyle="#162234"; ctx.fillRect(0,0,W,H);
-    // Grid lines
-    for(let i=0;i<=4;i++){
-      const y=pad.top+(H-pad.top-pad.bottom)*i/4;
-      ctx.strokeStyle="#2D4057"; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(W-pad.right,y); ctx.stroke();
-      ctx.fillStyle="#8B9AB2"; ctx.font="11px DM Sans,Arial"; ctx.textAlign="right";
-      ctx.fillText(Math.round(maxKg-range*i/4)+"kg",pad.left-4,y+4);
-    }
-    const pts = datos.map((d,i)=>({
-      x:pad.left+(W-pad.left-pad.right)*i/(datos.length-1),
-      y:pad.top+(H-pad.top-pad.bottom)*(1-(d.kg-minKg)/range),
-      kg:d.kg, fecha:d.fecha
-    }));
-    // Área
-    ctx.beginPath(); ctx.moveTo(pts[0].x,H-pad.bottom);
-    pts.forEach(p=>ctx.lineTo(p.x,p.y));
-    ctx.lineTo(pts[pts.length-1].x,H-pad.bottom); ctx.closePath();
-    ctx.fillStyle="rgba(239,68,68,0.12)"; ctx.fill();
-    // Línea
-    ctx.beginPath(); ctx.strokeStyle="#2563EB"; ctx.lineWidth=2.5;
-    pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)); ctx.stroke();
-    // PR line
-    const prY = pad.top+(H-pad.top-pad.bottom)*(1-(maxKg-minKg)/range);
-    ctx.setLineDash([4,4]); ctx.strokeStyle="#8B9AB2"; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(pad.left,prY); ctx.lineTo(W-pad.right,prY); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle="#8B9AB2"; ctx.font="bold 10px DM Sans,Arial"; ctx.textAlign="left";
-    ctx.fillText("PR "+maxKg+"kg",pad.left+4,prY-4);
-    // Puntos
-    pts.forEach((p,i)=>{
-      const isPR = p.kg===maxKg;
-      ctx.beginPath(); ctx.arc(p.x,p.y,isPR?6:4,0,Math.PI*2);
-      ctx.fillStyle=isPR?"#8B9AB2":"#2563EB"; ctx.fill();
-      if(isPR){ctx.fillStyle="#8B9AB2";ctx.font="bold 11px DM Sans,Arial";ctx.textAlign="center";ctx.fillText("★",p.x,p.y-10);}
-      ctx.fillStyle="#FFFFFF"; ctx.font="10px DM Sans,Arial"; ctx.textAlign="center";
-      ctx.fillText(p.kg+"kg",p.x,p.y-(isPR?22:10));
-    });
-    // Fechas
-    ctx.fillStyle="#8B9AB2"; ctx.font="10px DM Sans,Arial"; ctx.textAlign="center";
-    const step=Math.ceil(pts.length/4);
-    pts.forEach((p,i)=>{ if(i%step===0||i===pts.length-1) ctx.fillText(p.fecha.slice(5),p.x,H-pad.bottom+14); });
-    } catch(e){ console.error("canvas err",e); }
-  },[selEx,sbData,vista]);
-
-  // CANVAS: comparar semanas (barras)
-  React.useEffect(()=>{
-    try {
-    if(vista!=="semanas"||!canvasSem.current) return;
-    const datos = getVolumenSemanal();
-    if(!datos.length) return;
-    const canvas=canvasSem.current;
-    const ctx=canvas.getContext("2d");
-    const W=canvas.width,H=canvas.height;
-    const pad={top:20,right:10,bottom:50,left:55};
-    ctx.clearRect(0,0,W,H);
-    ctx.fillStyle="#162234"; ctx.fillRect(0,0,W,H);
-    const maxSeries=Math.max(...datos.map(d=>d.series))||1;
-    const maxTon=Math.max(...datos.map(d=>d.tonelaje))||1;
-    const bw=(W-pad.left-pad.right)/datos.length-6;
-    datos.forEach((d,i)=>{
-      const x=pad.left+i*(W-pad.left-pad.right)/datos.length+3;
-      // Series (azul)
-      const hS=(H-pad.top-pad.bottom)*(d.series/maxSeries);
-      ctx.fillStyle="#2563EB"; ctx.fillRect(x,H-pad.bottom-hS,bw*0.45,hS);
-      // Tonelaje (rojo)
-      const hT=(H-pad.top-pad.bottom)*(d.tonelaje/maxTon);
-      ctx.fillStyle="#2563EB"; ctx.fillRect(x+bw*0.48,H-pad.bottom-hT,bw*0.45,hT);
-      // Label semana
-      ctx.fillStyle="#8B9AB2"; ctx.font="10px DM Sans,Arial"; ctx.textAlign="center";
-      ctx.fillText(d.label,x+bw/2,H-pad.bottom+14);
-      // Valores
-      if(d.series>0){ctx.fillStyle="#2563EB";ctx.font="9px DM Sans,Arial";ctx.textAlign="center";ctx.fillText(d.series,x+bw*0.22,H-pad.bottom-hS-3);}
-    });
-    // Leyenda
-    ctx.fillStyle="#2563EB"; ctx.fillRect(pad.left,8,12,10);
-    ctx.fillStyle="#2D4057"; ctx.font="10px DM Sans,Arial"; ctx.textAlign="left"; ctx.fillText("Series",pad.left+15,17);
-    ctx.fillStyle="#2563EB"; ctx.fillRect(pad.left+70,8,12,10);
-    ctx.fillStyle="#2D4057"; ctx.fillText("Tonelaje",pad.left+85,17);
-    // Eje Y
-    for(let i=0;i<=4;i++){
-      const y=pad.top+(H-pad.top-pad.bottom)*i/4;
-      ctx.strokeStyle="#2D4057";ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(W-pad.right,y);ctx.stroke();
-      ctx.fillStyle="#8B9AB2";ctx.font="10px DM Sans,Arial";ctx.textAlign="right";
-      ctx.fillText(Math.round(maxSeries*(1-i/4)),pad.left-3,y+4);
-    }
-    } catch(e){ console.error("Canvas semanas:",e); }
-  },[sesiones,vista]);
-
-  const volMuscular = vista==="volumen" ? getVolumenMuscular() : [];
-  const COLORS = ["#2563EB","#2563EB","#22C55E","#8B9AB2","#2563EB","#8B9AB2","#2563EB"];
-
-  // FIX 3: skeleton mientras carga
   if(loadingGrafico) return (
-    <div style={{padding:"40px 0",textAlign:"center"}}>
-      <div className="sk" style={{height:180,borderRadius:12,marginBottom:12}}/>
-      <div className="sk" style={{height:14,width:"60%",margin:"0 auto"}}/>
+    <div style={{textAlign:"center",padding:"40px 0"}}>
+      <div className="sk" style={{height:80,borderRadius:12,marginBottom:8}}/>
+      <div className="sk" style={{height:80,borderRadius:12,marginBottom:8}}/>
+      <div className="sk" style={{height:80,borderRadius:12}}/>
     </div>
   );
-  if(exConDatos.length===0 && sesionesData.length===0) return (
-    <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
-      <div style={{fontSize:36,marginBottom:8}}>📊</div>
-      <div style={{fontSize:15,fontWeight:700}}>Sin datos aún</div>
-      <div style={{fontSize:13,marginTop:4}}>Registrá series con peso para ver el gráfico</div>
+
+  if(exConDatos.length===0) return (
+    <div style={{textAlign:"center",padding:"40px 16px"}}>
+      <div style={{fontSize:44,marginBottom:12}}>📊</div>
+      <div style={{fontSize:17,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin datos aún":"No data yet"}</div>
+      <div style={{fontSize:13,color:textMuted,lineHeight:1.6}}>{es?"Registrá sets con peso para ver tu progreso.":"Log sets with weight to see your progress."}</div>
     </div>
   );
 
   return (
     <div>
-      <div style={{display:"flex",gap:8,marginBottom:12}}>
-        {[
-          {k:"ejercicio", lbl:<><Ic name="activity" size={13}/> {es?"Ejercicio":"Exercise"}</>},
-          {k:"semanas",   lbl:<><Ic name="calendar" size={13}/> {es?"Semanas":"Weeks"}</>},
-          {k:"volumen",   lbl:<><Ic name="bar-chart-2" size={13}/> {es?"Volumen":"Volume"}</>},
-        ].map(({k,lbl})=>(          <button key={k} onClick={()=>setVista(k)} style={{background:vista===k?"#2563EB":"#2D4057",color:vista===k?"#fff":"#8B9AB2",border:"none",borderRadius:8,padding:"8px 12px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",flex:1}}>
-            {lbl}
-          </button>
-        ))}
+      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>
+        {es?"PROGRESO POR EJERCICIO":"PROGRESS BY EXERCISE"} ({exConDatos.length})
       </div>
-            {vista==="ejercicio"&&(()=>{
-        // ── helpers de narrativa ──────────────────────────────
-        const getNarrativa = (exId) => {
-          const datos = getDatos(exId);
-          if(!datos||datos.length<2) return null;
-          const pr = getPR(exId);
-          const primero = datos[0];
-          const ultimo  = datos[datos.length-1];
-          const totalSets = (progress[exId]?.sets||[]).length;
-          const semanas = [...new Set((progress[exId]?.sets||[]).map(s=>s.week))].length;
-
-          // ── Variación de carga ──
-          const diffKg = pr - primero.kg;
-          const pctKg  = primero.kg>0 ? Math.round(diffKg/primero.kg*100) : 0;
-
-          // ── Frase principal ──
-          let frase = "";
-          if(pctKg>0){
-            frase = es
-              ? `Pasaste de ${primero.kg} kg a ${pr} kg — subiste un ${pctKg}% de carga.`
-              : `You went from ${primero.kg} kg to ${pr} kg — a ${pctKg}% load increase.`;
-          } else if(pctKg===0){
-            frase = es
-              ? `Mantuviste ${pr} kg en todos los registros. Intentá subir el peso la próxima semana.`
-              : `You maintained ${pr} kg across all records. Try increasing weight next session.`;
-          } else {
-            frase = es
-              ? `El máximo registrado es ${pr} kg con ${totalSets} sets en ${semanas} semana${semanas!==1?"s":""}.`
-              : `Your best is ${pr} kg across ${totalSets} sets over ${semanas} week${semanas!==1?"s":""}.`;
-          }
-
-          // ── Tendencia reciente (últimos 3 registros) ──
-          let tendencia = null;
-          if(datos.length>=3){
-            const rec = datos.slice(-3);
-            const subio = rec[2].kg > rec[0].kg;
-            const igual = rec[2].kg === rec[0].kg;
-            tendencia = igual
-              ? (es ? "Tendencia: estable en los últimos 3 registros." : "Trend: stable over last 3 records.")
-              : subio
-                ? (es ? `Tendencia: en alza (+${Math.round((rec[2].kg-rec[0].kg)*10)/10} kg en últimas 3 sesiones).` : `Trend: rising (+${Math.round((rec[2].kg-rec[0].kg)*10)/10} kg last 3 sessions).`)
-                : (es ? `Tendencia: bajó ${Math.round((rec[0].kg-rec[2].kg)*10)/10} kg en últimas 3 sesiones — revisá la técnica o el descanso.` : `Trend: dropped ${Math.round((rec[0].kg-rec[2].kg)*10)/10} kg last 3 sessions — check form or recovery.`);
-          }
-
-          // ── PR reciente ──
-          const sets = (progress[exId]?.sets||[]);
-          const esPRReciente = sets.length>0 && parseFloat(sets[0]?.kg||0)===pr;
-          const prMsg = esPRReciente
-            ? (es ? "Rompiste tu récord personal en el último registro." : "You broke your personal record in your last session.")
-            : null;
-
-          return { frase, tendencia, prMsg, pctKg, pr, primero, ultimo, totalSets, semanas };
-        };
-
-        const exConDatosLocal = (allEx||[]).filter(e=>
-          (progress[e.id]?.sets||[]).some(s=>parseFloat(s.kg)>0)
-        );
-
-        if(exConDatosLocal.length===0) return (
-          <div style={{textAlign:"center",padding:"40px 16px"}}>
-            <div style={{fontSize:44,marginBottom:12}}>📊</div>
-            <div style={{fontSize:17,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin datos aún":"No data yet"}</div>
-            <div style={{fontSize:13,color:textMuted,lineHeight:1.6}}>{es?"Registrá sets con peso en tu entrenamiento para ver tu progreso.":"Log sets with weight to see your progress here."}</div>
-          </div>
-        );
-
-        const narrativa = selEx ? getNarrativa(selEx) : null;
+      {exConDatos.map(function(e){
+        var datos = getDatos(e.id);
+        if(datos.length===0) return null;
+        var pr = Math.max.apply(null, datos.map(function(d){return d.kg}));
+        var ultimo = datos[datos.length-1];
+        var primero = datos[0];
+        var diff = datos.length>=2 ? Math.round((ultimo.kg-primero.kg)*10)/10 : 0;
+        var pct = primero.kg>0 ? Math.round((ultimo.kg-primero.kg)/primero.kg*100) : 0;
+        var isExpanded = expandedEx===e.id;
+        var tendDir = pct>0?"sube":pct<0?"baja":"estable";
 
         return (
-          <div>
-            {/* Selector de ejercicios */}
-            <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
-              {exConDatosLocal.map(e=>{
-                const pr=getPR(e.id);
-                const nar=getNarrativa(e.id);
-                const isUp = nar&&nar.pctKg>0;
-                return (
-                  <button key={e.id} onClick={()=>setSelEx(e.id)}
-                    style={{background:selEx===e.id?"#2563EB":bgSub,
-                      border:"1px solid "+(selEx===e.id?"#2563EB":border),
-                      borderRadius:20,padding:"8px 12px",cursor:"pointer",
-                      display:"flex",alignItems:"center",gap:4,fontFamily:"inherit"}}>
-                    <span style={{fontSize:12,color:selEx===e.id?"#fff":textMain,fontWeight:600}}>{e.name}</span>
-                    {pr>0&&<span style={{fontSize:10,color:selEx===e.id?"rgba(255,255,255,0.8)":isUp?"#22C55E":"#8B9AB2",fontWeight:700}}>{pr}kg</span>}
-                    {isUp&&<span style={{fontSize:9,color:selEx===e.id?"#90EE90":"#22C55E",fontWeight:700}}>+{nar.pctKg}%</span>}
-                  </button>
-                );
-              })}
+          <div key={e.id} style={{background:bgCard,border:"1px solid "+(isExpanded?"#2563EB":border),borderRadius:12,marginBottom:8,overflow:"hidden",transition:"all .2s"}}>
+            {/* Card compacta - siempre visible */}
+            <div onClick={function(){setExpandedEx(isExpanded?null:e.id)}} style={{padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:40,height:40,borderRadius:10,background:tendDir==="sube"?"#22C55E15":tendDir==="baja"?"#EF444415":"#2563EB15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
+                {tendDir==="sube"?"↑":tendDir==="baja"?"↓":"→"}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:15,fontWeight:700,color:textMain,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{es?e.name:(e.nameEn||e.name)}</div>
+                <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2}}>
+                  <span style={{fontSize:12,color:textMuted}}>{es?"Último":"Last"}: {ultimo.kg}kg×{ultimo.reps}</span>
+                  {datos.length>=2&&<span style={{fontSize:11,fontWeight:700,color:tendDir==="sube"?"#22C55E":tendDir==="baja"?"#EF4444":"#8B9AB2"}}>{pct>0?"+":""}{pct}%</span>}
+                </div>
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:18,fontWeight:900,color:"#fbbf24"}}>{pr}kg</div>
+                <div style={{fontSize:10,fontWeight:700,color:"#fbbf24"}}>PR</div>
+              </div>
+              <div style={{fontSize:13,color:textMuted,flexShrink:0}}>{isExpanded?"▲":"▼"}</div>
             </div>
 
-            {selEx&&narrativa&&(
-              <div>
-                {/* Tarjeta de narrativa */}
-                <div style={{background:narrativa.prMsg?"#0c1f12":bgSub,
-                  border:"1px solid "+(narrativa.prMsg?"#1a3d22":border),
-                  borderRadius:14,padding:"16px",marginBottom:12}}>
-                  {narrativa.prMsg&&(
-                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                      <div style={{background:"#22C55E",borderRadius:6,padding:"4px 8px",fontSize:11,color:"#fff",fontWeight:700}}>PR</div>
-                      <div style={{fontSize:12,color:"#4ade80",fontWeight:600}}>{narrativa.prMsg}</div>
-                    </div>
-                  )}
-                  <div style={{fontSize:14,color:narrativa.prMsg?"#d1fae5":textMain,lineHeight:1.65,marginBottom:narrativa.tendencia?10:0,fontWeight:500}}>
-                    {narrativa.frase}
-                  </div>
-                  {narrativa.tendencia&&(
-                    <div style={{fontSize:12,color:textMuted,lineHeight:1.5,borderTop:"1px solid "+(narrativa.prMsg?"#1a3d22":border),paddingTop:8,marginTop:4}}>
-                      {narrativa.tendencia}
-                    </div>
-                  )}
-                </div>
-
-                {/* Stats compactos */}
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
-                  <div style={{background:bgSub,borderRadius:10,padding:"8px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:22,fontWeight:800,color:"#2563EB"}}>{narrativa.pr}kg</div>
-                    <div style={{fontSize:10,color:textMuted,marginTop:2}}>PR</div>
-                  </div>
-                  <div style={{background:bgSub,borderRadius:10,padding:"8px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:22,fontWeight:800,color:narrativa.pctKg>0?"#22C55E":narrativa.pctKg<0?"#EF4444":textMuted}}>
-                      {narrativa.pctKg>0?"+":""}{narrativa.pctKg}%
-                    </div>
-                    <div style={{fontSize:10,color:textMuted,marginTop:2}}>{es?"vs inicio":"vs start"}</div>
-                  </div>
-                  <div style={{background:bgSub,borderRadius:10,padding:"8px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:22,fontWeight:800,color:textMain}}>{narrativa.totalSets}</div>
-                    <div style={{fontSize:10,color:textMuted,marginTop:2}}>sets</div>
-                  </div>
-                </div>
-
-                {/* Gráfico de línea con canvas */}
-                {getDatos(selEx).length>=2&&(
-                  <div style={{borderRadius:12,overflow:"hidden",marginBottom:8}}>
-                    <canvas ref={canvasRef} width={340} height={180} style={{width:"100%",height:"auto",display:"block"}}/>
-                  </div>
-                )}
-
-                {/* Mini historial de últimos registros */}
-                <div style={{marginTop:8}}>
-                  <div style={{fontSize:11,color:textMuted,fontWeight:600,marginBottom:8,letterSpacing:.5}}>{es?"ÚLTIMOS REGISTROS":"RECENT RECORDS"}</div>
-                  {getDatos(selEx).slice(-5).reverse().map((d,i)=>{
-                    const isPR2 = d.kg===narrativa.pr;
+            {/* Gráfico expandido */}
+            {isExpanded&&(
+              <div style={{padding:"0 14px 14px",borderTop:"1px solid "+border}}>
+                {/* Mini gráfico SVG inline */}
+                <div style={{height:120,position:"relative",marginTop:8}}>
+                  {(function(){
+                    var W=300,H=100,padL=40,padR=10,padT=10,padB=20;
+                    var pts=datos;
+                    if(pts.length<2) return <div style={{textAlign:"center",padding:"20px 0",fontSize:13,color:textMuted}}>{es?"Necesitás al menos 2 registros":"Need at least 2 records"}</div>;
+                    var kgs=pts.map(function(p){return p.kg});
+                    var minK=Math.min.apply(null,kgs);
+                    var maxK=Math.max.apply(null,kgs);
+                    var rangeK=maxK-minK||1;
+                    var points=pts.map(function(p,i){
+                      var x=padL+(W-padL-padR)*i/(pts.length-1);
+                      var y=padT+(H-padT-padB)*(1-(p.kg-minK)/rangeK);
+                      return{x:x,y:y,kg:p.kg,reps:p.reps,fecha:p.fecha};
+                    });
+                    var pathD="M"+points.map(function(p){return p.x+","+p.y}).join("L");
+                    var areaD=pathD+"L"+points[points.length-1].x+","+(H-padB)+"L"+points[0].x+","+(H-padB)+"Z";
                     return(
-                      <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid "+border}}>
-                        <div style={{fontSize:12,color:textMuted,minWidth:70}}>{d.fecha||"—"}</div>
-                        <div style={{flex:1,background:bgSub,borderRadius:6,height:6,overflow:"hidden"}}>
-                          <div style={{height:"100%",background:isPR2?"#22C55E":"#2563EB",borderRadius:6,width:Math.round(d.kg/narrativa.pr*100)+"%",transition:"width .3s"}}/>
-                        </div>
-                        <div style={{fontSize:13,fontWeight:700,color:isPR2?"#22C55E":textMain,minWidth:50,textAlign:"right"}}>{d.kg}kg</div>
-                        {isPR2&&<div style={{fontSize:10,color:"#22C55E",fontWeight:700}}>PR</div>}
-                      </div>
+                      <svg width="100%" viewBox={"0 0 "+W+" "+H} style={{overflow:"visible"}}>
+                        <defs><linearGradient id={"grad-"+e.id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563EB" stopOpacity="0.3"/><stop offset="100%" stopColor="#2563EB" stopOpacity="0"/></linearGradient></defs>
+                        {[0,0.25,0.5,0.75,1].map(function(f,i){
+                          var y2=padT+(H-padT-padB)*f;
+                          var val=Math.round(maxK-(maxK-minK)*f);
+                          return(<g key={e.id+"-chart-grid-y-"+val}><line x1={padL} y1={y2} x2={W-padR} y2={y2} stroke={border} strokeWidth="0.5"/><text x={padL-4} y={y2+3} textAnchor="end" fill={textMuted} fontSize="9">{val}</text></g>);
+                        })}
+                        <path d={areaD} fill={"url(#grad-"+e.id+")"}/>
+                        <path d={pathD} fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        {points.map(function(p,i){return(
+                          <g key={e.id+"-chart-pt-"+(p.fecha||"")+"-"+p.kg+"-"+i}>
+                            <circle cx={p.x} cy={p.y} r={i===points.length-1?5:3} fill={p.kg>=pr?"#fbbf24":"#2563EB"} stroke={_dm?"#0F1923":"#fff"} strokeWidth="2"/>
+                            {i===points.length-1&&<text x={p.x} y={p.y-10} textAnchor="middle" fill="#2563EB" fontSize="11" fontWeight="700">{p.kg}kg</text>}
+                          </g>
+                        )})}
+                        {pts.length<=8&&points.map(function(p,i){return(
+                          <text key={e.id+"-xaxis-"+(p.fecha||"")+"-"+i} x={p.x} y={H-padB+12} textAnchor="middle" fill={textMuted} fontSize="8">{(p.fecha||"").split("/").slice(0,2).join("/")}</text>
+                        )})}
+                      </svg>
                     );
-                  })}
+                  })()}
                 </div>
-              </div>
-            )}
-
-            {selEx&&!narrativa&&(
-              <div style={{textAlign:"center",padding:"32px 16px"}}>
-                <div style={{fontSize:40,marginBottom:8}}>🏋️</div>
-                <div style={{fontSize:15,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Falta un registro más":"One more record needed"}</div>
-                <div style={{fontSize:13,color:textMuted,lineHeight:1.6}}>{es?"Registrá al menos 2 sesiones de este ejercicio para ver tu evolución.":"Log at least 2 sessions of this exercise to see your evolution."}</div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-{vista==="semanas"&&(()=>{
-        const sem = getVolumenSemanal();
-        if(sem.length===0) return (
-          <div style={{textAlign:"center",padding:"40px 16px"}}>
-            <div style={{fontSize:44,marginBottom:12}}>📅</div>
-            <div style={{fontSize:17,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin datos aún":"No data yet"}</div>
-            <div style={{fontSize:13,color:textMuted,lineHeight:1.6}}>{es?"Registrá sets en tu entrenamiento para ver tu evolución.":"Log sets in your workout to see your evolution."}</div>
-          </div>
-        );
-        const maxSeries = Math.max(...sem.map(s=>s.series), 1);
-        const maxKg     = Math.max(...sem.map(s=>s.maxKg), 1);
-        const maxTon    = Math.max(...sem.map(s=>s.tonelaje), 1);
-        const ultima    = sem[sem.length-1];
-        const anterior  = sem.length>=2 ? sem[sem.length-2] : null;
-        const diffSeries = anterior&&anterior.series>0 ? Math.round((ultima.series-anterior.series)/anterior.series*100) : null;
-        const diffKg     = anterior&&anterior.maxKg>0   ? Math.round((ultima.maxKg-anterior.maxKg)/anterior.maxKg*100)   : null;
-        return (
-          <div>
-            {anterior&&(
-              <div style={{display:"flex",gap:8,marginBottom:16}}>
-                <div style={{background:bgSub,borderRadius:10,padding:"8px 10px",textAlign:"center",flex:1}}>
-                  <div style={{fontSize:20,fontWeight:800,color:"#2563EB"}}>{ultima.series}</div>
-                  <div style={{fontSize:10,color:textMuted}}>{es?"Series":"Sets"}</div>
-                  {diffSeries!==null&&<div style={{fontSize:11,fontWeight:700,color:diffSeries>=0?"#22C55E":"#EF4444"}}>{diffSeries>=0?"+":""}{diffSeries}%</div>}
-                </div>
-                <div style={{background:bgSub,borderRadius:10,padding:"8px 10px",textAlign:"center",flex:1}}>
-                  <div style={{fontSize:20,fontWeight:800,color:"#22C55E"}}>{ultima.maxKg}kg</div>
-                  <div style={{fontSize:10,color:textMuted}}>{es?"Max kg":"Max kg"}</div>
-                  {diffKg!==null&&<div style={{fontSize:11,fontWeight:700,color:diffKg>=0?"#22C55E":"#EF4444"}}>{diffKg>=0?"+":""}{diffKg}%</div>}
-                </div>
-                <div style={{background:bgSub,borderRadius:10,padding:"8px 10px",textAlign:"center",flex:1}}>
-                  <div style={{fontSize:20,fontWeight:800,color:"#8B9AB2"}}>{Math.round(ultima.tonelaje/1000*10)/10}t</div>
-                  <div style={{fontSize:10,color:textMuted}}>{es?"Tonelaje":"Volume"}</div>
-                </div>
-              </div>
-            )}
-            <div style={{fontSize:12,color:textMuted,marginBottom:8,fontWeight:600}}>{es?"Series por semana":"Sets per week"}</div>
-            <div style={{display:"flex",alignItems:"flex-end",gap:4,height:120,marginBottom:16}}>
-              {sem.map((s,i)=>{
-                const pct = Math.max((s.series/maxSeries)*100, 3);
-                const isLast = i===sem.length-1;
-                return (
-                  <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                    <div style={{fontSize:10,color:isLast?"#2563EB":textMuted,fontWeight:700}}>{s.series}</div>
-                    <div style={{width:"100%",height:pct+"%",background:isLast?"#2563EB":"#2563EB55",borderRadius:"3px 3px 0 0",minHeight:4}}/>
-                    <div style={{fontSize:10,color:isLast?textMain:textMuted,fontWeight:isLast?700:400}}>{s.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{fontSize:12,color:textMuted,marginBottom:8,fontWeight:600}}>{es?"Kg máximo por semana":"Max kg per week"}</div>
-            <div style={{display:"flex",alignItems:"flex-end",gap:4,height:100,marginBottom:8}}>
-              {sem.map((s,i)=>{
-                const pct = Math.max((s.maxKg/maxKg)*100, 3);
-                const isLast = i===sem.length-1;
-                return (
-                  <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                    <div style={{fontSize:10,color:isLast?"#22C55E":textMuted,fontWeight:700}}>{s.maxKg>0?s.maxKg+"kg":""}</div>
-                    <div style={{width:"100%",height:pct+"%",background:isLast?"#22C55E":"#22C55E55",borderRadius:"3px 3px 0 0",minHeight:4}}/>
-                    <div style={{fontSize:10,color:isLast?textMain:textMuted,fontWeight:isLast?700:400}}>{s.label}</div>
-                  </div>
-                );
-              })}
-            </div>
-            {sem.length===1&&(
-              <div style={{textAlign:"center",padding:"8px",fontSize:12,color:textMuted,background:bgSub,borderRadius:8}}>
-                {es?"💪 Completá la Semana 2 para ver tu evolución":"💪 Complete Week 2 to see your evolution"}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-      {vista==="volumen"&&(()=>{
-        const {semanas:semsVol, patrones:patsVol} = getVolumenPorPatron();
-        const PAT_COLORS = {empuje:"#2563EB",traccion:"#2563EB",rodilla:"#22C55E",bisagra:"#8B9AB2",core:"#8B9AB2",movilidad:"#2563EB",cardio:"#60A5FA",oly:"#8B9AB2",otros:"#8B9AB2"};
-        const PAT_LABELS = {empuje:"Empuje",traccion:"Traccion",rodilla:"Rodilla/Cuads",bisagra:"Bisagra/Glu",core:"Core",movilidad:"Movilidad",cardio:"Cardio",oly:"Olimpico",otros:"Otros"};
-        // Calcular totales por patron
-        const totalesPorPatron = {};
-        patsVol.forEach(pat=>{
-          totalesPorPatron[pat] = semsVol.reduce((acc,s)=>{
-            const d = s.patrones[pat]||{series:0,reps:0,tonelaje:0};
-            return {series:acc.series+(d.series||0), reps:acc.reps+(d.reps||0), tonelaje:acc.tonelaje+(d.tonelaje||0)};
-          }, {series:0,reps:0,tonelaje:0});
-        });
-        if(semsVol.length===0) return (
-          <div style={{textAlign:"center",padding:"32px 16px"}}>
-            <div style={{fontSize:44,marginBottom:12}}>💪</div>
-            <div style={{fontSize:18,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin sesiones aún":"No sessions yet"}</div>
-            <div style={{fontSize:13,color:textMuted,lineHeight:1.5}}>{es?"Completá tu primer entrenamiento para ver el análisis de volumen por patrón muscular":"Complete your first workout to unlock volume analysis by muscle pattern"}</div>
-          </div>
-        );
-        return (
-          <div>
-            <div style={{fontSize:15,color:textMuted,marginBottom:12,fontWeight:700}}>Series por patron — {semsVol.length} semanas</div>
-            {patsVol.map((pat,pi)=>{
-              const col = PAT_COLORS[pat]||"#8B9AB2";
-              const maxVal = Math.max(...semsVol.map(s=>(s.patrones[pat]?.series||0)),1);
-              return (
-                <div key={pat} style={{marginBottom:16}}>
-                  <div style={{marginBottom:8}}>
-                    <div style={{display:"flex",justifyContent:"space-between"}}>
-                      <span style={{fontSize:22,fontWeight:900,color:col}}>{PAT_LABELS[pat]||pat}</span>
-                      <span style={{fontSize:18,fontWeight:900,color:col}}>{totalesPorPatron[pat]?.series||0} series</span>
-                    </div>
-                    <div style={{fontSize:15,color:textMuted,marginBottom:8}}>
-                      {totalesPorPatron[pat]?.reps||0} reps totales · {Math.round(totalesPorPatron[pat]?.tonelaje||0).toLocaleString()} kg tonelaje
-                    </div>
-                  </div>
-                  <div style={{display:"flex",gap:4,alignItems:"flex-end",height:60}}>
-                    {semsVol.map((s,si)=>{
-                      const val = s.patrones[pat]?.series||0;
-                      const pct = val/maxVal;
-                      return (
-                        <div key={si} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                          <div style={{fontSize:13,color:col,fontWeight:900}}>{val>0?val:""}</div>
-                          <div style={{width:"100%",background:col,borderRadius:"3px 3px 0 0",height:Math.max(pct*50,val>0?4:0),opacity:0.85}}/>
-                          <div style={{fontSize:13,color:textMuted,whiteSpace:"nowrap",fontWeight:700}}>{s.label}</div>
+                {/* Historial de registros */}
+                <div style={{marginTop:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{es?"HISTORIAL":"HISTORY"} ({datos.length})</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                    {datos.slice().reverse().slice(0,6).map(function(d,i){
+                      var esPR=d.kg>=pr;
+                      return(
+                        <div key={e.id+"-exp-hist-"+(d.fecha||"")+"-"+d.kg+"-"+d.reps+"-"+i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",background:esPR?"#fbbf2410":bgSub,borderRadius:6,border:esPR?"1px solid #fbbf2433":"none"}}>
+                          <span style={{fontSize:12,color:textMuted}}>{d.fecha}</span>
+                          <div style={{display:"flex",alignItems:"center",gap:6}}>
+                            <span style={{fontSize:13,fontWeight:700,color:esPR?"#fbbf24":textMain}}>{d.kg}kg × {d.reps}</span>
+                            {esPR&&<span style={{fontSize:9,fontWeight:700,color:"#fbbf24"}}>🏆</span>}
+                          </div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
         );
-      })()}
+      })}
     </div>
   );
 }
@@ -4665,7 +3505,7 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones}) {
         const alumnoId = rutData.alumnoId;
         if(alumnoId) {
           const ses = await sb.getSesiones(alumnoId);
-          setSesionesLocal(ses||[]);
+          setSesionesData(ses||[]);
         }
       } catch(e) {}
       setLoading(false);
@@ -4676,7 +3516,7 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones}) {
   if(loading) return (
     <div>
       {[1,2,3,4].map(i=>(
-        <div key={i} style={{background:bgCard,borderRadius:12,padding:"8px 12px",marginBottom:8,border:"1px solid "+border}}>
+        <div key={"historial-sesiones-skel-"+i} style={{background:bgCard,borderRadius:12,padding:"8px 12px",marginBottom:8,border:"1px solid "+border}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div className="sk" style={{height:14,width:"40%"}}/>
             <div className="sk" style={{height:12,width:"20%"}}/>
@@ -4698,7 +3538,7 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones}) {
   return (
     <div>
       {sesionesData.map((s,i)=>(
-        <div key={i} style={{background:bgCard,borderRadius:12,padding:"16px 18px",marginBottom:8,border:"1px solid "+border}}>
+        <div key={s.id||("sesion-"+(s.fecha||"")+"-"+(s.hora||"")+"-"+i)} style={{background:bgCard,borderRadius:12,padding:"16px 18px",marginBottom:8,border:"1px solid "+border}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
             <div style={{fontSize:15,fontWeight:800,color:"#22C55E"}}>✅ {s.dia_label}</div>
             <div style={{fontSize:13,color:textMuted}}>{s.fecha} · {s.hora}</div>
@@ -4751,7 +3591,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
     reader.onload = async (ev) => {
       const base64 = ev.target.result;
       const fecha = new Date().toLocaleDateString("es-AR");
-      const res = await sb.addFoto({alumno_id: alumnoId, imagen: base64, fecha, nota:""});
+      const res = await sb.addFoto({alumno_id: alumnoIdSync, imagen: base64, fecha, nota:""});
       if(res && res[0]) setFotos(prev=>[res[0],...prev]);
       setUploading(false);
     };
@@ -4767,7 +3607,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
   if(loading) return (
     <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
       {[1,2,3,4,5,6].map(i=>(
-        <div key={i} className="sk" style={{aspectRatio:"1",borderRadius:12}}/>
+        <div key={"fotos-progreso-skel-"+i} className="sk" style={{aspectRatio:"1",borderRadius:12}}/>
       ))}
     </div>
   );
@@ -4803,7 +3643,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
 
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
         {fotos.map((f,i)=>(
-          <div key={f.id||i} style={{borderRadius:12,overflow:"hidden",position:"relative"}}>
+          <div key={f.id!=null?String(f.id):"foto-row-"+i} style={{borderRadius:12,overflow:"hidden",position:"relative"}}>
             <img src={f.imagen} style={{width:"100%",aspectRatio:"3/4",objectFit:"cover",display:"block",cursor:"pointer"}} onClick={()=>setFotoGrande(f)}/>
             <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(to top,rgba(0,0,0,.8),transparent)",padding:"20px 8px 6px"}}>
               <div style={{fontSize:11,color:textMain,fontWeight:700}}>{f.fecha}</div>
@@ -4825,7 +3665,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
       </div>
       {fotoGrande&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.95)",zIndex:300,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setFotoGrande(null)}>
-          <img src={fotoGrande.imagen} style={{maxWidth:"100%",maxHeight:"80vh",objectFit:"contain",borderRadius:12}}/>
+          <img src={fotoGrande.imagen} style={{maxWidth:"100%",maxHeight:"80dvh",objectFit:"contain",borderRadius:12}}/>
           <div style={{color:textMuted,marginTop:12,fontSize:15}}>{fotoGrande.fecha}</div>
           <button style={{marginTop:12,background:_dm?"#162234":"#E2E8F0",color:textMain,border:"1px solid "+border,borderRadius:8,padding:"8px 20px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>setFotoGrande(null)}>Cerrar</button>
         </div>
@@ -4847,7 +3687,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
   );
 }
 
-function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
+function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, videoOverrides, setVideoOverrides, setVideoModal}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
@@ -4871,7 +3711,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
   const [newEquip, setNewEquip] = React.useState("");
   const [newYT, setNewYT] = React.useState("");
   const [borrarId, setBorrarId] = React.useState(null);
-  const [ytOverrides, setYtOverrides] = React.useState(()=>{try{return JSON.parse(localStorage.getItem("it_yt_ov")||"{}")}catch(e){return {}}});
+  const ytOverrides = videoOverrides || {};
 
   const patrones = ["todos","empuje","traccion","rodilla","bisagra","core","movilidad","cardio","oly"];
   const musculos = ["todos","Cuadriceps","Gluteo","Isquios","Pecho","Dorsal","Hombro","Biceps","Triceps","Core","Pantorrilla"];
@@ -4902,26 +3742,35 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
       const updated = customEx.map(e=>e.id===editModal.id?{...e,name:editNombre,youtube:editYT}:e);
       setCustomEx(updated);
       localStorage.setItem("it_cex", JSON.stringify(updated));
-    } else {
-      // Ejercicio base: guardar solo el override de youtube
-      const newOverrides = {...ytOverrides, [editModal.id]: editYT};
-      setYtOverrides(newOverrides);
-      localStorage.setItem("it_yt_ov", JSON.stringify(newOverrides));
+      // Actualizar en Supabase
+      try { await sb.updateCustomEx(editModal.id, {name:editNombre, youtube:editYT}); } catch(e){}
+    }
+    // Guardar override de youtube en Supabase
+    if(editYT) {
+      try {
+        await sb.setVideoOverride(editModal.id, editYT);
+        if(setVideoOverrides) setVideoOverrides(function(prev){return {...prev, [editModal.id]: editYT}});
+      } catch(e){ console.error("[videoOverride]",e); }
     }
     setEditModal(null); toast2(es?"Link actualizado ✓":"Link updated ✓");
   };
-  const borrarEjercicio = (id) => {
+  const borrarEjercicio = async (id) => {
     const updated = customEx.filter(e=>e.id!==id);
     setCustomEx(updated);
     localStorage.setItem("it_cex", JSON.stringify(updated));
+    try { await sb.deleteCustomEx(id); } catch(e){}
     setBorrarId(null); toast2(es?"Ejercicio eliminado ✓":"Exercise deleted ✓");
   };
-  const agregarEjercicio = () => {
+  const agregarEjercicio = async () => {
     if(!newNombre.trim()){toast2(es?"Ingresa un nombre":"Enter a name");return;}
     const newEx = {id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, pattern:newPat, muscle:newMus, equip:newEquip||"Libre", youtube:newYT};
     const updated = [...(customEx||[]), newEx];
     setCustomEx(updated);
     localStorage.setItem("it_cex", JSON.stringify(updated));
+    // Guardar en Supabase
+    try {
+      await sb.addCustomEx({id:newEx.id, name:newEx.name, name_en:newEx.nameEn, pattern:newEx.pattern, muscle:newEx.muscle, equip:newEx.equip, youtube:newEx.youtube, entrenador_id:"entrenador_principal"});
+    } catch(e){ console.error("[addCustomEx]",e); }
     setNewNombre(""); setNewPat("empuje"); setNewMus(""); setNewEquip(""); setNewYT("");
     setTab(0); toast2(es?"Ejercicio agregado ✓":"Exercise added ✓");
   };
@@ -4931,10 +3780,17 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
     <div>
       <div style={{display:"flex",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),marginBottom:12}}>
         {[es?"GESTIONAR":"MANAGE", es?"+ NUEVO":"+ NEW"].map((t,i)=>(
-          <button key={i} onClick={()=>setTab(i)} style={{flex:1,padding:"16px",border:"none",background:"none",
+          <button key={i===0?"bib-tab-manage":"bib-tab-new"} onClick={()=>setTab(i)} style={{flex:1,padding:"16px",border:"none",background:"none",
             fontFamily:"inherit",fontSize:18,fontWeight:800,cursor:"pointer",
             color:tab===i?"#2563EB":"#8B9AB2",borderBottom:tab===i?"2px solid #3B82F6":"2px solid transparent"}}>
-            {t}{i===0&&dupCount>0?<span style={{marginLeft:8,background:"#2563EB",color:"#fff",borderRadius:12,padding:"1px 7px",fontSize:13}}>{dupCount}</span>:null}
+            {t}{i===0&&dupCount>0?(
+              <span
+                title={es?`Hay ${dupCount} nombres de ejercicio duplicados`:`There are ${dupCount} duplicate exercise names`}
+                style={{marginLeft:8,background:"#2563EB",color:"#fff",borderRadius:12,padding:"1px 7px",fontSize:13,display:"inline-flex",alignItems:"center",justifyContent:"center"}}
+              >
+                <Ic name="alert-triangle" size={12} color="#fff"/>
+              </span>
+            ):null}
           </button>
         ))}
       </div>
@@ -4945,7 +3801,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
 
           <div style={{display:"flex",background:bgSub,border:"1px solid "+border,borderRadius:12,padding:4,gap:4,marginBottom:8}}>
             {[es?"POR PATRON":"BY PATTERN", es?"POR MUSCULO":"BY MUSCLE"].map((t,i)=>(
-              <button key={i} onClick={()=>{setModoFiltro(i===0?"patron":"musculo");setFiltPat("todos");setFiltMus("todos");}}
+              <button key={i===0?"bib-filt-patron":"bib-filt-muscle"} onClick={()=>{setModoFiltro(i===0?"patron":"musculo");setFiltPat("todos");setFiltMus("todos");}}
                 style={{flex:1,padding:"8px",border:"none",borderRadius:8,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",
                   background:modoFiltro===(i===0?"patron":"musculo")?"#2563EB":"transparent",
                   color:modoFiltro===(i===0?"patron":"musculo")?"#fff":"#8B9AB2"}}>
@@ -5072,9 +3928,11 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
         </div>
       )}
 
+
+
       {editModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setEditModal(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,border:"1px solid "+border}} onClick={e=>e.stopPropagation()}>
+          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",width:"100%",maxHeight:"80dvh",minHeight:0,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:18,fontWeight:800,marginBottom:16}}>{es?"Editar ejercicio":"Edit exercise"}</div>
             <div style={{marginBottom:12}}>
               <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{es?"NOMBRE":"NAME"}</div>
@@ -5084,8 +3942,30 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode}) {
               <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>LINK YOUTUBE</div>
               <div style={{fontSize:11,color:"#60A5FA",marginBottom:8}}><Ic name="info" size={14} color="#60a5fa"/> {es?"Ideal: video corto -30 seg (YouTube Shorts)":"Ideal: short video -30 sec (YouTube Shorts)"}</div>
               <input style={inpS} value={editYT} onChange={e=>setEditYT(e.target.value)} placeholder="https://youtube.com/shorts/..."/>
-              {editYT&&(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(
-                <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>▶️ {es?"Link valido ✓":"Valid link ✓"}</div>
+              {editYT&&(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(()=>{
+                var videoId = null;
+                try {
+                  if(editYT.includes("shorts/")) videoId = editYT.split("shorts/")[1].split("?")[0].split("&")[0];
+                  else if(editYT.includes("v=")) videoId = editYT.split("v=")[1].split("&")[0];
+                  else if(editYT.includes("youtu.be/")) videoId = editYT.split("youtu.be/")[1].split("?")[0];
+                } catch(e){}
+                if(!videoId) return <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>✓ {es?"Link detectado":"Link detected"}</div>;
+                return (
+                  <div style={{marginTop:10}}>
+                    <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{es?"PREVIEW":"PREVIEW"}</div>
+                    <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                      <img loading="lazy" src={"https://img.youtube.com/vi/"+videoId+"/mqdefault.jpg"} style={{width:120,height:68,borderRadius:8,objectFit:"cover",border:"1px solid "+border}} onError={function(e){e.target.style.display="none"}}/>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✓ {es?"Video detectado":"Video detected"}</div>
+                        <div style={{fontSize:11,color:textMuted,marginTop:2}}>ID: {videoId}</div>
+                        <a href={editYT} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#2563EB",textDecoration:"none",marginTop:4,display:"inline-block"}}>{es?"Abrir en YouTube ↗":"Open in YouTube ↗"}</a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              {editYT&&!(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(
+                <div style={{marginTop:8,fontSize:12,color:"#F59E0B"}}>⚠ {es?"No parece un link de YouTube":"Doesn't look like a YouTube link"}</div>
               )}
             </div>
             <div style={{display:"flex",gap:8}}>
@@ -5305,7 +4185,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
                 if(!ej.match&&!ej.selManual) return null;
                 const ref = ej.selManual||ej.match;
                 return (
-                  <div key={i} style={{background:bg,border:"1px solid "+border,borderRadius:12,padding:"8px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+                  <div key={(ref.id||"ex")+"-scan-ok-"+i+"-"+(ej.nombre||"")} style={{background:bg,border:"1px solid "+border,borderRadius:12,padding:"8px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,fontWeight:800}}>{ref.name}</div>
                       <div style={{fontSize:11,color:textMuted}}>{ej.nombre!==ref.name?`Detectado: "${ej.nombre}"`:""}</div>
@@ -5325,7 +4205,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
                 if(ej.match||ej.selManual) return null;
                 const resBib = ej.busqueda?.length>=2 ? allEx.filter(e=>e.name.toLowerCase().includes(ej.busqueda.toLowerCase())).slice(0,4) : [];
                 return (
-                  <div key={i} style={{background:bgCard,border:"1px solid #243040",borderRadius:12,padding:12,marginBottom:8}}>
+                  <div key={"scan-miss-"+(ej.nombre||"ej")+"-"+i} style={{background:bgCard,border:"1px solid #243040",borderRadius:12,padding:12,marginBottom:8}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                       <div>
                         <div style={{fontSize:15,fontWeight:800,color:"#8B9AB2"}}>(es?"Detectado":"Detected")+": \""+ej.nombre+"\""</div>
@@ -5400,7 +4280,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
 }
 
 
-function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}}) {
+function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, darkMode, progress={}, progresoGlobal={}, session=null, routines=[], pagosEstado={}, togglePago=()=>{}, customEx=[]}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#1E2D40":"#FFFFFF";
@@ -5476,6 +4356,26 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
           </div>
         </div>
       )}
+      <AtencionHoy
+  alumnos={alumnos.map(a => {
+    const ulS = sesiones?.filter(s => s.alumno_id === a.id)
+      .sort((x,y) => new Date(y.created_at||y.fecha) - new Date(x.created_at||x.fecha))[0];
+    const diasSinEntrenar = ulS
+      ? Math.floor((new Date() - new Date(ulS.created_at||ulS.fecha)) / 86400000)
+      : 99;
+    return {
+      id: a.id,
+      nombre: a.nombre || a.email,
+      diasSinEntrenar,
+      pagoVencidoDias: pagosEstado[a.id] === "vencido" ? 5 : 0,
+      tieneRutina: routines?.some(r => r.alumno_id === a.id) ?? true,
+      tieneNuevoPR: false,
+      descripcion: diasSinEntrenar >= 5 ? `${diasSinEntrenar} días sin entrenar` : "",
+    };
+  })}
+  onVerProgreso={(a) => onVerAlumno?.({ id: a.id })}
+  onAccion={(a) => onChatAlumno?.({ id: a.id })}
+/>
       <div style={{...sec}}>{es?"ESTA SEMANA":"THIS WEEK"}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:20}}>
         {[
@@ -5484,7 +4384,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
           {v:alumnos.filter(a=>(pagosEstado[a.id]||"pendiente")==="pendiente").length, lbl:es?"PAGO PEND.":"PAYMENT DUE", col:"#fbbf24"},
           {v:alumnos.filter(a=>pagosEstado[a.id]==="vencido").length, lbl:es?"VENCIDOS":"OVERDUE", col:"#f87171"},
         ].map((s,i)=>(
-          <div key={i} style={{background:bgCard,border:"1px solid "+s.col+"33",borderRadius:12,padding:"16px 14px"}}>
+          <div key={"dash-kpi-"+String(s.lbl).replace(/\s/g,"-")+"-"+i} style={{background:bgCard,border:"1px solid "+s.col+"33",borderRadius:12,padding:"16px 14px"}}>
             <div style={{fontSize:36,fontWeight:900,color:s.col,lineHeight:1}}>{s.v}</div>
             <div style={{fontSize:13,fontWeight:800,color:textMuted,letterSpacing:0.3,marginTop:8}}>{s.lbl}</div>
           </div>
@@ -5515,12 +4415,10 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   </div>
                 </div>
                 <div style={{display:"flex",gap:8}}>
-                  {tel&&(
-                    <a href={"https://wa.me/549"+tel+"?text="+waMsg} target="_blank"
-                      style={{background:"#25D36622",color:"#25D366",border:"1px solid #25D36633",
-                        borderRadius:8,padding:"8px 10px",fontSize:18,textDecoration:"none",
-                        display:"flex",alignItems:"center"}}>💬</a>
-                  )}
+                  <button className="hov" onClick={function(e){e.stopPropagation();console.log("[CHAT-DASH] abriendo para",a.id);onChatAlumno&&onChatAlumno(a)}}
+                    style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",
+                      borderRadius:8,padding:"8px 10px",fontSize:18,cursor:"pointer",
+                      display:"flex",alignItems:"center"}}>💬</button>
                   {a.onesignal_id&&(
                     <button className="hov"
                       onClick={()=>{
@@ -5551,14 +4449,53 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
           </div>
           <div style={{background:bgCard,border:"1px solid "+border,borderRadius:12,marginBottom:20,overflow:"hidden"}}>
             {alumnos.map((a,i)=>{
-              const alumnoProgress = routines
-                .filter(r=>r.alumno_id===a.id)
-                .flatMap(r=>r.days||[])
-                .flatMap(d=>[...(d.exercises||[]),(d.warmup||[])].flat())
-                .reduce((acc,ex)=>{
-                  if(ex?.id && a.progress?.[ex.id]) acc[ex.id]=a.progress[ex.id];
-                  return acc;
-                }, {});
+              const alumnoProgress = progresoGlobal[a.id] || [];
+
+              // ── Datos del alumno desde Supabase ──────────────────
+              const regsAlumno = progresoGlobal[a.id] || [];
+              const sesAlumno = (sesiones||[]).filter(function(s){return s.alumno_id===a.id})
+                .sort(function(x,y){return new Date(y.created_at||y.fecha)-new Date(x.created_at||x.fecha)});
+              const ultimaSes = sesAlumno[0];
+
+              // PRs por ejercicio
+              const prsPorEj = {};
+              regsAlumno.forEach(function(reg){
+                var exId = reg.ejercicio_id;
+                var kg = parseFloat(reg.kg)||0;
+                if(!prsPorEj[exId] || kg > prsPorEj[exId].kg) {
+                  prsPorEj[exId] = {kg:kg, fecha:reg.fecha};
+                }
+              });
+
+              // Últimos pesos por ejercicio
+              const ultimosPesos = {};
+              regsAlumno.forEach(function(reg){
+                var exId = reg.ejercicio_id;
+                if(!ultimosPesos[exId]) ultimosPesos[exId] = {kg:parseFloat(reg.kg)||0, reps:parseInt(reg.reps)||0, fecha:reg.fecha};
+              });
+
+              // Top 3 PRs
+              const topPRs = Object.entries(prsPorEj)
+                .sort(function(a2,b2){return b2[1].kg-a2[1].kg})
+                .slice(0,3)
+                .map(function(entry){
+                  var exInfo = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
+                  return {id:entry[0], nombre:exInfo?exInfo.name:entry[0], kg:entry[1].kg};
+                });
+
+              // Tendencia
+              var tendencia = null;
+              if(regsAlumno.length >= 6) {
+                var sortedRegs = regsAlumno.slice().sort(function(a2,b2){return new Date(b2.created_at||b2.fecha)-new Date(a2.created_at||a2.fecha)});
+                var recientes = sortedRegs.slice(0,3);
+                var anteriores = sortedRegs.slice(3,6);
+                var avgRec = recientes.reduce(function(acc,r){return acc+(parseFloat(r.kg)||0)},0)/3;
+                var avgAnt = anteriores.reduce(function(acc,r){return acc+(parseFloat(r.kg)||0)},0)/3;
+                if(avgAnt > 0) {
+                  var pctCambio = Math.round((avgRec-avgAnt)/avgAnt*100);
+                  tendencia = {pct:pctCambio, dir:pctCambio>2?"sube":pctCambio<-2?"baja":"estable"};
+                }
+              }
 
               // ── Narrativa inteligente ──────────────────────────────
               const getNarrativaAlumno = () => {
@@ -5567,7 +4504,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                 let mejorPct = 0;
                 let ejercicioCaida = null;
 
-                const progData = a.progress||{};
+                var regsAlu = progresoGlobal[a.id] || []; var progData = {}; regsAlu.forEach(function(r){if(!progData[r.ejercicio_id])progData[r.ejercicio_id]={sets:[],max:0};progData[r.ejercicio_id].sets.push({kg:parseFloat(r.kg)||0,reps:parseInt(r.reps)||0,date:r.fecha,week:0});progData[r.ejercicio_id].max=Math.max(progData[r.ejercicio_id].max,parseFloat(r.kg)||0);});
                 Object.entries(progData).forEach(([exId, pg])=>{
                   const sets = pg?.sets||[];
                   if(sets.length < 2) return;
@@ -5724,6 +4661,46 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                       {narrativa.msg}
                     </div>
                   )}
+                  {/* ── Info expandida de progreso ── */}
+                  {regsAlumno.length>0&&(
+                    <div style={{marginLeft:46,marginTop:8}}>
+                      {ultimaSes&&(
+                        <div style={{fontSize:11,color:textMuted,marginBottom:6}}>
+                          <span style={{fontWeight:700}}>{es?"Última sesión":"Last session"}:</span> {ultimaSes.dia_label||"?"} · {ultimaSes.fecha||"?"} {ultimaSes.hora?" · "+ultimaSes.hora:""}
+                        </div>
+                      )}
+                      {tendencia&&(
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                          <span style={{fontSize:11,fontWeight:700,color:tendencia.dir==="sube"?"#22C55E":tendencia.dir==="baja"?"#EF4444":"#8B9AB2"}}>
+                            {tendencia.dir==="sube"?"↑":tendencia.dir==="baja"?"↓":"→"} {tendencia.pct>0?"+":""}{tendencia.pct}%
+                          </span>
+                          <span style={{fontSize:10,color:textMuted}}>{es?"tendencia carga":"load trend"}</span>
+                        </div>
+                      )}
+                      {topPRs.length>0&&(
+                        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:6}}>
+                          {topPRs.map(function(pr){return(
+                            <span key={pr.id} style={{background:"#22C55E15",border:"1px solid #22C55E33",borderRadius:6,padding:"2px 7px",fontSize:10,fontWeight:700,color:"#22C55E"}}>
+                              🏆 {pr.nombre.substring(0,15)} {pr.kg}kg
+                            </span>
+                          )})}
+                        </div>
+                      )}
+                      {Object.keys(ultimosPesos).length>0&&(
+                        <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                          {Object.entries(ultimosPesos).slice(0,4).map(function(entry){
+                            var exInfo = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
+                            var nombre = exInfo?exInfo.name:entry[0];
+                            return(
+                              <span key={entry[0]} style={{background:bgSub,borderRadius:6,padding:"2px 6px",fontSize:9,color:textMuted,fontWeight:600}}>
+                                {nombre.substring(0,12)} {entry[1].kg}kg×{entry[1].reps}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -5754,105 +4731,75 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
 }
 
 
-function LibraryAlumno({allEx, es, darkMode}) {
+const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, routines, videoOverrides, setVideoModal}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
   const bgSub = _dm?"#162234":"#EEF2F7";
   const border = _dm?"#2D4057":"#E2E8F0";
   const textMain = _dm?"#FFFFFF":"#0F1923";
   const textMuted = _dm?"#8B9AB2":"#64748B";
 
-  const [grupoActivo, setGrupoActivo] = React.useState("todos");
-  const [q, setQ] = React.useState("");
-
-  const GRUPOS = [
-    {key:"todos",     label:"TODO",       labelEn:"ALL",        icon:"⚡",  color:"#2563EB"},
-    {key:"cuad",      label:"CUADRICEPS", labelEn:"QUADS",      icon:"R",  color:"#22C55E"},
-    {key:"isquios",   label:"ISQUIOS",    labelEn:"HAMSTRINGS", icon:"R",  color:"#8B9AB2"},
-    {key:"gluteos",   label:"GLUTEOS",    labelEn:"GLUTES",     icon:"GL",  color:"#8B9AB2"},
-    {key:"pecho",     label:"PECHO",      labelEn:"CHEST",      icon:"E",  color:"#2563EB"},
-    {key:"espalda",   label:"ESPALDA",    labelEn:"BACK",       icon:"T",  color:"#2563EB"},
-    {key:"brazos",    label:"BRAZOS",     labelEn:"ARMS",       icon:"BR", color:"#2563EB"},
-    {key:"core",      label:"CORE",       labelEn:"CORE",       icon:"·",  color:"#8B9AB2"},
-    {key:"movilidad", label:"MOVILIDAD",  labelEn:"MOBILITY",   icon:"·",  color:"#2563EB"},
-    {key:"cardio",    label:"CARDIO",     labelEn:"CARDIO",     icon:"C",  color:"#60A5FA"},
-    {key:"oly",       label:"OLIMPICOS",  labelEn:"OLYMPIC",    icon:"B",  color:"#8B9AB2"},
-  ];
-
-  const matchGrupo = (e, key) => {
-    if (key === "todos")    return true;
-    if (key === "cuad")     return e.pattern === "rodilla";
-    if (key === "isquios")  return e.pattern === "bisagra" && !/glut/i.test(e.muscle||"");
-    if (key === "gluteos")  return e.pattern === "bisagra" && /glut/i.test(e.muscle||"");
-    if (key === "pecho")    return e.pattern === "empuje"  && /pecho/i.test(e.muscle||"");
-    if (key === "espalda")  return e.pattern === "traccion" && !/bicep|tricep/i.test(e.muscle||"");
-    if (key === "brazos")   return (e.pattern === "empuje" || e.pattern === "traccion") && /bicep|tricep/i.test(e.muscle||"");
-    if (key === "core")     return e.pattern === "core";
-    if (key === "movilidad")return e.pattern === "movilidad";
-    if (key === "cardio")   return e.pattern === "cardio";
-    if (key === "oly")      return e.pattern === "oly";
-    return false;
-  };
-
-  const filtered = (allEx||[]).filter(e => {
-    const nombre = es ? e.name : (e.nameEn || e.name);
-    const matchQ = !q || nombre.toLowerCase().includes(q.toLowerCase());
-    return matchQ && matchGrupo(e, grupoActivo);
+  // Obtener ejercicios únicos de todas las rutinas del alumno
+  const rutina = (routines||[])[0];
+  const dias = rutina?.days || [];
+  const ejerciciosUnicos = {};
+  dias.forEach(function(d, di) {
+    (d.warmup||[]).forEach(function(ex) {
+      if(!ejerciciosUnicos[ex.id]) ejerciciosUnicos[ex.id] = {ex:ex, dia:d.label||("Día "+(di+1)), bloque:"warmup"};
+    });
+    (d.exercises||[]).forEach(function(ex) {
+      if(!ejerciciosUnicos[ex.id]) ejerciciosUnicos[ex.id] = {ex:ex, dia:d.label||("Día "+(di+1)), bloque:"principal"};
+    });
   });
 
-  const g = GRUPOS.find(x => x.key === grupoActivo);
-  const card = {background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"16px 18px",marginBottom:8};
-  const tagStyle = col => ({background:"#162234",color:"#8B9AB2",padding:"2px 7px",borderRadius:6,fontSize:11,fontWeight:700,border:"1px solid #2D4057"});
-  const PAT_COLORS = {rodilla:"#8B9AB2",bisagra:"#8B9AB2",empuje:"#8B9AB2",traccion:"#8B9AB2",core:"#8B9AB2",movilidad:"#2563EB",cardio:"#60A5FA",oly:"#8B9AB2"};
+  const lista = Object.entries(ejerciciosUnicos).map(function(entry) {
+    var exId = entry[0], data = entry[1];
+    var info = (allEx||[]).find(function(e) { return e.id === exId; });
+    return { id: exId, info: info, ex: data.ex, dia: data.dia, bloque: data.bloque };
+  });
+
+  if(lista.length === 0) return (
+    <div style={{textAlign:"center",padding:"60px 0",color:textMuted}}>
+      <div style={{fontSize:48,marginBottom:12}}>💪</div>
+      <div style={{fontSize:18,fontWeight:700}}>{es?"Sin ejercicios en tu rutina":"No exercises in your routine"}</div>
+      <div style={{fontSize:13,marginTop:4,color:textMuted}}>{es?"Tu entrenador te asignará una rutina":"Your coach will assign you a routine"}</div>
+    </div>
+  );
 
   return (
     <div>
-      <input
-        placeholder={es?"Buscar ejercicio...":"Search exercise..."}
-        value={q} onChange={e=>setQ(e.target.value)}
-        style={{background:bgSub,border:"1px solid "+border,borderRadius:12,padding:"12px 14px",
-          color:textMain,fontSize:15,width:"100%",marginBottom:12,fontFamily:"inherit",outline:"none"}}
-      />
-      <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:8,marginBottom:12,scrollbarWidth:"none"}}>
-        {GRUPOS.map(gr=>(
-          <button key={gr.key} onClick={()=>{setGrupoActivo(gr.key);setQ("");}}
-            style={{padding:"8px 13px",borderRadius:20,fontSize:13,fontWeight:700,cursor:"pointer",
-              border: grupoActivo===gr.key ? "1px solid "+gr.color : "1px solid "+border,
-              background: grupoActivo===gr.key ? "#2563EB22" : "#162234",
-              color: grupoActivo===gr.key ? "#2563EB" : "#8B9AB2",
-              whiteSpace:"nowrap",fontFamily:"inherit"}}>
-            {gr.icon} {es?gr.label:gr.labelEn}
-          </button>
-        ))}
+      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>
+        {es?"MIS EJERCICIOS":"MY EXERCISES"} ({lista.length})
       </div>
-      {grupoActivo !== "todos" && !q && g && (
-        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,padding:"8px 12px",
-          background:g.color+"15",border:"1px solid "+g.color+"33",borderRadius:12}}>
-          <span style={{fontSize:22}}>{g.icon}</span>
-          <div style={{fontSize:18,fontWeight:900,color:g.color}}>{es?g.label:g.labelEn}</div>
-          <div style={{marginLeft:"auto",fontSize:13,color:g.color,fontWeight:700}}>{filtered.length} {es?"ejercicios":"exercises"}</div>
-        </div>
-      )}
-      <div style={{fontSize:13,color:textMuted,marginBottom:8}}>{filtered.length} {es?"ejercicios":"exercises"}</div>
-      {filtered.map(e => {
-        const nombre = es ? e.name : (e.nameEn || e.name);
-        const patCol = PAT_COLORS[e.pattern] || "#8B9AB2";
+      {lista.map(function(item) {
+        var info = item.info;
+        var ex = item.ex;
+        var nombre = info ? (es ? info.name : (info.nameEn||info.name)) : item.id;
+        var musculo = info?.muscle || "";
+        var patron = info?.pattern || "";
+        var tieneVideo = (videoOverrides&&videoOverrides[item.id]) || info?.youtube;
+        var videoUrl = (videoOverrides&&videoOverrides[item.id]) || info?.youtube || "";
+        var PAT_COLORS = {rodilla:"#22C55E",bisagra:"#8B9AB2",empuje:"#2563EB",traccion:"#60A5FA",core:"#F59E0B",movilidad:"#A78BFA",cardio:"#EF4444",oly:"#8B9AB2"};
+        var barColor = PAT_COLORS[patron] || "#2563EB";
+
         return (
-          <div key={e.id} style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"16px",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div key={item.id} style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"14px",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:barColor,flexShrink:0,minHeight:36}}/>
               <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:8}}>{nombre}</div>
-                <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-                  <span style={{background:"#162234",color:"#8B9AB2",padding:"4px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid "+border}}>{e.pattern?.toUpperCase()}</span>
-                  {e.muscle&&<span style={{color:textMuted,fontSize:11}}>{e.muscle}</span>}
+                <div style={{fontSize:16,fontWeight:800,color:textMain,marginBottom:2}}>{nombre}</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                  {musculo&&<span style={{fontSize:11,color:textMuted}}>{musculo}</span>}
+                  <span style={{fontSize:10,color:textMuted,background:bgSub,borderRadius:4,padding:"1px 5px"}}>{item.dia}</span>
+                  {ex.sets&&ex.reps&&<span style={{fontSize:11,fontWeight:700,color:"#2563EB"}}>{ex.sets}×{ex.reps}</span>}
+                  {ex.kg&&<span style={{fontSize:11,color:textMuted}}>{ex.kg}kg</span>}
                 </div>
               </div>
-              {e.youtube&&(
-                <a href={e.youtube} target="_blank" rel="noopener noreferrer"
-                  style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",
-                    background:"#162234",color:"#8B9AB2",border:"1px solid "+border,
-                    borderRadius:12,textDecoration:"none",fontSize:18,flexShrink:0}}>▶</a>
+              {tieneVideo&&(
+                <button onClick={function(){var vid=getYTVideoId(videoUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:nombre})}else{window.open(videoUrl,"_blank")}}}
+                  style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",
+                    background:"#EF4444",color:"#fff",border:"none",
+                    borderRadius:10,fontSize:16,flexShrink:0,fontWeight:700,cursor:"pointer"}}>▶</button>
               )}
             </div>
           </div>
@@ -5860,7 +4807,7 @@ function LibraryAlumno({allEx, es, darkMode}) {
       })}
     </div>
   );
-}
+});
 
 
 function OnboardingScreen({es, darkMode, onDone}) {
@@ -5925,7 +4872,7 @@ function OnboardingScreen({es, darkMode, onDone}) {
   // Animación de step
   return (
     <div style={{
-      minHeight:"100vh", background:bg, display:"flex", flexDirection:"column",
+      minHeight:"100dvh", background:bg, display:"flex", flexDirection:"column",
       alignItems:"center", justifyContent:"center", padding:"24px 20px",
       fontFamily:"Inter,sans-serif"
     }}>
@@ -5936,8 +4883,8 @@ function OnboardingScreen({es, darkMode, onDone}) {
 
       {/* Indicador de pasos */}
       <div style={{display:"flex",gap:8,marginBottom:40}}>
-        {STEPS.map((_,i)=>(
-          <div key={i} style={{
+        {STEPS.map((st,i)=>(
+          <div key={"onboard-dot-"+st.id} style={{
             height:4, borderRadius:2, transition:"all .3s",
             width: i===step ? 28 : 12,
             background: i<=step ? "#2563EB" : border,
@@ -6021,7 +4968,7 @@ function OnboardingScreen({es, darkMode, onDone}) {
         {cur.content==="features"&&(
           <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:8}}>
             {features.map((f,i)=>(
-              <div key={i} style={{
+              <div key={(role||"u")+"-onboard-feat-"+i} style={{
                 display:"flex",alignItems:"center",gap:12,
                 padding:"12px 14px",borderRadius:10,
                 background:bgSub,border:"1px solid "+border
@@ -6158,7 +5105,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:125,overflowY:"auto"}} onClick={onClose}>
-      <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <div style={{width:36,height:36,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:color,flexShrink:0}}>{pat?.icon||"·"}</div>
           <div style={{fontSize:22,fontWeight:800,flex:1}}>{es?info?.name:info?.nameEn}</div>
@@ -6203,7 +5150,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
         )}
         <div style={{fontSize:12,fontWeight:700,letterSpacing:0.5,color:textMuted,marginBottom:8}}>{es?"VALORES POR SEMANA":"VALUES PER WEEK"}</div>
         {weeks.map((w,wi)=>(
-          <div key={wi} style={{background:_dm?"#162234":"#EEF2F7",borderRadius:12,padding:"8px 12px",marginBottom:8}}>
+          <div key={(editEx.ex?.id||"ex")+"-edit-wk-"+wi} style={{background:_dm?"#162234":"#EEF2F7",borderRadius:12,padding:"8px 12px",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <div style={{fontSize:13,fontWeight:700,color:color}}>SEM {wi+1}</div>
               {wi>0&&progresion!=="manual"&&(()=>{
