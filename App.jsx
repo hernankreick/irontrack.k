@@ -1149,6 +1149,9 @@ function GymApp() {
   };
 
   const coachDashboardData = useMemo(function() {
+    if (!sessionData || sessionData.role !== "entrenador") {
+      return {};
+    }
     function parsearFechaSesion(s) {
       var raw = s.created_at || "";
       if (raw) return raw.slice(0, 10); // "2026-04-01"
