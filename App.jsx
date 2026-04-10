@@ -153,6 +153,53 @@ const EX = [
   {id:"core_bird_dog",           name:"Bird dog",                      nameEn:"Bird Dog",                    pattern:"core", muscle:"Core/Estabilidad",equip:"Colchoneta", youtube:"https://www.youtube.com/watch?v=wiFNA3sqjCA"},
 ];
 
+// Biblioteca entrenador: músculos multi-select (JSON en campo `muscle`) + texto legacy
+const BIB_MUSCLE_OPTIONS = [
+  { k: "pecho", chipEs: "PECHO", chipEn: "CHEST", selEs: "Pecho", selEn: "Chest" },
+  { k: "espalda", chipEs: "ESPALDA", chipEn: "BACK", selEs: "Espalda", selEn: "Back" },
+  { k: "hombros", chipEs: "HOMBROS", chipEn: "SHOULDERS", selEs: "Hombros", selEn: "Shoulders" },
+  { k: "biceps", chipEs: "BICEPS", chipEn: "BICEPS", selEs: "Bíceps", selEn: "Biceps" },
+  { k: "triceps", chipEs: "TRICEPS", chipEn: "TRICEPS", selEs: "Tríceps", selEn: "Triceps" },
+  { k: "cuadriceps", chipEs: "CUADRICEPS", chipEn: "QUADS", selEs: "Cuádriceps", selEn: "Quads" },
+  { k: "isquios", chipEs: "ISQUIOS", chipEn: "HAMSTRINGS", selEs: "Isquios", selEn: "Hamstrings" },
+  { k: "gluteos", chipEs: "GLUTEOS", chipEn: "GLUTES", selEs: "Glúteos", selEn: "Glutes" },
+  { k: "core", chipEs: "CORE", chipEn: "CORE", selEs: "Core", selEn: "Core" },
+  { k: "pantorrillas", chipEs: "PANTORRILLAS", chipEn: "CALVES", selEs: "Pantorrillas", selEn: "Calves" },
+  { k: "antebrazos", chipEs: "ANTEBRAZOS", chipEn: "FOREARMS", selEs: "Antebrazos", selEn: "Forearms" },
+];
+const BIB_MUSCLE_ORDER = BIB_MUSCLE_OPTIONS.map(function (o) { return o.k; });
+
+function parseBibMuscleJson(raw) {
+  if (raw == null || raw === "") return null;
+  var s = String(raw).trim();
+  if (s.charAt(0) !== "[") return null;
+  try {
+    var a = JSON.parse(s);
+    if (Array.isArray(a) && a.every(function (x) { return typeof x === "string"; })) return a;
+  } catch (e) {}
+  return null;
+}
+
+function formatBibMuscleDisplay(raw, es) {
+  var arr = parseBibMuscleJson(raw);
+  if (arr) {
+    if (arr.length === 0) return "";
+    var ordered = BIB_MUSCLE_ORDER.filter(function (k) { return arr.indexOf(k) >= 0; });
+    return ordered.map(function (k) {
+      var o = BIB_MUSCLE_OPTIONS.find(function (x) { return x.k === k; });
+      return o ? (es ? o.selEs : o.selEn) : k;
+    }).join(", ");
+  }
+  return raw ? String(raw) : "";
+}
+
+function bibMuscleFilterHaystack(raw) {
+  var base = formatBibMuscleDisplay(raw, true) + " " + formatBibMuscleDisplay(raw, false) + " " + String(raw || "");
+  var arr = parseBibMuscleJson(raw);
+  if (arr && arr.length) base += " " + arr.join(" ");
+  return base.toLowerCase();
+}
+
 const VIDEOS = {
   "sq":    "https://youtu.be/-bJIpOq-LWk",
   "lp":    "https://www.youtube.com/results?search_query=prensa+piernas+tecnica+shorts",
@@ -1165,7 +1212,7 @@ function GymApp() {
     const q=search.toLowerCase();
     if(filterPat && e.pattern!==filterPat) return false;
     if(!q) return true;
-    return e.name.toLowerCase().includes(q)||e.nameEn.toLowerCase().includes(q)||e.muscle.toLowerCase().includes(q);
+    return e.name.toLowerCase().includes(q)||e.nameEn.toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
   });
 
   const activeR = session ? routines.find(r=>r.id===session.rId) : null;
@@ -3686,7 +3733,7 @@ function GymApp() {
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
                 if(!q) return true;
-                return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||(e.muscle||"").toLowerCase().includes(q);
+                return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
               }).map(ex=>{
                 const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
                 const sel=addExSelectedIds.includes(ex.id);
@@ -3696,7 +3743,7 @@ function GymApp() {
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:18,fontWeight:700,lineHeight:1.25,wordBreak:"break-word"}}>{es?ex.name:ex.nameEn}</div>
                       <div style={{fontSize:12,fontWeight:700,color:pat.color,textTransform:"uppercase",letterSpacing:.4,marginTop:4,lineHeight:1.3}}>{es?pat.label:pat.labelEn}</div>
-                      {(ex.muscle||ex.equip)&&<div style={{fontSize:14,color:textMuted,marginTop:2,lineHeight:1.35,wordBreak:"break-word"}}>{[ex.muscle,ex.equip].filter(Boolean).join(" · ")}</div>}
+                      {(formatBibMuscleDisplay(ex.muscle, es)||ex.equip)&&<div style={{fontSize:14,color:textMuted,marginTop:2,lineHeight:1.35,wordBreak:"break-word"}}>{[formatBibMuscleDisplay(ex.muscle, es),ex.equip].filter(Boolean).join(" · ")}</div>}
                     </div>
                     <div style={{width:28,height:28,borderRadius:"50%",border:sel?"2px solid "+pat.color:"2px solid "+border,background:sel?pat.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:4}}>
                       {sel ? <Ic name="check-sm" size={16} color={pat.color}/> : null}
@@ -4320,7 +4367,8 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
   const [editYT, setEditYT] = React.useState("");
   const [newNombre, setNewNombre] = React.useState("");
   const [newPat, setNewPat] = React.useState("empuje");
-  const [newMus, setNewMus] = React.useState("");
+  const [newMusKeys, setNewMusKeys] = React.useState([]);
+  const [sortModo, setSortModo] = React.useState(0);
   const [newEquip, setNewEquip] = React.useState("");
   const [newYT, setNewYT] = React.useState("");
   const [borrarId, setBorrarId] = React.useState(null);
@@ -4340,9 +4388,22 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
     const nombre = es?e.name:(e.nameEn||e.name);
     const matchQ = !busq || nombre.toLowerCase().includes(busq.toLowerCase());
     const matchPat = filtPat==="todos" || e.pattern===filtPat;
-    const matchMus = filtMus==="todos" || (e.muscle||"").toLowerCase().includes(filtMus.toLowerCase());
+    const matchMus = filtMus==="todos" || bibMuscleFilterHaystack(e.muscle).includes(filtMus.toLowerCase());
     return matchQ && (modoFiltro==="patron"?matchPat:matchMus);
   });
+
+  const exFiltradosSorted = React.useMemo(function () {
+    var list = exFiltrados.slice();
+    if (sortModo === 0) return list;
+    var loc = es ? "es" : "en";
+    list.sort(function (a, b) {
+      var na = (es ? a.name : (a.nameEn || a.name)) || "";
+      var nb = (es ? b.name : (b.nameEn || b.name)) || "";
+      var cmp = na.localeCompare(nb, loc, { sensitivity: "base" });
+      return sortModo === 1 ? cmp : -cmp;
+    });
+    return list;
+  }, [exFiltrados, sortModo, es]);
 
   const counts = {};
   allEx.forEach(e=>{ counts[e.name.toLowerCase()]=(counts[e.name.toLowerCase()]||0)+1; });
@@ -4376,7 +4437,8 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
   };
   const agregarEjercicio = async () => {
     if(!newNombre.trim()){toast2(es?"Ingresa un nombre":"Enter a name");return;}
-    const newEx = {id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, pattern:newPat, muscle:newMus, equip:newEquip||"Libre", youtube:newYT};
+    var muscleStored = newMusKeys.length ? JSON.stringify(BIB_MUSCLE_ORDER.filter(function (k) { return newMusKeys.indexOf(k) >= 0; })) : "";
+    const newEx = {id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, pattern:newPat, muscle:muscleStored, equip:newEquip||"Libre", youtube:newYT};
     const updated = [...(customEx||[]), newEx];
     setCustomEx(updated);
     localStorage.setItem("it_cex", JSON.stringify(updated));
@@ -4384,7 +4446,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
     try {
       await sb.addCustomEx({id:newEx.id, name:newEx.name, name_en:newEx.nameEn, pattern:newEx.pattern, muscle:newEx.muscle, equip:newEx.equip, youtube:newEx.youtube, entrenador_id:"entrenador_principal"});
     } catch(e){ console.error("[addCustomEx]",e); }
-    setNewNombre(""); setNewPat("empuje"); setNewMus(""); setNewEquip(""); setNewYT("");
+    setNewNombre(""); setNewPat("empuje"); setNewMusKeys([]); setNewEquip(""); setNewYT("");
     setTab(0); toast2(es?"Ejercicio agregado ✓":"Exercise added ✓");
   };
   const inpS = {background:bg,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",color:textMain,fontSize:15,width:"100%",fontFamily:"inherit",outline:"none",marginBottom:8};
@@ -4452,16 +4514,42 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
             </div>
           )}
 
-          <div style={{fontSize:15,color:textMuted,marginBottom:8,fontWeight:700}}>
-            {es?"Mostrando":"Showing"} {exFiltrados.length} {es?"ejercicios de":"exercises of"} {allEx.length}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap"}}>
+            <div style={{fontSize:15,color:textMuted,fontWeight:700,flex:"1 1 auto",minWidth:0}}>
+              {es?"Mostrando":"Showing"} {exFiltrados.length} {es?"ejercicios de":"exercises of"} {allEx.length}
+            </div>
+            <button
+              type="button"
+              onClick={function () { setSortModo(function (m) { return (m + 1) % 3; }); }}
+              title={sortModo === 0 ? (es ? "Sin orden definido — clic para A-Z" : "Default order — click for A-Z") : sortModo === 1 ? (es ? "Orden: A-Z — clic para Z-A" : "Order: A-Z — click for Z-A") : (es ? "Orden: Z-A — clic para quitar orden" : "Order: Z-A — click to clear sort")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid " + (sortModo === 0 ? border : "#2563EB"),
+                background: sortModo === 0 ? bgSub : "#2563EB22",
+                color: sortModo === 0 ? textMuted : "#2563EB",
+                fontFamily: "inherit",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <Ic name="arrow-up-down" size={18} color={sortModo === 0 ? "#8B9AB2" : "#2563EB"} />
+              {es ? "Ordenar" : "Sort"}
+            </button>
           </div>
 
           <div>
-          {exFiltrados.map(e=>{
+          {exFiltradosSorted.map(e=>{
             const isDup = counts[e.name.toLowerCase()]>1;
             const patCol = patColors[e.pattern]||"#8B9AB2";
             const isCustom = !!(customEx||[]).find(c=>c.id===e.id);
             const nombre = es?e.name:(e.nameEn||e.name);
+            const muscleLine = formatBibMuscleDisplay(e.muscle, es);
             const ytUrl = ytOverrides[e.id] || e.youtube || "";
             return (
               <div key={e.id} style={{background:bgCard,border:"1px solid #2D4057",borderRadius:12,padding:"16px",marginBottom:8}}>
@@ -4470,7 +4558,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
                     <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:8,lineHeight:1.2}}>{nombre}</div>
                     <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                       <span style={{background:"#162234",color:"#8B9AB2",padding:"4px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid #2D4057",letterSpacing:.5}}>{patLabel(e.pattern)}</span>
-                      {e.muscle&&<span style={{color:textMuted,fontSize:11,fontWeight:600}}>{e.muscle}</span>}
+                      {muscleLine ? <span style={{color:textMuted,fontSize:11,fontWeight:600}}>{muscleLine}</span> : null}
                       {isCustom&&<span style={{background:"#2563EB18",color:"#2563EB",padding:"4px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid #2563EB33"}}>CUSTOM</span>}
                     </div>
                   </div>
@@ -4522,7 +4610,44 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
           </div>
           <div style={{marginBottom:12}}>
             <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{es?"MUSCULO":"MUSCLE"}</div>
-            <input style={inpS} value={newMus} onChange={e=>setNewMus(e.target.value)} placeholder={es?"Ej: Pecho, Triceps":"Ex: Chest, Triceps"}/>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {BIB_MUSCLE_OPTIONS.map(function (o) {
+                var sel = newMusKeys.indexOf(o.k) >= 0;
+                return (
+                  <button
+                    key={o.k}
+                    type="button"
+                    onClick={function () {
+                      setNewMusKeys(function (prev) {
+                        return prev.indexOf(o.k) >= 0 ? prev.filter(function (x) { return x !== o.k; }) : prev.concat([o.k]);
+                      });
+                    }}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      fontSize: 15,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      border: sel ? "1px solid #2563EB" : "1px solid " + border,
+                      background: sel ? "#2563EB22" : "#1E2D40",
+                      color: sel ? "#2563EB" : "#8B9AB2",
+                    }}
+                  >
+                    {es ? o.chipEs : o.chipEn}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{fontSize: 13, color: textMuted, marginTop: 8, lineHeight: 1.4 }}>
+              {es ? "Seleccionados: " : "Selected: "}
+              {BIB_MUSCLE_ORDER.filter(function (k) { return newMusKeys.indexOf(k) >= 0; })
+                .map(function (k) {
+                  var opt = BIB_MUSCLE_OPTIONS.find(function (x) { return x.k === k; });
+                  return opt ? (es ? opt.selEs : opt.selEn) : k;
+                })
+                .join(", ") || "—"}
+            </div>
           </div>
           <div style={{marginBottom:12}}>
             <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{es?"EQUIPAMIENTO":"EQUIPMENT"}</div>
