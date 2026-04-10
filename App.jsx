@@ -825,6 +825,12 @@ function GymApp() {
   const [videoModal, setVideoModal] = useState(null); // {url, nombre}
   const [expandedPlanDay, setExpandedPlanDay] = useState(null); // "rutId-dayIdx"
   const [editEx, setEditEx] = useState(null);
+  const [coachAlumnosSearch, setCoachAlumnosSearch] = useState("");
+  const [coachAlumnosFilter, setCoachAlumnosFilter] = useState("todos");
+  const [coachRoutineDiaIdx, setCoachRoutineDiaIdx] = useState(0);
+  const [coachDiaSecsOpen, setCoachDiaSecsOpen] = useState({ warmup: true, main: true });
+  const [coachCardMenuId, setCoachCardMenuId] = useState(null);
+  const [coachRutinaMenuOpen, setCoachRutinaMenuOpen] = useState(false);
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
   const [preSessionPRs, setPreSessionPRs] = useState({});
@@ -1112,6 +1118,67 @@ function GymApp() {
     setTimeout(() => setToast(null), 2200);
   }, []);
 
+  const coachAlumnoCategoria = React.useCallback(function (a) {
+    if (!rutinasSBEntrenador.some(function (r) { return r.alumno_id === a.id; })) return "sin_rutina";
+    var cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000;
+    var ses = sesionesGlobales || [];
+    for (var i = 0; i < ses.length; i++) {
+      if (ses[i].alumno_id !== a.id) continue;
+      var raw = ses[i].created_at || "";
+      if (!raw) continue;
+      var d = new Date(raw.slice(0, 10));
+      if (!isNaN(d.getTime()) && d.getTime() >= cutoff) return "activo";
+    }
+    var plist = progresoGlobal[a.id];
+    if (plist && plist.length) {
+      for (var j = 0; j < plist.length; j++) {
+        var fecha = plist[j].fecha || "";
+        if (!fecha) continue;
+        var d2;
+        if (fecha.indexOf("/") >= 0) {
+          var p = fecha.split("/");
+          d2 = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+        } else {
+          d2 = new Date(fecha.slice(0, 10));
+        }
+        if (!isNaN(d2.getTime()) && d2.getTime() >= cutoff) return "activo";
+      }
+    }
+    return "inactivo";
+  }, [rutinasSBEntrenador, sesionesGlobales, progresoGlobal]);
+
+  const coachAlumnosCounts = React.useMemo(function () {
+    var c = { todos: alumnos.length, activos: 0, inactivos: 0, sin_rutina: 0 };
+    alumnos.forEach(function (a) {
+      var cat = coachAlumnoCategoria(a);
+      if (cat === "sin_rutina") c.sin_rutina++;
+      else if (cat === "activo") c.activos++;
+      else c.inactivos++;
+    });
+    return c;
+  }, [alumnos, coachAlumnoCategoria]);
+
+  const coachAlumnosListaFiltrada = React.useMemo(function () {
+    var q = coachAlumnosSearch.trim().toLowerCase();
+    return alumnos.filter(function (a) {
+      if (q) {
+        var hay = ((a.nombre || "") + " " + (a.email || "")).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      var cat = coachAlumnoCategoria(a);
+      if (coachAlumnosFilter === "todos") return true;
+      if (coachAlumnosFilter === "sin_rutina") return cat === "sin_rutina";
+      if (coachAlumnosFilter === "activos") return cat === "activo";
+      if (coachAlumnosFilter === "inactivos") return cat === "inactivo";
+      return true;
+    });
+  }, [alumnos, coachAlumnosSearch, coachAlumnosFilter, coachAlumnoCategoria]);
+
+  React.useEffect(function () {
+    setCoachRoutineDiaIdx(0);
+    setCoachDiaSecsOpen({ warmup: true, main: true });
+    setCoachRutinaMenuOpen(false);
+  }, [alumnoActivo?.id]);
 
   const R = 26; const circ = 2*Math.PI*R;
 
@@ -2344,9 +2411,9 @@ function GymApp() {
           </div>
         )}
         {tab==="alumnos"&&sessionData?.role==="entrenador"&&(
-          <div>
+          <div style={{background:"#0a0f1a",marginLeft:-4,marginRight:-4,padding:"8px 4px 20px",borderRadius:12}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-              <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:textMain}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
+              <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:"#fff"}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
               <div style={{display:"flex",gap:8}}>
                 <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={es?"Datos de pago":"Payment info"}><Ic name="share" size={16}/></button>
                 <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={es?"Actualizar":"Refresh"}><Ic name="refresh-cw" size={16}/></button>
@@ -2372,6 +2439,50 @@ function GymApp() {
                 <div style={{fontSize:12,color:textMuted,marginTop:6}}>{es?"Creá o editá rutinas en RUTINAS. Con varias listas, elegí cuál mandar acá.":"Create or edit routines under ROUTINES. If you have several, pick which one to send."}</div>
               </div>
             )}
+
+            <div style={{marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,background:"#111827",border:"1px solid rgba(59,130,246,0.22)",borderRadius:12,padding:"10px 12px"}}>
+                <Ic name="search" size={18} color="#64748b"/>
+                <input
+                  type="search"
+                  value={coachAlumnosSearch}
+                  onChange={function (e) { setCoachAlumnosSearch(e.target.value); }}
+                  placeholder={es ? "Buscar alumno..." : "Search athlete..."}
+                  style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#fff",fontSize:15,fontFamily:"inherit",minWidth:0}}
+                />
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+                {[
+                  { k: "todos", es: "Todos", en: "All", n: coachAlumnosCounts.todos },
+                  { k: "activos", es: "Activos", en: "Active", n: coachAlumnosCounts.activos },
+                  { k: "inactivos", es: "Inactivos", en: "Inactive", n: coachAlumnosCounts.inactivos },
+                  { k: "sin_rutina", es: "Sin rutina", en: "No routine", n: coachAlumnosCounts.sin_rutina },
+                ].map(function (chip) {
+                  var sel = coachAlumnosFilter === chip.k;
+                  return (
+                    <button
+                      key={chip.k}
+                      type="button"
+                      className="hov"
+                      onClick={function () { setCoachAlumnosFilter(chip.k); }}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 999,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        border: sel ? "1px solid #3b82f6" : "1px solid rgba(59,130,246,0.2)",
+                        background: sel ? "rgba(59,130,246,0.2)" : "#111827",
+                        color: sel ? "#3b82f6" : "#94a3b8",
+                      }}
+                    >
+                      {es ? chip.es : chip.en} ({chip.n})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {newAlumnoForm&&(
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>{setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}}>
@@ -2444,161 +2555,269 @@ function GymApp() {
               </div>
             )}
             {alumnos.length===0&&!loadingSB&&(
-              <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
+              <div style={{textAlign:"center",padding:"30px 0",color:"#94a3b8"}}>
                 <div style={{fontSize:36,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <Ic name="users" size={34} color={textMuted}/>
+                  <Ic name="users" size={34} color="#64748b"/>
                 </div>
                 <div style={{fontSize:15,fontWeight:700}}>{es?"Sin alumnos aún":"No athletes yet"}</div>
               </div>
             )}
+            {alumnos.length>0 && coachAlumnosListaFiltrada.length===0 && !loadingSB && (
+              <div style={{textAlign:"center",padding:"24px 12px",color:"#94a3b8",fontSize:15,fontWeight:600}}>
+                {es?"No hay alumnos que coincidan con la búsqueda o el filtro.":"No athletes match your search or filter."}
+              </div>
+            )}
 
-            {alumnos.map(a=>(
-              <div key={a.id} style={{background:bgCard,borderRadius:12,padding:"16px",marginBottom:8,border:alumnoActivo?.id===a.id?"1px solid #2563EB":"1px solid "+border}}>
- <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:alumnoActivo?.id===a.id?8:0,gap:8}}>
-  <div style={{flex:1,minWidth:0}}>
-    <div style={{fontSize:18,fontWeight:700,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.nombre}</div>
-    <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
-  </div>
-  <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+            {coachAlumnosListaFiltrada.map(a=>(
+              <div key={a.id} style={{position:"relative",background:"#111827",borderRadius:12,padding:"14px 14px 12px",marginBottom:10,border:alumnoActivo?.id===a.id?"1px solid #3b82f6":"1px solid rgba(59,130,246,0.22)"}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+                  <div style={{width:48,height:48,borderRadius:"50%",background:"#3b82f6",color:"#fff",fontSize:20,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}>
+                    {(a.nombre||a.email||"?").trim().charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                      <span style={{fontSize:17,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
+                      {(() => {
+                        var cat = coachAlumnoCategoria(a);
+                        var cfg = cat === "activo" ? { bg: "#14532d", color: "#4ade80", t: es ? "Activo" : "Active" } : cat === "inactivo" ? { bg: "#422006", color: "#fbbf24", t: es ? "Inactivo" : "Inactive" } : { bg: "#1e293b", color: "#94a3b8", t: es ? "Sin rutina" : "No routine" };
+                        return <span style={{fontSize:11,fontWeight:800,padding:"2px 8px",borderRadius:6,background:cfg.bg,color:cfg.color}}>{cfg.t}</span>;
+                      })()}
+                    </div>
+                    <div style={{fontSize:13,color:"#94a3b8",lineHeight:1.4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
+                    {(() => {
+                      var rA = rutinasSBEntrenador.find(function (r) { return r.alumno_id === a.id; });
+                      var nD = rA ? (rA.datos?.days || []).length : 0;
+                      var done = rA ? completedDays.filter(function (k) { return k.startsWith(rA.id + "-") && k.endsWith("-w" + currentWeek); }).length : 0;
+                      if (!nD) return null;
+                      var pct = Math.min(100, Math.round((done / nD) * 100));
+                      return (
+                        <div style={{marginTop:10}}>
+                          <div style={{fontSize:12,fontWeight:700,color:"#94a3b8",marginBottom:4}}>{done}/{nD} {es ? "días esta semana" : "days this week"}</div>
+                          <div style={{height:6,background:"#1e293b",borderRadius:4,overflow:"hidden"}}>
+                            <div style={{width: pct + "%", height: "100%", background: "#22c55e", borderRadius: 4, transition: "width .2s ease"}}/>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginLeft:"auto"}}>
                     <button
                       className="hov"
-                      style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center"}}
-                      onClick={()=>{if(!confirm(es?"¿Editar alumno?":"Edit athlete?")) return; setEditAlumnoModal(a);setEditAlumnoEmail(a.email);setEditAlumnoPass("");}}
-                      aria-label={es?"Editar alumno":"Edit athlete"}
-                    >
-                      <Ic name="edit-2" size={16} color={textMuted}/>
-                    </button>
-                    <button
-                      className="hov"
-                      style={{background:"#2563EB22",color:"#2563EB",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer",display:"inline-flex",alignItems:"center",justifyContent:"center"}}
-                      onClick={function(e){e.stopPropagation();console.log("[CHAT] abriendo para",a.id,a.nombre);setChatModal({alumnoId:a.id,alumnoNombre:a.nombre||a.email||"Alumno"});}}
-                      aria-label={es?"Abrir chat":"Open chat"}
-                    >
-                      <Ic name="message-circle" size={16} color="#2563EB"/>
-                    </button>
-                    <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"4px 14px",fontSize:13,fontWeight:700,cursor:"pointer"}} onClick={async()=>{
-                      if(alumnoActivo?.id===a.id){setAlumnoActivo(null);return;}
-                      setAlumnoActivo(a);setRegistrosSubTab(0);setLoadingSB(true);
-                      const ruts=await sb.getRutinas(a.id);setRutinasSB(ruts||[]);
-                      const prog=await sb.getProgreso(a.id);setAlumnoProgreso(prog||[]);
-                      const ses=await sb.getSesiones(a.id);setAlumnoSesiones(ses||[]);
-                      setLoadingSB(false);
-                    }}>{alumnoActivo?.id===a.id?"CERRAR":"VER"}</button>
-                    <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"4px 8px",fontSize:13,cursor:"pointer"}} onClick={async()=>{
-                      if(!confirm("Eliminar a "+a.nombre+"?")) return;
-                      await sb.deleteAlumno?.(a.id);setAlumnos(prev=>prev.filter(x=>x.id!==a.id));toast2("Alumno eliminado");
-                    }}><Ic name="trash-2" size={15}/></button>
+                      style={{background:"#3b82f6",color:"#fff",border:"none",borderRadius:10,padding:"8px 18px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+                      onClick={async function () {
+                        setCoachCardMenuId(null);
+                        if (alumnoActivo?.id === a.id) { setAlumnoActivo(null); return; }
+                        setAlumnoActivo(a); setRegistrosSubTab(0); setLoadingSB(true);
+                        const ruts = await sb.getRutinas(a.id); setRutinasSB(ruts || []);
+                        const prog = await sb.getProgreso(a.id); setAlumnoProgreso(prog || []);
+                        const ses = await sb.getSesiones(a.id); setAlumnoSesiones(ses || []);
+                        setLoadingSB(false);
+                      }}
+                    >{alumnoActivo?.id === a.id ? (es ? "CERRAR" : "CLOSE") : "VER"}</button>
+                    <div style={{position:"relative"}}>
+                      <button
+                        type="button"
+                        className="hov"
+                        aria-label={es ? "Más opciones" : "More options"}
+                        style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",color:"#94a3b8",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,cursor:"pointer"}}
+                        onClick={function (e) { e.stopPropagation(); setCoachCardMenuId(coachCardMenuId === a.id ? null : a.id); }}
+                      >
+                        <Ic name="more-vertical" size={18} color="currentColor"/>
+                      </button>
+                      {coachCardMenuId === a.id && (
+                        <div
+                          style={{position:"absolute",right:0,top:"100%",marginTop:6,background:"#111827",border:"1px solid rgba(59,130,246,0.35)",borderRadius:12,padding:6,zIndex:30,minWidth:176,boxShadow:"0 12px 32px rgba(0,0,0,0.55)"}}
+                          onClick={function (e) { e.stopPropagation(); }}
+                        >
+                          <button
+                            type="button"
+                            className="hov"
+                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#e2e8f0",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
+                            onClick={function () { setCoachCardMenuId(null); if (!confirm(es ? "¿Editar alumno?" : "Edit athlete?")) return; setEditAlumnoModal(a); setEditAlumnoEmail(a.email); setEditAlumnoPass(""); }}
+                          >
+                            <Ic name="edit-2" size={16} color="#94a3b8"/> {es ? "Editar" : "Edit"}
+                          </button>
+                          <button
+                            type="button"
+                            className="hov"
+                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#e2e8f0",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
+                            onClick={function () { setCoachCardMenuId(null); setChatModal({ alumnoId: a.id, alumnoNombre: a.nombre || a.email || "Alumno" }); }}
+                          >
+                            <Ic name="message-circle" size={16} color="#3b82f6"/> {es ? "Mensaje" : "Message"}
+                          </button>
+                          <button
+                            type="button"
+                            className="hov"
+                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
+                            onClick={async function () {
+                              setCoachCardMenuId(null);
+                              if (!confirm((es ? "Eliminar a " : "Delete ") + a.nombre + "?")) return;
+                              await sb.deleteAlumno?.(a.id); setAlumnos(function (prev) { return prev.filter(function (x) { return x.id !== a.id; }); }); toast2(es ? "Alumno eliminado" : "Athlete removed");
+                            }}
+                          >
+                            <Ic name="trash-2" size={16} color="#f87171"/> {es ? "Eliminar" : "Delete"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 {alumnoActivo?.id===a.id&&(
                   <div>
                     {(()=>{
-                      const rutinaActiva=rutinasSB.find(r=>r.alumno_id===a.id);
-                      if(!rutinaActiva) return <div style={{background:bgSub,borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid "+border}}><div style={{fontSize:13,color:textMuted}}>{es?"Sin rutina asignada":"No routine assigned"}</div></div>;
+                      const rutinaActiva=rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
+                      if(!rutinaActiva) return <div style={{background:"#111827",borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid rgba(59,130,246,0.22)"}}><div style={{fontSize:13,color:"#94a3b8"}}>{es?"Sin rutina asignada":"No routine assigned"}</div></div>;
                       const dias=rutinaActiva.datos?.days||[];
+                      const semanaCiclo = currentWeek + 1;
+                      const rId = rutinaActiva.id;
+                      const diasCompletados = completedDays.filter(function(k){return k.startsWith(rId+"-") && k.endsWith("-w"+currentWeek)}).length;
+                      const hoyDate = new Date();
+                      const inicioSemana = new Date(hoyDate);
+                      inicioSemana.setDate(hoyDate.getDate() - ((hoyDate.getDay()+6)%7));
+                      const finSemana = new Date(inicioSemana);
+                      finSemana.setDate(inicioSemana.getDate() + 6);
+                      const semCalLabel = inicioSemana.getDate() + "/" + (inicioSemana.getMonth()+1) + " — " + finSemana.getDate() + "/" + (finSemana.getMonth()+1);
+                      const pctBar = dias.length ? Math.min(100, Math.round((diasCompletados / dias.length) * 100)) : 0;
+                      const diSel = dias.length ? Math.min(coachRoutineDiaIdx, Math.max(0, dias.length - 1)) : 0;
+                      const dSel = dias[diSel] || { warmup: [], exercises: [], label: "" };
+                      const proxTxt = (function(){
+                        var proxDia, proxSemana;
+                        if(diasCompletados >= dias.length) { proxDia = 1; proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1; }
+                        else { proxDia = diasCompletados + 1; proxSemana = semanaCiclo; }
+                        var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
+                        return proxLabel + " · " + (es?"Semana ":"Week ") + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (es?" (nuevo ciclo)":" (new cycle)") : "");
+                      })();
                       return(
                         <div style={{marginBottom:8}}>
-                          <div style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"16px"}}>
-                            <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:4,textTransform:"uppercase"}}>{es?"RUTINA ACTIVA":"ACTIVE ROUTINE"}</div>
-                            <div style={{fontSize:22,fontWeight:900,color:textMain}}>{rutinaActiva.nombre}</div>
-                            <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginTop:4}}>{dias.length} {es?"días":"days"}</div>
-                            {/* ── Info de semana ── */}
-                            {(()=>{
-                              // Usar currentWeek global (sincronizado con el alumno)
-                              const semanaCiclo = currentWeek + 1;
-                              // Días completados esta semana desde completedDays
-                              const rId = rutinaActiva.id;
-                              const diasCompletados = completedDays.filter(function(k){return k.startsWith(rId+"-") && k.endsWith("-w"+currentWeek)}).length;
-                              // Semana calendario (corregido para fin de mes)
-                              const hoyDate = new Date();
-                              const inicioSemana = new Date(hoyDate);
-                              inicioSemana.setDate(hoyDate.getDate() - ((hoyDate.getDay()+6)%7));
-                              const finSemana = new Date(inicioSemana);
-                              finSemana.setDate(inicioSemana.getDate() + 6);
-                              const semCalLabel = inicioSemana.getDate() + "/" + (inicioSemana.getMonth()+1) + " — " + finSemana.getDate() + "/" + (finSemana.getMonth()+1);
-                              return (
-                                <>
-                                <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
-                                  <div style={{background:"#2563EB15",border:"1px solid #2563EB33",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
-                                    <Ic name="calendar" size={14} color="#2563EB"/>
-                                    <span style={{fontSize:12,fontWeight:800,color:"#2563EB"}}>{es?"Semana":"Week"} {semanaCiclo} {es?"de":"of"} 4</span>
-                                  </div>
-                                  <div style={{background:bgSub,border:"1px solid "+border,borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
-                                    <span style={{fontSize:12,fontWeight:700,color:textMuted}}>{diasCompletados}/{dias.length} {es?"días":"days"}</span>
-                                  </div>
-                                  <div style={{background:bgSub,border:"1px solid "+border,borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:4}}>
-                                    <span style={{fontSize:11,color:textMuted}}>{es?"Sem. cal:":"Cal. wk:"} {semCalLabel}</span>
-                                  </div>
+                          <div style={{background:"#111827",border:"1px solid rgba(59,130,246,0.22)",borderRadius:12,padding:"16px",position:"relative"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:14}}>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontSize:24,fontWeight:900,color:"#fff",lineHeight:1.15}}>{rutinaActiva.nombre}</div>
+                                <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:10,alignItems:"center"}}>
+                                  <span style={{fontSize:14,color:"#94a3b8",fontWeight:600}}>{dias.length} {es?"días":"days"}</span>
+                                  <span style={{padding:"4px 10px",borderRadius:8,background:"rgba(59,130,246,0.15)",border:"1px solid rgba(59,130,246,0.35)",color:"#3b82f6",fontSize:12,fontWeight:800}}>{es?"Semana":"Week"} {semanaCiclo} {es?"de":"of"} 4</span>
+                                  <span style={{fontSize:13,color:"#94a3b8",fontWeight:600}}>{semCalLabel}</span>
                                 </div>
-                                <div style={{marginTop:8,background:"#2563EB08",border:"1px solid #2563EB22",borderRadius:8,padding:"8px 10px",display:"flex",alignItems:"center",gap:6}}>
-                                  <Ic name="chevron-right" size={14} color={textMain}/>
-                                  <span style={{fontSize:13,fontWeight:700,color:textMain}}>
-                                    {es?"Próxima sesión:":"Next session:"} {(()=>{
-                                      var proxDia, proxSemana;
-                                      if(diasCompletados >= dias.length) { proxDia = 1; proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1; }
-                                      else { proxDia = diasCompletados + 1; proxSemana = semanaCiclo; }
-                                      var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
-                                      return proxLabel + " · " + (es?"Semana ":"Week ") + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (es?" (nuevo ciclo)":" (new cycle)") : "");
-                                    })()}
-                                  </span>
-                                </div>
-                                <div style={{display:"flex",gap:8,marginTop:8}}>
-                                  <button className="hov" onClick={()=>{
-                                    if(!confirm(es?"¿Reiniciar semana actual? El alumno volverá a Día 1 de la semana "+semanaCiclo+".":"Reset current week? Athlete will restart at Day 1 of week "+semanaCiclo+".")) return;
-                                    setCompletedDays(function(prev){return prev.filter(function(k){return !k.endsWith("-w"+(semanaCiclo-1))})});
-                                    toast2(es?"Semana reiniciada ✓":"Week reset ✓");
-                                  }} style={{flex:1,padding:"6px",background:"transparent",border:"1px solid #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit"}}>
-                                    <Ic name="refresh-cw" size={14} color="#F59E0B"/> {es?"Reiniciar semana":"Reset week"}
-                                  </button>
-                                  <button className="hov" onClick={()=>{
-                                    if(!confirm(es?"¿Reiniciar rutina completa? Volverá a Semana 1, Día 1. El historial de progreso se mantiene.":"Reset entire routine? Will go back to Week 1, Day 1. Progress history is kept.")) return;
-                                    setCompletedDays([]);
-                                    setCurrentWeek(0);
-                                    localStorage.removeItem('it_last_week_advance_date');
-                                    toast2(es?"Rutina reiniciada ✓":"Routine reset ✓");
-                                  }} style={{flex:1,padding:"6px",background:"transparent",border:"1px solid #EF444444",borderRadius:8,fontSize:11,fontWeight:700,color:"#EF4444",cursor:"pointer",fontFamily:"inherit"}}>
-                                    <Ic name="refresh-cw" size={14} color="#EF4444"/> {es?"Reiniciar rutina":"Reset routine"}
-                                  </button>
-                                </div>
-                                </>
-                              );
-                            })()}
-                            {dias.map((d,di)=>(
-                              <div key={(rutinaActiva?.id||"rut")+"-coach-day-"+di} style={{background:bgSub,borderRadius:12,padding:"8px 12px",marginBottom:8,marginTop:8,border:"1px solid "+border}}>
-                                <div style={{fontSize:11,fontWeight:800,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{d.label||("Día "+(di+1))} · {((d.warmup||[]).length+(d.exercises||[]).length)} ej.</div>
-                                {(d.warmup||[]).length>0&&(
-                                  <div style={{marginBottom:8}}>
-                                    <div style={{fontSize:10,fontWeight:700,color:"#F59E0B",letterSpacing:1,marginBottom:4}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</div>
-                                    {(d.warmup||[]).map((ex,ei)=>{
-                                      const exInfo=allEx.find(e=>e.id===ex.id);
-                                      const nombre=exInfo?(es?exInfo.name:(exInfo.nameEn||exInfo.name)):(ex.name||ex.id||"Ejercicio");
-                                      return <div key={(rutinaActiva?.id||"rut")+"-d"+di+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
-                                        <div style={{width:3,height:16,borderRadius:2,background:"#F59E0B44",flexShrink:0,marginTop:0}}/>
-                                        <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{nombre}</div>
-                                        <div style={{fontSize:11,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
-                                        <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
-                                      </div>;
-                                    })}
-                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:4,padding:"6px",background:"transparent",border:"1px dashed #F59E0B44",borderRadius:8,fontSize:11,fontWeight:700,color:"#F59E0B",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#F59E0B"/>{es?"Añadir entrada en calor":"Add warm-up"}</button>
+                              </div>
+                              <div style={{position:"relative",flexShrink:0}}>
+                                <button type="button" className="hov" aria-label={es?"Opciones de rutina":"Routine options"} style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,cursor:"pointer"}} onClick={function(){setCoachRutinaMenuOpen(function(o){return !o;});}}>
+                                  <Ic name="more-vertical" size={18} color="#94a3b8"/>
+                                </button>
+                                {coachRutinaMenuOpen && (
+                                  <div style={{position:"absolute",right:0,top:"100%",marginTop:6,background:"#0f172a",border:"1px solid rgba(59,130,246,0.35)",borderRadius:12,padding:6,zIndex:40,minWidth:200,boxShadow:"0 12px 32px rgba(0,0,0,0.55)"}} onClick={function(e){e.stopPropagation();}}>
+                                    <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#fbbf24",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
+                                      if(!confirm(es?"¿Reiniciar semana actual? El alumno volverá a Día 1 de la semana "+semanaCiclo+".":"Reset current week? Athlete will restart at Day 1 of week "+semanaCiclo+".")) return;
+                                      setCompletedDays(function(prev){return prev.filter(function(k){return !k.endsWith("-w"+(semanaCiclo-1))});});
+                                      setCoachRutinaMenuOpen(false);
+                                      toast2(es?"Semana reiniciada ✓":"Week reset ✓");
+                                    }}>
+                                      <Ic name="refresh-cw" size={15} color="#fbbf24"/> {es?"Reiniciar semana":"Reset week"}
+                                    </button>
+                                    <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
+                                      if(!confirm(es?"¿Reiniciar rutina completa? Volverá a Semana 1, Día 1. El historial de progreso se mantiene.":"Reset entire routine? Will go back to Week 1, Day 1. Progress history is kept.")) return;
+                                      setCompletedDays([]); setCurrentWeek(0); localStorage.removeItem("it_last_week_advance_date");
+                                      setCoachRutinaMenuOpen(false);
+                                      toast2(es?"Rutina reiniciada ✓":"Routine reset ✓");
+                                    }}>
+                                      <Ic name="refresh-cw" size={15} color="#f87171"/> {es?"Reiniciar rutina":"Reset routine"}
+                                    </button>
                                   </div>
                                 )}
-                                <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1,marginBottom:4}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</div>
-                                {(d.exercises||[]).map((ex,ei)=>{
-                                  const exInfo=allEx.find(e=>e.id===ex.id);
-                                  const nombre=exInfo?(es?exInfo.name:(exInfo.nameEn||exInfo.name)):(ex.name||ex.id||"Ejercicio");
-                                  return <div key={(rutinaActiva?.id||"rut")+"-d"+di+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.exercises||[]).length-1?"1px solid "+border:"none"}}>
-                                    <div style={{width:3,height:16,borderRadius:2,background:border,flexShrink:0,marginTop:0}}/>
-                                    <div style={{flex:1,fontSize:15,fontWeight:700,color:textMain}}>{nombre}</div>
-                                    <div style={{fontSize:11,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
-                                    <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
-                                  </div>;
-                                })}
-                                <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:di,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed "+border,borderRadius:8,fontSize:13,fontWeight:700,color:"#2563EB",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#2563EB"/>{es?"Añadir bloque principal":"Add main block"}</button>
                               </div>
-                            ))}
-                            <div style={{display:"flex",gap:8,marginTop:8}}>
-                              <button className="hov" style={{flex:2,padding:"8px",background:bgSub,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(es?"¿Editar esta rutina?":"Edit this routine?")) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(es?"Abierta en RUTINAS":"Opened in ROUTINES");}}><Ic name="edit-2" size={16} color={textMuted}/>{es?"Editar":"Edit"}</button>
-                              <button className="hov" style={{padding:"8px 16px",background:bgSub,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(es?"¿Quitar rutina?":"Remove?")) return;await sb.deleteRutina(rutinaActiva.id);setRutinasSB(prev=>prev.filter(x=>x.id!==rutinaActiva.id));toast2(es?"Quitada":"Removed");}}><Ic name="trash-2" size={15}/></button>
+                            </div>
+                            <div style={{marginBottom:12}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+                                <span style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{diasCompletados} {es?"de":"of"} {dias.length} {es?"días completados":"days completed"}</span>
+                                <span style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>{pctBar}%</span>
+                              </div>
+                              <div style={{height:12,background:"#1e293b",borderRadius:8,overflow:"hidden"}}>
+                                <div style={{width:pctBar+"%",height:"100%",background:"linear-gradient(90deg,#22c55e,#16a34a)",borderRadius:8,transition:"width .25s ease"}}/>
+                              </div>
+                            </div>
+                            <div style={{marginBottom:14,padding:"10px 12px",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10}}>
+                              <span style={{fontSize:13,color:"#cbd5e1",fontWeight:600}}>{es?"Próxima sesión:":"Next session:"} </span>
+                              <span style={{fontSize:13,color:"#fff",fontWeight:700}}>{proxTxt}</span>
+                            </div>
+                            {dias.length > 0 && (
+                              <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:14,paddingBottom:4,WebkitOverflowScrolling:"touch"}}>
+                                {dias.map(function(d, di){
+                                  var dayDone = completedDays.includes(rId+"-"+di+"-w"+currentWeek);
+                                  var active = di === diSel;
+                                  return (
+                                    <button
+                                      key={(rutinaActiva?.id||"rut")+"-tab-"+di}
+                                      type="button"
+                                      className="hov"
+                                      onClick={function(){ setCoachRoutineDiaIdx(di); }}
+                                      style={{
+                                        flexShrink:0,
+                                        padding:"10px 14px",
+                                        borderRadius:10,
+                                        border:active?"2px solid #3b82f6":"1px solid rgba(59,130,246,0.25)",
+                                        background:active?"rgba(59,130,246,0.18)":"#0f172a",
+                                        color:active?"#fff":"#94a3b8",
+                                        fontSize:13,
+                                        fontWeight:800,
+                                        cursor:"pointer",
+                                        fontFamily:"inherit",
+                                        display:"flex",
+                                        alignItems:"center",
+                                        gap:6,
+                                      }}
+                                    >
+                                      {es?"Día ":"Day "}{di+1}
+                                      {dayDone ? <Ic name="check-sm" size={14} color="#22c55e"/> : null}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {dias.length > 0 && (
+                              <div style={{background:"#0f172a",borderRadius:12,border:"1px solid rgba(59,130,246,0.15)",padding:"12px"}}>
+                                <div style={{fontSize:12,fontWeight:800,color:"#94a3b8",marginBottom:10}}>{dSel.label || ((es?"Día ":"Day ")+(diSel+1))} · {((dSel.warmup||[]).length+(dSel.exercises||[]).length)} {es?"ej.":"ex."}</div>
+                                <div style={{marginBottom:12}}>
+                                    <button type="button" className="hov" onClick={function(){ setCoachDiaSecsOpen(function(o){ return {...o, warmup:!o.warmup}; }); }} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"transparent",border:"none",padding:"6px 0",cursor:"pointer",marginBottom:8}}>
+                                      <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</span>
+                                      <Ic name="chevron-right" size={16} color="#f59e0b" style={{transform:coachDiaSecsOpen.warmup?"rotate(90deg)":"none",transition:"transform .2s"}}/>
+                                    </button>
+                                    {coachDiaSecsOpen.warmup && (
+                                      <div>
+                                        {(dSel.warmup||[]).map((ex,ei)=>{
+                                          const exInfo=allEx.find(e=>e.id===ex.id);
+                                          const nombre=exInfo?(es?exInfo.name:(exInfo.nameEn||exInfo.name)):(ex.name||ex.id||"Ejercicio");
+                                          return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.warmup||[]).length-1?"1px solid rgba(59,130,246,0.12)":"none"}}>
+                                            <div style={{flex:1,fontSize:14,fontWeight:600,color:"#fff"}}>{nombre}</div>
+                                            <div style={{fontSize:12,color:"#94a3b8",marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
+                                            <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
+                                          </div>;
+                                        })}
+                                        <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:6,padding:"8px",background:"transparent",border:"1px dashed rgba(245,158,11,0.45)",borderRadius:8,fontSize:12,fontWeight:700,color:"#f59e0b",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#f59e0b"/>{es?"+ Añadir ejercicio":"+ Add exercise"}</button>
+                                      </div>
+                                    )}
+                                </div>
+                                <button type="button" className="hov" onClick={function(){ setCoachDiaSecsOpen(function(o){ return {...o, main:!o.main}; }); }} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"transparent",border:"none",padding:"6px 0",cursor:"pointer",marginBottom:8}}>
+                                  <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
+                                  <Ic name="chevron-right" size={16} color="#f59e0b" style={{transform:coachDiaSecsOpen.main?"rotate(90deg)":"none",transition:"transform .2s"}}/>
+                                </button>
+                                {coachDiaSecsOpen.main && (
+                                  <div>
+                                    {(dSel.exercises||[]).map((ex,ei)=>{
+                                      const exInfo=allEx.find(e=>e.id===ex.id);
+                                      const nombre=exInfo?(es?exInfo.name:(exInfo.nameEn||exInfo.name)):(ex.name||ex.id||"Ejercicio");
+                                      return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.exercises||[]).length-1?"1px solid rgba(59,130,246,0.12)":"none"}}>
+                                        <div style={{flex:1,fontSize:15,fontWeight:700,color:"#fff"}}>{nombre}</div>
+                                        <div style={{fontSize:12,color:"#94a3b8",marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
+                                        <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
+                                      </div>;
+                                    })}
+                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed rgba(59,130,246,0.4)",borderRadius:8,fontSize:13,fontWeight:700,color:"#3b82f6",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#3b82f6"/>{es?"+ Añadir ejercicio":"+ Add exercise"}</button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <div style={{display:"flex",gap:8,marginTop:14}}>
+                              <button className="hov" style={{flex:2,padding:"10px",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:12,fontSize:14,fontWeight:800,color:"#e2e8f0",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(es?"¿Editar esta rutina?":"Edit this routine?")) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(es?"Abierta en RUTINAS":"Opened in ROUTINES");}}><Ic name="edit-2" size={16} color="#94a3b8"/>{es?"Editar rutina":"Edit routine"}</button>
+                              <button className="hov" style={{padding:"10px 16px",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:12,fontSize:14,fontWeight:800,color:"#94a3b8",cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(es?"¿Quitar rutina?":"Remove?")) return;await sb.deleteRutina(rutinaActiva.id);setRutinasSB(prev=>prev.filter(x=>x.id!==rutinaActiva.id));toast2(es?"Quitada":"Removed");}}><Ic name="trash-2" size={15}/></button>
                             </div>
                           </div>
                         </div>
@@ -2606,7 +2825,7 @@ function GymApp() {
                     })()}
                     <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={async()=>{
                       const rutinaLocal=routineForAssign;if(!rutinaLocal){toast2(es?"Creá una rutina en RUTINAS":"Create a routine in ROUTINES");return;}
-                      const ex=rutinasSB.find(r=>r.alumno_id===a.id);
+                      const ex=rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
                       const rutinaNombre=rutinaLocal.name||"Rutina";
                       var msg = ex
                         ? (es?("Ya tiene: "+ex.nombre+"\n¿Reemplazar por: "+rutinaNombre+"?"):("Has: "+ex.nombre+"\nReplace with: "+rutinaNombre+"?"))
@@ -2617,10 +2836,10 @@ function GymApp() {
                       const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:rutinaLocal.days,alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
                       setLoadingSB(false);
-                    }}>{rutinasSB.find(r=>r.alumno_id===a.id)?(<><Ic name="refresh-cw" size={16}/>{es?"Cambiar rutina":"Change routine"}</>):(<><Ic name="plus" size={16}/>{es?"Asignar rutina":"Assign routine"}</>)}</button>
+                    }}>{(rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id))?(<><Ic name="refresh-cw" size={16}/>{es?"Cambiar rutina":"Change routine"}</>):(<><Ic name="plus" size={16}/>{es?"Asignar rutina":"Assign routine"}</>)}</button>
                     {/* ── SUGERENCIAS ── */}
                     {(()=>{
-                      const rutSB = rutinasSB.find(r=>r.alumno_id===a.id);
+                      const rutSB = rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
                       const regsAlu = alumnoProgreso || [];
                       if(!rutSB || regsAlu.length < 2) return null;
                       const sugs = generarSugerenciasAlumno(regsAlu, rutSB.datos, EX);
