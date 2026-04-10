@@ -12,6 +12,7 @@ import { fmt, fmtP } from './lib/timeFormat.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboard from './components/CoachDashboard';
+import { WelcomeModal } from './components/WelcomeModal.jsx';
 
 
 const PATS = {
@@ -329,39 +330,105 @@ const uid = () => Math.random().toString(36).slice(2,9);
 
 function PagoAlumno({aliasData, es, toast2, darkMode}) {
   const {bg, bgCard, bgSub, border, textMain, textMuted} = getTheme(darkMode);
-const [pagoVisible, setPagoVisible] = React.useState(()=>
-  localStorage.getItem("it_pago_cerrado")!=="true"
-);
-if(!pagoVisible) return null;
-return(
-  <div style={{background:bgCard,border:"1px solid #22c55e44",borderRadius:12,
-    padding:"12px 16px",marginBottom:12,position:"relative"}}>
-    <button onClick={()=>{
-        setPagoVisible(false);
-        localStorage.setItem("it_pago_cerrado","true");
-      }}
-      style={{position:"absolute",top:8,right:8,background:"transparent",
-        border:"none",color:textMuted,fontSize:18,cursor:"pointer",
-        width:28,height:28,display:"flex",alignItems:"center",
-        justifyContent:"center",borderRadius:6,lineHeight:1}}><Ic name="x" size={16}/></button>
-    <div style={{fontSize:13,fontWeight:700,color:"#22C55E",marginBottom:8,
-      paddingRight:28}}>💰 {es?"Datos de pago":"Payment info"}</div>
-    <div style={{background:bgSub,borderRadius:12,padding:"8px 12px"}}>
-      {aliasData.banco&&<div style={{fontSize:11,color:textMuted,marginBottom:4}}>{aliasData.banco}</div>}
-      <div style={{fontSize:18,fontWeight:800,letterSpacing:0.3,marginBottom:4}}>{aliasData.alias}</div>
-      {aliasData.cbu&&<div style={{fontSize:11,color:textMuted,marginBottom:4}}>{aliasData.cbu}</div>}
-      {aliasData.monto&&<div style={{fontSize:13,fontWeight:700,color:"#22C55E",marginBottom:4}}>{aliasData.monto}/mes</div>}
-      {aliasData.nota&&<div style={{fontSize:11,color:textMuted}}>{aliasData.nota}</div>}
+  const [pagoVisible, setPagoVisible] = React.useState(() =>
+    localStorage.getItem("it_pago_cerrado") !== "true"
+  );
+  const [copied, setCopied] = React.useState(false);
+
+  if (!pagoVisible) return null;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(aliasData.alias);
+    setCopied(true);
+    toast2(es ? "Alias copiado ✓" : "Alias copied ✓");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const infoGradient = darkMode
+    ? "linear-gradient(165deg, rgba(34,197,94,.22) 0%, #0a1610 42%, rgba(21,128,61,.28) 100%)"
+    : "linear-gradient(165deg, rgba(34,197,94,.2) 0%, rgba(236,253,245,.98) 45%, rgba(167,243,208,.55) 100%)";
+  const aliasLineColor = darkMode ? "#fff" : "#0f1923";
+  const metaLineColor = darkMode ? "rgba(220,252,231,.78)" : "#475569";
+  const bancoLineColor = darkMode ? "rgba(230,245,235,.92)" : "#0a0a0a";
+  const montoLineColor = darkMode ? "#4ade80" : "#166534";
+
+  return (
+    <div style={{
+      background: bgCard,
+      border: "1px solid rgba(34,197,94,.25)",
+      borderRadius: 14,
+      marginBottom: 12,
+      overflow: "hidden",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px 14px 8px",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round">
+            <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+          </svg>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#22C55E" }}>
+            {es ? "Datos de pago" : "Payment info"}
+          </span>
+        </div>
+        <button
+          onClick={() => { setPagoVisible(false); localStorage.setItem("it_pago_cerrado", "true"); }}
+          style={{
+            background: "transparent", border: "none", cursor: "pointer",
+            color: textMuted, width: 28, height: 28, borderRadius: 6,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <Ic name="x" size={14} />
+        </button>
+      </div>
+      <div style={{ padding: "0 14px 14px" }}>
+        <div style={{
+          background: infoGradient,
+          border: "1px solid rgba(34,197,94,.22)",
+          borderRadius: 10,
+          padding: "10px 12px",
+          marginBottom: 10,
+          boxShadow: darkMode ? "inset 0 1px 0 rgba(255,255,255,.06)" : "inset 0 1px 0 rgba(255,255,255,.5)",
+        }}>
+          {aliasData.banco && (
+            <div style={{ fontSize: 11, color: bancoLineColor, marginBottom: 2 }}>{aliasData.banco}</div>
+          )}
+          <div style={{ fontSize: 20, fontWeight: 800, color: aliasLineColor, marginBottom: 2 }}>{aliasData.alias}</div>
+          {aliasData.cbu && (
+            <div style={{ fontSize: 11, color: metaLineColor, marginBottom: 2 }}>{aliasData.cbu}</div>
+          )}
+          {aliasData.monto && (
+            <div style={{ fontSize: 14, fontWeight: 700, color: montoLineColor, marginBottom: 2 }}>{aliasData.monto}/mes</div>
+          )}
+          {aliasData.nota && (
+            <div style={{ fontSize: 11, color: metaLineColor }}>{aliasData.nota}</div>
+          )}
+        </div>
+        <button
+          className="hov"
+          onClick={handleCopy}
+          style={{
+            width: "100%", padding: "10px",
+            background: copied ? "rgba(34,197,94,.2)" : "rgba(34,197,94,.1)",
+            border: "1px solid rgba(34,197,94,.2)",
+            borderRadius: 10,
+            color: copied ? "#fff" : "#22C55E",
+            fontFamily: "inherit", fontSize: 13, fontWeight: 700,
+            cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            transition: "all .2s",
+          }}
+        >
+          {copied
+            ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> {es ? "¡Copiado!" : "Copied!"}</>
+            : <><Ic name="copy" size={14}/> {es ? "Copiar alias" : "Copy alias"}</>
+          }
+        </button>
+      </div>
     </div>
-    <button className="hov"
-      style={{background:"#22C55E20",color:"#22C55E",border:"none",
-        borderRadius:8,padding:"8px",width:"100%",marginTop:8,
-        fontFamily:"inherit",fontSize:13,fontWeight:700,cursor:"pointer"}}
-      onClick={()=>{navigator.clipboard.writeText(aliasData.alias);toast2(es?"Alias copiado ✓":"Alias copied ✓");}}>
-      <Ic name="copy" size={14}/> {es?"Copiar alias":"Copy alias"}
-    </button>
-  </div>
-);
+  );
 }
 
 function FotosSlider({fotos, es, darkMode, toast2, sb, sessionData, setFotos}) {
@@ -1715,51 +1782,105 @@ function GymApp() {
                       </div>
                     </div>
                   )}
-                  <div style={{background:bgCard,borderRadius:12,padding:"12px 16px",marginBottom:8,border:"1px solid "+border}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                      <span style={{fontSize:13,fontWeight:800,color:textMuted,letterSpacing:0.3}}>{es?"ESTA SEMANA":"THIS WEEK"}</span>
-                      <span style={{fontSize:12,fontWeight:700,color:"#2563EB"}}>{es?"Semana":"Week"} {currentWeek+1} {es?"de":"of"} 4</span>
-                    </div>
-                    <div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}>
-                      <span style={{fontSize:13,fontWeight:900,color:"#2563EB"}}>{daysCompletedThisWeek}/{totalDays} {es?"días":"days"}</span>
+                  {/* ESTA SEMANA */}
+                  <div style={{background:bgCard,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"1px solid "+border}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                      <span style={{fontSize:11,fontWeight:700,color:textMuted,letterSpacing:1,textTransform:"uppercase"}}>{es?"Esta semana":"This week"}</span>
+                      <div style={{textAlign:"right"}}>
+                        <div style={{fontSize:12,fontWeight:700,color:"#2563EB"}}>{es?"Semana":"Week"} {currentWeek+1} {es?"de":"of"} 4</div>
+                        <div style={{fontSize:11,color:textMuted}}>{daysCompletedThisWeek}/{totalDays} {es?"días":"days"}</div>
+                      </div>
                     </div>
                     <div style={{display:"flex",gap:8}}>
                       {(r0?.days||[]).map((d,i)=>{
                         const done = completedDays.includes((r0?.id||"")+"-"+i+"-w"+currentWeek);
                         const isNext = i===nextDayIdx;
                         return (
-                          <div key={(r0?.id||"rut")+"-sem-pill-d"+i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                            <div style={{width:"100%",height:7,borderRadius:4,background:done?"#22C55E":isNext?"#2563EB":border}}/>
-                            <div style={{fontSize:11,fontWeight:700,color:done?"#22C55E":isNext?"#2563EB":textMuted,textTransform:"uppercase"}}>
-                              {(d.label||("D"+(i+1))).slice(0,6)}
+                          <div key={(r0?.id||"rut")+"-bar-d"+i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+                            <div style={{width:"100%",height:5,borderRadius:3,overflow:"hidden",background:"rgba(255,255,255,.06)"}}>
+                              <div style={{
+                                height:"100%",borderRadius:3,width:"100%",
+                                background: done?"#22C55E":isNext?"#2563EB":"rgba(255,255,255,.08)",
+                              }}/>
+                            </div>
+                            <div style={{display:"flex",alignItems:"center",gap:3}}>
+                              {done&&(
+                                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                                  <circle cx="7" cy="7" r="6" fill="rgba(34,197,94,.15)"/>
+                                  <path d="M4 7l2.2 2.2L10 5" stroke="#22C55E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                              <span style={{fontSize:10,fontWeight:700,color:done?"#22C55E":isNext?"#2563EB":textMuted,textTransform:"uppercase",letterSpacing:.5}}>
+                                {(d.label||("D"+(i+1))).slice(0,6)}
+                              </span>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
+
+                  {/* HOY */}
                   {todayDay&&!yaEntrenoHoy&&!session&&(
-                    <div style={{background:"#2563EB11",borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid #243040"}}>
-                      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:4}}>{es?"HOY":"TODAY"}</div>
-                      <div style={{fontSize:22,fontWeight:900,color:textMain,marginBottom:4}}>{todayDay.label||("Día "+(nextDayIdx+1))}</div>
-                      <div style={{fontSize:13,color:textMuted,marginBottom:12}}>{((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {es?"ejercicios":"exercises"} · {r0?.name}</div>
-                      <button className="hov" style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:18,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}
+                    <div style={{
+                      background:"rgba(37,99,235,.07)",borderRadius:14,padding:"16px",marginBottom:8,
+                      border:"1px solid rgba(37,99,235,.18)",position:"relative",overflow:"hidden",
+                    }}>
+                      <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:"#2563EB",borderRadius:"3px 0 0 3px"}}/>
+                      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4}}>
+                        <div>
+                          <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1.2,textTransform:"uppercase",marginBottom:4}}>{es?"HOY":"TODAY"}</div>
+                          <div style={{fontSize:22,fontWeight:900,color:textMain,lineHeight:1}}>
+                            {todayDay.label||("Día "+(nextDayIdx+1))}
+                          </div>
+                          <div style={{fontSize:13,color:textMuted,marginTop:4,marginBottom:14}}>
+                            {((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {es?"ejercicios":"exercises"} · {r0?.name}
+                          </div>
+                        </div>
+                        <div style={{
+                          background:"rgba(37,99,235,.15)",border:"1px solid rgba(37,99,235,.25)",
+                          borderRadius:8,padding:"3px 10px",
+                          fontSize:12,fontWeight:700,color:"#2563EB",flexShrink:0,
+                        }}>
+                          {es?"Sem":"Wk"} {currentWeek+1}
+                        </div>
+                      </div>
+                      <button
+                        className="hov"
+                        style={{
+                          width:"100%",padding:"15px",background:"#2563EB",color:"#fff",
+                          border:"none",borderRadius:12,fontSize:16,fontWeight:800,
+                          cursor:"pointer",fontFamily:"inherit",letterSpacing:.5,
+                          display:"flex",alignItems:"center",justifyContent:"center",gap:8,
+                          textTransform:"uppercase",minHeight:52,
+                        }}
                         onClick={()=>{
                           const snap={};
                           [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                           setPreSessionPRs({...snap});
                           setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
-                        }}>
-                        <Ic name="zap" size={16}/> {es?"EMPEZAR AHORA":"START NOW"}
+                        }}
+                      >
+                        <Ic name="zap" size={16} color="#fff"/>
+                        {es?"EMPEZAR AHORA":"START NOW"}
                       </button>
                     </div>
                   )}
+
+                  {/* DÍA YA ENTRENADO */}
                   {yaEntrenoHoy&&!session&&(
-                    <div style={{background:"#22C55E12",borderRadius:12,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:28}}>✅</span>
+                    <div style={{
+                      background:"rgba(34,197,94,.08)",borderRadius:14,padding:"14px 16px",
+                      marginBottom:8,display:"flex",alignItems:"center",gap:12,
+                      border:"1px solid rgba(34,197,94,.18)",
+                    }}>
+                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                        <circle cx="14" cy="14" r="13" fill="rgba(34,197,94,.15)"/>
+                        <path d="M8 14l4.5 4.5L20 9" stroke="#22C55E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                       <div>
-                        <div style={{fontSize:15,fontWeight:900,color:"#22C55E"}}>{es?"¡Entrenamiento completado!":"Workout done!"}</div>
-                        <div style={{fontSize:13,color:textMuted}}>{es?"Descansá 💪":"Rest up 💪"}</div>
+                        <div style={{fontSize:14,fontWeight:800,color:"#22C55E"}}>{es?"¡Entrenamiento completado!":"Workout done!"}</div>
+                        <div style={{fontSize:12,color:textMuted}}>{es?"Buen trabajo, descansá.":"Great work, rest up."}</div>
                       </div>
                     </div>
                   )}
@@ -2563,9 +2684,23 @@ function GymApp() {
       )}
 {showWelcome&&(()=>{
         const isCoach = sessionData?.role==="entrenador";
+        if(!isCoach){
+          return(
+            <WelcomeModal
+              open={true}
+              onOpenChange={(v)=>{if(!v)setShowWelcome(false);}}
+              userName={sessionData?.name}
+              es={es}
+              bgCard={bgCard}
+              border={border}
+              textMain={textMain}
+              textMuted={textMuted}
+            />
+          );
+        }
         const obStep = onboardStep||0;
         const setObStep = setOnboardStep;
-        const steps = isCoach ? [
+        const steps = [
           {
             icon:"👋",title:es?"¡Bienvenido/a!":"Welcome!",
             subtitle:es?"Configurá tu cuenta en 3 pasos":"Set up your account in 3 steps",
@@ -2597,17 +2732,7 @@ function GymApp() {
             cta:es?"ABRIR IRON TRACK 💪":"OPEN IRON TRACK 💪",
             action:()=>setShowWelcome(false)
           }
-        ] : [{
-          icon:"E",title:es?"¡Bienvenido/a!":"Welcome!",
-          subtitle:es?"A IRON TRACK":"To IRON TRACK",
-          body:null,
-          items:[
-            {n:1,text:es?"Deslizá → para completar cada set":"Swipe → to complete each set",done:false},
-            {n:2,text:es?"Seguí tu progreso y PRs":"Track your progress & PRs",done:false},
-            {n:3,text:es?"Rompé tus récords 🏆":"Break your records 🏆",done:false},
-          ],
-          cta:es?"EMPEZAR 💪":"LET'S GO 💪",action:()=>setShowWelcome(false)
-        }];
+        ];
         const step = steps[Math.min(obStep,steps.length-1)];
         return(
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.93)",zIndex:300,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
