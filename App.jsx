@@ -787,10 +787,13 @@ function GymApp() {
   const [notaDiaInput, setNotaDiaInput] = useState(""); // input del entrenador
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const scrollRef = useRef(null);
+  const profileFileRef = useRef(null);
   const lastScrollY = useRef(0);
   const [resumenSesion, setResumenSesion] = useState(null);
   const [chatOpenId, setChatOpenId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileEdit, setProfileEdit] = useState({nombre:"",apellido:"",email:"",phone:"",avatarDataUrl:null});
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(()=>{ try{ const v=localStorage.getItem("it_show_welcome"); if(v){localStorage.removeItem("it_show_welcome");return true;} return false; }catch(e){return false;} });
   const [currentWeek, setCurrentWeek] = useState(() => { try{return parseInt(localStorage.getItem("it_week")||"0")}catch(e){return 0} });
@@ -1165,6 +1168,8 @@ function GymApp() {
   const activeR = session ? routines.find(r=>r.id===session.rId) : null;
   const activeDay = activeR ? activeR.days[session.dIdx] : null;
   const esAlumno = readOnly || sessionData?.role==="alumno";
+  const showAlumnoProgressStack = (readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId);
+  const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
         {k:"plan",    icon:(c)=><Ic name="calendar" size={20} color={c}/>,      lbl:es?"PLAN":"PLAN"},
@@ -1608,19 +1613,23 @@ function GymApp() {
               {userMenuOpen&&(
                 <>
                 <div style={{position:"fixed",inset:0,zIndex:40}} onClick={()=>setUserMenuOpen(false)}/>
-                <div style={{position:"absolute",top:44,right:0,background:"#111827",border:"1px solid #1E3A5F",borderRadius:12,width:220,overflow:"hidden",zIndex:50,boxShadow:"0 8px 32px rgba(0,0,0,.5)",animation:"fadeIn .2s ease"}}>
-                  <div style={{padding:"12px 14px",background:"#0D1520",borderBottom:"1px solid #1a2535"}}>
-                    <div style={{fontSize:14,fontWeight:800,color:"#fff"}}>{sessionData.name}</div>
-                    <div style={{fontSize:11,color:"#475569",marginTop:1}}>{sessionData.email||""}</div>
+                <div style={{position:"absolute",top:44,right:0,background:"#0a1628",border:"1px solid rgba(59,130,246,.25)",borderRadius:14,width:240,overflow:"hidden",zIndex:50,boxShadow:"0 12px 40px rgba(0,0,0,.55)",animation:"fadeIn .2s ease"}}>
+                  <div style={{padding:"14px 16px",background:"linear-gradient(180deg,#0f1f3a 0%,#0a1628 100%)",borderBottom:"1px solid rgba(59,130,246,.15)"}}>
+                    <div style={{fontSize:15,fontWeight:800,color:"#fff",lineHeight:1.3}}>{sessionData.name}</div>
+                    <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{sessionData.email||""}</div>
                   </div>
-                  <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",borderBottom:"1px solid #1a2535",fontSize:13,fontWeight:600,color:"#94A3B8"}} onClick={()=>{setUserMenuOpen(false);setSettingsOpen(true)}}>
-                    <Ic name="user" size={15} color="#94A3B8"/> {es?"Mi perfil":"My profile"}
+                  <div style={{padding:"6px 0"}}>
+                  <div className="hov" style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:600,color:"#e2e8f0"}} onClick={()=>{setUserMenuOpen(false);const n=(sessionData.name||"").trim().split(/\s+/);setProfileEdit({nombre:n[0]||"",apellido:n.slice(1).join(" ")||"",email:sessionData.email||"",phone:sessionData.phone||"",avatarDataUrl:sessionData.avatarUrl||null});setProfileModalOpen(true);}}>
+                    <Ic name="user" size={17} color="#3b82f6"/> {es?"Mi perfil":"My profile"}
                   </div>
-                  <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",borderBottom:"1px solid #1a2535",fontSize:13,fontWeight:600,color:"#94A3B8"}} onClick={()=>{setUserMenuOpen(false);setSettingsOpen(true)}}>
-                    <Ic name="settings" size={15} color="#94A3B8"/> {es?"Configuración":"Settings"}
+                  <div className="hov" style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:600,color:"#e2e8f0"}} onClick={()=>{setUserMenuOpen(false);setSettingsOpen(true);}}>
+                    <Ic name="settings" size={17} color="#94a3b8"/> {es?"Configuración":"Settings"}
                   </div>
-                  <div style={{padding:"10px 14px",display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,fontWeight:600,color:"#EF4444"}} onClick={()=>{setUserMenuOpen(false);if(confirm(es?"¿Cerrar sesión?":"Log out?")){localStorage.clear();syncStateWithLocalStorage();}}}>
-                    <Ic name="log-out" size={15} color="#EF4444"/> {es?"Cerrar sesión":"Log out"}
+                  </div>
+                  <div style={{borderTop:"1px solid rgba(239,68,68,.2)",padding:"4px 0"}}>
+                  <div className="hov" style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:700,color:"#f87171"}} onClick={()=>{setUserMenuOpen(false);if(confirm(es?"¿Cerrar sesión?":"Log out?")){localStorage.clear();syncStateWithLocalStorage();}}}>
+                    <Ic name="log-out" size={17} color="#f87171"/> {es?"Cerrar sesión":"Log out"}
+                  </div>
                   </div>
                 </div>
                 </>
@@ -2186,14 +2195,16 @@ function GymApp() {
             <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
           </div>
         )}
-        {tab==="progress"&&(readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId)&&(
+        {tab==="progress"&&showAlumnoProgressStack&&(
           <div style={{marginBottom:24}}>
-            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:8,color:textMain}}>🏋️ MIS SESIONES</div>
-            <HistorialSesiones sessionData={sessionData} darkMode={darkMode} sharedParam={sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId}))} sb={sb} EX={EX}
-          es={es} sesiones={sesiones}/>
-            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,margin:"20px 0 10px",color:textMain}}><Ic name="image" size={16}/> FOTOS DE PROGRESO</div>
+            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:8,color:textMain}}><Ic name="bar-chart-2" size={16}/> {es?"GRÁFICO DE PROGRESO":"PROGRESS CHART"}</div>
+            <GraficoProgreso allEx={allEx} es={es} darkMode={darkMode} progress={progress} EX={EX} readOnly={readOnly||esAlumno} sharedParam={sharedParam} sb={sb} sessionData={sessionData} sesiones={sesiones}/>
+            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,margin:"20px 0 10px",color:textMain}}><Ic name="image" size={16}/> {es?"FOTOS DE PROGRESO":"PROGRESS PHOTOS"}</div>
             <FotosProgreso darkMode={darkMode} sharedParam={sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId}))} sb={sb} esEntrenador={false}
           es={es} toast2={toast2} sessionData={sessionData} progress={progress}/>
+            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,margin:"20px 0 10px",color:textMain}}>🏋️ {es?"MIS SESIONES":"MY SESSIONS"}</div>
+            <HistorialSesiones sessionData={sessionData} darkMode={darkMode} sharedParam={sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId}))} sb={sb} EX={EX}
+          es={es} sesiones={sesiones} expectedDaysPerWeek={routineDaysCount}/>
           </div>
         )}
         {tab==="scanner"&&!esAlumno&&(
@@ -2206,9 +2217,9 @@ function GymApp() {
             <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
           </div>
         )}
-        {tab==="progress"&&(
+        {tab==="progress"&&!showAlumnoProgressStack&&(
           <div style={{marginBottom:24}}>
-            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:8,color:textMain}}><Ic name="bar-chart-2" size={16}/> GRÁFICO DE PROGRESO</div>
+            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:8,color:textMain}}><Ic name="bar-chart-2" size={16}/> {es?"GRÁFICO DE PROGRESO":"PROGRESS CHART"}</div>
             <GraficoProgreso allEx={allEx} es={es} darkMode={darkMode} progress={progress} EX={EX} readOnly={readOnly||esAlumno} sharedParam={sharedParam} sb={sb} sessionData={sessionData} sesiones={sesiones}/>
           </div>
         )}
@@ -2787,59 +2798,159 @@ function GymApp() {
           </div>
         );
       })()}
-      {settingsOpen&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
-          onClick={()=>setSettingsOpen(false)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px 36px",width:"100%",maxWidth:480,border:"1px solid "+border}}
+      {profileModalOpen&&sessionData&&esAlumno&&(
+        <div style={{position:"fixed",inset:0,zIndex:205,background:"rgba(10,22,40,.78)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+          onClick={()=>setProfileModalOpen(false)}>
+          <div style={{background:"#0a1628",borderRadius:"20px 20px 0 0",padding:"12px 18px 36px",width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.22)",animation:"slideUpFade 0.35s ease",maxHeight:"92dvh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,.45)"}}
             onClick={e=>e.stopPropagation()}>
-            <div style={{width:40,height:4,background:"#2D4057",borderRadius:2,margin:"0 auto 20px"}}></div>
-            <div style={{fontSize:18,fontWeight:800,letterSpacing:1,marginBottom:24}}><Ic name="settings" size={16}/> CONFIGURACION</div>
-            <div style={{marginBottom:24}}>
-              <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:2,marginBottom:8}}>IDIOMA</div>
-              <div style={{display:"flex",background:bgSub,border:"1px solid "+border,borderRadius:12,padding:4,gap:4}}>
-                {["es","en"].map(l=>(
-                  <button key={l} className="hov"
-                    style={{flex:1,padding:"8px",border:"none",borderRadius:8,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",
-                      background:lang===l?"#2563EB":"transparent",color:lang===l?"#fff":"#8B9AB2"}}
-                    onClick={()=>{setLang(l);localStorage.setItem("it_lang",l);}}>
-                    {l==="es"?"🇦🇷 ESPAÑOL":"🇺🇸 ENGLISH"}
-                  </button>
-                ))}
+            <div style={{width:40,height:4,background:"#3b82f6",borderRadius:2,margin:"0 auto 16px"}}/>
+            <div style={{fontSize:18,fontWeight:800,marginBottom:18,color:"#fff",letterSpacing:0.5}}>{es?"Mi perfil":"My profile"}</div>
+            <input ref={profileFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+              const f=e.target.files&&e.target.files[0];
+              if(!f) return;
+              const r=new FileReader();
+              r.onload=ev=>setProfileEdit(p=>({...p,avatarDataUrl:ev.target.result}));
+              r.readAsDataURL(f);
+            }}/>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:20}}>
+              <div style={{width:96,height:96,borderRadius:"50%",background:profileEdit.avatarDataUrl?"transparent":"linear-gradient(135deg,#3b82f6,#1d4ed8)",overflow:"hidden",border:"3px solid rgba(59,130,246,.4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,fontWeight:900,color:"#fff"}}>
+                {profileEdit.avatarDataUrl
+                  ? <img src={profileEdit.avatarDataUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  : (sessionData.name||"A").slice(0,2).toUpperCase()}
               </div>
+              <button type="button" className="hov" style={{marginTop:10,background:"rgba(59,130,246,.15)",border:"1px solid rgba(59,130,246,.35)",borderRadius:10,padding:"8px 16px",color:"#3b82f6",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
+                onClick={()=>profileFileRef.current&&profileFileRef.current.click()}>
+                {es?"Cambiar foto":"Change photo"}
+              </button>
             </div>
-            <div style={{marginBottom:24}}>
-              <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:2,marginBottom:8}}>TEMA</div>
-              <div style={{display:"flex",background:bgSub,border:"1px solid "+border,borderRadius:12,padding:4,gap:4}}>
-                {[["dark","NOCHE",true],["light","DÍA",false]].map(([k,lbl,val])=>(
-                  <button key={k} className="hov"
-                    style={{flex:1,padding:"8px",border:"none",borderRadius:8,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",
-                      background:darkMode===val?"#2563EB":"transparent",color:darkMode===val?"#fff":"#8B9AB2"}}
-                    onClick={()=>{setDarkMode(val);localStorage.setItem("it_dark",val?"true":"false");}}>
-                    {lbl}
-                  </button>
-                ))}
+            {[
+              {k:"nombre",lbl:es?"Nombre":"First name",ph:""},
+              {k:"apellido",lbl:es?"Apellido":"Last name",ph:""},
+              {k:"email",lbl:"Email",ph:"email@",type:"email"},
+              {k:"phone",lbl:es?"Celular":"Phone",ph:"+54 ...",type:"tel"},
+            ].map(row=>(
+              <div key={row.k} style={{marginBottom:14}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",marginBottom:6,letterSpacing:0.5}}>{row.lbl}</div>
+                <div style={{display:"flex",alignItems:"center",gap:10,background:bgSub,border:"1px solid "+border,borderRadius:12,padding:"4px 4px 4px 12px"}}>
+                  {row.k==="email" ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> :
+                   row.k==="phone" ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                   : <Ic name="user" size={18} color="#64748b"/>}
+                  <input style={{flex:1,background:"transparent",border:"none",color:textMain,fontSize:15,padding:"10px 8px",outline:"none",fontFamily:"inherit"}}
+                    value={row.k==="phone"?profileEdit.phone:(row.k==="email"?profileEdit.email:profileEdit[row.k])}
+                    onChange={e=>{
+                      const v=e.target.value;
+                      if(row.k==="phone") setProfileEdit(p=>({...p,phone:v}));
+                      else if(row.k==="email") setProfileEdit(p=>({...p,email:v}));
+                      else setProfileEdit(p=>({...p,[row.k]:v}));
+                    }}
+                    type={row.type||"text"}
+                    placeholder={row.ph}
+                  />
+                </div>
               </div>
-            </div>
-            {esAlumno&&(
+            ))}
+            <button type="button" className="hov" style={{width:"100%",padding:"14px",background:"#3b82f6",color:"#fff",border:"none",borderRadius:12,fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",marginTop:8,boxShadow:"0 4px 20px rgba(59,130,246,.35)"}}
+              onClick={()=>{
+                try{
+                  const fullName=[profileEdit.nombre,profileEdit.apellido].filter(Boolean).join(" ").trim()||profileEdit.email||"Atleta";
+                  const next={...sessionData,name:fullName,email:profileEdit.email,phone:profileEdit.phone,avatarUrl:profileEdit.avatarDataUrl||sessionData.avatarUrl};
+                  localStorage.setItem("it_session",JSON.stringify(next));
+                  setSessionData(next);
+                  setProfileModalOpen(false);
+                  toast2(es?"Perfil guardado ✓":"Profile saved ✓");
+                }catch(err){ toast2("Error"); }
+              }}>
+              {es?"Guardar cambios":"Save changes"}
+            </button>
+          </div>
+        </div>
+      )}
+      {settingsOpen&&(
+        <div style={{position:"fixed",inset:0,background:esAlumno?"rgba(10,22,40,.75)":"rgba(0,0,0,.88)",backdropFilter:esAlumno?"blur(12px)":undefined,WebkitBackdropFilter:esAlumno?"blur(12px)":undefined,zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+          onClick={()=>setSettingsOpen(false)}>
+          <div style={{background:esAlumno?"#0a1628":bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px 36px",width:"100%",maxWidth:480,border:esAlumno?"1px solid rgba(59,130,246,.2)":"1px solid "+border,animation:"slideUpFade 0.3s ease",maxHeight:"92dvh",overflowY:"auto"}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{width:40,height:4,background:esAlumno?"#3b82f6":"#2D4057",borderRadius:2,margin:"0 auto 20px"}}/>
+            <div style={{fontSize:18,fontWeight:800,letterSpacing:1,marginBottom:20,color:esAlumno?"#fff":textMain}}><Ic name="settings" size={18} color="#3b82f6"/> {es?"CONFIGURACIÓN":"SETTINGS"}</div>
+            {esAlumno ? (
               <>
-              <div style={{marginBottom:24}}>
-                <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:2,marginBottom:8}}>{es?"SOPORTE":"SUPPORT"}</div>
-                <a href="https://wa.me/541164461075" target="_blank" rel="noreferrer"
-                  style={{display:"flex",alignItems:"center",gap:12,padding:"16px",
-                    background:"#22C55E22",border:"1px solid #25d36633",borderRadius:12,color:"#22C55E",
-                    fontSize:15,fontWeight:800,textDecoration:"none"}}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="#25D366">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/>
-                    <path d="M11.5 0C5.149 0 0 5.149 0 11.5c0 2.059.546 4.019 1.545 5.701L0 23l5.978-1.52A11.451 11.451 0 0011.5 23C17.851 23 23 17.851 23 11.5S17.851 0 11.5 0zm0 21.087a9.576 9.576 0 01-5.072-1.446l-.364-.217-3.548.902.918-3.453-.24-.378A9.567 9.567 0 011.913 11.5c0-5.289 4.299-9.587 9.587-9.587 5.289 0 9.587 4.298 9.587 9.587 0 5.288-4.298 9.587-9.587 9.587z"/>
-                  </svg>
-                  {es?"Contactar entrenador":"Contact trainer"}
-                </a>
-              </div>
-              <RecordatoriosPanel es={es} darkMode={darkMode} toast2={toast2}/>
+                <div style={{marginBottom:22}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{es?"APARIENCIA":"APPEARANCE"}</div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(255,255,255,.04)",border:"1px solid rgba(148,163,184,.2)",borderRadius:14,padding:"14px 16px"}}>
+                    <span style={{fontSize:15,fontWeight:600,color:"#e2e8f0"}}>{es?"Modo oscuro":"Dark mode"}</span>
+                    <button type="button" className="hov" onClick={()=>{const v=!darkMode;setDarkMode(v);localStorage.setItem("it_dark",v?"true":"false");}}
+                      style={{width:52,height:28,borderRadius:14,border:"none",background:darkMode?"#22c55e":"#475569",position:"relative",cursor:"pointer",transition:"background .25s"}}>
+                      <span style={{position:"absolute",top:3,left:darkMode?26:3,width:22,height:22,borderRadius:"50%",background:"#fff",transition:"left .25s ease",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
+                    </button>
+                  </div>
+                </div>
+                <div style={{marginBottom:22}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{es?"IDIOMA":"LANGUAGE"}</div>
+                  {[{code:"es",label:es?"Español":"Spanish"},{code:"en",label:"English"}].map(opt=>(
+                    <button key={opt.code} type="button" className="hov" onClick={()=>{setLang(opt.code);localStorage.setItem("it_lang",opt.code);}}
+                      style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",marginBottom:8,background:lang===opt.code?"rgba(59,130,246,.12)":"rgba(255,255,255,.03)",border:"1px solid "+(lang===opt.code?"rgba(59,130,246,.4)":"rgba(148,163,184,.15)"),borderRadius:12,cursor:"pointer",fontFamily:"inherit"}}>
+                      <span style={{fontSize:15,fontWeight:600,color:"#e2e8f0"}}>{opt.label}</span>
+                      {lang===opt.code ? <span style={{color:"#22c55e",fontSize:18,fontWeight:900}}>✓</span> : <span style={{width:18}}/>}
+                    </button>
+                  ))}
+                </div>
+                <div style={{marginBottom:22}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{es?"AYUDA":"HELP"}</div>
+                  <a href="https://wa.me/541164461075" target="_blank" rel="noreferrer" style={{display:"block",textDecoration:"none",marginBottom:10}}>
+                    <div style={{padding:"14px 16px",background:"rgba(59,130,246,.1)",border:"1px solid rgba(59,130,246,.25)",borderRadius:12}}>
+                      <div style={{fontSize:15,fontWeight:800,color:"#3b82f6"}}>{es?"Soporte":"Support"}</div>
+                      <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{es?"Contactá con nosotros":"Contact us"}</div>
+                    </div>
+                  </a>
+                  <a href="mailto:soporte@irontrack.app?subject=Feedback" style={{display:"block",textDecoration:"none"}}>
+                    <div style={{padding:"14px 16px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(148,163,184,.15)",borderRadius:12}}>
+                      <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0"}}>{es?"Enviar comentarios":"Send feedback"}</div>
+                      <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{es?"Ayudanos a mejorar":"Help us improve"}</div>
+                    </div>
+                  </a>
+                  <div style={{textAlign:"center",marginTop:12,fontSize:12,color:"#64748b"}}>Iron Track v1.0.0</div>
+                </div>
+                <RecordatoriosPanel es={es} darkMode={darkMode} toast2={toast2}/>
+                <div style={{marginTop:22,paddingTop:16,borderTop:"1px solid rgba(239,68,68,.25)"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#f87171",letterSpacing:1.2,marginBottom:10}}>{es?"ZONA DE PELIGRO":"DANGER ZONE"}</div>
+                  <button type="button" className="hov" style={{width:"100%",padding:"14px",background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.35)",borderRadius:12,color:"#f87171",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+                    onClick={()=>{if(confirm(es?"¿Cerrar sesión?":"Log out?")){setSettingsOpen(false);localStorage.clear();syncStateWithLocalStorage();}}}>
+                    <Ic name="log-out" size={18} color="#f87171"/> {es?"Cerrar sesión":"Log out"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{marginBottom:24}}>
+                  <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:2,marginBottom:8}}>IDIOMA</div>
+                  <div style={{display:"flex",background:bgSub,border:"1px solid "+border,borderRadius:12,padding:4,gap:4}}>
+                    {["es","en"].map(l=>(
+                      <button key={l} className="hov"
+                        style={{flex:1,padding:"8px",border:"none",borderRadius:8,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",
+                          background:lang===l?"#2563EB":"transparent",color:lang===l?"#fff":"#8B9AB2"}}
+                        onClick={()=>{setLang(l);localStorage.setItem("it_lang",l);}}>
+                        {l==="es"?"🇦🇷 ESPAÑOL":"🇺🇸 ENGLISH"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{marginBottom:24}}>
+                  <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:2,marginBottom:8}}>TEMA</div>
+                  <div style={{display:"flex",background:bgSub,border:"1px solid "+border,borderRadius:12,padding:4,gap:4}}>
+                    {[["dark","NOCHE",true],["light","DÍA",false]].map(([k,lbl,val])=>(
+                      <button key={k} className="hov"
+                        style={{flex:1,padding:"8px",border:"none",borderRadius:8,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",
+                          background:darkMode===val?"#2563EB":"transparent",color:darkMode===val?"#fff":"#8B9AB2"}}
+                        onClick={()=>{setDarkMode(val);localStorage.setItem("it_dark",val?"true":"false");}}>
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </>
             )}
             <button className="hov"
-              style={{width:"100%",padding:"12px",background:darkMode?"#162234":"#E2E8F0",border:"none",borderRadius:12,color:textMuted,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
+              style={{width:"100%",padding:"12px",marginTop:16,background:esAlumno?"rgba(148,163,184,.12)":(darkMode?"#162234":"#E2E8F0"),border:esAlumno?"1px solid rgba(148,163,184,.2)":"none",borderRadius:12,color:esAlumno?"#cbd5e1":textMuted,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
               onClick={()=>setSettingsOpen(false)}>
               {es?"CERRAR":"CLOSE"}
             </button>
@@ -3904,19 +4015,30 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
   );
 }
 
-function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones}) {
+function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones: sesionesProp, expectedDaysPerWeek}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
-  const bgSub = _dm?"#162234":"#EEF2F7";
+  const bgSub = _dm?"#132032":"#EEF2F7";
   const border = _dm?"#2D4057":"#E2E8F0";
   const textMain = _dm?"#FFFFFF":"#0F1923";
   const textMuted = _dm?"#8B9AB2":"#64748B";
+  const primary = "#3b82f6";
+  const accent = "#22c55e";
+  const expDays = Math.max(1, parseInt(expectedDaysPerWeek, 10) || 3);
 
   const [sesionesData, setSesionesData] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [openWeek, setOpenWeek] = React.useState(null);
 
   React.useEffect(()=>{
+    if(sesionesProp && sesionesProp.length>0) {
+      setSesionesData(sesionesProp);
+      setLoading(false);
+    }
+  },[sesionesProp]);
+
+  React.useEffect(()=>{
+    if(sesionesProp && sesionesProp.length>0) return;
     const load = async () => {
       try {
         const rutData = JSON.parse(atob(sharedParam));
@@ -3929,7 +4051,31 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones}) {
       setLoading(false);
     };
     load();
-  },[]);
+  },[sharedParam, sb, sesionesProp]);
+
+  React.useEffect(()=>{
+    if(!sesionesData.length) return;
+    const weeks = [...new Set(sesionesData.map(s=>Number(s.semana)||0))];
+    const maxW = Math.max(...weeks, 0);
+    setOpenWeek((prev)=> (prev!=null ? prev : maxW));
+  },[sesionesData]);
+
+  const byWeek = React.useMemo(()=>{
+    const m = {};
+    sesionesData.forEach((s)=>{
+      const w = Number(s.semana)||0;
+      if(!m[w]) m[w]=[];
+      m[w].push(s);
+    });
+    Object.keys(m).forEach((w)=>{
+      m[w].sort((a,b)=>{
+        const da = new Date(a.created_at||a.fecha||0).getTime();
+        const db = new Date(b.created_at||b.fecha||0).getTime();
+        return db - da;
+      });
+    });
+    return m;
+  },[sesionesData]);
 
   if(loading) return (
     <div>
@@ -3948,30 +4094,72 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones}) {
   if(sesionesData.length===0) return (
     <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
       <div style={{fontSize:44,marginBottom:12}}>📋</div>
-      <div style={{fontSize:18,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin sesionesData aún":"No sessions yet"}</div>
+      <div style={{fontSize:18,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin sesiones aún":"No sessions yet"}</div>
       <div style={{fontSize:13,color:textMuted,lineHeight:1.5}}>{es?"Completá tu primer entrenamiento para ver el historial aquí":"Complete your first workout to see your history here"}</div>
     </div>
   );
 
+  const weekKeys = Object.keys(byWeek).map(Number).sort((a,b)=>b-a);
+
   return (
     <div>
-      {sesionesData.map((s,i)=>(
-        <div key={s.id||("sesion-"+(s.fecha||"")+"-"+(s.hora||"")+"-"+i)} style={{background:bgCard,borderRadius:12,padding:"16px 18px",marginBottom:8,border:"1px solid "+border}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
-            <div style={{fontSize:15,fontWeight:800,color:"#22C55E"}}>✅ {s.dia_label}</div>
-            <div style={{fontSize:13,color:textMuted}}>{s.fecha} · {s.hora}</div>
+      {weekKeys.map((wk)=>{
+        const list = byWeek[wk];
+        const dayLabels = list.map(s=>(s.dia_label||"").trim()).filter(Boolean);
+        const uniqueDays = dayLabels.length ? new Set(dayLabels).size : list.length;
+        const done = uniqueDays>=expDays;
+        const wkDisplay = list[0]?.semana != null && list[0]?.semana !== "" ? list[0].semana : wk;
+        const label = (es?"Semana ":"Week ")+wkDisplay;
+        const expanded = openWeek===wk;
+        return (
+          <div key={"hist-wk-"+wk} style={{background:bgCard,borderRadius:12,marginBottom:8,border:"1px solid "+border,overflow:"hidden"}}>
+            <button type="button" className="hov" onClick={()=>setOpenWeek(expanded?null:wk)}
+              style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",background:expanded?"rgba(59,130,246,.08)":bgCard,border:"none",cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <span style={{display:"inline-flex",transform:expanded?"rotate(90deg)":"rotate(0deg)",transition:"transform .2s ease"}}>
+                  <Ic name="chevron-right" size={18} color={primary}/>
+                </span>
+                <span style={{fontSize:16,fontWeight:800,color:textMain}}>{label}</span>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                {done ? (
+                  <span style={{display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:800,color:accent}}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    {es?"Listo":"Done"}
+                  </span>
+                ) : (
+                  <span style={{fontSize:13,fontWeight:800,color:primary,background:"rgba(59,130,246,.12)",borderRadius:8,padding:"4px 10px"}}>
+                    {Math.min(uniqueDays,expDays)}/{expDays}
+                  </span>
+                )}
+              </div>
+            </button>
+            {expanded && (
+              <div style={{borderTop:"1px solid "+border,padding:"8px 12px 14px",background:bgSub}}>
+                {list.map((s,i)=>(
+                  <div key={s.id||("sesion-"+wk+"-"+i)} style={{background:_dm?"#0f1a2a":"#fff",borderRadius:10,padding:"12px 14px",marginBottom:8,border:"1px solid "+border}}>
+                    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:6}}>
+                      <div>
+                        <div style={{fontSize:15,fontWeight:800,color:accent}}>✅ {s.dia_label||(es?"Día":"Day")}</div>
+                        <div style={{fontSize:12,color:textMuted,marginTop:2}}>{s.fecha}{s.hora?(" · "+s.hora):""}</div>
+                      </div>
+                    </div>
+                    <div style={{fontSize:12,color:primary,fontWeight:700,marginBottom:6}}>{s.rutina_nombre||(es?"Entrenamiento":"Workout")}</div>
+                    {s.ejercicios&&(
+                      <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                        {s.ejercicios.split(",").map(exId=>{
+                          const ex = EX.find(e=>e.id===exId.trim());
+                          return ex ? <span key={exId+"-"+i} style={{background:_dm?"#162234":"#E2E8F0",color:textMuted,borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:700}}>{es?ex.name:ex.nameEn||ex.name}</span> : null;
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div style={{fontSize:13,color:textMuted,marginBottom:4}}>Semana {s.semana} · {s.rutina_nombre}</div>
-          {s.ejercicios&&(
-            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:8}}>
-              {s.ejercicios.split(",").map(exId=>{
-                const ex = EX.find(e=>e.id===exId);
-                return ex ? <span key={exId} style={{background:_dm?"#162234":"#E2E8F0",color:textMuted,borderRadius:6,padding:"4px 8px",fontSize:11,fontWeight:700}}>{ex.name}</span> : null;
-              })}
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -4009,7 +4197,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
     reader.onload = async (ev) => {
       const base64 = ev.target.result;
       const fecha = new Date().toLocaleDateString("es-AR");
-      const res = await sb.addFoto({alumno_id: alumnoIdSync, imagen: base64, fecha, nota:""});
+      const res = await sb.addFoto({alumno_id: alumnoId, imagen: base64, fecha, nota:""});
       if(res && res[0]) setFotos(prev=>[res[0],...prev]);
       setUploading(false);
     };
