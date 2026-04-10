@@ -313,7 +313,7 @@ const sb = {
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
   getVideoOverrides: () => sbFetch("video_overrides?select=ejercicio_id,youtube_url"),
-  getCustomEx: () => sbFetch("ejercicios_custom?entrenador_id=eq.entrenador_principal&select=*"),
+  getCustomEx: (entId) => sbFetch("ejercicios_custom?entrenador_id=eq."+(entId||"entrenador_principal")+"&select=*"),
   addCustomEx: (data) => sbFetch("ejercicios_custom", "POST", data),
   deleteCustomEx: (id) => sbFetch("ejercicios_custom?id=eq."+id, "DELETE"),
   updateCustomEx: (id, data) => sbFetch("ejercicios_custom?id=eq."+id, "PATCH", data),
@@ -1046,7 +1046,8 @@ function GymApp() {
       }
     }).catch(function(){});
     // Cargar ejercicios custom desde Supabase
-    sb.getCustomEx().then(function(res){
+    var entId = (()=>{ try{ return JSON.parse(localStorage.getItem("it_session")||"null")?.entrenadorId || "entrenador_principal"; }catch(e){ return "entrenador_principal"; } })();
+    sb.getCustomEx(entId).then(function(res){
       if(res && Array.isArray(res) && res.length > 0) {
         var exs = res.map(function(e){ return {id:e.id, name:e.name, nameEn:e.name_en||e.name, pattern:e.pattern||"empuje", muscle:e.muscle||"", equip:e.equip||"Libre", youtube:e.youtube||""}; });
         setCustomEx(function(prev){
@@ -1116,15 +1117,17 @@ function GymApp() {
     const exPrevData = progress[exId]||{sets:[],max:0};
     const newKgVal = parseFloat(kg)||0;
     if(newKgVal > (exPrevData.max||0) && (exPrevData.max||0) > 0) {
-      const exInfoCel = [...EX,...(customEx||[])].find(e=>e.id===exId);
+      const inf = [...EX,...(customEx||[])].find(e=>e.id===exId);
+      const exR = routines.flatMap(r=>r.days||[]).flatMap(d=>[...(d.warmup||[]),...(d.exercises||[])]).find(e=>e.id===exId);
+      const nombreEj = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : ((exR && exR.name) || exId || "Ejercicio");
       const prevMax = exPrevData.max||0;
       const diff = Math.round((newKgVal - prevMax)*10)/10;
-      setPrCelebration({ejercicio: exInfoCel?.name||exId, kg: newKgVal, prevKg: prevMax, diff: diff, exId: exId});
+      setPrCelebration({ejercicio: nombreEj, kg: newKgVal, prevKg: prevMax, diff: diff, exId: exId});
       // Guardar PR en lista de la sesión
       setSessionPRList(function(prev){
         var existe = prev.find(function(p){return p.exId===exId && p.kg===newKgVal});
         if(existe) return prev;
-        return [...prev, {exId:exId, ejercicio:exInfoCel?.name||exId, kg:newKgVal, prevKg:prevMax, diff:diff}];
+        return [...prev, {exId:exId, ejercicio:nombreEj, kg:newKgVal, prevKg:prevMax, diff:diff}];
       });
       setTimeout(()=>setPrCelebration(null), 3000);
     }
@@ -1192,8 +1195,8 @@ function GymApp() {
       if(d.warmup && d.warmup.length>0) {
         rows.push({type:"warmup-header"});
         d.warmup.forEach((ex,ei) => {
-          const info = allEx.find(e=>e.id===ex.id);
-          const exName = es?(info?.name||ex.id):(info?.nameEn||info?.name||ex.id);
+          const inf = allEx.find(e=>e.id===ex.id);
+          const exName = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : (ex.name || ex.id || "Ejercicio");
           const wks = weeks4.map(wi => {
             const w = (ex.weeks||[])[wi]||{};
             return {s:w.sets||ex.sets||"-", r:w.reps||ex.reps||"-", kg:w.kg||ex.kg||"", note:w.note||"", filled:!!(w.sets||w.reps||w.kg), active:wi===currentWeek};
@@ -1204,16 +1207,16 @@ function GymApp() {
       if(d.exercises && d.exercises.length>0) {
         rows.push({type:"main-header"});
         d.exercises.forEach((ex,ei) => {
-          const info = allEx.find(e=>e.id===ex.id);
-          const pat = info?.pattern||"empuje";
+          const inf = allEx.find(e=>e.id===ex.id);
+          const pat = inf?.pattern||"empuje";
           const col = patColors[pat]||"#2563EB";
-          const exName = es?(info?.name||ex.id):(info?.nameEn||info?.name||ex.id);
+          const exName = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : (ex.name || ex.id || "Ejercicio");
           const wks = weeks4.map(wi => {
             const w = (ex.weeks||[])[wi]||{};
             return {s:w.sets||ex.sets||"-", r:w.reps||ex.reps||"-", kg:w.kg||ex.kg||"", note:w.note||"", filled:!!(w.sets||w.reps||w.kg), active:wi===currentWeek};
           });
           const lastRpe = progress[ex.id]?.sets?.[0]?.rpe||null;
-          rows.push({type:"ex", exName, info, pat, col, ex, wks, lastRpe});
+          rows.push({type:"ex", exName, info:inf, pat, col, ex, wks, lastRpe});
         });
       }
     });
@@ -1489,7 +1492,7 @@ function GymApp() {
                 const alumno=res[0];
                 const ruts=await sbFetch("rutinas?alumno_id=eq."+alumno.id+"&select=*&order=created_at.desc&limit=1");
                 localStorage.clear();
-                const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id};
+                const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id,entrenadorId:alumno.entrenador_id};
                 localStorage.setItem("it_session",JSON.stringify(s));
                 localStorage.setItem("it_show_welcome","1");
                 if(ruts&&ruts[0]) localStorage.setItem("it_rt",JSON.stringify([{...ruts[0].datos,alumnoId:alumno.id}]));
@@ -1949,7 +1952,7 @@ function GymApp() {
                     const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
                     const totalEj=((d.warmup||[]).length+(d.exercises||[]).length);
                     const isOpen=expandedPlanDay===r.id+"-"+di;
-                    const exNames=(d.exercises||[]).slice(0,3).map(function(ex){var inf=allEx.find(function(e){return e.id===ex.id});return inf?(es?inf.name:(inf.nameEn||inf.name)):ex.id}).join(", ");
+                    const exNames=(d.exercises||[]).slice(0,3).map(function(ex){var inf=allEx.find(function(e){return e.id===ex.id});var nombre=inf?(es?inf.name:(inf.nameEn||inf.name)):(ex.name||ex.id||"Ejercicio");return nombre}).join(", ");
 
                     return(
                       <div key={r.id+"-plan-day-"+di} style={{background:bgCard,border:"1px solid "+(isNextDay?"#2563EB":isDayDone?"#22C55E44":border),borderRadius:12,marginBottom:8,overflow:"hidden"}}>
@@ -1983,13 +1986,14 @@ function GymApp() {
                                 </div>
                                 {(d.warmup||[]).map(function(ex,ei){
                                   var inf=allEx.find(function(e){return e.id===ex.id});
+                                  var nombre=inf?(es?inf.name:(inf.nameEn||inf.name)):(ex.name||ex.id||"Ejercicio");
                                   var vUrl=(videoOverrides&&videoOverrides[ex.id])||inf?.youtube||"";
                                   return(
                                     <div key={r.id+"-d"+di+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
                                       <div style={{width:3,height:20,borderRadius:2,background:"#F59E0B44",flexShrink:0}}/>
-                                      <div style={{flex:1,fontSize:16,fontWeight:700,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
+                                      <div style={{flex:1,fontSize:16,fontWeight:700,color:textMain}}>{nombre}</div>
                                       <span style={{fontSize:13,color:"#A3B4CC",fontWeight:600}}>{ex.sets||"-"}×{ex.reps||"-"}</span>
-                                      {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:es?inf?.name:(inf?.nameEn||inf?.name)});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
+                                      {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:nombre});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
                                     </div>
                                   );
                                 })}
@@ -2002,6 +2006,7 @@ function GymApp() {
                               </div>
                               {d.exercises.map(function(ex,ei){
                                 var inf=allEx.find(function(e){return e.id===ex.id});
+                                var nombre=inf?(es?inf.name:(inf.nameEn||inf.name)):(ex.name||ex.id||"Ejercicio");
                                 var vUrl=(videoOverrides&&videoOverrides[ex.id])||inf?.youtube||"";
                                 var w=((ex.weeks||[])[currentWeek])||{};
                                 var s=w.sets||ex.sets||"-";
@@ -2011,12 +2016,12 @@ function GymApp() {
                                   <div key={r.id+"-d"+di+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 0",borderBottom:ei<d.exercises.length-1?"1px solid "+border:"none"}}>
                                     <div style={{width:3,height:24,borderRadius:2,background:border,flexShrink:0}}/>
                                     <div style={{flex:1,minWidth:0}}>
-                                      <div style={{fontSize:17,fontWeight:800,color:textMain}}>{es?inf?.name:(inf?.nameEn||inf?.name||ex.id)}</div>
+                                      <div style={{fontSize:17,fontWeight:800,color:textMain}}>{nombre}</div>
                                       <div style={{fontSize:13,color:"#A3B4CC",fontWeight:500,marginTop:2,display:"flex",gap:6,flexWrap:"wrap"}}>
                                         <span style={{fontWeight:700}}>{s}×{rp}</span>{kg2&&<span>{kg2}kg</span>}{ex.pause&&<span>⏱ {fmtP(ex.pause)}</span>}
                                       </div>
                                     </div>
-                                    {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:es?inf?.name:(inf?.nameEn||inf?.name)});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
+                                    {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:nombre});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
                                   </div>
                                 );
                               })}
@@ -2519,9 +2524,10 @@ function GymApp() {
                                     <div style={{fontSize:10,fontWeight:700,color:"#F59E0B",letterSpacing:1,marginBottom:4}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</div>
                                     {(d.warmup||[]).map((ex,ei)=>{
                                       const exInfo=allEx.find(e=>e.id===ex.id);
+                                      const nombre=exInfo?(es?exInfo.name:(exInfo.nameEn||exInfo.name)):(ex.name||ex.id||"Ejercicio");
                                       return <div key={(rutinaActiva?.id||"rut")+"-d"+di+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
                                         <div style={{width:3,height:16,borderRadius:2,background:"#F59E0B44",flexShrink:0,marginTop:0}}/>
-                                        <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{es?exInfo?.name:exInfo?.nameEn||exInfo?.name||ex.id}</div>
+                                        <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{nombre}</div>
                                         <div style={{fontSize:11,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
                                         <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
                                       </div>;
@@ -2532,9 +2538,10 @@ function GymApp() {
                                 <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1,marginBottom:4}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</div>
                                 {(d.exercises||[]).map((ex,ei)=>{
                                   const exInfo=allEx.find(e=>e.id===ex.id);
+                                  const nombre=exInfo?(es?exInfo.name:(exInfo.nameEn||exInfo.name)):(ex.name||ex.id||"Ejercicio");
                                   return <div key={(rutinaActiva?.id||"rut")+"-d"+di+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"4px 0",alignItems:"center",borderBottom:ei<(d.exercises||[]).length-1?"1px solid "+border:"none"}}>
                                     <div style={{width:3,height:16,borderRadius:2,background:border,flexShrink:0,marginTop:0}}/>
-                                    <div style={{flex:1,fontSize:15,fontWeight:700,color:textMain}}>{es?exInfo?.name:exInfo?.nameEn||exInfo?.name||ex.id}</div>
+                                    <div style={{flex:1,fontSize:15,fontWeight:700,color:textMain}}>{nombre}</div>
                                     <div style={{fontSize:11,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
                                     <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:di,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid "+border,borderRadius:8,padding:"4px 8px",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color={textMuted}/></button>
                                   </div>;
@@ -4620,7 +4627,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
   const fileRef = React.useRef();
   const fileGalRef = React.useRef();
   const allEx = React.useMemo(()=>{
-    try{ const c=JSON.parse(localStorage.getItem("it_customEx")||"[]"); return [...EX,...c]; }catch(e){return EX;}
+    try{ const c=JSON.parse(localStorage.getItem("it_cex")||"[]"); return [...EX,...c]; }catch(e){return EX;}
   },[]);
 
   const procesarImagen = async (base64) => {
@@ -5085,8 +5092,11 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                 .sort(function(a2,b2){return b2[1].kg-a2[1].kg})
                 .slice(0,3)
                 .map(function(entry){
-                  var exInfo = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
-                  return {id:entry[0], nombre:exInfo?exInfo.name:entry[0], kg:entry[1].kg};
+                  var inf = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
+                  var rutA = rutinasSB.find(function(r){return r.alumno_id===a.id;});
+                  var exR = rutA && rutA.datos && rutA.datos.days ? rutA.datos.days.flatMap(function(d){return [...(d.warmup||[]),...(d.exercises||[])]}).find(function(e){return e.id===entry[0];}) : null;
+                  var nombre = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : ((exR && exR.name) || entry[0] || "Ejercicio");
+                  return {id:entry[0], nombre:nombre, kg:entry[1].kg};
                 });
 
               // Tendencia
@@ -5125,14 +5135,17 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   // PR: máximo de todos los sets es del set más reciente
                   const lastSet = sets[0];
                   if(lastSet&&parseFloat(lastSet.kg||0)>=maxKg&&sets.length>1) {
+                    const inf = [...EX,...(customEx||[])].find(e=>e.id===exId);
                     const exInfo = (routines.flatMap(r=>r.days||[]).flatMap(d=>[...(d.exercises||[]),...(d.warmup||[])]).find(e=>e?.id===exId));
-                    if(!prReciente) prReciente = {exId, kg:maxKg, nombre:exInfo?.name||exId};
+                    const nombre = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : ((exInfo && exInfo.name) || exId || "Ejercicio");
+                    if(!prReciente) prReciente = {exId, kg:maxKg, nombre};
                   }
                   if(pct>mejorPct) mejorPct = pct;
                   // Caída: última semana bajó vs semana anterior
                   if(semanaUltSets.length&&kgSU<kgS1&&!ejercicioCaida) {
+                    const inf2 = [...EX,...(customEx||[])].find(e=>e.id===exId);
                     const exInfo2 = routines.flatMap(r=>r.days||[]).flatMap(d=>[...(d.exercises||[]),...(d.warmup||[])]).find(e=>e?.id===exId);
-                    ejercicioCaida = exInfo2?.name||null;
+                    ejercicioCaida = inf2 ? (es ? inf2.name : (inf2.nameEn || inf2.name)) : ((exInfo2 && exInfo2.name) || exId || null);
                   }
                 });
 
@@ -5295,8 +5308,10 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                       {Object.keys(ultimosPesos).length>0&&(
                         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                           {Object.entries(ultimosPesos).slice(0,4).map(function(entry){
-                            var exInfo = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
-                            var nombre = exInfo?exInfo.name:entry[0];
+                            var inf = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
+                            var rutA = rutinasSB.find(function(r){return r.alumno_id===a.id;});
+                            var exR = rutA && rutA.datos && rutA.datos.days ? rutA.datos.days.flatMap(function(d){return [...(d.warmup||[]),...(d.exercises||[])]}).find(function(e){return e.id===entry[0];}) : null;
+                            var nombre = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : ((exR && exR.name) || entry[0] || "Ejercicio");
                             return(
                               <span key={entry[0]} style={{background:bgSub,borderRadius:6,padding:"2px 6px",fontSize:9,color:textMuted,fontWeight:600}}>
                                 {nombre.substring(0,12)} {entry[1].kg}kg×{entry[1].reps}
@@ -6237,9 +6252,10 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
   const textMain = _dm?"#FFFFFF":"#0F1923";
   const textMuted = _dm?"#8B9AB2":"#64748B";
 
-  const info = (allEx||[]).find(e=>e.id===editEx.ex.id);
+  const inf = (allEx||[]).find(e=>e.id===editEx.ex.id);
+  const nombre = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : (editEx.ex.name || editEx.ex.id || "Ejercicio");
   const safePATS = PATS||{};
-  const pat = safePATS[info?.pattern] || safePATS["core"] || Object.values(safePATS)[0] || {color:"#2563EB",icon:"E",label:"Ejercicio"};
+  const pat = safePATS[inf?.pattern] || safePATS["core"] || Object.values(safePATS)[0] || {color:"#2563EB",icon:"E",label:"Ejercicio"};
   const initWeeks = () => {
     const w = [...(editEx.ex.weeks||[])];
     while(w.length<4) w.push({sets:"",reps:"",kg:"",note:"",pausa:""});
@@ -6267,7 +6283,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
       <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <div style={{width:36,height:36,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:color,flexShrink:0}}>{pat?.icon||"·"}</div>
-          <div style={{fontSize:22,fontWeight:800,flex:1}}>{es?info?.name:info?.nameEn}</div>
+          <div style={{fontSize:22,fontWeight:800,flex:1}}>{nombre}</div>
           <button className="hov" style={{...btn(),fontSize:22,padding:"4px 8px"}} onClick={onClose}>x</button>
         </div>
 
