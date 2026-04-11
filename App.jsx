@@ -1781,7 +1781,7 @@ function GymApp() {
           if(!dir && y < 20 && headerCollapsed) setHeaderCollapsed(false);
           lastScrollY.current = y;
         }}
-        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100dvh - 130px)",paddingBottom:100,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth"}}>
+        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100dvh - 140px)",paddingBottom:120,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth"}}>
         {tab==="plan"&&esAlumno&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&(
           <div>
@@ -3942,7 +3942,7 @@ function GymApp() {
               <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:12,paddingBottom:4,minHeight:44,alignItems:"center",WebkitOverflowScrolling:"touch",scrollbarWidth:"none",msOverflowStyle:"none"}}>
                 {Object.entries(PATS).map(([k,p])=>(
                   <button key={k} type="button" className="hov" style={{background:addExPat===k?p.color+"44":"#2D4057",color:addExPat===k?p.color:textMuted,border:addExPat===k?"1px solid "+p.color:"1px solid "+border,borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:".5px"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
-                    {p.icon} {es?p.label:p.labelEn}
+                    {es?p.label:p.labelEn}
                   </button>
                 ))}
               </div>
