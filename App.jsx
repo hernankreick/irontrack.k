@@ -1781,7 +1781,7 @@ function GymApp() {
           if(!dir && y < 20 && headerCollapsed) setHeaderCollapsed(false);
           lastScrollY.current = y;
         }}
-        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100dvh - 140px)",paddingBottom:120,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth"}}>
+        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100dvh - 140px)",paddingBottom:120,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth",background: darkMode ? "#0B1120" : "#F1F5F9"}}>
         {tab==="plan"&&esAlumno&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&(
           <div>
