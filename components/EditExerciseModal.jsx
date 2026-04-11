@@ -1,280 +1,319 @@
 import React, { useState, useEffect } from 'react';
 
 const METODOS = [
-  { id: 'carga',  label: '+ Carga',   desc: 'Subir kg c/semana',      color: '#2563EB' },
-  { id: 'reps',   label: '+ Reps',    desc: 'Más reps, mismo peso',   color: '#22C55E' },
-  { id: 'series', label: '+ Series',  desc: 'Más series c/semana',    color: '#8B5CF6' },
-  { id: 'pausa',  label: '− Pausa',   desc: 'Reducir descanso',       color: '#F59E0B' },
-  { id: 'manual', label: 'Manual',    desc: 'Definís vos c/semana',   color: '#8B9AB2' },
+  { id: 'carga',  label: '+ Carga',   desc: 'Subir kg c/semana — completá los valores de cada semana abajo' },
+  { id: 'reps',   label: '+ Reps',    desc: 'Más reps, mismo peso — completá los valores de cada semana abajo' },
+  { id: 'series', label: '+ Series',  desc: 'Más series c/semana — completá los valores de cada semana abajo' },
+  { id: 'pausa',  label: '− Pausa',   desc: 'Reducir descanso — completá los valores de cada semana abajo' },
+  { id: 'manual', label: 'Manual',    desc: 'Definís vos los valores de cada semana' },
 ];
 
 function initWeeks(exercise) {
   const w = [...(exercise?.weeks || [])];
   while (w.length < 4) w.push({ sets: '', reps: '', kg: '', note: '', pausa: '' });
   return w.slice(0, 4).map(wk => ({
-    sets:  wk.sets  || '',
-    reps:  wk.reps  || '',
-    kg:    wk.kg    || '',
-    note:  wk.note  || '',
-    pausa: wk.pausa || '',
+    sets:  wk.sets  ?? '',
+    reps:  wk.reps  ?? '',
+    kg:    wk.kg    ?? '',
+    note:  wk.note  ?? '',
+    pausa: wk.pausa ?? '',
   }));
 }
+
+// ─── Styles ──────────────────────────────────────────────────────────────────
+const BG       = '#0f172a';
+const BG_CARD  = '#1e293b';
+const BG_WEEK  = '#0f172a';
+const BORDER_INACTIVE = 'rgba(255,255,255,0.15)';
+const ACTIVE_COLOR    = '#22c55e';
+const TEXT_MUTED      = '#94a3b8';
+const TEXT_LABEL      = '#64748b';
+
+const baseInput = {
+  background: BG,
+  color: '#f1f5f9',
+  border: `1px solid ${BORDER_INACTIVE}`,
+  borderRadius: 10,
+  padding: '10px 8px',
+  fontSize: 14,
+  fontFamily: 'inherit',
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+  textAlign: 'center',
+};
+
+const sectionLabel = {
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '1px',
+  color: TEXT_LABEL,
+  textTransform: 'uppercase',
+  marginBottom: 10,
+};
+
+const fieldLabel = {
+  fontSize: 10,
+  fontWeight: 600,
+  letterSpacing: '.5px',
+  color: TEXT_LABEL,
+  textTransform: 'uppercase',
+  marginBottom: 6,
+  display: 'block',
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function EditExerciseModal({ exercise, onSave, onClose }) {
   const [sets,       setSets]       = useState('3');
   const [reps,       setReps]       = useState('8-10');
   const [kg,         setKg]         = useState('');
   const [pause,      setPause]      = useState('90');
-  const [rpe,        setRpe]        = useState('');
   const [progresion, setProgresion] = useState('manual');
   const [weeks,      setWeeks]      = useState(() => initWeeks(null));
 
-  // Populate form when exercise changes
   useEffect(() => {
     if (exercise) {
-      setSets(exercise.sets       ?? '3');
-      setReps(exercise.reps       ?? '8-10');
-      setKg(exercise.kg           ?? '');
-      setPause(exercise.pause     ?? '90');
-      setRpe(exercise.rpe         ?? '');
+      setSets(String(exercise.sets  ?? '3'));
+      setReps(String(exercise.reps  ?? '8-10'));
+      setKg(String(exercise.kg      ?? ''));
+      setPause(String(exercise.pause ?? '90'));
       setProgresion(exercise.progresion ?? 'manual');
       setWeeks(initWeeks(exercise));
     } else {
-      setSets('3'); setReps('8-10'); setKg(''); setPause('90');
-      setRpe(''); setProgresion('manual'); setWeeks(initWeeks(null));
+      setSets('3'); setReps('8-10'); setKg('');
+      setPause('90'); setProgresion('manual');
+      setWeeks(initWeeks(null));
     }
   }, [exercise]);
 
   const updW = (wi, field, val) =>
     setWeeks(prev => prev.map((w, i) => i === wi ? { ...w, [field]: val } : w));
 
-  // ── Autocompletar semanas basado en el método ──
   const autocompletar = () => {
-    if (progresion === 'manual' || progresion === 'pausa') return;
-    const base = { sets, reps, kg, pausa: pause };
+    if (progresion === 'manual') return;
     setWeeks(prev => prev.map((w, i) => {
-      if (i === 0) return { ...w, sets: w.sets || sets, reps: w.reps || reps, kg: w.kg || kg, pausa: w.pausa || pause };
-      const prev_w = prev[i - 1];
+      const p = i > 0 ? prev[i - 1] : null;
+      const base = {
+        sets:  w.sets  || sets,
+        reps:  w.reps  || reps,
+        kg:    w.kg    || kg,
+        note:  w.note,
+        pausa: w.pausa || pause,
+      };
+      if (i === 0) return base;
       if (progresion === 'carga') {
-        const kgBase = parseFloat(prev_w.kg || kg || 0);
-        return { ...w, sets: w.sets || sets, reps: w.reps || reps, kg: String(Math.round((kgBase + 2.5) * 10) / 10), pausa: w.pausa || pause };
+        const kgPrev = parseFloat(p.kg || kg || 0);
+        return { ...base, kg: String(Math.round((kgPrev + 2.5) * 10) / 10) };
       }
       if (progresion === 'reps') {
-        const repsBase = parseInt(prev_w.reps || reps || 8);
-        return { ...w, sets: w.sets || sets, reps: String(repsBase + 1), kg: w.kg || kg, pausa: w.pausa || pause };
+        return { ...base, reps: String(parseInt(p.reps || reps || 8) + 1) };
       }
       if (progresion === 'series') {
-        const setsBase = parseInt(prev_w.sets || sets || 3);
-        return { ...w, sets: String(setsBase + 1), reps: w.reps || reps, kg: w.kg || kg, pausa: w.pausa || pause };
+        return { ...base, sets: String(parseInt(p.sets || sets || 3) + 1) };
       }
-      return w;
+      if (progresion === 'pausa') {
+        const pausaPrev = parseInt(p.pausa || pause || 90);
+        return { ...base, pausa: String(Math.max(15, pausaPrev - 15)) };
+      }
+      return base;
     }));
   };
 
   const handleSave = () => {
-    const formData = {
+    onSave({
       sets,
       reps,
       kg,
       pause,
-      rpe,
       progresion,
       weeks: weeks.map(w => ({ ...w, pausa: w.pausa || pause })),
-    };
-    onSave(formData);
+    });
   };
-
-  // ── Styles ──
-  const bg     = '#0F1923';
-  const bgCard = '#162234';
-  const border = '#2D4057';
-  const textMuted = '#8B9AB2';
-
-  const inp = {
-    background: bg,
-    color: '#FFFFFF',
-    border: `1px solid ${border}`,
-    borderRadius: 8,
-    padding: '8px 6px',
-    fontSize: 14,
-    fontFamily: 'inherit',
-    outline: 'none',
-    width: '100%',
-    boxSizing: 'border-box',
-  };
-
-  const methodColor = METODOS.find(m => m.id === progresion)?.color || '#8B9AB2';
 
   return (
     <div
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,.92)',
-        zIndex: 125,
+        background: 'rgba(0,0,0,0.85)',
+        zIndex: 200,
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
+        display: 'flex',
+        justifyContent: 'center',
+        paddingBottom: 32,
       }}
     >
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: bgCard,
-          margin: '20px 16px',
-          borderRadius: 16,
-          padding: '20px 16px',
-          maxWidth: 500,
-          marginLeft: 'auto',
-          marginRight: 'auto',
+          background: BG_CARD,
+          margin: '24px 16px 0',
+          borderRadius: 18,
+          padding: '20px 16px 24px',
+          width: '100%',
+          maxWidth: 480,
+          alignSelf: 'flex-start',
         }}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-            background: methodColor + '22',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, fontWeight: 700, color: methodColor,
-          }}>
-            {exercise ? '✏' : '+'}
-          </div>
-          <div style={{ flex: 1, fontSize: 18, fontWeight: 800, color: '#fff', wordBreak: 'break-word' }}>
+        {/* ── Header ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <div style={{ flex: 1, fontSize: 17, fontWeight: 800, color: '#f1f5f9', wordBreak: 'break-word', lineHeight: 1.3 }}>
             {exercise?.name || 'Nuevo ejercicio'}
           </div>
           <button
             onClick={onClose}
             style={{
               background: 'transparent', border: 'none',
-              color: textMuted, fontSize: 22, cursor: 'pointer',
-              padding: '4px 8px', lineHeight: 1,
+              color: TEXT_MUTED, fontSize: 24, cursor: 'pointer',
+              padding: '4px 8px', lineHeight: 1, flexShrink: 0,
             }}
           >
             ×
           </button>
         </div>
 
-        {/* ── Configuración Base ── */}
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.5px', color: textMuted, marginBottom: 8 }}>
-          CONFIGURACIÓN BASE
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+        {/* ══ 1. CONFIGURACIÓN BASE ══ */}
+        <div style={sectionLabel}>Configuración Base</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
           <div>
-            <div style={{ fontSize: 10, color: textMuted, marginBottom: 4, fontWeight: 600 }}>SERIES</div>
-            <input style={{ ...inp, textAlign: 'center' }} value={sets} onChange={e => setSets(e.target.value)} />
+            <span style={fieldLabel}>Series</span>
+            <input style={baseInput} value={sets} onChange={e => setSets(e.target.value)} />
           </div>
           <div>
-            <div style={{ fontSize: 10, color: textMuted, marginBottom: 4, fontWeight: 600 }}>REPS</div>
-            <input style={{ ...inp, textAlign: 'center' }} value={reps} onChange={e => setReps(e.target.value)} />
+            <span style={fieldLabel}>Reps</span>
+            <input style={baseInput} value={reps} onChange={e => setReps(e.target.value)} />
           </div>
           <div>
-            <div style={{ fontSize: 10, color: textMuted, marginBottom: 4, fontWeight: 600 }}>KG</div>
-            <input style={{ ...inp, textAlign: 'center' }} value={kg} onChange={e => setKg(e.target.value)} placeholder="—" />
+            <span style={fieldLabel}>Kg</span>
+            <input style={baseInput} value={kg} onChange={e => setKg(e.target.value)} placeholder="—" />
           </div>
           <div>
-            <div style={{ fontSize: 10, color: textMuted, marginBottom: 4, fontWeight: 600 }}>PAUSA (s)</div>
-            <input style={{ ...inp, textAlign: 'center' }} value={pause} onChange={e => setPause(e.target.value)} placeholder="seg" />
+            <span style={fieldLabel}>Pausa (seg)</span>
+            <input style={baseInput} value={pause} onChange={e => setPause(e.target.value)} placeholder="90" />
           </div>
-        </div>
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 10, color: textMuted, marginBottom: 4, fontWeight: 600 }}>RPE</div>
-          <input
-            type="number" min="1" max="10"
-            style={{ ...inp, width: 'auto', minWidth: 80 }}
-            value={rpe}
-            onChange={e => setRpe(e.target.value)}
-            placeholder="1-10"
-          />
         </div>
 
-        {/* ── Método de Progresión ── */}
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.5px', color: textMuted, marginBottom: 8 }}>
-          MÉTODO DE PROGRESIÓN
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-          {METODOS.map(m => (
-            <button
-              key={m.id}
-              onClick={() => setProgresion(m.id)}
-              style={{
-                padding: '8px 12px',
-                borderRadius: 8,
-                border: `1px solid ${progresion === m.id ? m.color : border}`,
-                background: progresion === m.id ? m.color + '22' : 'transparent',
-                color: progresion === m.id ? m.color : textMuted,
-                fontSize: 12, fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              {m.label}
-            </button>
-          ))}
+        {/* ══ 2. MÉTODO DE PROGRESIÓN ══ */}
+        <div style={sectionLabel}>Método de Progresión</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+          {METODOS.map(m => {
+            const active = progresion === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setProgresion(m.id)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: `1px solid ${active ? ACTIVE_COLOR : BORDER_INACTIVE}`,
+                  background: active ? 'rgba(34,197,94,0.12)' : 'transparent',
+                  color: active ? ACTIVE_COLOR : TEXT_MUTED,
+                  fontSize: 13, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                  transition: 'all .15s',
+                }}
+              >
+                {m.label}
+              </button>
+            );
+          })}
         </div>
 
-        {progresion !== 'manual' && (
-          <div style={{
-            background: bg, borderRadius: 8, padding: '8px 12px',
-            marginBottom: 12, fontSize: 12, color: textMuted,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-          }}>
-            <span>{METODOS.find(m => m.id === progresion)?.desc}</span>
+        {/* Texto descriptivo + autocompletar */}
+        <div style={{
+          background: BG,
+          borderRadius: 10,
+          padding: '10px 12px',
+          marginBottom: 20,
+          fontSize: 12,
+          color: TEXT_MUTED,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}>
+          <span style={{ lineHeight: 1.5 }}>
+            {METODOS.find(m => m.id === progresion)?.desc}
+          </span>
+          {progresion !== 'manual' && (
             <button
               onClick={autocompletar}
               style={{
-                background: methodColor + '22',
-                border: `1px solid ${methodColor}44`,
-                borderRadius: 6,
-                padding: '4px 10px',
-                color: methodColor,
+                background: 'rgba(34,197,94,0.12)',
+                border: '1px solid rgba(34,197,94,0.3)',
+                borderRadius: 7,
+                padding: '5px 10px',
+                color: ACTIVE_COLOR,
                 fontSize: 11, fontWeight: 700,
                 cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
+                whiteSpace: 'nowrap',
               }}
             >
               Autocompletar semanas
             </button>
-          </div>
-        )}
-
-        {/* ── Valores por Semana ── */}
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.5px', color: textMuted, marginBottom: 8 }}>
-          VALORES POR SEMANA
+          )}
         </div>
+
+        {/* ══ 3. VALORES POR SEMANA ══ */}
+        <div style={sectionLabel}>Valores por Semana</div>
         {weeks.map((w, wi) => {
           // Delta hint vs semana anterior
           let hint = null;
           if (wi > 0 && progresion !== 'manual') {
-            const prev = weeks[wi - 1];
-            if (progresion === 'carga'  && prev.kg    && w.kg)    hint = (parseFloat(w.kg)    - parseFloat(prev.kg)    > 0 ? '+' : '') + Math.round((parseFloat(w.kg)    - parseFloat(prev.kg))    * 10) / 10 + ' kg';
-            if (progresion === 'reps'   && prev.reps   && w.reps)  hint = (parseInt(w.reps)   - parseInt(prev.reps)   > 0 ? '+' : '') + (parseInt(w.reps)   - parseInt(prev.reps))   + ' reps';
-            if (progresion === 'series' && prev.sets   && w.sets)  hint = (parseInt(w.sets)   - parseInt(prev.sets)   > 0 ? '+' : '') + (parseInt(w.sets)   - parseInt(prev.sets))   + ' series';
-            if (progresion === 'pausa'  && prev.pausa  && w.pausa) hint = (parseInt(w.pausa)  - parseInt(prev.pausa)  > 0 ? '+' : '') + (parseInt(w.pausa)  - parseInt(prev.pausa))  + 's pausa';
+            const p = weeks[wi - 1];
+            if (progresion === 'carga'  && p.kg    && w.kg)    hint = (parseFloat(w.kg)  - parseFloat(p.kg)  > 0 ? '+' : '') + Math.round((parseFloat(w.kg)  - parseFloat(p.kg))  * 10) / 10 + ' kg';
+            if (progresion === 'reps'   && p.reps  && w.reps)  hint = (parseInt(w.reps)  - parseInt(p.reps)  > 0 ? '+' : '') + (parseInt(w.reps)  - parseInt(p.reps))  + ' reps';
+            if (progresion === 'series' && p.sets  && w.sets)  hint = (parseInt(w.sets)  - parseInt(p.sets)  > 0 ? '+' : '') + (parseInt(w.sets)  - parseInt(p.sets))  + ' series';
+            if (progresion === 'pausa'  && p.pausa && w.pausa) hint = (parseInt(w.pausa) - parseInt(p.pausa) > 0 ? '+' : '') + (parseInt(w.pausa) - parseInt(p.pausa)) + 's pausa';
           }
 
           return (
-            <div key={wi} style={{ background: bg, borderRadius: 12, padding: '10px 12px', marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: methodColor }}>SEM {wi + 1}</div>
-                {hint && <span style={{ fontSize: 11, color: '#22C55E', fontWeight: 700 }}>{hint}</span>}
+            <div
+              key={wi}
+              style={{
+                background: BG_WEEK,
+                borderRadius: 12,
+                padding: '12px',
+                marginBottom: 8,
+              }}
+            >
+              {/* Semana header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: ACTIVE_COLOR }}>
+                  SEM {wi + 1}
+                </span>
+                {hint && (
+                  <span style={{ fontSize: 11, color: ACTIVE_COLOR, fontWeight: 700 }}>
+                    {hint}
+                  </span>
+                )}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, marginBottom: 8 }}>
+
+              {/* Grid 2×2 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: textMuted, marginBottom: 4, fontWeight: 600 }}>SERIES</div>
-                  <input style={{ ...inp, textAlign: 'center' }} value={w.sets}  onChange={e => updW(wi, 'sets',  e.target.value)} placeholder={sets} />
+                  <span style={fieldLabel}>Series</span>
+                  <input style={baseInput} value={w.sets}  onChange={e => updW(wi, 'sets',  e.target.value)} placeholder={sets} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: textMuted, marginBottom: 4, fontWeight: 600 }}>REPS</div>
-                  <input style={{ ...inp, textAlign: 'center' }} value={w.reps}  onChange={e => updW(wi, 'reps',  e.target.value)} placeholder={reps} />
+                  <span style={fieldLabel}>Reps</span>
+                  <input style={baseInput} value={w.reps}  onChange={e => updW(wi, 'reps',  e.target.value)} placeholder={reps} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: textMuted, marginBottom: 4, fontWeight: 600 }}>KG</div>
-                  <input style={{ ...inp, textAlign: 'center' }} value={w.kg}    onChange={e => updW(wi, 'kg',    e.target.value)} placeholder={kg || '—'} />
+                  <span style={fieldLabel}>Kg</span>
+                  <input style={baseInput} value={w.kg}    onChange={e => updW(wi, 'kg',    e.target.value)} placeholder={kg || '—'} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: textMuted, marginBottom: 4, fontWeight: 600 }}>PAUSA</div>
-                  <input style={{ ...inp, textAlign: 'center' }} value={w.pausa} onChange={e => updW(wi, 'pausa', e.target.value)} placeholder={pause + 's'} />
+                  <span style={fieldLabel}>Pausa</span>
+                  <input style={baseInput} value={w.pausa} onChange={e => updW(wi, 'pausa', e.target.value)} placeholder={pause + 's'} />
                 </div>
               </div>
+
+              {/* Nota */}
               <input
-                style={{ ...inp }}
+                style={{ ...baseInput, textAlign: 'left', fontSize: 12, color: TEXT_MUTED }}
                 value={w.note}
                 onChange={e => updW(wi, 'note', e.target.value)}
                 placeholder="Nota de semana (opcional)"
@@ -283,15 +322,15 @@ export function EditExerciseModal({ exercise, onSave, onClose }) {
           );
         })}
 
-        {/* ── Botones ── */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        {/* ══ 4. BOTONES ══ */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
           <button
             onClick={onClose}
             style={{
-              flex: 1, padding: '12px',
+              flex: 1, padding: '14px',
               background: 'transparent',
-              border: `1px solid ${border}`,
-              borderRadius: 10, color: textMuted,
+              border: `1px solid ${BORDER_INACTIVE}`,
+              borderRadius: 12, color: TEXT_MUTED,
               fontSize: 13, fontWeight: 700,
               cursor: 'pointer', fontFamily: 'inherit',
             }}
@@ -301,10 +340,10 @@ export function EditExerciseModal({ exercise, onSave, onClose }) {
           <button
             onClick={handleSave}
             style={{
-              flex: 2, padding: '12px',
-              background: '#2563EB', border: 'none',
-              borderRadius: 10, color: '#fff',
-              fontSize: 14, fontWeight: 700,
+              flex: 2, padding: '14px',
+              background: '#3b82f6', border: 'none',
+              borderRadius: 12, color: '#fff',
+              fontSize: 14, fontWeight: 800,
               cursor: 'pointer', fontFamily: 'inherit',
             }}
           >
