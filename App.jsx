@@ -810,6 +810,7 @@ function GymApp() {
   const [addExModal, setAddExModal] = useState(null); // {rId, dIdx}
   const [addExSearch, setAddExSearch] = useState("");
   const [addExPat, setAddExPat] = useState(null);
+  const [addExMuscle, setAddExMuscle] = useState(null);
   const [addExSelectedIds, setAddExSelectedIds] = useState([]);
   const [newR, setNewR] = useState(null);
   /** Rutina local usada al pulsar "Asignar rutina" en cada alumno (explícita si hay varias). */
@@ -2297,6 +2298,7 @@ function GymApp() {
             setAddExModal={setAddExModal}
             setAddExSearch={setAddExSearch}
             setAddExPat={setAddExPat}
+            setAddExMuscle={setAddExMuscle}
             setAddExSelectedIds={setAddExSelectedIds}
             setDupDayModal={setDupDayModal}
             alumnos={alumnos}
@@ -2791,7 +2793,7 @@ function GymApp() {
                                             <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
                                           </div>;
                                         })}
-                                        <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:6,padding:"8px",background:"transparent",border:"1px dashed rgba(245,158,11,0.45)",borderRadius:8,fontSize:12,fontWeight:700,color:"#f59e0b",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#f59e0b"/>{es?"+ Añadir ejercicio":"+ Add exercise"}</button>
+                                        <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:6,padding:"8px",background:"transparent",border:"1px dashed rgba(245,158,11,0.45)",borderRadius:8,fontSize:12,fontWeight:700,color:"#f59e0b",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#f59e0b"/>{es?"+ Añadir ejercicio":"+ Add exercise"}</button>
                                       </div>
                                     )}
                                 </div>
@@ -2810,7 +2812,7 @@ function GymApp() {
                                         <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
                                       </div>;
                                     })}
-                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed rgba(59,130,246,0.4)",borderRadius:8,fontSize:13,fontWeight:700,color:"#3b82f6",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#3b82f6"/>{es?"+ Añadir ejercicio":"+ Add exercise"}</button>
+                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed rgba(59,130,246,0.4)",borderRadius:8,fontSize:13,fontWeight:700,color:"#3b82f6",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#3b82f6"/>{es?"+ Añadir ejercicio":"+ Add exercise"}</button>
                                   </div>
                                 )}
                               </div>
@@ -3946,11 +3948,35 @@ function GymApp() {
                   </button>
                 ))}
               </div>
+              <div style={{fontSize:11,fontWeight:700,color:"#64748b",letterSpacing:".5px",
+                marginBottom:6,marginTop:8,textTransform:"uppercase"}}>
+                Músculo
+              </div>
+              <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:8,paddingBottom:4,
+                WebkitOverflowScrolling:"touch",scrollbarWidth:"none"}}>
+                {["Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda",
+                  "Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"]
+                  .map(m=>(
+                    <button key={m} type="button" style={{
+                      background: addExMuscle===m ? "#3b82f622" : "#2D4057",
+                      color: addExMuscle===m ? "#3b82f6" : "#64748b",
+                      border: addExMuscle===m ? "1px solid #3b82f6" : "1px solid "+border,
+                      borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:700,
+                      cursor:"pointer", flexShrink:0, whiteSpace:"nowrap",
+                      textTransform:"uppercase", letterSpacing:".5px"
+                    }} onClick={()=>setAddExMuscle(addExMuscle===m?null:m)}>
+                      {m}
+                    </button>
+                  ))
+                }
+              </div>
             </div>
             <div style={{flex:1,minHeight:0,minWidth:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",padding:"8px 16px 100px 16px",boxSizing:"border-box",touchAction:"pan-y"}}>
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
+                if(addExMuscle && !(formatBibMuscleDisplay(e.muscle, es)||"").toLowerCase()
+                  .includes(addExMuscle.toLowerCase())) return false;
                 if(!q) return true;
                 return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
               }).map(ex=>{
