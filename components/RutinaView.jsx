@@ -21,7 +21,7 @@ function RutinaCard({
   r, es, darkMode, border, textMain, textMuted, bgCard, bgSub,
   allEx, setRoutines, toast2, btn, card, routines,
   setDupDayModal, alumnos, sb, setAssignRoutineId,
-  setHasUnsaved, setEditingExercise, setAddingToDay,
+  setHasUnsaved, setEditingExercise,
 }) {
   const [collapsed, setCollapsed] = useState(!!r.collapsed);
   const [saving, setSaving]       = useState(false);
@@ -474,7 +474,6 @@ export function RutinaView(props) {
               toast2={toast2} btn={btn} card={card} routines={routines}
               setHasUnsaved={setHasUnsaved}
               setEditingExercise={setEditingExercise}
-              setAddingToDay={setAddingToDay}
             />
           ))
         )}
