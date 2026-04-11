@@ -209,7 +209,14 @@ function RutinaCard({
                 minHeight: 36,
               }}
             >
-              <Ic name={collapsed ? 'chevron-down' : 'chevron-up'} size={15} color={textMuted} />
+              {collapsed ? (
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={textMuted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              ) : (
+                <Ic name="chevron-up" size={15} color={textMuted} />
+              )}
               {collapsed ? (es ? 'VER' : 'VIEW') : (es ? 'CERRAR' : 'CLOSE')}
             </button>
           </div>
@@ -461,7 +468,7 @@ export function RutinaView(props) {
     <>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      <div style={{ paddingBottom: 80 }}>
+      <div style={{ paddingBottom: 140 }}>
 
         {/* ── Botón escanear ── */}
         <button className="hov" onClick={() => setTab('scanner')} style={{
@@ -547,7 +554,7 @@ export function RutinaView(props) {
         borderTop: `1px solid ${border}`,
         display: 'flex',
         justifyContent: 'center',
-        zIndex: 50,
+        zIndex: 35,
       }}>
         <button
           onClick={handleSaveAll}
