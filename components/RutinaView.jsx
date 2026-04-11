@@ -21,7 +21,7 @@ function RutinaCard({
   r, es, darkMode, border, textMain, textMuted, bgCard, bgSub,
   allEx, setRoutines, toast2, btn, card, routines,
   setDupDayModal, alumnos, sb, setAssignRoutineId,
-  setHasUnsaved, setEditingExercise,
+  setHasUnsaved, setEditingExercise, onOpenLibrary,
 }) {
   const [collapsed, setCollapsed] = useState(!!r.collapsed);
   const [saving, setSaving]       = useState(false);
@@ -291,8 +291,8 @@ function RutinaCard({
                   }));
                   setHasUnsaved(true);
                 }}
-                onAddWarmup={() => openLibrary(r.id, di, 'warmup')}
-                onAddExercise={() => openLibrary(r.id, di, 'exercises')}
+                onAddWarmup={() => onOpenLibrary(r.id, di, 'warmup')}
+                onAddExercise={() => onOpenLibrary(r.id, di, 'exercises')}
                 onEditExercise={(exercise) => {
                   // Determine which bloque the exercise belongs to
                   const inWarmup = (d.warmup || []).some(ex => ex.id === exercise.id);
@@ -474,6 +474,7 @@ export function RutinaView(props) {
               toast2={toast2} btn={btn} card={card} routines={routines}
               setHasUnsaved={setHasUnsaved}
               setEditingExercise={setEditingExercise}
+              onOpenLibrary={openLibrary}
             />
           ))
         )}
