@@ -261,29 +261,21 @@ function RutinaCard({
       {!collapsed && (
         <div style={{ padding: '12px 16px 16px' }}>
           {r.days.map((d, di) => {
-            // Merge warmup + exercises into flat list with explicit block
-            const mergedExercises = [
-              ...(d.warmup || []).map(ex => ({
-                ...ex,
-                id:    ex.id || uid(),
-                name:  allEx.find(e => e.id === ex.id)?.name || ex.name || '',
-                block: ex.block || 'warmup',
-              })),
-              ...(d.exercises || []).map(ex => ({
-                ...ex,
-                id:    ex.id || uid(),
-                name:  allEx.find(e => e.id === ex.id)?.name || ex.name || '',
-                block: ex.block || 'main',
-              })),
-            ];
+            // Enrich exercises with display name (lookup in allEx by id)
+            const enrichList = (list) => (list || []).map(ex => ({
+              ...ex,
+              id:   ex.id || uid(),
+              name: allEx.find(e => e.id === ex.id)?.name || ex.name || ex.id || '',
+            }));
 
             return (
               <DaySection
                 key={di}
                 day={{
-                  id: di,
-                  name: d.label || `${es ? 'Día' : 'Day'} ${di + 1}`,
-                  exercises: mergedExercises,
+                  id:        di,
+                  name:      d.label || `${es ? 'Día' : 'Day'} ${di + 1}`,
+                  warmup:    enrichList(d.warmup),
+                  exercises: enrichList(d.exercises),
                 }}
                 onCopyDay={() => {
                   if (r.days.length < 2) { toast2(es ? 'No hay otros días' : 'No other days'); return; }
@@ -299,13 +291,17 @@ function RutinaCard({
                   }));
                   setHasUnsaved(true);
                 }}
-                onAddExercise={() => {
-                  setAddingToDay({ routineId: r.id, dayIdx: di });
-                  setEditingExercise(null);
-                }}
+                onAddWarmup={() => openLibrary(r.id, di, 'warmup')}
+                onAddExercise={() => openLibrary(r.id, di, 'exercises')}
                 onEditExercise={(exercise) => {
-                  setEditingExercise({ routineId: r.id, dayIdx: di, exercise });
-                  setAddingToDay(null);
+                  // Determine which bloque the exercise belongs to
+                  const inWarmup = (d.warmup || []).some(ex => ex.id === exercise.id);
+                  setEditingExercise({
+                    routineId: r.id,
+                    dayIdx:    di,
+                    bloque:    inWarmup ? 'warmup' : 'exercises',
+                    exercise,
+                  });
                 }}
                 onDeleteExercise={(exerciseId) => {
                   setRoutines(p => p.map(rr => rr.id !== r.id ? rr : {
@@ -318,14 +314,20 @@ function RutinaCard({
                   }));
                   setHasUnsaved(true);
                 }}
-                onReorder={(_, newExercises) => {
-                  const warmup    = newExercises.filter(e => e.block === 'warmup');
-                  const exercises = newExercises.filter(e => e.block !== 'warmup');
+                onReorderWarmup={(newList) => {
                   setRoutines(p => p.map(rr => rr.id !== r.id ? rr : {
                     ...rr,
-                    days: rr.days.map((dd, ddi) => ddi !== di
-                      ? dd
-                      : { ...dd, warmup, exercises }
+                    days: rr.days.map((dd, ddi) =>
+                      ddi !== di ? dd : { ...dd, warmup: newList }
+                    ),
+                  }));
+                  setHasUnsaved(true);
+                }}
+                onReorderExercises={(newList) => {
+                  setRoutines(p => p.map(rr => rr.id !== r.id ? rr : {
+                    ...rr,
+                    days: rr.days.map((dd, ddi) =>
+                      ddi !== di ? dd : { ...dd, exercises: newList }
                     ),
                   }));
                   setHasUnsaved(true);
@@ -350,7 +352,13 @@ export function RutinaView(props) {
 
   const [hasUnsaved, setHasUnsaved]           = useState(false);
   const [editingExercise, setEditingExercise] = useState(null);
-  const [addingToDay, setAddingToDay]         = useState(null);
+
+  const openLibrary = (routineId, dayIdx, bloque) => {
+    setAddExModal({ rId: routineId, dIdx: dayIdx, bloque });
+    setAddExSearch('');
+    setAddExPat(null);
+    setAddExSelectedIds([]);
+  };
 
   const handleSaveAll = async () => {
     if (!hasUnsaved) return;
@@ -380,54 +388,25 @@ export function RutinaView(props) {
     }
   };
 
-  const closeModal = () => {
-    setEditingExercise(null);
-    setAddingToDay(null);
-  };
+  const closeEditModal = () => setEditingExercise(null);
 
   const handleModalSave = (formData) => {
-    if (editingExercise) {
-      const { routineId, dayIdx, exercise } = editingExercise;
-      const oldBloque = exercise.block === 'warmup' ? 'warmup' : 'exercises';
-      const newBloque = formData.block  === 'warmup' ? 'warmup' : 'exercises';
-      const updatedEx = { ...exercise, ...formData };
+    if (!editingExercise) return;
+    const { routineId, dayIdx, exercise, bloque } = editingExercise;
+    const updatedEx = { ...exercise, ...formData };
 
-      setRoutines(p => p.map(rr => rr.id !== routineId ? rr : {
-        ...rr,
-        days: rr.days.map((dd, di) => {
-          if (di !== dayIdx) return dd;
-          if (oldBloque === newBloque) {
-            return {
-              ...dd,
-              [oldBloque]: (dd[oldBloque] || []).map(ex =>
-                ex.id === exercise.id ? updatedEx : ex
-              ),
-            };
-          }
-          // Block changed — move between arrays
-          return {
-            ...dd,
-            [oldBloque]: (dd[oldBloque] || []).filter(ex => ex.id !== exercise.id),
-            [newBloque]: [...(dd[newBloque] || []), updatedEx],
-          };
-        }),
-      }));
-    } else if (addingToDay) {
-      const { routineId, dayIdx } = addingToDay;
-      const newEx  = { id: uid(), ...formData };
-      const bloque = formData.block === 'warmup' ? 'warmup' : 'exercises';
-
-      setRoutines(p => p.map(rr => rr.id !== routineId ? rr : {
-        ...rr,
-        days: rr.days.map((dd, di) => di !== dayIdx ? dd : {
-          ...dd,
-          [bloque]: [...(dd[bloque] || []), newEx],
-        }),
-      }));
-    }
+    setRoutines(p => p.map(rr => rr.id !== routineId ? rr : {
+      ...rr,
+      days: rr.days.map((dd, di) => di !== dayIdx ? dd : {
+        ...dd,
+        [bloque]: (dd[bloque] || []).map(ex =>
+          ex.id === exercise.id ? updatedEx : ex
+        ),
+      }),
+    }));
 
     setHasUnsaved(true);
-    closeModal();
+    closeEditModal();
   };
 
   return (
@@ -501,11 +480,11 @@ export function RutinaView(props) {
         )}
       </div>
 
-      {/* ── EditExerciseModal ── */}
-      {(editingExercise || addingToDay) && (
+      {/* ── EditExerciseModal (solo para lápiz / editar) ── */}
+      {editingExercise && (
         <EditExerciseModal
-          exercise={editingExercise?.exercise || null}
-          onClose={closeModal}
+          exercise={editingExercise.exercise}
+          onClose={closeEditModal}
           onSave={handleModalSave}
         />
       )}
