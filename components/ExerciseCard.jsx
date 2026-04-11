@@ -2,7 +2,6 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
-import { MetricPill } from './MetricPill.jsx';
 
 const BLOCK_COLORS = {
   warmup: '#f59e0b',
@@ -11,12 +10,14 @@ const BLOCK_COLORS = {
   cardio: '#a855f7',
 };
 
-const BLOCK_LABELS = {
-  warmup: 'WARMUP',
-  main:   'MAIN',
-  cool:   'COOL',
-  cardio: 'CARDIO',
-};
+function compactSummary(ex) {
+  const parts = [];
+  if (ex.sets || ex.reps) parts.push(`${ex.sets || '?'}×${ex.reps || '?'}`);
+  if (ex.kg)    parts.push(`${ex.kg}kg`);
+  if (ex.pause) parts.push(`${ex.pause}s`);
+  if (ex.rpe)   parts.push(`RPE ${ex.rpe}`);
+  return parts.join(' · ');
+}
 
 export function ExerciseCard({ exercise, onEdit, onDelete }) {
   const {
@@ -25,6 +26,7 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
   } = useSortable({ id: exercise.id });
 
   const color = BLOCK_COLORS[exercise.block] || BLOCK_COLORS.main;
+  const summary = compactSummary(exercise);
 
   return (
     <div
@@ -66,55 +68,63 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
           fontWeight: 700,
           wordBreak: 'break-word',
           color: '#f1f5f9',
-          marginBottom: 2,
           lineHeight: 1.3,
+          marginBottom: summary ? 2 : 0,
         }}>
           {exercise.name}
         </div>
-        <div style={{
-          fontSize: 11,
-          textTransform: 'uppercase',
-          color,
-          letterSpacing: '.5px',
-          marginBottom: 6,
-        }}>
-          {BLOCK_LABELS[exercise.block] || exercise.block}
-        </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <MetricPill label="Series" value={exercise.sets} />
-          <MetricPill label="Reps"   value={exercise.reps} />
-          <MetricPill label="Kg"     value={exercise.kg}   highlight />
-          <MetricPill label="RPE"    value={exercise.rpe} />
-        </div>
+        {summary && (
+          <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>
+            {summary}
+          </div>
+        )}
       </div>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
-        <button
-          onClick={() => onEdit(exercise)}
+      {/* Video button */}
+      {exercise.youtube && (
+        <a
+          href={exercise.youtube}
+          target="_blank"
+          rel="noreferrer"
+          onClick={e => e.stopPropagation()}
           style={{
-            width: 44, height: 44,
-            background: 'transparent', border: 'none',
-            cursor: 'pointer', color: '#60a5fa',
+            width: 44, height: 44, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: 8,
+            color: '#94a3b8', textDecoration: 'none',
+            fontSize: 14, borderRadius: 8,
           }}
         >
-          <Pencil size={16} />
-        </button>
-        <button
-          onClick={() => onDelete(exercise.id)}
-          style={{
-            width: 44, height: 44,
-            background: 'transparent', border: 'none',
-            cursor: 'pointer', color: '#f87171',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            borderRadius: 8,
-          }}
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
+          ▶
+        </a>
+      )}
+
+      {/* Edit */}
+      <button
+        onClick={() => onEdit(exercise)}
+        style={{
+          width: 44, height: 44, flexShrink: 0,
+          background: 'transparent', border: 'none',
+          cursor: 'pointer', color: '#60a5fa',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 8,
+        }}
+      >
+        <Pencil size={16} />
+      </button>
+
+      {/* Delete */}
+      <button
+        onClick={() => onDelete(exercise.id)}
+        style={{
+          width: 44, height: 44, flexShrink: 0,
+          background: 'transparent', border: 'none',
+          cursor: 'pointer', color: '#f87171',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRadius: 8,
+        }}
+      >
+        <Trash2 size={16} />
+      </button>
     </div>
   );
 }
