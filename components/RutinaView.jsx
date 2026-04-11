@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScanLine, Plus, Save } from 'lucide-react';
+import { ScanLine, Plus, Save, Pencil } from 'lucide-react';
 import { Ic } from './Ic.jsx';
 import { DaySection } from './DaySection.jsx';
 import { EditExerciseModal } from './EditExerciseModal.jsx';
@@ -23,9 +23,17 @@ function RutinaCard({
   setDupDayModal, alumnos, sb, setAssignRoutineId,
   setHasUnsaved, setEditingExercise, onOpenLibrary,
 }) {
-  const [collapsed, setCollapsed] = useState(!!r.collapsed);
-  const [saving, setSaving]       = useState(false);
-  const [lastSaved, setLastSaved] = useState(null);
+  const [collapsed, setCollapsed]         = useState(!!r.collapsed);
+  const [saving, setSaving]               = useState(false);
+  const [lastSaved, setLastSaved]         = useState(null);
+  const [editandoNombre, setEditandoNombre] = useState(false);
+  const [nombreLocal, setNombreLocal]     = useState(r.name);
+
+  const guardarNombreRutina = () => {
+    setEditandoNombre(false);
+    setRoutines(p => p.map(rr => rr.id === r.id ? { ...rr, name: nombreLocal } : rr));
+    setHasUnsaved(true);
+  };
 
   const totalEx = r.days.reduce(
     (a, d) => a + (d.exercises || []).length + (d.warmup || []).length,
@@ -84,9 +92,40 @@ function RutinaCard({
       <div style={{ background: bgHeader, padding: '16px 16px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 22, fontWeight: 900, color: textMain, lineHeight: 1.1, wordBreak: 'break-word' }}>
-              {r.name}
-            </div>
+            {editandoNombre ? (
+              <input
+                autoFocus
+                value={nombreLocal}
+                onChange={e => setNombreLocal(e.target.value)}
+                onBlur={guardarNombreRutina}
+                onKeyDown={e => e.key === 'Enter' && guardarNombreRutina()}
+                style={{
+                  fontSize: 22, fontWeight: 900, color: textMain,
+                  background: 'transparent', border: 'none',
+                  borderBottom: '1px solid #3b82f6',
+                  outline: 'none', padding: '2px 0',
+                  fontFamily: 'inherit', width: '100%',
+                  lineHeight: 1.2,
+                }}
+              />
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: textMain, lineHeight: 1.1, wordBreak: 'break-word' }}>
+                  {nombreLocal}
+                </div>
+                <button
+                  onClick={() => setEditandoNombre(true)}
+                  style={{
+                    width: 44, height: 44, background: 'transparent', border: 'none',
+                    cursor: 'pointer', color: '#64748b',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: 8, flexShrink: 0,
+                  }}
+                >
+                  <Pencil size={15} />
+                </button>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: textMuted, fontWeight: 600 }}>
                 {r.days.length} {es ? 'días' : 'days'} · {totalEx} {es ? 'ejercicios' : 'exercises'}
@@ -293,6 +332,15 @@ function RutinaCard({
                 }}
                 onAddWarmup={() => onOpenLibrary(r.id, di, 'warmup')}
                 onAddExercise={() => onOpenLibrary(r.id, di, 'exercises')}
+                onRenameDay={(_, nuevoNombre) => {
+                  setRoutines(p => p.map(rr => rr.id !== r.id ? rr : {
+                    ...rr,
+                    days: rr.days.map((dd, ddi) =>
+                      ddi !== di ? dd : { ...dd, label: nuevoNombre }
+                    ),
+                  }));
+                  setHasUnsaved(true);
+                }}
                 onEditExercise={(exercise) => {
                   // Determine which bloque the exercise belongs to
                   const inWarmup = (d.warmup || []).some(ex => ex.id === exercise.id);

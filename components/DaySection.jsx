@@ -5,7 +5,7 @@ import {
 import {
   SortableContext, verticalListSortingStrategy, arrayMove,
 } from '@dnd-kit/sortable';
-import { Copy, Trash2, Plus } from 'lucide-react';
+import { Copy, Trash2, Plus, Pencil } from 'lucide-react';
 import { ExerciseCard } from './ExerciseCard.jsx';
 
 const BLOCK_ACCENT = {
@@ -150,9 +150,18 @@ export function DaySection({
   onDeleteExercise,
   onReorderWarmup,
   onReorderExercises,
+  onRenameDay,
 }) {
   const warmup    = day.warmup    || [];
   const exercises = day.exercises || [];
+
+  const [editandoNombre, setEditandoNombre] = useState(false);
+  const [nombre, setNombre] = useState(day.name);
+
+  const guardarNombre = () => {
+    setEditandoNombre(false);
+    if (onRenameDay) onRenameDay(day.id, nombre);
+  };
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -163,11 +172,40 @@ export function DaySection({
         justifyContent: 'space-between',
         marginBottom: 10,
       }}>
-        <span style={{
-          fontSize: 15, fontWeight: 700, color: '#f1f5f9',
-        }}>
-          {day.name}
-        </span>
+        {editandoNombre ? (
+          <input
+            autoFocus
+            value={nombre}
+            onChange={e => setNombre(e.target.value)}
+            onBlur={guardarNombre}
+            onKeyDown={e => e.key === 'Enter' && guardarNombre()}
+            style={{
+              flex: 1, minWidth: 0,
+              fontSize: 15, fontWeight: 700, color: '#f1f5f9',
+              background: 'transparent', border: 'none',
+              borderBottom: '1px solid #3b82f6',
+              outline: 'none', padding: '2px 0',
+              fontFamily: 'inherit',
+            }}
+          />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9' }}>
+              {nombre}
+            </span>
+            <button
+              onClick={() => setEditandoNombre(true)}
+              style={{
+                width: 44, height: 44, background: 'transparent', border: 'none',
+                cursor: 'pointer', color: '#64748b',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 8, flexShrink: 0,
+              }}
+            >
+              <Pencil size={15} />
+            </button>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 4 }}>
           <button
             onClick={onCopyDay}
