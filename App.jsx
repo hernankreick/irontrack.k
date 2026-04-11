@@ -1301,6 +1301,8 @@ function GymApp() {
         {k:"alumnos",   icon:(c)=><Ic name="users" size={20} color={c}/>,  lbl:es?"ALUMNOS":"ATHLETES"}
       ];
 
+  const hideGlobalBottomNavCoachDash = !esAlumno && sessionData?.role==="entrenador" && tab==="plan";
+
   const generatePDF = (r) => {
     const patColors = {pierna:"#22C55E",empuje:"#2563EB",traccion:"#2563EB",core:"#8B9AB2",movil:"#8B9AB2"};
     const weeks4 = [0,1,2,3];
@@ -1337,228 +1339,6 @@ function GymApp() {
     });
     setPdfRoutine({r, rows});
   };
-
-  const coachDashboardData = useMemo(function() {
-    if (!sessionData || sessionData.role !== "entrenador") {
-      return {};
-    }
-    function parsearFechaSesion(s) {
-      var raw = s.created_at || "";
-      if (raw) return raw.slice(0, 10); // "2026-04-01"
-      return "";
-    }
-    const COACH_TOTAL_SLOTS = 12;
-    var totalSlots = COACH_TOTAL_SLOTS;
-    var activeStudents = (alumnos || []).length;
-    var ses = sesionesGlobales || [];
-    var now = new Date();
-    var dayKeys = ["L", "M", "X", "J", "V", "S", "D"];
-    var ws = new Date(now);
-    var wd = ws.getDay();
-    var diff = wd === 0 ? -6 : 1 - wd;
-    ws.setDate(ws.getDate() + diff);
-    ws.setHours(0, 0, 0, 0);
-    var we = new Date(ws);
-    we.setDate(we.getDate() + 7);
-    var counts = [0, 0, 0, 0, 0, 0, 0];
-    ses.forEach(function(s) {
-      var d = new Date(parsearFechaSesion(s));
-      if (isNaN(d.getTime())) return;
-      if (d < ws || d >= we) return;
-      var idx = (d.getDay() + 6) % 7;
-      counts[idx]++;
-    });
-    var maxC = Math.max.apply(null, counts.concat([1]));
-    var todayIdx = (now.getDay() + 6) % 7;
-    var weekDays = dayKeys.map(function(label, i) {
-      return {
-        label: label,
-        id: "wd-" + i,
-        sessionsCount: counts[i],
-        barHeightPx: counts[i] === 0 ? 0 : Math.max(5, Math.round((counts[i] / maxC) * 56)),
-        isToday: i === todayIdx,
-      };
-    });
-    var weekTotal = counts.reduce(function(a, b) { return a + b; }, 0);
-    var weekGoalTarget = 24;
-    var completionPercent = Math.min(100, Math.round((weekTotal / weekGoalTarget) * 100));
-    var dateSet = {};
-    ses.forEach(function(s) {
-      var d = new Date(parsearFechaSesion(s));
-      if (isNaN(d.getTime())) return;
-      d.setHours(0, 0, 0, 0);
-      dateSet[d.getTime()] = true;
-    });
-    var streak = 0;
-    var cur = new Date();
-    cur.setHours(0, 0, 0, 0);
-    while (dateSet[cur.getTime()]) {
-      streak++;
-      cur.setDate(cur.getDate() - 1);
-    }
-    function sessionsLast7Days(alumnoId) {
-      var t0 = Date.now() - 7 * 86400000;
-      return ses.filter(function(s) {
-        if (s.alumno_id !== alumnoId) return false;
-        var t = new Date(parsearFechaSesion(s)).getTime();
-        return t >= t0;
-      }).length;
-    }
-    function hasRecentPR(alumnoId) {
-      var regs = progresoGlobal[alumnoId];
-      if (!regs || regs.length < 2) return false;
-      var byEx = {};
-      regs.forEach(function(r) {
-        var ex = r.ejercicio_id;
-        if (!byEx[ex]) byEx[ex] = [];
-        byEx[ex].push(r);
-      });
-      for (var k in byEx) {
-        if (!Object.prototype.hasOwnProperty.call(byEx, k)) continue;
-        var list = byEx[k].slice().sort(function(a, b) {
-          return new Date(b.fecha || b.created_at || 0) - new Date(a.fecha || a.created_at || 0);
-        });
-        if (list.length < 2) continue;
-        var latest = parseFloat(list[0].kg) || 0;
-        var olderMax = 0;
-        for (var j = 1; j < list.length; j++) {
-          olderMax = Math.max(olderMax, parseFloat(list[j].kg) || 0);
-        }
-        if (latest > olderMax) return true;
-      }
-      return false;
-    }
-    var alerts = [];
-    (alumnos || []).forEach(function(a) {
-      var aid = a.id;
-      var s7 = sessionsLast7Days(aid);
-      var compliancePct = Math.min(100, (s7 / 4) * 100);
-      var level = null;
-      if (s7 === 0) level = "high";
-      else if (compliancePct < 60) level = "med";
-      else if (hasRecentPR(aid)) level = "pos";
-      if (!level) return;
-      var name = a.nombre || a.email || "?";
-      var initials = name.slice(0, 2).toUpperCase();
-      var id = "coach-alert-" + aid;
-      var avatarStyle = level === "high"
-        ? { background: "rgba(239,68,68,.12)", color: "#EF4444" }
-        : level === "med"
-          ? { background: "rgba(245,158,11,.12)", color: "#F59E0B" }
-          : { background: "rgba(34,197,94,.12)", color: "#22C55E" };
-      var contextLine = level === "high"
-        ? (es ? "Sin sesión en los últimos 7 días" : "No session in the last 7 days")
-        : level === "med"
-          ? (es ? ("Cumplimiento ~" + Math.round(compliancePct) + "% esta semana") : ("~" + Math.round(compliancePct) + "% compliance this week"))
-          : (es ? "Progreso reciente en cargas (posible PR)" : "Recent load progress (possible PR)");
-      var risk = level === "pos"
-        ? { kind: "pr", value: "PR", badgeVariant: "p" }
-        : { kind: "score", value: level === "high" ? "90" : String(Math.round(compliancePct)), badgeVariant: level === "high" ? "h" : "m" };
-      alerts.push({
-        id: id,
-        level: level,
-        initials: initials,
-        avatarStyle: avatarStyle,
-        name: name,
-        contextLine: contextLine,
-        patternQuote: level === "med" ? (es ? "Por debajo del 60% de sesiones esperadas" : "Below 60% of expected sessions") : undefined,
-        risk: risk,
-        factors: level === "high"
-          ? [{ label: es ? "7 días sin sesión" : "7 days without session", icon: "clock" }]
-          : level === "med"
-            ? [{ label: es ? "Cumplimiento bajo" : "Low compliance", icon: "trend" }]
-            : [{ label: es ? "Mejora vs anterior" : "Improvement vs before", icon: "trend" }],
-        suggestion: {
-          text: level === "pos"
-            ? (es ? "Buen momento para felicitar y reforzar el hábito." : "Good time to praise and reinforce the habit.")
-            : (es ? "Enviá un recordatorio amable para reenganchar." : "Send a friendly reminder to re-engage."),
-          tone: level === "pos" ? "positive" : "default",
-        },
-        primaryAction: { label: es ? "Notificar" : "Notify", icon: "message" },
-        secondaryAction: { label: es ? "Ver perfil" : "View profile", icon: "profile" },
-        highlightedBorder: level === "pos",
-      });
-    });
-    const NOMBRES_GENERICOS = ["entrenador","coach","admin",""];
-    const nombreCoach = sessionData?.name || "";
-    const esGenerico = NOMBRES_GENERICOS.includes(nombreCoach.toLowerCase().trim());
-    const displayName = esGenerico
-      ? (sessionData?.email?.split("@")[0] || "Coach")
-      : nombreCoach;
-    var coachInitialsGreet = displayName
-      .split(" ")
-      .map(function(w) { return w[0]; })
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-    return {
-      greeting: {
-        name: displayName,
-        coachName: displayName,
-        initials: coachInitialsGreet,
-      },
-      businessMetrics: {
-        cards: [
-          {
-            id: "m-alu",
-            accentColor: "#2563EB",
-            icon: "users",
-            label: es ? "Alumnos activos" : "Active athletes",
-            value: String(activeStudents) + " / " + String(totalSlots),
-            subline: es ? (Math.max(0, totalSlots - activeStudents) + " cupos disponibles") : (Math.max(0, totalSlots - activeStudents) + " slots open"),
-          },
-          {
-            id: "m-ses",
-            accentColor: "#22C55E",
-            icon: "trend",
-            label: es ? "Sesiones esta semana" : "Sessions this week",
-            value: String(weekTotal),
-            subline: es ? "Registradas en el equipo" : "Logged team-wide",
-          },
-        ],
-      },
-      weeklyActivity: {
-        completionPercent: completionPercent,
-        completionLabel: es ? "Cumplimiento semanal" : "Weekly completion",
-        sessionsSummary: weekTotal + " / " + weekGoalTarget + (es ? " sesiones completadas" : " sessions completed"),
-        days: weekDays,
-      },
-      aiAlerts: {
-        alerts: alerts,
-        urgentCount: alerts.filter(function(x) { return x.level === "high"; }).length,
-        onPrimaryAction: function(alertId) {
-          var raw = String(alertId).replace(/^coach-alert-/, "");
-          notifyAlumno(raw, es ? "¡Tu entrenador te recuerda entrenar! 💪" : "Your coach reminds you to train! 💪")
-            .then(function() { toast2(es ? "Notificación enviada" : "Notification sent"); })
-            .catch(function() { toast2("Error al notificar"); });
-        },
-        onSecondaryAction: async function(alertId) {
-          var raw = String(alertId).replace(/^coach-alert-/, "");
-          var alum = (alumnos || []).find(function(x) { return String(x.id) === raw; });
-          if (!alum) return;
-          setAlumnoActivo(alum);
-          setTab("alumnos");
-          setLoadingSB(true);
-          try {
-            var results = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
-            setRutinasSB(results[0] || []);
-            setAlumnoProgreso(results[1] || []);
-            setAlumnoSesiones(results[2] || []);
-          } catch (e) { console.error("[onVerAlumno]", e); }
-          setLoadingSB(false);
-        },
-      },
-      coachGamification: {
-        streakValue: String(streak),
-        streakTitle: es ? "Racha del equipo" : "Team streak",
-        streakSubtitle: es ? "Días seguidos con al menos una sesión" : "Consecutive days with at least one session",
-        weeklyGoalLabel: es ? "Meta semanal de sesiones" : "Weekly session goal",
-        weeklyGoalCurrent: weekTotal,
-        weeklyGoalTarget: weekGoalTarget,
-        achievements: [],
-      },
-    };
-  }, [alumnos, sesionesGlobales, sesionesGlobales.length, progresoGlobal, es, notifyAlumno, toast2, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones, sessionData]);
 
   // Pantalla de login
 
@@ -1786,61 +1566,43 @@ function GymApp() {
         {tab==="plan"&&esAlumno&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&(
           <div>
-            {!esAlumno&&(
+            {!esAlumno&&sessionData?.role==="entrenador"&&(
               <CoachDashboard
-                {...coachDashboardData}
-                students={{
-                  students: alumnos.map((a) => {
-                    const ver = async () => {
-                      setAlumnoActivo(a); setTab("alumnos"); setLoadingSB(true);
-                      try {
-                        const [ruts, prog, ses] = await Promise.all([sb.getRutinas(a.id), sb.getProgreso(a.id), sb.getSesiones(a.id)]);
-                        setRutinasSB(ruts || []); setAlumnoProgreso(prog || []); setAlumnoSesiones(ses || []);
-                      } catch (e) { console.error("[onVerAlumno]", e); }
-                      setLoadingSB(false);
-                    };
-                    const chat = () => { setChatModal({ alumnoId: a.id, alumnoNombre: a.nombre || a.email || "Alumno" }); };
-                    return {
-                      id: a.id,
-                      initials: (a.nombre || a.email || "?").slice(0, 2).toUpperCase(),
-                      name: a.nombre || a.email || "",
-                      subline: "",
-                      avatarBg: "rgba(37,99,235,0.12)",
-                      avatarColor: "#3B82F6",
-                      dotColor: "#22C55E",
-                      rateLabel: "",
-                      onRowClick: ver,
-                      onChart: ver,
-                      onMessage: chat,
-                    };
-                  }),
+                alumnos={alumnos}
+                activeNav="dashboard"
+                setActiveNav={function(nav){
+                  if(nav==="dashboard") setTab("plan");
+                  else if(nav==="routines") setTab("routines");
+                  else if(nav==="exercises") setTab("biblioteca");
+                  else if(nav==="alumnos") setTab("alumnos");
                 }}
-                todayAgenda={{
-                  sessions: (() => {
-                    const hoyStr = new Date().toISOString().slice(0, 10);
-                    const sessionesHoy = (sesionesGlobales || []).filter((s) => {
-                      const campo = s.created_at || "";
-                      return campo.slice(0, 10) === hoyStr;
-                    });
-                    return sessionesHoy.map((s, i) => {
-                      const d = new Date(s.created_at || 0);
-                      const alumno = alumnos.find((x) => x.id === s.alumno_id);
-                      const h = d.getHours();
-                      const m = d.getMinutes();
-                      return {
-                        id: s.id ?? i,
-                        time: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
-                        ampm: h < 12 ? "AM" : "PM",
-                        studentName: alumno?.nombre || alumno?.email || "—",
-                        detail: es ? "Sesión" : "Session",
-                        statusLabel: es ? "Registrada" : "Logged",
-                        statusVariant: "done",
-                        timeTone: "muted",
-                        sessionTypeIcon: "presencial",
-                      };
-                    });
-                  })(),
+                onRevisar={async function(alumnoId){
+                  var alum=(alumnos||[]).find(function(x){ return String(x.id)===String(alumnoId); });
+                  if(!alum){ return; }
+                  setAlumnoActivo(alum); setTab("alumnos"); setLoadingSB(true);
+                  try{
+                    var r=await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
+                    setRutinasSB(r[0]||[]); setAlumnoProgreso(r[1]||[]); setAlumnoSesiones(r[2]||[]);
+                  }catch(e){ console.error("[CoachDashboard onRevisar]", e); }
+                  setLoadingSB(false);
                 }}
+                onVerPerfil={async function(alumnoId){
+                  var alum=(alumnos||[]).find(function(x){ return String(x.id)===String(alumnoId); });
+                  if(!alum){ return; }
+                  setAlumnoActivo(alum); setTab("alumnos"); setLoadingSB(true);
+                  try{
+                    var r=await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
+                    setRutinasSB(r[0]||[]); setAlumnoProgreso(r[1]||[]); setAlumnoSesiones(r[2]||[]);
+                  }catch(e){ console.error("[CoachDashboard onVerPerfil]", e); }
+                  setLoadingSB(false);
+                }}
+                onEnviarMensaje={function(){
+                  var first=(alumnos||[])[0];
+                  if(first) setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
+                  else toast2(es?"No hay alumnos para contactar":"No athletes to message");
+                }}
+                onCrearRutina={function(){ setTab("routines"); }}
+                onRevisarAlumnos={function(){ setTab("alumnos"); }}
               />
             )}
             
@@ -4104,6 +3866,7 @@ function GymApp() {
           setVideoModal={setVideoModal}
         />
       )}
+      {!hideGlobalBottomNavCoachDash && (
       <nav style={{
         position:"fixed",bottom:0,left:0,right:0,
         background:darkMode?"rgba(15,25,35,0.96)":"rgba(255,255,255,0.96)",
@@ -4147,6 +3910,7 @@ function GymApp() {
           );
         })}
       </nav>
+      )}
       </div>
     </div>
   );

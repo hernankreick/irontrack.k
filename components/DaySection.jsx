@@ -128,12 +128,13 @@ function SortableBlock({
           justifyContent: 'center',
           gap: 5,
           fontFamily: 'inherit',
-          letterSpacing: '.3px',
+          textTransform: 'uppercase',
+          letterSpacing: '.5px',
           minHeight: 44,
         }}
       >
         <Plus size={13} />
-        AÑADIR
+        Añadir ejercicio
       </button>
     </div>
   );

@@ -401,7 +401,7 @@ export function RutinaView(props) {
   const {
     setTab, border, textMuted, bgCard, textMain, darkMode, bgSub, es,
     setFiltroRut, btn, card, setNewR, routines, setRoutines, allEx, PATS,
-    setEditEx, toast2, setAddExModal, setAddExSearch, setAddExPat,
+    setEditEx, toast2, setAddExModal, setAddExSearch, setAddExPat, setAddExMuscle,
     setAddExSelectedIds, setDupDayModal, alumnos, sb, setAssignRoutineId,
   } = props;
 
@@ -412,6 +412,7 @@ export function RutinaView(props) {
     setAddExModal({ rId: routineId, dIdx: dayIdx, bloque });
     setAddExSearch('');
     setAddExPat(null);
+    setAddExMuscle(null);
     setAddExSelectedIds([]);
   };
 
