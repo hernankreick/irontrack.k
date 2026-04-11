@@ -552,7 +552,7 @@ export function RutinaView(props) {
         background: 'rgba(15,23,42,0.95)',
         backdropFilter: 'blur(12px)',
         borderTop: `1px solid ${border}`,
-        display: 'flex',
+        display: hasUnsaved ? 'flex' : 'none',
         justifyContent: 'center',
         zIndex: 35,
       }}>
