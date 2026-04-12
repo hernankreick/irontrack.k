@@ -8,6 +8,7 @@ import { ChatFlotante } from './components/ChatFlotante.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
 import { ROUTINE_TEMPLATES, instantiateTemplate, emptyDays, getTemplateById } from './lib/routineTemplates.js';
 import { getYTVideoId } from './lib/getYTVideoId.js';
+import { resolveExerciseTitle, resolveYoutubeUrl } from './lib/exerciseResolve.js';
 import { fmt, fmtP } from './lib/timeFormat.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
@@ -1235,7 +1236,22 @@ function GymApp() {
     var entId = (()=>{ try{ return JSON.parse(localStorage.getItem("it_session")||"null")?.entrenadorId || "entrenador_principal"; }catch(e){ return "entrenador_principal"; } })();
     sb.getCustomEx(entId).then(function(res){
       if(res && Array.isArray(res) && res.length > 0) {
-        var exs = res.map(function(e){ return {id:e.id, name:e.name, nameEn:e.name_en||e.name, pattern:e.pattern||"empuje", muscle:e.muscle||"", equip:e.equip||"Libre", youtube:e.youtube||""}; });
+        var exs = res.map(function(e){
+          var rawName = e.name != null && e.name !== "" ? e.name : (e.nombre != null ? e.nombre : "");
+          var rawEn = e.name_en != null && e.name_en !== "" ? e.name_en : (e.nameEn != null ? e.nameEn : rawName);
+          var rawYt = e.youtube || e.video_url || e.youtube_url || e.videoUrl || "";
+          return {
+            id: e.id,
+            name: rawName,
+            nameEn: rawEn || rawName,
+            nombre: rawName,
+            pattern: e.pattern || "empuje",
+            muscle: e.muscle || "",
+            equip: e.equip || "Libre",
+            youtube: rawYt,
+            isCustom: true,
+          };
+        });
         setCustomEx(function(prev){
           // Merge: Supabase tiene prioridad, agregar locales que no estén
           var ids = new Set(exs.map(function(e){return e.id}));
@@ -1366,7 +1382,7 @@ function GymApp() {
     if(newKgVal > (exPrevData.max||0) && (exPrevData.max||0) > 0) {
       const inf = [...EX,...(customEx||[])].find(e=>e.id===exId);
       const exR = routines.flatMap(r=>r.days||[]).flatMap(d=>[...(d.warmup||[]),...(d.exercises||[])]).find(e=>e.id===exId);
-      const nombreEj = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : ((exR && exR.name) || exId || "Ejercicio");
+      const nombreEj = resolveExerciseTitle(inf || null, exR || null, es);
       const prevMax = exPrevData.max||0;
       const diff = Math.round((newKgVal - prevMax)*10)/10;
       setPrCelebration({ejercicio: nombreEj, kg: newKgVal, prevKg: prevMax, diff: diff, exId: exId});
@@ -3910,7 +3926,16 @@ function GymApp() {
             var newExs=ids.map(function(id){
               var ex=allEx.find(function(e){return e.id===id;});
               if(!ex) return null;
-              return {id:ex.id,sets:"3",reps:"8-10",kg:"",pause:0,note:"",weeks:[]};
+              var yt = ex.youtube || ex.video_url || ex.videoUrl || "";
+              return {
+                id:ex.id,
+                name:ex.name||ex.nombre||"",
+                nameEn:ex.nameEn||ex.name||ex.nombre||"",
+                nombre:ex.nombre||ex.name||"",
+                youtube:yt,
+                isCustom:String(ex.id||"").indexOf("custom_")===0,
+                sets:"3",reps:"8-10",kg:"",pause:0,note:"",weeks:[],
+              };
             }).filter(Boolean);
             setRoutines(function(p){return p.map(function(rr){
               if(rr.id!==rId) return rr;
@@ -4544,11 +4569,11 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
     if(!editNombre.trim()){toast2(es?"Ingresa un nombre":"Enter a name");return;}
     const isCustom = !!(customEx||[]).find(c=>c.id===editModal.id);
     if(isCustom) {
-      const updated = customEx.map(e=>e.id===editModal.id?{...e,name:editNombre,youtube:editYT}:e);
+      const updated = customEx.map(e=>e.id===editModal.id?{...e,name:editNombre,nombre:editNombre,nameEn:editNombre,youtube:editYT}:e);
       setCustomEx(updated);
       localStorage.setItem("it_cex", JSON.stringify(updated));
       // Actualizar en Supabase
-      try { await sb.updateCustomEx(editModal.id, {name:editNombre, youtube:editYT}); } catch(e){}
+      try { await sb.updateCustomEx(editModal.id, {name:editNombre, name_en:editNombre, youtube:editYT}); } catch(e){}
     }
     // Guardar override de youtube en Supabase
     if(editYT) {
@@ -4569,7 +4594,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
   const agregarEjercicio = async () => {
     if(!newNombre.trim()){toast2(es?"Ingresa un nombre":"Enter a name");return;}
     var muscleStored = newMusKeys.length ? JSON.stringify(BIB_MUSCLE_ORDER.filter(function (k) { return newMusKeys.indexOf(k) >= 0; })) : "";
-    const newEx = {id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, pattern:newPat, muscle:muscleStored, equip:newEquip||"Libre", youtube:newYT};
+    const newEx = {id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, nombre:newNombre, pattern:newPat, muscle:muscleStored, equip:newEquip||"Libre", youtube:newYT, isCustom:true};
     const updated = [...(customEx||[]), newEx];
     setCustomEx(updated);
     localStorage.setItem("it_cex", JSON.stringify(updated));
@@ -4690,7 +4715,6 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
                     <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                       <span style={{background:"#162234",color:"#8B9AB2",padding:"4px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid #2D4057",letterSpacing:.5}}>{patLabel(e.pattern)}</span>
                       {muscleLine ? <span style={{color:textMuted,fontSize:11,fontWeight:600}}>{muscleLine}</span> : null}
-                      {isCustom&&<span style={{background:"#2563EB18",color:"#2563EB",padding:"4px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid #2563EB33"}}>CUSTOM</span>}
                     </div>
                   </div>
                   <div style={{display:"flex",gap:8,flexShrink:0,alignItems:"center"}}>
@@ -5651,11 +5675,11 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
       {lista.map(function(item) {
         var info = item.info;
         var ex = item.ex;
-        var nombre = info ? (es ? info.name : (info.nameEn||info.name)) : item.id;
+        var nombre = resolveExerciseTitle(info || null, ex, es);
         var musculo = info?.muscle || "";
         var patron = info?.pattern || "";
-        var tieneVideo = (videoOverrides&&videoOverrides[item.id]) || info?.youtube;
-        var videoUrl = (videoOverrides&&videoOverrides[item.id]) || info?.youtube || "";
+        var videoUrl = resolveYoutubeUrl(info || null, ex, videoOverrides);
+        var tieneVideo = !!videoUrl;
         var PAT_COLORS = {rodilla:"#22C55E",bisagra:"#8B9AB2",empuje:"#2563EB",traccion:"#60A5FA",core:"#F59E0B",movilidad:"#A78BFA",cardio:"#EF4444",oly:"#8B9AB2"};
         var barColor = PAT_COLORS[patron] || "#2563EB";
 

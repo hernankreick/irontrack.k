@@ -117,7 +117,11 @@ function topEjercicios(progreso, customEx = []) {
     .slice(0, 4)
     .map(e => ({
       ...e,
-      nombre: customEx.find(x => x.id === e.id)?.nombre || `Ejercicio ${String(e.id).slice(-4)}`,
+      nombre: (() => {
+        const c = customEx.find(x => x.id === e.id);
+        const n = c && (c.name || c.nombre);
+        return (n && String(n).trim()) || `Ejercicio ${String(e.id).slice(-4)}`;
+      })(),
       deltaSesion: sesionDeltaKg(progreso, e.id),
     }));
 }

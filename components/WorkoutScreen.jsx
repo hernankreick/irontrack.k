@@ -1,6 +1,7 @@
 import React from 'react';
 import { WorkoutExercisePanel } from './WorkoutExercisePanel.jsx';
 import { normalizeFecha } from '../lib/normalizeFecha.js';
+import { resolveExerciseTitle } from '../lib/exerciseResolve.js';
 
 export function WorkoutScreen(props) {
   const {
@@ -45,6 +46,7 @@ export function WorkoutScreen(props) {
 
   const nextEx   = exercises[activeExIdx + 1];
   const nextInfo = nextEx ? allEx.find(e => e.id === nextEx.id) : null;
+  const nextDisplayName = nextEx ? resolveExerciseTitle(nextInfo || null, nextEx, es) : "";
 
   // ── Finalizar (sin cambios de lógica) ─────────────────────────────
   const finalizarSesion = async () => {
@@ -212,10 +214,10 @@ export function WorkoutScreen(props) {
             </div>
           </div>
 
-          {nextEx && nextInfo && (
+          {nextEx && (
             <div style={{ fontSize:14, color:textMuted, textAlign:"center" }}>
               {es ? "Próximo:" : "Next up:"}{" "}
-              <strong style={{ color:textMain }}>{es ? nextInfo.name : nextInfo.nameEn||nextInfo.name}</strong>
+              <strong style={{ color:textMain }}>{nextDisplayName}</strong>
             </div>
           )}
 

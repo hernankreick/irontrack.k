@@ -308,11 +308,19 @@ function RutinaCard({
         <div style={{ padding: '12px 16px 16px' }}>
           {r.days.map((d, di) => {
             // Enrich exercises with display name (lookup in allEx by id)
-            const enrichList = (list) => (list || []).map(ex => ({
-              ...ex,
-              id:   ex.id || uid(),
-              name: allEx.find(e => e.id === ex.id)?.name || ex.name || ex.id || '',
-            }));
+            const enrichList = (list) => (list || []).map(ex => {
+              const lib = allEx.find(e => e.id === ex.id);
+              const yt = lib?.youtube || lib?.video_url || ex.youtube || ex.video_url || '';
+              const nm = lib?.name || lib?.nombre || ex.name || ex.nombre || ex.id || '';
+              return {
+                ...ex,
+                id: ex.id || uid(),
+                name: nm,
+                nameEn: lib?.nameEn || lib?.name || ex.nameEn || ex.name || nm,
+                youtube: yt,
+                isCustom: String(ex.id || '').indexOf('custom_') === 0 || !!ex.isCustom,
+              };
+            });
 
             return (
               <DaySection

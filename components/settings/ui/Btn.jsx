@@ -2,8 +2,8 @@ import React from 'react';
 
 export default function Btn({ variant = 'primary', children, onClick, icon, small, type = 'button', disabled, className = '' }) {
   const base =
-    'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border-0 font-bold uppercase tracking-wider transition-all duration-200';
-  const pad = small ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-sm';
+    'inline-flex min-h-[38px] items-center justify-center gap-2 rounded-xl border-0 font-bold uppercase tracking-[0.05em] transition-all duration-200';
+  const pad = small ? 'min-h-[32px] px-3 py-1.5 text-[11px]' : 'px-4 py-2 text-[11px]';
 
   const hoverCls =
     disabled
@@ -43,6 +43,7 @@ export default function Btn({ variant = 'primary', children, onClick, icon, smal
         fontFamily: 'inherit',
         letterSpacing: '0.05em',
         fontWeight: 700,
+        fontSize: 11,
         opacity: disabled ? (variant === 'danger' ? 0.4 : 0.5) : 1,
         ...(variant === 'primary' && !disabled ? { boxShadow: '0 4px 14px rgba(37,99,235,0.35)' } : {}),
       }}

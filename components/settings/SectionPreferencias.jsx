@@ -100,9 +100,9 @@ export default function SectionPreferencias({ lang, setLang, darkMode, setDarkMo
   };
 
   const langCards = [
-    { id: 'es', flag: '🇦🇷', label: 'Español' },
-    { id: 'en', flag: '🇺🇸', label: 'English' },
-    { id: 'pt', flag: '🇧🇷', label: 'Português' },
+    { id: 'es', abbr: 'ES', label: 'Español' },
+    { id: 'en', abbr: 'EN', label: 'English' },
+    { id: 'pt', abbr: 'PT', label: 'Português' },
   ];
 
   const themeCards = [
@@ -147,65 +147,81 @@ export default function SectionPreferencias({ lang, setLang, darkMode, setDarkMo
 
   return (
     <div className="flex flex-col space-y-8">
-      <SectionCard title="Idioma" subtitle="Seleccioná el idioma de la interfaz.">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {langCards.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                setLocale(c.id);
-                const p = { ...readPrefs(), lang: c.id, theme, tz };
-                if (!readPrefs()) Object.assign(p, { theme, tz });
-                persist({ lang: c.id, theme, tz });
-              }}
-              className="flex min-h-[44px] flex-col items-start rounded-xl border p-4 text-left transition-colors"
-              style={{
-                borderColor: locale === c.id ? '#2563EB' : 'rgba(255,255,255,0.08)',
-                background: locale === c.id ? 'rgba(37,99,235,0.12)' : 'rgba(255,255,255,0.03)',
-              }}
-            >
-              <span className="text-2xl">{c.flag}</span>
-              <span className="mt-1 font-bold text-white">{c.label}</span>
-            </button>
-          ))}
-        </div>
-      </SectionCard>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-6 xl:gap-8">
+        <SectionCard title="Idioma" subtitle="Seleccioná el idioma de la interfaz.">
+          <div className="space-y-4">
+            <h3 className="mb-6 block text-lg font-semibold text-white">Idioma de la interfaz</h3>
+            <div className="flex flex-wrap gap-3">
+            {langCards.map((c) => {
+              const selected = locale === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setLocale(c.id);
+                    const p = { ...readPrefs(), lang: c.id, theme, tz };
+                    if (!readPrefs()) Object.assign(p, { theme, tz });
+                    persist({ lang: c.id, theme, tz });
+                  }}
+                  className={`flex h-11 min-h-[44px] min-w-[100px] flex-1 flex-col items-center justify-center gap-3 rounded-lg border px-5 py-3 text-center text-sm font-medium transition-all sm:flex-initial ${
+                    selected
+                      ? 'border-blue-500 bg-blue-500/20 text-blue-400'
+                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs font-bold text-white/90">
+                    {c.abbr}
+                  </span>
+                  <span className="font-semibold text-white">{c.label}</span>
+                </button>
+              );
+            })}
+            </div>
+          </div>
+        </SectionCard>
 
-      <SectionCard title="Tema" subtitle="Apariencia clara u oscura.">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {themeCards.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                setTheme(c.id);
-                persist({ lang: locale, theme: c.id, tz });
-              }}
-              className="flex min-h-[44px] items-center gap-3 rounded-xl border p-4 text-left"
-              style={{
-                borderColor: theme === c.id ? '#2563EB' : 'rgba(255,255,255,0.08)',
-                background: theme === c.id ? 'rgba(37,99,235,0.12)' : 'rgba(255,255,255,0.03)',
-                color: '#e2e8f0',
-              }}
-            >
-              {c.icon}
-              <span className="font-bold">{c.label}</span>
-            </button>
-          ))}
-        </div>
-      </SectionCard>
+        <SectionCard title="Tema" subtitle="Apariencia clara u oscura.">
+          <div className="space-y-4">
+            <h3 className="mb-6 block text-lg font-semibold text-white">Apariencia</h3>
+            <div className="flex flex-wrap gap-3">
+            {themeCards.map((c) => {
+              const selected = theme === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setTheme(c.id);
+                    persist({ lang: locale, theme: c.id, tz });
+                  }}
+                  className={`flex h-11 min-h-[44px] min-w-[100px] flex-1 items-center justify-center gap-3 rounded-lg border px-5 py-3 text-sm font-medium transition-all sm:flex-initial ${
+                    selected
+                      ? 'border-blue-500 bg-blue-500/20 text-blue-400'
+                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="flex size-12 shrink-0 items-center justify-center text-white/90">{c.icon}</span>
+                  <span className="font-semibold">{c.label}</span>
+                </button>
+              );
+            })}
+            </div>
+          </div>
+        </SectionCard>
+      </div>
 
       <SectionCard title="Zona horaria" subtitle="Referencia para recordatorios y vistas de calendario.">
-        <label className="block">
-          <span className="mb-2 block text-[11px] font-bold uppercase tracking-wider" style={{ color: '#64748b' }}>
+        <div className="space-y-4">
+          <h3 className="mb-6 block text-lg font-semibold text-white">Referencia horaria</h3>
+          <div className="space-y-2">
+          <label className="block text-sm font-medium text-white/80" htmlFor="it-settings-tz">
             Zona horaria
-          </span>
+          </label>
           <select
-            className="min-h-[44px] w-full rounded-xl border px-4 py-3 text-[15px] text-white outline-none"
+            id="it-settings-tz"
+            className="h-11 min-h-[44px] w-full rounded-lg border border-white/10 bg-white/5 px-4 text-[15px] text-white outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             style={{
-              borderColor: 'rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.02)',
               fontFamily: 'inherit',
             }}
             value={tz}
@@ -221,7 +237,8 @@ export default function SectionPreferencias({ lang, setLang, darkMode, setDarkMo
               </option>
             ))}
           </select>
-        </label>
+          </div>
+        </div>
       </SectionCard>
 
       <StickyActionBar>
@@ -230,7 +247,7 @@ export default function SectionPreferencias({ lang, setLang, darkMode, setDarkMo
         </Btn>
       </StickyActionBar>
 
-      <div className="mt-6 hidden lg:flex">
+      <div className="mt-8 hidden sm:flex">
         <Btn onClick={onSave}>GUARDAR PREFERENCIAS</Btn>
       </div>
     </div>

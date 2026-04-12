@@ -91,62 +91,59 @@ export default function SectionPerfil({ coach, setSessionData, toast2, sb, entre
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col space-y-8">
-      <SectionCard title="Perfil del entrenador" subtitle="Datos visibles para tus alumnos y en la app.">
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-white/80">Foto de perfil</h3>
-            <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-              <div className="relative shrink-0">
-                <div
-                  className="flex h-[88px] w-[88px] items-center justify-center rounded-2xl text-2xl font-black text-white"
-                  style={{
-                    background: 'linear-gradient(135deg, #1e40af 0%, #2563EB 50%, #3b82f6 100%)',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {avatarUrl && avatarUrl.startsWith('data:') ? (
-                    <img src={avatarUrl} alt="" className="h-full w-full rounded-2xl object-cover" />
-                  ) : (
-                    initials(fullName || coach?.name)
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="absolute -bottom-1 -right-1 flex h-10 w-10 items-center justify-center rounded-full border-2 border-[#0d1424] bg-[#2563EB] text-white shadow-lg"
-                  onClick={() => fileRef.current && fileRef.current.click()}
-                  aria-label="Cambiar foto"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                </button>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickAvatar} />
-              </div>
-              <p className="max-w-md text-center text-sm leading-relaxed sm:text-left" style={{ color: '#64748b' }}>
-                Tocá el ícono de cámara para subir una imagen. Si no hay foto, usamos tus iniciales.
-              </p>
+    <div className="flex w-full flex-col space-y-8">
+      <SectionCard title="Perfil" subtitle="Foto visible para tus alumnos y en la app.">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+          <div className="relative shrink-0">
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-2xl text-lg font-black text-white"
+              style={{
+                background: 'linear-gradient(135deg, #1e40af 0%, #2563EB 50%, #3b82f6 100%)',
+                fontFamily: 'inherit',
+              }}
+            >
+              {avatarUrl && avatarUrl.startsWith('data:') ? (
+                <img src={avatarUrl} alt="" className="h-full w-full rounded-2xl object-cover" />
+              ) : (
+                initials(fullName || coach?.name)
+              )}
             </div>
+            <button
+              type="button"
+              className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 min-h-[36px] min-w-[36px] items-center justify-center rounded-full border-2 border-[#0d1424] bg-[#2563EB] text-white shadow-lg"
+              onClick={() => fileRef.current && fileRef.current.click()}
+              aria-label="Cambiar foto"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickAvatar} />
           </div>
+          <p className="max-w-md text-center text-sm leading-relaxed sm:text-left" style={{ color: '#64748b' }}>
+            Tocá el ícono de cámara para subir una imagen. Si no hay foto, usamos tus iniciales.
+          </p>
+        </div>
+      </SectionCard>
 
-          <div className="space-y-4 border-t border-white/10 pt-6">
-            <h3 className="text-sm font-medium text-white/80">Datos personales</h3>
-            <Field label="Nombre completo" value={fullName} onChange={setFullName} type="text" placeholder="Nombre y apellido" />
-            <Field label="Título profesional" value={titulo} onChange={setTitulo} type="text" placeholder="Ej. Entrenador personal · Fuerza" />
-            <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="correo@ejemplo.com" />
-            <Field label="Teléfono" value={phone} onChange={setPhone} type="tel" placeholder="+54 9 11 …" />
-          </div>
+      <SectionCard title="Datos personales" subtitle="Nombre, título profesional y contacto.">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-5">
+          <Field label="Nombre completo" value={fullName} onChange={setFullName} type="text" placeholder="Nombre y apellido" />
+          <Field label="Título profesional" value={titulo} onChange={setTitulo} type="text" placeholder="Ej. Entrenador personal · Fuerza" />
+          <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="correo@ejemplo.com" />
+          <Field label="Teléfono" value={phone} onChange={setPhone} type="tel" placeholder="+54 9 11 …" />
+        </div>
+      </SectionCard>
 
-          <div className="space-y-4 border-t border-white/10 pt-6">
-            <h3 className="text-sm font-medium text-white/80">Seguridad</h3>
-            <p className="text-sm leading-relaxed" style={{ color: '#64748b' }}>
-              Cambiá tu contraseña si tu cuenta usa Supabase Auth.
-            </p>
-            <Field label="Contraseña actual" value={passCur} onChange={setPassCur} type="password" placeholder="••••••••" />
-            <Field label="Nueva contraseña" value={passNew} onChange={setPassNew} type="password" placeholder="Mínimo 6 caracteres" />
-            <Field label="Confirmar nueva" value={passConf} onChange={setPassConf} type="password" placeholder="Repetí la nueva" />
-          </div>
+      <SectionCard title="Seguridad" subtitle="Contraseña de acceso (Supabase Auth).">
+        <div className="space-y-5">
+          <p className="text-sm leading-relaxed text-white/50">
+            Cambiá tu contraseña si tu cuenta usa Supabase Auth.
+          </p>
+          <Field label="Contraseña actual" value={passCur} onChange={setPassCur} type="password" placeholder="••••••••" />
+          <Field label="Nueva contraseña" value={passNew} onChange={setPassNew} type="password" placeholder="Mínimo 6 caracteres" />
+          <Field label="Confirmar nueva" value={passConf} onChange={setPassConf} type="password" placeholder="Repetí la nueva" />
         </div>
       </SectionCard>
 
@@ -161,7 +158,7 @@ export default function SectionPerfil({ coach, setSessionData, toast2, sb, entre
         ) : null}
       </StickyActionBar>
 
-      <div className="mt-8 hidden flex-wrap items-center gap-3 lg:flex">
+      <div className="mt-8 hidden flex-wrap items-center gap-3 sm:flex">
         <Btn onClick={onSave}>{saved ? 'GUARDADO ✓' : 'GUARDAR CAMBIOS'}</Btn>
         {saved ? (
           <span className="text-xs opacity-90" style={{ color: '#22C55E' }}>

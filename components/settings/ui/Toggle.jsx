@@ -1,8 +1,8 @@
 import React from 'react';
 
 const track = {
-  md: { w: 46, h: 24, thumb: 20, pad: 2 },
-  sm: { w: 36, h: 20, thumb: 16, pad: 2 },
+  md: { w: 42, h: 22, thumb: 18, pad: 2 },
+  sm: { w: 34, h: 18, thumb: 14, pad: 2 },
 };
 
 export default function Toggle({ checked, onChange, size = 'md' }) {
@@ -17,7 +17,7 @@ export default function Toggle({ checked, onChange, size = 'md' }) {
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0f1a]"
+      className="flex min-h-[36px] min-w-[36px] cursor-pointer items-center justify-center border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0f1a]"
     >
       <span
         className="relative block shrink-0 rounded-full"

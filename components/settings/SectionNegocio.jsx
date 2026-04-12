@@ -155,8 +155,7 @@ export default function SectionNegocio({ toast2, sb, entrenadorId, alumnosCount 
   const renderDayRow = (d, idx) => (
     <div
       key={d.key}
-      className="flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between"
-      style={{ borderColor: 'rgba(255,255,255,0.08)' }}
+      className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="flex items-center justify-between gap-3 sm:w-40">
         <span className="font-bold text-white">{d.label}</span>
@@ -166,16 +165,14 @@ export default function SectionNegocio({ toast2, sb, entrenadorId, alumnosCount 
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="time"
-            className="min-h-[44px] rounded-lg border px-3 py-2 text-white"
-            style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}
+            className="h-11 min-h-[44px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={disp[idx].desde}
             onChange={(e) => setDay(idx, { desde: e.target.value })}
           />
-          <span style={{ color: '#64748b' }}>—</span>
+          <span className="text-white/40">—</span>
           <input
             type="time"
-            className="min-h-[44px] rounded-lg border px-3 py-2 text-white"
-            style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}
+            className="h-11 min-h-[44px] rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={disp[idx].hasta}
             onChange={(e) => setDay(idx, { hasta: e.target.value })}
           />
@@ -190,42 +187,38 @@ export default function SectionNegocio({ toast2, sb, entrenadorId, alumnosCount 
 
   return (
     <div className="flex flex-col space-y-8">
-      <SectionCard premium title="Datos del negocio" subtitle="Nombre comercial y contacto.">
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-white/80">Marca y contacto</h3>
-            <label className="block">
-              <span className="mb-2 block text-[11px] font-bold uppercase tracking-wider" style={{ color: '#64748b' }}>
-                Nombre del gimnasio / marca
-              </span>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-6 xl:gap-8">
+        <SectionCard title="Marca y contacto" subtitle="Nombre comercial y teléfono de contacto.">
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <div className="mb-3 text-sm font-medium text-white/80">Nombre del gimnasio / marca</div>
               <input
-                className="min-h-[44px] w-full rounded-xl border px-4 py-3 text-[15px] text-white outline-none"
-                style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', fontFamily: 'inherit' }}
+                className="h-11 min-h-[44px] w-full rounded-lg border border-white/10 bg-white/5 px-4 text-[15px] text-white outline-none placeholder:text-white/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                style={{ fontFamily: 'inherit' }}
                 value={nombreGimnasio}
                 onChange={(e) => setNombreGimnasio(e.target.value)}
                 placeholder="Iron Track Gym"
               />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-[11px] font-bold uppercase tracking-wider" style={{ color: '#64748b' }}>
-                Teléfono comercial
-              </span>
+            </div>
+            <div className="space-y-2">
+              <div className="mb-3 text-sm font-medium text-white/80">Teléfono comercial</div>
               <input
-                className="min-h-[44px] w-full rounded-xl border px-4 py-3 text-[15px] text-white outline-none"
-                style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', fontFamily: 'inherit' }}
+                className="h-11 min-h-[44px] w-full rounded-lg border border-white/10 bg-white/5 px-4 text-[15px] text-white outline-none placeholder:text-white/40 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                style={{ fontFamily: 'inherit' }}
                 value={telComercial}
                 onChange={(e) => setTelComercial(e.target.value)}
                 placeholder="+54 …"
               />
-            </label>
+            </div>
           </div>
+        </SectionCard>
 
-          <div className="space-y-4 border-t border-white/10 pt-6">
-            <h3 className="text-sm font-medium text-white/80">Capacidad</h3>
-            <div className="mb-2 flex items-end justify-between gap-2">
+        <SectionCard title="Capacidad" subtitle="Cupos máximos de alumnos activos.">
+          <div className="space-y-5">
+            <div className="mb-3 flex items-end justify-between gap-2">
               <div>
                 <div className="text-3xl font-black text-white">{capMax}</div>
-                <div className="text-sm" style={{ color: '#64748b' }}>
+                <div className="text-sm text-white/50">
                   Cupos disponibles: <span style={{ color: '#22C55E' }}>{cuposLibres}</span> (alumnos actuales: {alumnosCount ?? 0})
                 </div>
               </div>
@@ -239,49 +232,43 @@ export default function SectionNegocio({ toast2, sb, entrenadorId, alumnosCount 
               className="h-3 w-full cursor-pointer accent-[#2563EB]"
             />
           </div>
+        </SectionCard>
+      </div>
 
-          <div className="space-y-4 border-t border-white/10 pt-6">
-            <h3 className="text-sm font-medium text-white/80">Moneda</h3>
-            <p className="text-sm" style={{ color: '#64748b' }}>
-              Visualización de montos y reportes.
-            </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {MONEDAS.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setMoneda(m)}
-                  className="min-h-[44px] rounded-xl border font-bold uppercase tracking-wide"
-                  style={{
-                    borderColor: moneda === m ? '#2563EB' : 'rgba(255,255,255,0.1)',
-                    background: moneda === m ? 'rgba(37,99,235,0.2)' : 'rgba(255,255,255,0.04)',
-                    color: '#fff',
-                  }}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
+      <SectionCard title="Moneda" subtitle="Visualización de montos y reportes.">
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-6">
+            {MONEDAS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMoneda(m)}
+                className={`h-11 min-h-[44px] rounded-lg border font-bold uppercase tracking-wide transition-colors ${
+                  moneda === m
+                    ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                    : 'border-white/10 bg-white/5 text-white hover:bg-white/10'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
           </div>
         </div>
       </SectionCard>
 
-      <SectionCard premium title="Disponibilidad semanal" subtitle="Horarios en los que atendés consultas o clases.">
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-white/80">Disponibilidad</h3>
-            <div className="flex flex-col space-y-3">
-              {DIAS.slice(0, 4).map((d, i) => renderDayRow(d, i))}
-            </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 xl:gap-8">
+        <SectionCard title="Disponibilidad" subtitle="Lunes a jueves.">
+          <div className="flex flex-col space-y-5">
+            {DIAS.slice(0, 4).map((d, i) => renderDayRow(d, i))}
           </div>
-          <div className="space-y-4 border-t border-white/10 pt-6">
-            <h3 className="text-sm font-medium text-white/80">Fin de semana</h3>
-            <div className="flex flex-col space-y-3">
-              {DIAS.slice(4).map((d, i) => renderDayRow(d, i + 4))}
-            </div>
+        </SectionCard>
+
+        <SectionCard title="Fin de semana" subtitle="Viernes a domingo.">
+          <div className="flex flex-col space-y-5">
+            {DIAS.slice(4).map((d, i) => renderDayRow(d, i + 4))}
           </div>
-        </div>
-      </SectionCard>
+        </SectionCard>
+      </div>
 
       <StickyActionBar>
         <Btn className="w-full" onClick={onSave}>
@@ -294,7 +281,7 @@ export default function SectionNegocio({ toast2, sb, entrenadorId, alumnosCount 
         ) : null}
       </StickyActionBar>
 
-      <div className="mt-8 hidden flex-wrap items-center gap-3 lg:flex">
+      <div className="mt-8 hidden flex-wrap items-center gap-3 sm:flex">
         <Btn onClick={onSave}>{saved ? 'GUARDADO ✓' : 'GUARDAR NEGOCIO'}</Btn>
         {saved ? (
           <span className="text-xs opacity-90" style={{ color: '#22C55E' }}>

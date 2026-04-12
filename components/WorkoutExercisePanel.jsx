@@ -1,6 +1,7 @@
 import React from 'react';
 import { Ic } from './Ic.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
+import { resolveExerciseTitle, resolveYoutubeUrl } from '../lib/exerciseResolve.js';
 
 export function WorkoutExercisePanel(props) {
   const {
@@ -61,6 +62,9 @@ export function WorkoutExercisePanel(props) {
   const adjustKg = (d) => setKg(v=>String(Math.max(0,(parseFloat(v)||0)+d)));
   const fmtTime = s => s>=60?Math.floor(s/60)+"m"+(s%60>0?s%60+"s":""):s+"s";
 
+  const displayName = resolveExerciseTitle(info, ex, es);
+  const videoUrlResolved = resolveYoutubeUrl(info, ex, videoOverrides);
+
   const handleLogSet = () => {
     if(!kg || !reps) return;
     // Haptic feedback — vibración corta al registrar set
@@ -75,7 +79,7 @@ export function WorkoutExercisePanel(props) {
     if(newKgVal > pr && pr > 0) {
       // Haptic doble para PR
       try { if(navigator.vibrate) navigator.vibrate([60,40,120]); } catch(e){}
-      setPrCelebration({ejercicio: es?info?.name:info?.nameEn||info?.name, kg: newKgVal});
+      setPrCelebration({ejercicio: displayName, kg: newKgVal});
       setTimeout(()=>setPrCelebration(null), 2500);
     }
     logSet(ex.id, parseFloat(kg), parseInt(reps), note, rpe);
@@ -98,7 +102,7 @@ export function WorkoutExercisePanel(props) {
           <div style={{width:4,height:36,borderRadius:2,background:pat.color||"#2563EB",flexShrink:0}}/>
           <div style={{flex:1}}>
             <div style={{fontSize:18,fontWeight:800,color:"#fff",lineHeight:1.15,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-              {es?info?.name:info?.nameEn||info?.name}
+              {displayName}
               {sessionPRList&&sessionPRList.some(function(p){return p.exId===ex.id})&&(
                 <span style={{background:"#fbbf2422",border:"1px solid #fbbf2444",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:800,color:"#fbbf24",flexShrink:0}}>PR</span>
               )}
@@ -109,8 +113,8 @@ export function WorkoutExercisePanel(props) {
               {ex.pause&&<span>⏱ {fmtTime(ex.pause)}</span>}
             </div>
           </div>
-          {(()=>{var vUrl=(videoOverrides&&videoOverrides[ex.id])||info?.youtube;if(!vUrl)return null;return(
-            <button className="hov" onClick={function(){var vid=getYTVideoId(vUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:es?info?.name:(info?.nameEn||info?.name)})}else{window.open(vUrl,"_blank")}}}
+          {(()=>{var vUrl=videoUrlResolved;if(!vUrl)return null;return(
+            <button className="hov" onClick={function(){var vid=getYTVideoId(vUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:displayName})}else{window.open(vUrl,"_blank")}}}
               style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:8,padding:"6px 12px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",gap:4}}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>VER
             </button>

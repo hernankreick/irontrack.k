@@ -7,11 +7,9 @@ const S = {
     fontFamily: "'DM Sans', sans-serif",
     background: "#0B0E11",
     color: "#F1F5F9",
-    padding: "0 16px",
     paddingBottom: 100,
     minHeight: "100%",
     boxSizing: "border-box",
-    maxWidth: "480px",
     width: "100%",
     margin: "0 auto",
   },
@@ -336,7 +334,10 @@ export default function CoachDashboard({
   const dayLabels = ["L", "M", "X", "J", "V", "S", "D"];
 
   return (
-    <div style={S.root}>
+    <div
+      style={S.root}
+      className="w-full max-w-[480px] px-4 sm:px-5 md:max-w-3xl md:px-6 lg:max-w-5xl lg:px-8 xl:max-w-6xl"
+    >
       <style>
         {`
           .coach-dash-alerts {
@@ -354,6 +355,14 @@ export default function CoachDashboard({
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
             -ms-overflow-style: none;
+          }
+          @media (min-width: 768px) {
+            .coach-dash-alerts {
+              margin-left: 0;
+              margin-right: 0;
+              padding-left: 0;
+              padding-right: 0;
+            }
           }
           .coach-dash-alerts::-webkit-scrollbar {
             display: none;
