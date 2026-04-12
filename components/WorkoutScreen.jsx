@@ -48,6 +48,16 @@ export function WorkoutScreen(props) {
   const nextInfo = nextEx ? allEx.find(e => e.id === nextEx.id) : null;
   const nextDisplayName = nextEx ? resolveExerciseTitle(nextInfo || null, nextEx, es) : "";
 
+  const [, setRestTick] = React.useState(0);
+  React.useEffect(() => {
+    if (!timer?.endAt) return;
+    const id = setInterval(() => setRestTick(function (n) { return n + 1; }), 250);
+    return function () { clearInterval(id); };
+  }, [timer?.endAt]);
+  const restRemaining = timer?.endAt
+    ? Math.max(0, Math.round((timer.endAt - Date.now()) / 1000))
+    : 0;
+
   // ── Finalizar (sin cambios de lógica) ─────────────────────────────
   const finalizarSesion = async () => {
     const r = activeR;
@@ -192,11 +202,11 @@ export function WorkoutScreen(props) {
               <circle cx="90" cy="90" r="80" fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="10"/>
               <circle
                 cx="90" cy="90" r="80" fill="none"
-                stroke={timer.remaining > timer.total * 0.5 ? green : timer.remaining > timer.total * 0.25 ? "#F59E0B" : "#EF4444"}
+                stroke={restRemaining > timer.total * 0.5 ? green : restRemaining > timer.total * 0.25 ? "#F59E0B" : "#EF4444"}
                 strokeWidth="10"
                 strokeLinecap="round"
                 strokeDasharray={`${2 * Math.PI * 80}`}
-                strokeDashoffset={`${2 * Math.PI * 80 * (1 - (timer.total - timer.remaining) / Math.max(timer.total, 1))}`}
+                strokeDashoffset={`${2 * Math.PI * 80 * (1 - (timer.total - restRemaining) / Math.max(timer.total, 1))}`}
                 style={{ transition:"stroke-dashoffset .1s linear, stroke .5s ease" }}
               />
             </svg>
@@ -206,7 +216,7 @@ export function WorkoutScreen(props) {
               alignItems:"center", justifyContent:"center",
             }}>
               <div style={{ fontSize:44, fontWeight:900, color:textMain, lineHeight:1 }}>
-                {Math.floor(timer.remaining/60)}:{String(timer.remaining%60).padStart(2,"0")}
+                {Math.floor(restRemaining/60)}:{String(restRemaining%60).padStart(2,"0")}
               </div>
               <div style={{ fontSize:11, fontWeight:700, color:textMuted, letterSpacing:1, textTransform:"uppercase", marginTop:4 }}>
                 {es ? "restante" : "remaining"}

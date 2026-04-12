@@ -21,6 +21,36 @@ import { applyItPrefsToDocument } from './components/settings/SectionPreferencia
 import { supabase } from './lib/supabaseClient.js';
 
 
+/** Barra de pausa del alumno (fuera de sesión): el countdown vive aquí para no re-renderizar GymApp cada tick. */
+const AlumnoRestTimerBar = memo(function AlumnoRestTimerBar({ timer, onCancel, bgSub, darkMode, textMuted, btn, fmt }) {
+  const R = 26;
+  const circ = 2 * Math.PI * R;
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!timer?.endAt) return;
+    const id = setInterval(() => setTick(function (t) { return t + 1; }), 250);
+    return function () { clearInterval(id); };
+  }, [timer?.endAt]);
+  const remaining = useMemo(
+    () => (timer?.endAt ? Math.max(0, Math.round((timer.endAt - Date.now()) / 1000)) : 0),
+    [timer?.endAt, tick]
+  );
+  const borderCol = darkMode ? "#2D4057" : "#2D4057";
+  return (
+    <div style={{ background: bgSub, borderBottom: "1px solid " + borderCol, padding: "8px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+      <svg width={52} height={52} style={{ flexShrink: 0 }}>
+        <circle cx={26} cy={26} r={R} fill="none" stroke="#2D4057" strokeWidth={3} />
+        <circle cx={26} cy={26} r={R} fill="none" stroke={remaining < 10 ? "#2563EB" : timer.color || "#22C55E"} strokeWidth={3}
+          strokeDasharray={circ} strokeDashoffset={circ * (1 - remaining / timer.total)}
+          style={{ transform: "rotate(-90deg)", transformOrigin: "center", transition: "stroke-dashoffset .8s" }} />
+        <text x={26} y={30} textAnchor="middle" fill="#FFFFFF" fontSize={13} fontWeight={700}>{fmt(remaining)}</text>
+      </svg>
+      <span style={{ color: textMuted, fontSize: 15, flex: 1 }}>Pausa activa</span>
+      <button type="button" className="hov" style={{ ...btn("#2563EB33"), color: "#2563EB", padding: "4px 8px", fontSize: 15 }} onClick={onCancel}>Cancelar</button>
+    </div>
+  );
+});
+
 const PATS = {
   rodilla:  {label:"RODILLA",   labelEn:"KNEE",      color:"#22C55E", icon:"R"},
   empuje:   {label:"EMPUJE",    labelEn:"PUSH",      color:"#2563EB", icon:"E"},
@@ -839,7 +869,9 @@ function GymApp() {
   const [sessionPRList, setSessionPRList] = useState([]); // [{exId, ejercicio, kg, prevKg, diff}]
   const [notaDia, setNotaDia] = useState(""); // nota del entrenador al alumno
   const [notaDiaInput, setNotaDiaInput] = useState(""); // input del entrenador
-  const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  const headerCollapsedRef = useRef(false);
+  const studentHeaderExpandRef = useRef(null);
+  const studentHeaderMiniRef = useRef(null);
   const scrollRef = useRef(null);
   const profileFileRef = useRef(null);
   const lastScrollY = useRef(0);
@@ -1167,23 +1199,49 @@ function GymApp() {
   }, [routines, readOnly]);
   useEffect(() => { localStorage.setItem("it_pg",JSON.stringify(progress)); },[progress]);
 
-  // Recalcular timer cuando el alumno vuelve de background
+  // Recalcular timer cuando el alumno vuelve de background (sin setState por tick)
   useEffect(()=>{
     const handleVisibility = () => {
       if(!document.hidden && timer?.endAt) {
         const rem = Math.max(0, Math.round((timer.endAt - Date.now()) / 1000));
         if(rem <= 0) {
-          if(timerRef.current) clearInterval(timerRef.current);
+          if(timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
           setTimer(null);
           toast2(es?"¡Pausa lista! 💪":"Rest done! 💪");
-        } else {
-          setTimer(prev => prev ? {...prev, remaining:rem} : null);
         }
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [timer, es]);
+  // Alarma de fin de pausa (un solo setTimer(null) al terminar; no actualiza el padre cada 500 ms)
+  useEffect(() => {
+    if (!timer?.endAt) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
+    const endAt = timer.endAt;
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      if (Date.now() >= endAt) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        setTimer(null);
+        toast2(es ? "¡Pausa lista! 💪" : "Rest done! 💪");
+      }
+    }, 500);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [timer?.endAt, es]);
   useEffect(() => { localStorage.setItem("it_week",String(currentWeek)); },[currentWeek]);
 
   useEffect(() => {
@@ -1342,24 +1400,20 @@ function GymApp() {
     setCoachRutinaMenuOpen(false);
   }, [alumnoActivo?.id]);
 
-  const R = 26; const circ = 2*Math.PI*R;
-
   const startTimer = (secs, color) => {
-    if(timerRef.current) clearInterval(timerRef.current);
-    const endAt = Date.now() + secs * 1000;
-    setTimer({total:secs, remaining:secs, color, endAt});
-    timerRef.current = setInterval(()=>{
-      const rem = Math.max(0, Math.round((endAt - Date.now()) / 1000));
-      setTimer(prev=>{
-        if(!prev) return null;
-        if(rem <= 0){
-          clearInterval(timerRef.current);
-          toast2(es?"¡Pausa lista! 💪":"Rest done! 💪");
-          return null;
-        }
-        return {...prev, remaining:rem};
-      });
-    }, 500); // cada 500ms para mayor precisión
+    if (secs <= 0) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setTimer(null);
+      return;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setTimer({ total: secs, color, endAt: Date.now() + secs * 1000 });
   };
 
   const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe) => {
@@ -1705,17 +1759,15 @@ function GymApp() {
         </div>
       </div>
       {timer&&!session&&(
-        <div style={{background:bgSub,borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),padding:"8px 16px",display:"flex",alignItems:"center",gap:12}}>
-          <svg width={52} height={52} style={{flexShrink:0}}>
-            <circle cx={26} cy={26} r={R} fill="none" stroke="#2D4057" strokeWidth={3}/>
-            <circle cx={26} cy={26} r={R} fill="none" stroke={timer.remaining<10?"#2563EB":timer.color||"#22C55E"} strokeWidth={3}
-              strokeDasharray={circ} strokeDashoffset={circ*(1-timer.remaining/timer.total)}
-              style={{transform:"rotate(-90deg)",transformOrigin:"center",transition:"stroke-dashoffset .8s"}}/>
-            <text x={26} y={30} textAnchor="middle" fill="#FFFFFF" fontSize={13} fontWeight={700}>{fmt(timer.remaining)}</text>
-          </svg>
-          <span style={{color:textMuted,fontSize:15,flex:1}}>Pausa activa</span>
-          <button className="hov" style={{...btn("#2563EB33"),color:"#2563EB",padding:"4px 8px",fontSize:15}} onClick={()=>{clearInterval(timerRef.current);setTimer(null);}}>Cancelar</button>
-        </div>
+        <AlumnoRestTimerBar
+          timer={timer}
+          bgSub={bgSub}
+          darkMode={darkMode}
+          textMuted={textMuted}
+          btn={btn}
+          fmt={fmt}
+          onCancel={() => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } setTimer(null); }}
+        />
       )}
 
       <div
@@ -1723,9 +1775,20 @@ function GymApp() {
         onScroll={e=>{
           const y = e.target.scrollTop;
           const dir = y > lastScrollY.current;
-          if(dir && y > 60 && !headerCollapsed) setHeaderCollapsed(true);
-          if(!dir && y < 20 && headerCollapsed) setHeaderCollapsed(false);
+          var nextCollapsed = headerCollapsedRef.current;
+          if(dir && y > 60 && !headerCollapsedRef.current) nextCollapsed = true;
+          if(!dir && y < 20 && headerCollapsedRef.current) nextCollapsed = false;
           lastScrollY.current = y;
+          if(nextCollapsed === headerCollapsedRef.current) return;
+          headerCollapsedRef.current = nextCollapsed;
+          var exp = studentHeaderExpandRef.current;
+          var mini = studentHeaderMiniRef.current;
+          if(exp) {
+            exp.style.maxHeight = nextCollapsed ? "0px" : "500px";
+            exp.style.opacity = nextCollapsed ? "0" : "1";
+            exp.style.marginBottom = nextCollapsed ? "0px" : "10px";
+          }
+          if(mini) mini.style.display = nextCollapsed ? "flex" : "none";
         }}
         style={{padding:"12px 16px",overflowY:"auto",height:"calc(100dvh - 130px)",paddingBottom:100,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth",background:darkMode?"#0B1120":"#F1F5F9"}}>
         {tab==="plan"&&esAlumno&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
@@ -1797,12 +1860,17 @@ function GymApp() {
               const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeek)));
               return (
                 <div style={{marginBottom:16}}>
-                  <div style={{
+                  <div ref={(el) => {
+                    studentHeaderExpandRef.current = el;
+                    if (el) {
+                      var c = headerCollapsedRef.current;
+                      el.style.maxHeight = c ? "0px" : "500px";
+                      el.style.opacity = c ? "0" : "1";
+                      el.style.marginBottom = c ? "0px" : "10px";
+                    }
+                  }} style={{
                     overflow:"hidden",
-                    maxHeight:headerCollapsed?"0px":"500px",
-                    opacity:headerCollapsed?0:1,
                     transition:"max-height 0.35s cubic-bezier(.4,0,.2,1), opacity 0.25s ease",
-                    marginBottom:headerCollapsed?0:10
                   }}>
                   <div style={{marginBottom:12}}>
                     <div style={{fontSize:13,color:textMuted,fontWeight:500,letterSpacing:0.3}}>
@@ -1941,9 +2009,12 @@ function GymApp() {
                     </div>
                   )}
                   </div>
-                  {headerCollapsed&&(
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                      marginBottom:8,animation:"fadeIn 0.2s ease"}}>
+                  <div ref={(el) => {
+                    studentHeaderMiniRef.current = el;
+                    if (el) el.style.display = headerCollapsedRef.current ? "flex" : "none";
+                  }} style={{
+                    alignItems:"center",justifyContent:"space-between",
+                    marginBottom:8,animation:"fadeIn 0.2s ease"}}>
                       <div style={{fontSize:15,fontWeight:700,color:textMain}}>
                         {sessionData?.name?.split(" ")[0]||"Atleta"}
                       </div>
@@ -1963,7 +2034,6 @@ function GymApp() {
                       )}
                       {yaEntrenoHoy&&<span style={{fontSize:13,color:"#22C55E",fontWeight:600}}>✅ {es?"Listo hoy":"Done today"}</span>}
                     </div>
-                  )}
                   <div style={{display:"none"}}/>
                 </div>
               );
