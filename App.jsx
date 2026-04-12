@@ -14,6 +14,9 @@ import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboard from './components/CoachDashboard';
 import IronTrackLogo from './components/IronTrackLogo.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
+import SettingsPage from './components/settings/SettingsPage.jsx';
+import { applyItPrefsToDocument } from './components/settings/SectionPreferencias.jsx';
+import { supabase } from './lib/supabaseClient.js';
 
 
 const PATS = {
@@ -368,6 +371,14 @@ const sb = {
   setVideoOverride: async (ejercicioId, url) => {
     try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
     try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
+  },
+  getEntrenador: (id) => sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal")+"&select=*"),
+  updateEntrenador: (id, data) => {
+    var clean = {};
+    if (data && typeof data === "object") {
+      Object.keys(data).forEach(function(k){ if(data[k] !== undefined) clean[k] = data[k]; });
+    }
+    return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
   },
 };
 
@@ -928,6 +939,140 @@ function GymApp() {
     };
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  useEffect(function(){
+    try {
+      var raw = localStorage.getItem("it_prefs");
+      if(!raw) return;
+      var p = JSON.parse(raw);
+      applyItPrefsToDocument(p);
+      if(p.lang === "es" || p.lang === "en") { setLang(p.lang); localStorage.setItem("it_lang", p.lang); }
+      if(p.theme === "night") { setDarkMode(true); localStorage.setItem("it_dark", "true"); }
+      else if(p.theme === "day") { setDarkMode(false); localStorage.setItem("it_dark", "false"); }
+      else if(p.theme === "system") {
+        var d = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        setDarkMode(d); localStorage.setItem("it_dark", d ? "true" : "false");
+      }
+    } catch(e) {}
+  }, []);
+
+  // ── Supabase Auth: fila mínima en `entrenadores` (id = auth.users.id) ──
+  useEffect(function () {
+    if (!supabase) return;
+    var cancelled = false;
+
+    function upsertEntrenador(user) {
+      if (cancelled || !user || !user.id) return;
+      supabase
+        .from('entrenadores')
+        .upsert({ id: user.id, email: user.email ?? null }, { onConflict: 'id' })
+        .then(function (result) {
+          if (result.error) console.error('[entrenadores upsert]', result.error);
+        });
+    }
+
+    supabase.auth.getUser().then(function (result) {
+      if (cancelled) return;
+      if (result.error) {
+        console.error('[supabase.auth.getUser]', result.error);
+        return;
+      }
+      if (result.data && result.data.user) upsertEntrenador(result.data.user);
+    });
+
+    var sub = supabase.auth.onAuthStateChange(function (event, session) {
+      if (cancelled) return;
+      if (event === 'INITIAL_SESSION') return;
+      if (session && session.user) upsertEntrenador(session.user);
+    });
+
+    return function () {
+      cancelled = true;
+      try {
+        if (sub && sub.data && sub.data.subscription) sub.data.subscription.unsubscribe();
+      } catch (e) {}
+    };
+  }, []);
+
+  // ── Cargar datos del coach desde `entrenadores` (Supabase); fallback localStorage ──
+  useEffect(function () {
+    if (!supabase) return;
+    var cancelled = false;
+
+    (async function () {
+      try {
+        var authRes = await supabase.auth.getUser();
+        if (authRes.error) {
+          console.error('[App] coach entrenadores getUser', authRes.error);
+          return;
+        }
+        var u = authRes.data && authRes.data.user;
+        if (!u || !u.id) return;
+
+        var q = await supabase.from('entrenadores').select('*').eq('id', u.id).maybeSingle();
+        if (q.error) {
+          console.error('[App] coach entrenadores select', q.error);
+          return;
+        }
+        var row = q.data;
+        if (cancelled) return;
+        if (!row) return;
+
+        setSessionData(function (prev) {
+          if (cancelled) return prev;
+          if (!prev || prev.role !== 'entrenador') return prev;
+          var next = Object.assign({}, prev, {
+            email: row.email || u.email || prev.email,
+            entrenadorId: u.id,
+          });
+          if (row.nombre) next.name = row.nombre;
+          if (row.titulo_profesional != null) next.titulo = row.titulo_profesional;
+          if (row.telefono != null) next.phone = row.telefono;
+          else if (row.telefono_comercial != null) next.phone = row.telefono_comercial;
+          if (row.avatar_url != null) next.avatarUrl = row.avatar_url;
+          try {
+            localStorage.setItem('it_session', JSON.stringify(next));
+          } catch (e) {
+            console.error('[App] coach it_session persist', e);
+          }
+          return next;
+        });
+
+        try {
+          var exNeg = null;
+          try {
+            exNeg = JSON.parse(localStorage.getItem('it_coach_negocio') || 'null');
+          } catch (e0) {}
+          if (!exNeg || typeof exNeg !== 'object') exNeg = {};
+          var disp = row.disponibilidad_json;
+          if (typeof disp === 'string') {
+            try {
+              disp = JSON.parse(disp);
+            } catch (e1) {
+              disp = null;
+            }
+          }
+          var merged = Object.assign({}, exNeg);
+          if (row.nombre_gimnasio != null) merged.nombre_gimnasio = row.nombre_gimnasio;
+          if (row.telefono_comercial != null) merged.telefono_comercial = row.telefono_comercial;
+          if (row.capacidad_max != null) merged.capacidad_max = Number(row.capacidad_max);
+          if (row.moneda) merged.moneda = row.moneda;
+          if (Array.isArray(disp) && disp.length === 7) merged.disponibilidad = disp;
+          if (typeof merged.capacidad_max !== 'number' || isNaN(merged.capacidad_max)) merged.capacidad_max = 30;
+          if (!merged.moneda) merged.moneda = 'ARS';
+          localStorage.setItem('it_coach_negocio', JSON.stringify(merged));
+        } catch (e2) {
+          console.error('[App] coach it_coach_negocio merge', e2);
+        }
+      } catch (e) {
+        console.error('[App] coach entrenadores load', e);
+      }
+    })();
+
+    return function () {
+      cancelled = true;
+    };
   }, []);
 
   // ── Detectar online/offline y sincronizar cola ─────────────────────────
@@ -2891,14 +3036,32 @@ function GymApp() {
           </div>
         </div>
       )}
-      {settingsOpen&&(
-        <div style={{position:"fixed",inset:0,background:esAlumno?"rgba(10,22,40,.75)":"rgba(0,0,0,.88)",backdropFilter:esAlumno?"blur(12px)":undefined,WebkitBackdropFilter:esAlumno?"blur(12px)":undefined,zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+      {settingsOpen && !esAlumno && sessionData && (
+        <SettingsPage
+          coach={sessionData}
+          onClose={()=>setSettingsOpen(false)}
+          toast2={toast2}
+          setSessionData={setSessionData}
+          syncStateWithLocalStorage={syncStateWithLocalStorage}
+          lang={lang}
+          setLang={setLang}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          es={es}
+          alumnosCount={alumnos.length}
+          rutinasActivasCount={rutinasSBEntrenador.length}
+          sesionesGlobales={sesionesGlobales}
+          sb={sb}
+          entrenadorId={sessionData.entrenadorId || "entrenador_principal"}
+        />
+      )}
+      {settingsOpen && esAlumno && (
+        <div style={{position:"fixed",inset:0,background:"rgba(10,22,40,.75)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
           onClick={()=>setSettingsOpen(false)}>
-          <div style={{background:esAlumno?"#0a1628":bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px 36px",width:"100%",maxWidth:480,border:esAlumno?"1px solid rgba(59,130,246,.2)":"1px solid "+border,animation:"slideUpFade 0.3s ease",maxHeight:"92dvh",overflowY:"auto"}}
+          <div style={{background:"#0a1628",borderRadius:"16px 16px 0 0",padding:"20px 16px 36px",width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.2)",animation:"slideUpFade 0.3s ease",maxHeight:"92dvh",overflowY:"auto"}}
             onClick={e=>e.stopPropagation()}>
-            <div style={{width:40,height:4,background:esAlumno?"#3b82f6":"#2D4057",borderRadius:2,margin:"0 auto 20px"}}/>
-            <div style={{fontSize:18,fontWeight:800,letterSpacing:1,marginBottom:20,color:esAlumno?"#fff":textMain}}><Ic name="settings" size={18} color="#3b82f6"/> {es?"CONFIGURACIÓN":"SETTINGS"}</div>
-            {esAlumno ? (
+            <div style={{width:40,height:4,background:"#3b82f6",borderRadius:2,margin:"0 auto 20px"}}/>
+            <div style={{fontSize:18,fontWeight:800,letterSpacing:1,marginBottom:20,color:"#fff"}}><Ic name="settings" size={18} color="#3b82f6"/> {es?"CONFIGURACIÓN":"SETTINGS"}</div>
               <>
                 <div style={{marginBottom:22}}>
                   <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{es?"APARIENCIA":"APPEARANCE"}</div>
@@ -2945,38 +3108,8 @@ function GymApp() {
                   </button>
                 </div>
               </>
-            ) : (
-              <>
-                <div style={{marginBottom:24}}>
-                  <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:2,marginBottom:8}}>IDIOMA</div>
-                  <div style={{display:"flex",background:bgSub,border:"1px solid "+border,borderRadius:12,padding:4,gap:4}}>
-                    {["es","en"].map(l=>(
-                      <button key={l} className="hov"
-                        style={{flex:1,padding:"8px",border:"none",borderRadius:8,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",
-                          background:lang===l?"#2563EB":"transparent",color:lang===l?"#fff":"#8B9AB2"}}
-                        onClick={()=>{setLang(l);localStorage.setItem("it_lang",l);}}>
-                        {l==="es"?"🇦🇷 ESPAÑOL":"🇺🇸 ENGLISH"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div style={{marginBottom:24}}>
-                  <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:2,marginBottom:8}}>TEMA</div>
-                  <div style={{display:"flex",background:bgSub,border:"1px solid "+border,borderRadius:12,padding:4,gap:4}}>
-                    {[["dark","NOCHE",true],["light","DÍA",false]].map(([k,lbl,val])=>(
-                      <button key={k} className="hov"
-                        style={{flex:1,padding:"8px",border:"none",borderRadius:8,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",
-                          background:darkMode===val?"#2563EB":"transparent",color:darkMode===val?"#fff":"#8B9AB2"}}
-                        onClick={()=>{setDarkMode(val);localStorage.setItem("it_dark",val?"true":"false");}}>
-                        {lbl}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
             <button className="hov"
-              style={{width:"100%",padding:"12px",marginTop:16,background:esAlumno?"rgba(148,163,184,.12)":(darkMode?"#162234":"#E2E8F0"),border:esAlumno?"1px solid rgba(148,163,184,.2)":"none",borderRadius:12,color:esAlumno?"#cbd5e1":textMuted,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
+              style={{width:"100%",padding:"12px",marginTop:16,background:"rgba(148,163,184,.12)",border:"1px solid rgba(148,163,184,.2)",borderRadius:12,color:"#cbd5e1",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
               onClick={()=>setSettingsOpen(false)}>
               {es?"CERRAR":"CLOSE"}
             </button>

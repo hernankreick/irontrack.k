@@ -1,0 +1,9 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap");
+@import "tailwindcss";
+
+/* Evitar que Preflight resetee estilos legacy del resto de la app (inline styles en App.jsx). */
+@layer base {
+  #root * {
+    box-sizing: border-box;
+  }
+}
