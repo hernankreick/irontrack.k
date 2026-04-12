@@ -1,4 +1,6 @@
 import React, { useMemo } from "react";
+import { Ic } from "./Ic.jsx";
+import IronTrackLogo from "./IronTrackLogo.jsx";
 
 const S = {
   root: {
@@ -9,25 +11,18 @@ const S = {
     paddingBottom: 100,
     minHeight: "100%",
     boxSizing: "border-box",
+    maxWidth: "480px",
+    width: "100%",
+    margin: "0 auto",
   },
   header: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
     paddingTop: 8,
     paddingBottom: 16,
-  },
-  headerBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.06)",
-    background: "#141820",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    color: "#F1F5F9",
+    minHeight: 44,
   },
   greeting: {
     fontSize: 26,
@@ -59,18 +54,6 @@ const S = {
     display: "flex",
     alignItems: "center",
     gap: 6,
-  },
-  alertsScroll: {
-    display: "flex",
-    gap: 12,
-    overflowX: "auto",
-    paddingBottom: 6,
-    marginLeft: -16,
-    marginRight: -16,
-    paddingLeft: 16,
-    paddingRight: 16,
-    scrollbarWidth: "none",
-    msOverflowStyle: "none",
   },
   bottomNav: {
     position: "fixed",
@@ -109,39 +92,6 @@ const MOCK_TEAM = [
   { id: 2, name: "Agustín Torres", initials: "AT", status: "En progreso", color: "#F59E0B", pct: 45 },
   { id: 3, name: "Sofía Gómez", initials: "SG", status: "Sin actividad", color: "#EF4444", pct: 0 },
 ];
-
-function IconMenu() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-      <line x1="4" y1="6" x2="20" y2="6" />
-      <line x1="4" y1="12" x2="20" y2="12" />
-      <line x1="4" y1="18" x2="20" y2="18" />
-    </svg>
-  );
-}
-
-function IconBell() {
-  return (
-    <span style={{ position: "relative", display: "inline-flex" }}>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-      </svg>
-      <span
-        style={{
-          position: "absolute",
-          top: 2,
-          right: 2,
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: "#EF4444",
-          border: "2px solid #141820",
-        }}
-      />
-    </span>
-  );
-}
 
 function IconInfo() {
   return (
@@ -215,49 +165,6 @@ function IconTrophy() {
       <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
       <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
       <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-    </svg>
-  );
-}
-
-function IconHome({ active }) {
-  const c = active ? "#2563EB" : "currentColor";
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  );
-}
-
-function IconCalendar({ active }) {
-  const c = active ? "#2563EB" : "currentColor";
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-
-function IconDumbbell({ active }) {
-  const c = active ? "#2563EB" : "currentColor";
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M6.5 6.5h3v11h-3a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z" />
-      <path d="M14.5 6.5h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3v-11z" />
-      <line x1="9.5" y1="12" x2="14.5" y2="12" />
-    </svg>
-  );
-}
-
-function IconPerson({ active }) {
-  const c = active ? "#2563EB" : "currentColor";
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
     </svg>
   );
 }
@@ -395,6 +302,8 @@ export default function CoachDashboard({
   onEnviarMensaje,
   onCrearRutina,
   onRevisarAlumnos,
+  coachAvatarUrl,
+  coachName,
 }) {
   const gradId = useMemo(() => "wk-grad-" + Math.random().toString(36).slice(2, 9), []);
   const ringAnimId = useMemo(() => "coachWkRing_" + Math.random().toString(36).slice(2, 9), []);
@@ -409,10 +318,10 @@ export default function CoachDashboard({
   const alerts = MOCK_ALERTS;
 
   const navItems = [
-    { key: "dashboard", label: "Dashboard", Icon: IconHome },
-    { key: "routines", label: "Rutinas", Icon: IconCalendar },
-    { key: "exercises", label: "Ejercicios", Icon: IconDumbbell },
-    { key: "alumnos", label: "Alumnos", Icon: IconPerson },
+    { key: "dashboard", label: "Dashboard", ic: "bar-chart-2" },
+    { key: "routines", label: "Rutinas", ic: "file-text" },
+    { key: "exercises", label: "Ejercicios", ic: "activity" },
+    { key: "alumnos", label: "Alumnos", ic: "users" },
   ];
 
   const dayBars = [
@@ -430,17 +339,85 @@ export default function CoachDashboard({
     <div style={S.root}>
       <style>
         {`
-          .coach-dash-alerts::-webkit-scrollbar { display: none; }
+          .coach-dash-alerts {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-behavior: smooth;
+            scroll-snap-type: x mandatory;
+            margin-left: -16px;
+            margin-right: -16px;
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-bottom: 6px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+          .coach-dash-alerts::-webkit-scrollbar {
+            display: none;
+            height: 0;
+          }
+          .coach-dash-alert-card {
+            scroll-snap-align: start;
+          }
+          @media (min-width: 768px) {
+            .coach-dash-alerts {
+              scrollbar-width: thin;
+              scrollbar-color: rgba(148, 163, 184, 0.45) rgba(255, 255, 255, 0.06);
+              padding-right: 36px;
+              padding-bottom: 10px;
+            }
+            .coach-dash-alerts::-webkit-scrollbar {
+              display: block;
+              height: 8px;
+            }
+            .coach-dash-alerts::-webkit-scrollbar-track {
+              background: rgba(255, 255, 255, 0.06);
+              border-radius: 4px;
+              margin: 0 4px;
+            }
+            .coach-dash-alerts::-webkit-scrollbar-thumb {
+              background: rgba(148, 163, 184, 0.35);
+              border-radius: 4px;
+            }
+            .coach-dash-alerts::-webkit-scrollbar-thumb:hover {
+              background: rgba(148, 163, 184, 0.55);
+            }
+          }
         `}
       </style>
 
       <header style={S.header}>
-        <button type="button" style={S.headerBtn} aria-label="Menu">
-          <IconMenu />
-        </button>
-        <button type="button" style={S.headerBtn} aria-label="Notificaciones">
-          <IconBell />
-        </button>
+        <IronTrackLogo size={22} color="#2563EB" showBar={true} mode="Modo entrenador" modeColor="#2563EB" />
+        {(coachAvatarUrl || coachName) ? (
+          <div
+            role="img"
+            aria-label={coachName ? "Entrenador " + coachName : "Avatar"}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              overflow: "hidden",
+              flexShrink: 0,
+              background: "linear-gradient(135deg,#1E3A5F,#2563EB)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 13,
+              fontWeight: 800,
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            {coachAvatarUrl ? (
+              <img src={coachAvatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              (coachName || "?").slice(0, 2).toUpperCase()
+            )}
+          </div>
+        ) : null}
       </header>
 
       <div style={S.greeting}>Hola, Coach</div>
@@ -501,10 +478,11 @@ export default function CoachDashboard({
         <IconStar />
         Alertas inteligentes
       </div>
-      <div className="coach-dash-alerts" style={S.alertsScroll}>
+      <div className="coach-dash-alerts">
         {alerts.map((a) => (
           <div
             key={a.id}
+            className="coach-dash-alert-card"
             style={{
               minWidth: 260,
               maxWidth: 280,
@@ -761,7 +739,7 @@ export default function CoachDashboard({
       </div>
 
       <nav style={S.bottomNav}>
-        {navItems.map(({ key, label, Icon }) => {
+        {navItems.map(({ key, label, ic }) => {
           const active = activeNav === key;
           return (
             <button
@@ -774,7 +752,7 @@ export default function CoachDashboard({
               }}
               onClick={() => setActiveNav && setActiveNav(key)}
             >
-              <Icon active={active} />
+              <Ic name={ic} size={20} color={active ? "#2563EB" : "#8B9AB2"} />
               <span style={{ fontSize: 10, fontWeight: active ? 800 : 600 }}>{label}</span>
               <span
                 style={{

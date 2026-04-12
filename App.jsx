@@ -12,6 +12,7 @@ import { fmt, fmtP } from './lib/timeFormat.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboard from './components/CoachDashboard';
+import IronTrackLogo from './components/IronTrackLogo.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 
 
@@ -635,20 +636,6 @@ return(
 
 
 
-
-const IronTrackLogo = ({size=28, color="#2563EB", showBar=true, mode=null, modeColor="#22C55E"}) => (
-  <div style={{display:"flex",flexDirection:"column",gap:2}}>
-    <div style={{display:"flex",alignItems:"center",gap:showBar?8:0}}>
-      {showBar&&<div style={{width:4,height:size*1.1,background:color,borderRadius:2,flexShrink:0}}/>}
-      <span style={{
-        fontSize:size,fontWeight:900,letterSpacing:size>22?3:2,color,
-        fontFamily:"'Barlow Condensed','Arial Black',sans-serif",
-        lineHeight:1,textTransform:"uppercase"
-      }}>IRON<br/>TRACK</span>
-    </div>
-    {mode&&<div style={{fontSize:11,color:modeColor,fontWeight:700,letterSpacing:2,textTransform:"uppercase",marginLeft:showBar?12:0}}>{mode}</div>}
-  </div>
-);
 
 const IconPlan = ({size=20, color="currentColor"}) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1569,6 +1556,8 @@ function GymApp() {
             {!esAlumno&&sessionData?.role==="entrenador"&&(
               <CoachDashboard
                 alumnos={alumnos}
+                coachAvatarUrl={sessionData?.avatarUrl}
+                coachName={sessionData?.name}
                 activeNav="dashboard"
                 setActiveNav={function(nav){
                   if(nav==="dashboard") setTab("plan");
