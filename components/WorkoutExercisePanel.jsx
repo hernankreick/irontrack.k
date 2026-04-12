@@ -1,7 +1,7 @@
 import React from 'react';
 import { Ic } from './Ic.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
-import { resolveExerciseTitle, resolveYoutubeUrl } from '../lib/exerciseResolve.js';
+import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
 
 export function WorkoutExercisePanel(props) {
   const {
@@ -63,7 +63,7 @@ export function WorkoutExercisePanel(props) {
   const fmtTime = s => s>=60?Math.floor(s/60)+"m"+(s%60>0?s%60+"s":""):s+"s";
 
   const displayName = resolveExerciseTitle(info, ex, es);
-  const videoUrlResolved = resolveYoutubeUrl(info, ex, videoOverrides);
+  const videoUrlResolved = resolveVideoUrl(info, ex, videoOverrides);
 
   const handleLogSet = () => {
     if(!kg || !reps) return;

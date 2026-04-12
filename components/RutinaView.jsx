@@ -4,6 +4,7 @@ import { Ic } from './Ic.jsx';
 import { DaySection } from './DaySection.jsx';
 import { EditExerciseModal } from './EditExerciseModal.jsx';
 import { emptyDays } from '../lib/routineTemplates.js';
+import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from '../lib/exerciseResolve.js';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -47,7 +48,7 @@ function RutinaCard({
       const payload = {
         nombre: rActual.name,
         alumno_id: rActual.alumno_id || null,
-        datos: { days: rActual.days, alumno: rActual.alumno || '', note: rActual.note || '' },
+        datos: { days: sanitizeRoutineDaysForWrite(rActual.days), alumno: rActual.alumno || '', note: rActual.note || '' },
         entrenador_id: 'entrenador_principal',
       };
       if (rActual.saved) {
@@ -310,15 +311,17 @@ function RutinaCard({
             // Enrich exercises with display name (lookup in allEx by id)
             const enrichList = (list) => (list || []).map(ex => {
               const lib = allEx.find(e => e.id === ex.id);
-              const yt = lib?.youtube || lib?.video_url || ex.youtube || ex.video_url || '';
-              const nm = lib?.name || lib?.nombre || ex.name || ex.nombre || ex.id || '';
+              const vu = pickVideoUrl(lib) || pickVideoUrl(ex);
+              const nm = resolveExerciseTitle(lib || null, ex, es);
+              const nameEnFallback = lib?.nameEn || ex.nameEn || lib?.name || ex.name || nm;
+              const { youtube: _y, videoUrl: _vv, youtube_url: _yu, ...exRest } = ex;
               return {
-                ...ex,
+                ...exRest,
                 id: ex.id || uid(),
                 name: nm,
-                nameEn: lib?.nameEn || lib?.name || ex.nameEn || ex.name || nm,
-                youtube: yt,
-                isCustom: String(ex.id || '').indexOf('custom_') === 0 || !!ex.isCustom,
+                nameEn: nameEnFallback,
+                video_url: vu,
+                isCustom: lib?.isCustom === true || String(ex.id || '').indexOf('custom_') === 0 || !!ex.isCustom,
               };
             });
 
@@ -431,7 +434,7 @@ export function RutinaView(props) {
         const payload = {
           nombre: r.name,
           alumno_id: r.alumno_id || null,
-          datos: { days: r.days, alumno: r.alumno || '', note: r.note || '' },
+          datos: { days: sanitizeRoutineDaysForWrite(r.days), alumno: r.alumno || '', note: r.note || '' },
           entrenador_id: 'entrenador_principal',
         };
         if (r.saved) {
@@ -457,7 +460,7 @@ export function RutinaView(props) {
   const handleModalSave = (formData) => {
     if (!editingExercise) return;
     const { routineId, dayIdx, exercise, bloque } = editingExercise;
-    const updatedEx = { ...exercise, ...formData };
+    const updatedEx = sanitizeExerciseSnapshotForWrite({ ...exercise, ...formData });
 
     setRoutines(p => p.map(rr => rr.id !== routineId ? rr : {
       ...rr,

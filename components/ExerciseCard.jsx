@@ -2,6 +2,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { pickVideoUrl } from '../lib/exerciseResolve.js';
 
 const BLOCK_COLORS = {
   warmup: '#f59e0b',
@@ -27,6 +28,7 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
 
   const color = BLOCK_COLORS[exercise.block] || BLOCK_COLORS.main;
   const summary = compactSummary(exercise);
+  const videoHref = pickVideoUrl(exercise);
 
   return (
     <div
@@ -81,9 +83,9 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
       </div>
 
       {/* Video button */}
-      {exercise.youtube && (
+      {videoHref && (
         <a
-          href={exercise.youtube}
+          href={videoHref}
           target="_blank"
           rel="noreferrer"
           onClick={e => e.stopPropagation()}

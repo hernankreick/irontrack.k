@@ -8,7 +8,7 @@ import { ChatFlotante } from './components/ChatFlotante.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
 import { ROUTINE_TEMPLATES, instantiateTemplate, emptyDays, getTemplateById } from './lib/routineTemplates.js';
 import { getYTVideoId } from './lib/getYTVideoId.js';
-import { resolveExerciseTitle, resolveYoutubeUrl } from './lib/exerciseResolve.js';
+import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVideoUrl, isValidHttpUrlString, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from './lib/exerciseResolve.js';
 import { fmt, fmtP } from './lib/timeFormat.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
@@ -1157,7 +1157,13 @@ function GymApp() {
       })();
     }
   }, []);
-  useEffect(() => { if(!readOnly) localStorage.setItem("it_rt",JSON.stringify(routines)); },[routines]);
+  useEffect(() => {
+    if (readOnly) return;
+    try {
+      const sanitized = routines.map((r) => ({ ...r, days: sanitizeRoutineDaysForWrite(r.days) }));
+      localStorage.setItem("it_rt", JSON.stringify(sanitized));
+    } catch (e) {}
+  }, [routines, readOnly]);
   useEffect(() => { localStorage.setItem("it_pg",JSON.stringify(progress)); },[progress]);
 
   // Recalcular timer cuando el alumno vuelve de background
@@ -1218,7 +1224,12 @@ function GymApp() {
     }
   }, [sessionData?.alumnoId]);
   useEffect(() => { localStorage.setItem("it_cd",JSON.stringify(completedDays)); },[completedDays]);
-  useEffect(() => { localStorage.setItem("it_cex",JSON.stringify(customEx)); },[customEx]);
+  useEffect(() => {
+    try {
+      const sanitized = (customEx || []).map(sanitizeExerciseSnapshotForWrite);
+      localStorage.setItem("it_cex", JSON.stringify(sanitized));
+    } catch (e) {}
+  }, [customEx]);
   // Cargar config de pagos desde Supabase
   useEffect(() => {
     sb.getConfig().then(res => {
@@ -1239,17 +1250,18 @@ function GymApp() {
         var exs = res.map(function(e){
           var rawName = e.name != null && e.name !== "" ? e.name : (e.nombre != null ? e.nombre : "");
           var rawEn = e.name_en != null && e.name_en !== "" ? e.name_en : (e.nameEn != null ? e.nameEn : rawName);
-          var rawYt = e.youtube || e.video_url || e.youtube_url || e.videoUrl || "";
+          var rawVu = (e.video_url || e.youtube || e.youtube_url || e.videoUrl || "").trim();
+          var vuStore = rawVu && isValidHttpUrlString(rawVu) ? rawVu : null;
+          var isCust = e.is_custom != null ? !!e.is_custom : true;
           return {
             id: e.id,
             name: rawName,
             nameEn: rawEn || rawName,
-            nombre: rawName,
             pattern: e.pattern || "empuje",
             muscle: e.muscle || "",
             equip: e.equip || "Libre",
-            youtube: rawYt,
-            isCustom: true,
+            video_url: vuStore,
+            isCustom: isCust,
           };
         });
         setCustomEx(function(prev){
@@ -1423,7 +1435,11 @@ function GymApp() {
   const btn=(col,txt)=>({background:col||(darkMode?"#2D4057":"#E2E8F0"),color:txt||(darkMode?"#FFFFFF":"#0F1923"),border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",letterSpacing:1});
   const tag=(col)=>({background:"#162234",color:"#8B9AB2",border:"1px solid #2D4057",borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700});
 
-  const allEx = React.useMemo(function(){ return [...EX, ...(customEx||[])]; }, [customEx]);
+  const allEx = React.useMemo(function () {
+    var catalog = EX.map(function (e) { return normalizeLibraryExercise(e, { catalog: true }); });
+    var custom = (customEx || []).map(function (e) { return normalizeLibraryExercise(e, { catalog: false }); });
+    return catalog.concat(custom);
+  }, [customEx]);
   const filteredEx = allEx.filter(e=>{
     const q=search.toLowerCase();
     if(filterPat && e.pattern!==filterPat) return false;
@@ -1461,7 +1477,7 @@ function GymApp() {
         rows.push({type:"warmup-header"});
         d.warmup.forEach((ex,ei) => {
           const inf = allEx.find(e=>e.id===ex.id);
-          const exName = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : (ex.name || ex.id || "Ejercicio");
+          const exName = resolveExerciseTitle(inf || null, ex, es);
           const wks = weeks4.map(wi => {
             const w = (ex.weeks||[])[wi]||{};
             return {s:w.sets||ex.sets||"-", r:w.reps||ex.reps||"-", kg:w.kg||ex.kg||"", note:w.note||"", filled:!!(w.sets||w.reps||w.kg), active:wi===currentWeek};
@@ -1475,7 +1491,7 @@ function GymApp() {
           const inf = allEx.find(e=>e.id===ex.id);
           const pat = inf?.pattern||"empuje";
           const col = patColors[pat]||"#2563EB";
-          const exName = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : (ex.name || ex.id || "Ejercicio");
+          const exName = resolveExerciseTitle(inf || null, ex, es);
           const wks = weeks4.map(wi => {
             const w = (ex.weeks||[])[wi]||{};
             return {s:w.sets||ex.sets||"-", r:w.reps||ex.reps||"-", kg:w.kg||ex.kg||"", note:w.note||"", filled:!!(w.sets||w.reps||w.kg), active:wi===currentWeek};
@@ -1979,7 +1995,7 @@ function GymApp() {
                     const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
                     const totalEj=((d.warmup||[]).length+(d.exercises||[]).length);
                     const isOpen=expandedPlanDay===r.id+"-"+di;
-                    const exNames=(d.exercises||[]).slice(0,3).map(function(ex){var inf=allEx.find(function(e){return e.id===ex.id});var nombre=inf?(es?inf.name:(inf.nameEn||inf.name)):(ex.name||ex.id||"Ejercicio");return nombre}).join(", ");
+                    const exNames=(d.exercises||[]).slice(0,3).map(function(ex){var inf=allEx.find(function(e){return e.id===ex.id});return resolveExerciseTitle(inf||null,ex,es);}).join(", ");
 
                     return(
                       <div key={r.id+"-plan-day-"+di} style={{background:bgCard,border:"1px solid "+(isNextDay?"#2563EB":isDayDone?"#22C55E44":border),borderRadius:12,marginBottom:8,overflow:"hidden"}}>
@@ -2013,8 +2029,8 @@ function GymApp() {
                                 </div>
                                 {(d.warmup||[]).map(function(ex,ei){
                                   var inf=allEx.find(function(e){return e.id===ex.id});
-                                  var nombre=inf?(es?inf.name:(inf.nameEn||inf.name)):(ex.name||ex.id||"Ejercicio");
-                                  var vUrl=(videoOverrides&&videoOverrides[ex.id])||inf?.youtube||"";
+                                  var nombre=resolveExerciseTitle(inf||null,ex,es);
+                                  var vUrl=resolveVideoUrl(inf||null,ex,videoOverrides);
                                   return(
                                     <div key={r.id+"-d"+di+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
                                       <div style={{width:3,height:20,borderRadius:2,background:"#F59E0B44",flexShrink:0}}/>
@@ -2033,8 +2049,8 @@ function GymApp() {
                               </div>
                               {d.exercises.map(function(ex,ei){
                                 var inf=allEx.find(function(e){return e.id===ex.id});
-                                var nombre=inf?(es?inf.name:(inf.nameEn||inf.name)):(ex.name||ex.id||"Ejercicio");
-                                var vUrl=(videoOverrides&&videoOverrides[ex.id])||inf?.youtube||"";
+                                var nombre=resolveExerciseTitle(inf||null,ex,es);
+                                var vUrl=resolveVideoUrl(inf||null,ex,videoOverrides);
                                 var w=((ex.weeks||[])[currentWeek])||{};
                                 var s=w.sets||ex.sets||"-";
                                 var rp=w.reps||ex.reps||"-";
@@ -2698,7 +2714,7 @@ function GymApp() {
                                       <div>
                                         {(dSel.warmup||[]).map((ex,ei)=>{
                                           const exInfo=allEx.find(e=>e.id===ex.id);
-                                          const nombre=exInfo?(es?exInfo.name:(exInfo.nameEn||exInfo.name)):(ex.name||ex.id||"Ejercicio");
+                                          const nombre=resolveExerciseTitle(exInfo||null,ex,es);
                                           return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.warmup||[]).length-1?"1px solid rgba(59,130,246,0.12)":"none"}}>
                                             <div style={{flex:1,fontSize:14,fontWeight:600,color:"#fff"}}>{nombre}</div>
                                             <div style={{fontSize:12,color:"#94a3b8",marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
@@ -2717,7 +2733,7 @@ function GymApp() {
                                   <div>
                                     {(dSel.exercises||[]).map((ex,ei)=>{
                                       const exInfo=allEx.find(e=>e.id===ex.id);
-                                      const nombre=exInfo?(es?exInfo.name:(exInfo.nameEn||exInfo.name)):(ex.name||ex.id||"Ejercicio");
+                                      const nombre=resolveExerciseTitle(exInfo||null,ex,es);
                                       return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.exercises||[]).length-1?"1px solid rgba(59,130,246,0.12)":"none"}}>
                                         <div style={{flex:1,fontSize:15,fontWeight:700,color:"#fff"}}>{nombre}</div>
                                         <div style={{fontSize:12,color:"#94a3b8",marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
@@ -2747,7 +2763,7 @@ function GymApp() {
                       if(!confirm(msg)) return;
                       if(ex){await sb.deleteRutina(ex.id);setRutinasSB(prev=>prev.filter(x=>x.id!==ex.id));}
                       setLoadingSB(true);
-                      const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:rutinaLocal.days,alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
+                      const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:sanitizeRoutineDaysForWrite(rutinaLocal.days||[]),alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
                       setLoadingSB(false);
                     }}>{(rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id))?(<><Ic name="refresh-cw" size={16}/>{es?"Cambiar rutina":"Change routine"}</>):(<><Ic name="plus" size={16}/>{es?"Asignar rutina":"Assign routine"}</>)}</button>
@@ -3610,7 +3626,8 @@ function GymApp() {
       )}
       {editEx&&(
         <EditExModal darkMode={darkMode} key={editEx.rId+"-"+editEx.dIdx+"-"+editEx.eIdx} editEx={editEx} btn={btn} inp={inp} allEx={allEx} es={es} PATS={PATS}
-          onSave={async(updated)=>{
+          onSave={async(updatedRaw)=>{
+            const updated = sanitizeExerciseSnapshotForWrite(updatedRaw);
             const blq = editEx.bloque||"exercises";
             // Actualizar routines locales
             setRoutines(p=>p.map(r=>r.id===editEx.rId?{...r,days:r.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d)}:r));
@@ -3618,7 +3635,7 @@ function GymApp() {
             try {
               const rActual = routines.find(x=>x.id===editEx.rId);
               if(rActual) {
-                const updatedDays = rActual.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
+                const updatedDays = sanitizeRoutineDaysForWrite(rActual.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d));
                 const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
                 else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
@@ -3626,7 +3643,7 @@ function GymApp() {
                 // Buscar en rutinasSB (edición desde vista alumno)
                 const rSB = rutinasSB.find(x=>x.id===editEx.rId);
                 if(rSB) {
-                  const diasActualizados = (rSB.datos?.days||[]).map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
+                  const diasActualizados = sanitizeRoutineDaysForWrite((rSB.datos?.days||[]).map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d));
                   const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:"entrenador_principal"};
                   await sb.updateRutina(rSB.id, payloadSB);
                   setRutinasSB(prev=>prev.map(r=>r.id===rSB.id?{...r,datos:{...r.datos,days:diasActualizados}}:r));
@@ -3926,16 +3943,15 @@ function GymApp() {
             var newExs=ids.map(function(id){
               var ex=allEx.find(function(e){return e.id===id;});
               if(!ex) return null;
-              var yt = ex.youtube || ex.video_url || ex.videoUrl || "";
-              return {
+              var vu = pickVideoUrl(ex);
+              return sanitizeExerciseSnapshotForWrite({
                 id:ex.id,
-                name:ex.name||ex.nombre||"",
-                nameEn:ex.nameEn||ex.name||ex.nombre||"",
-                nombre:ex.nombre||ex.name||"",
-                youtube:yt,
-                isCustom:String(ex.id||"").indexOf("custom_")===0,
+                name:ex.name||"",
+                nameEn:ex.nameEn||ex.name||"",
+                video_url:vu,
+                isCustom: Boolean(ex.isCustom) || String(ex.id||"").indexOf("custom_")===0,
                 sets:"3",reps:"8-10",kg:"",pause:0,note:"",weeks:[],
-              };
+              });
             }).filter(Boolean);
             setRoutines(function(p){return p.map(function(rr){
               if(rr.id!==rId) return rr;
@@ -3947,10 +3963,10 @@ function GymApp() {
             var rSB=rutinasSB.find(function(x){return x.id===rId;});
             if(rSB){
               try{
-                var diasAct=(rSB.datos&&rSB.datos.days?rSB.datos.days:[]).map(function(d,i){
+                var diasAct=sanitizeRoutineDaysForWrite((rSB.datos&&rSB.datos.days?rSB.datos.days:[]).map(function(d,i){
                   if(i!==dIdx) return d;
                   return {...d,[blk]:[...(d[blk]||[]),...newExs]};
-                });
+                }));
                 await sb.updateRutina(rSB.id,{nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:"entrenador_principal"});
                 setRutinasSB(function(prev){return prev.map(function(rw){return rw.id===rSB.id?{...rw,datos:{...rw.datos,days:diasAct}}:rw;});});
               }catch(e){console.error("Add batch save error:",e);}
@@ -4512,7 +4528,11 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
   const textMain = _dm?"#FFFFFF":"#0F1923";
   const textMuted = _dm?"#8B9AB2":"#64748B";
 
-  const allEx = React.useMemo(()=>[...EX,...(customEx||[])],[customEx]);
+  const allEx = React.useMemo(function () {
+    var catalog = EX.map(function (e) { return normalizeLibraryExercise(e, { catalog: true }); });
+    var custom = (customEx || []).map(function (e) { return normalizeLibraryExercise(e, { catalog: false }); });
+    return catalog.concat(custom);
+  }, [customEx]);
   const [tab, setTab] = React.useState(0);
   const [busq, setBusq] = React.useState("");
   const [filtPat, setFiltPat] = React.useState("todos");
@@ -4569,11 +4589,10 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
     if(!editNombre.trim()){toast2(es?"Ingresa un nombre":"Enter a name");return;}
     const isCustom = !!(customEx||[]).find(c=>c.id===editModal.id);
     if(isCustom) {
-      const updated = customEx.map(e=>e.id===editModal.id?{...e,name:editNombre,nombre:editNombre,nameEn:editNombre,youtube:editYT}:e);
+      const updated = customEx.map(e=>e.id===editModal.id?sanitizeExerciseSnapshotForWrite({...e,name:editNombre,nameEn:editNombre,video_url:(editYT||"").trim()}):sanitizeExerciseSnapshotForWrite(e));
       setCustomEx(updated);
-      localStorage.setItem("it_cex", JSON.stringify(updated));
-      // Actualizar en Supabase
-      try { await sb.updateCustomEx(editModal.id, {name:editNombre, name_en:editNombre, youtube:editYT}); } catch(e){}
+      const row = updated.find(c=>c.id===editModal.id);
+      if(row) try { await sb.updateCustomEx(editModal.id, {name:row.name, name_en:row.nameEn, video_url:row.video_url}); } catch(e){}
     }
     // Guardar override de youtube en Supabase
     if(editYT) {
@@ -4587,20 +4606,18 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
   const borrarEjercicio = async (id) => {
     const updated = customEx.filter(e=>e.id!==id);
     setCustomEx(updated);
-    localStorage.setItem("it_cex", JSON.stringify(updated));
     try { await sb.deleteCustomEx(id); } catch(e){}
     setBorrarId(null); toast2(es?"Ejercicio eliminado ✓":"Exercise deleted ✓");
   };
   const agregarEjercicio = async () => {
     if(!newNombre.trim()){toast2(es?"Ingresa un nombre":"Enter a name");return;}
     var muscleStored = newMusKeys.length ? JSON.stringify(BIB_MUSCLE_ORDER.filter(function (k) { return newMusKeys.indexOf(k) >= 0; })) : "";
-    const newEx = {id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, nombre:newNombre, pattern:newPat, muscle:muscleStored, equip:newEquip||"Libre", youtube:newYT, isCustom:true};
+    const newEx = sanitizeExerciseSnapshotForWrite({id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, pattern:newPat, muscle:muscleStored, equip:newEquip||"Libre", video_url:(newYT||"").trim(), isCustom:true});
     const updated = [...(customEx||[]), newEx];
     setCustomEx(updated);
-    localStorage.setItem("it_cex", JSON.stringify(updated));
     // Guardar en Supabase
     try {
-      await sb.addCustomEx({id:newEx.id, name:newEx.name, name_en:newEx.nameEn, pattern:newEx.pattern, muscle:newEx.muscle, equip:newEx.equip, youtube:newEx.youtube, entrenador_id:"entrenador_principal"});
+      await sb.addCustomEx({id:newEx.id, name:newEx.name, name_en:newEx.nameEn, pattern:newEx.pattern, muscle:newEx.muscle, equip:newEx.equip, video_url:newEx.video_url!=null?newEx.video_url:null, entrenador_id:"entrenador_principal"});
     } catch(e){ console.error("[addCustomEx]",e); }
     setNewNombre(""); setNewPat("empuje"); setNewMusKeys([]); setNewEquip(""); setNewYT("");
     setTab(0); toast2(es?"Ejercicio agregado ✓":"Exercise added ✓");
@@ -4706,7 +4723,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
             const isCustom = !!(customEx||[]).find(c=>c.id===e.id);
             const nombre = es?e.name:(e.nameEn||e.name);
             const muscleLine = formatBibMuscleDisplay(e.muscle, es);
-            const ytUrl = ytOverrides[e.id] || e.youtube || "";
+            const ytUrl = resolveVideoUrl(e, null, ytOverrides);
             return (
               <div key={e.id} style={{background:bgCard,border:"1px solid #2D4057",borderRadius:12,padding:"16px",marginBottom:8}}>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -5375,7 +5392,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   var inf = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
                   var rutA = rutinasSB.find(function(r){return r.alumno_id===a.id;});
                   var exR = rutA && rutA.datos && rutA.datos.days ? rutA.datos.days.flatMap(function(d){return [...(d.warmup||[]),...(d.exercises||[])]}).find(function(e){return e.id===entry[0];}) : null;
-                  var nombre = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : ((exR && exR.name) || entry[0] || "Ejercicio");
+                  var nombre = resolveExerciseTitle(inf || null, exR || null, es);
                   return {id:entry[0], nombre:nombre, kg:entry[1].kg};
                 });
 
@@ -5417,7 +5434,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   if(lastSet&&parseFloat(lastSet.kg||0)>=maxKg&&sets.length>1) {
                     const inf = [...EX,...(customEx||[])].find(e=>e.id===exId);
                     const exInfo = (routines.flatMap(r=>r.days||[]).flatMap(d=>[...(d.exercises||[]),...(d.warmup||[])]).find(e=>e?.id===exId));
-                    const nombre = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : ((exInfo && exInfo.name) || exId || "Ejercicio");
+                    const nombre = resolveExerciseTitle(inf || null, exInfo || null, es);
                     if(!prReciente) prReciente = {exId, kg:maxKg, nombre};
                   }
                   if(pct>mejorPct) mejorPct = pct;
@@ -5425,7 +5442,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   if(semanaUltSets.length&&kgSU<kgS1&&!ejercicioCaida) {
                     const inf2 = [...EX,...(customEx||[])].find(e=>e.id===exId);
                     const exInfo2 = routines.flatMap(r=>r.days||[]).flatMap(d=>[...(d.exercises||[]),...(d.warmup||[])]).find(e=>e?.id===exId);
-                    ejercicioCaida = inf2 ? (es ? inf2.name : (inf2.nameEn || inf2.name)) : ((exInfo2 && exInfo2.name) || exId || null);
+                    ejercicioCaida = resolveExerciseTitle(inf2 || null, exInfo2 || null, es);
                   }
                 });
 
@@ -5591,7 +5608,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                             var inf = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
                             var rutA = rutinasSB.find(function(r){return r.alumno_id===a.id;});
                             var exR = rutA && rutA.datos && rutA.datos.days ? rutA.datos.days.flatMap(function(d){return [...(d.warmup||[]),...(d.exercises||[])]}).find(function(e){return e.id===entry[0];}) : null;
-                            var nombre = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : ((exR && exR.name) || entry[0] || "Ejercicio");
+                            var nombre = resolveExerciseTitle(inf || null, exR || null, es);
                             return(
                               <span key={entry[0]} style={{background:bgSub,borderRadius:6,padding:"2px 6px",fontSize:9,color:textMuted,fontWeight:600}}>
                                 {nombre.substring(0,12)} {entry[1].kg}kg×{entry[1].reps}
@@ -5678,7 +5695,7 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
         var nombre = resolveExerciseTitle(info || null, ex, es);
         var musculo = info?.muscle || "";
         var patron = info?.pattern || "";
-        var videoUrl = resolveYoutubeUrl(info || null, ex, videoOverrides);
+        var videoUrl = resolveVideoUrl(info || null, ex, videoOverrides);
         var tieneVideo = !!videoUrl;
         var PAT_COLORS = {rodilla:"#22C55E",bisagra:"#8B9AB2",empuje:"#2563EB",traccion:"#60A5FA",core:"#F59E0B",movilidad:"#A78BFA",cardio:"#EF4444",oly:"#8B9AB2"};
         var barColor = PAT_COLORS[patron] || "#2563EB";
@@ -6533,7 +6550,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
   const textMuted = _dm?"#8B9AB2":"#64748B";
 
   const inf = (allEx||[]).find(e=>e.id===editEx.ex.id);
-  const nombre = inf ? (es ? inf.name : (inf.nameEn || inf.name)) : (editEx.ex.name || editEx.ex.id || "Ejercicio");
+  const nombre = resolveExerciseTitle(inf || null, editEx.ex, es);
   const safePATS = PATS||{};
   const pat = safePATS[inf?.pattern] || safePATS["core"] || Object.values(safePATS)[0] || {color:"#2563EB",icon:"E",label:"Ejercicio"};
   const initWeeks = () => {
