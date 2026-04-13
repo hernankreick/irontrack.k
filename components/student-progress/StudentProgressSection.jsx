@@ -1,0 +1,212 @@
+import React from 'react'
+import { Trophy, Image as ImageIcon, BarChart3, Settings, Calendar, Flame, TrendingUp } from 'lucide-react'
+import IronTrackLogo from '@/components/IronTrackLogo.jsx'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { cn } from '@/lib/utils'
+import { ProgressChartsPanel } from './ProgressChartsPanel.jsx'
+import { ProgressSessionsPanel } from './ProgressSessionsPanel.jsx'
+import { ProgressPhotosPanel } from './ProgressPhotosPanel.jsx'
+import {
+  averageImprovementPercent,
+  computeDayStreak,
+  countPRsThisMonth,
+} from './progressMetrics.js'
+
+/**
+ * Sección Progreso (alumno) — diseño mobile-first tema oscuro.
+ */
+export default function StudentProgressSection({
+  progress,
+  EX,
+  allEx,
+  sesiones,
+  sessionData,
+  sb,
+  sharedParam,
+  es,
+  expectedDaysPerWeek,
+  onSettings,
+  onAvatarClick,
+  esEntrenador = false,
+}) {
+  const [sbData, setSbData] = React.useState([])
+  const [loadingSb, setLoadingSb] = React.useState(true)
+
+  React.useEffect(() => {
+    const alumnoId =
+      sessionData?.alumnoId ||
+      (sharedParam
+        ? (() => {
+            try {
+              return JSON.parse(atob(sharedParam)).alumnoId
+            } catch {
+              return null
+            }
+          })()
+        : null)
+    if (!alumnoId) {
+      setLoadingSb(false)
+      return
+    }
+    sb.getProgreso(alumnoId)
+      .then((prog) => {
+        if (prog) setSbData(prog)
+        setLoadingSb(false)
+      })
+      .catch(() => setLoadingSb(false))
+  }, [sb, sessionData?.alumnoId, sharedParam])
+
+  const stats = React.useMemo(() => {
+    return {
+      totalSessions: sesiones?.length ?? 0,
+      prsThisMonth: countPRsThisMonth(allEx, EX, progress, sbData),
+      streak: computeDayStreak(sesiones, progress),
+      overall: averageImprovementPercent(allEx, EX, progress, sbData),
+    }
+  }, [sesiones, allEx, EX, progress, sbData])
+
+  const initials = (sessionData?.name || 'U').slice(0, 2).toUpperCase()
+
+  return (
+    <div
+      className="student-progress-scope text-[#f0f6ff]"
+      style={{
+        fontFamily:
+          "'Geist Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
+        ['--background']: '#0d1117',
+        ['--foreground']: '#f0f6ff',
+        ['--card']: '#131b2e',
+        ['--border']: '#1e3050',
+        ['--muted']: '#1a2540',
+        ['--muted-foreground']: '#7c8db0',
+        ['--primary']: '#2563eb',
+        ['--success']: '#4ade80',
+        ['--warning']: '#f59e0b',
+      }}
+    >
+      <div className="sticky top-0 z-30 -mx-4 border-b border-[#1e3050] bg-[#0d1117]/95 px-4 py-3 backdrop-blur-md">
+        <div className="mx-auto flex max-w-lg items-start justify-between gap-3">
+          <IronTrackLogo
+            size={20}
+            color="#2563eb"
+            barColor="#4ade80"
+            showBar
+            mode={es ? 'MODO ALUMNO' : 'ATHLETE MODE'}
+            modeColor="#4ade80"
+          />
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-[#1a2540] text-[#7c8db0] transition-colors hover:bg-[#162038]"
+              aria-label={es ? 'Configuración' : 'Settings'}
+              onClick={onSettings}
+            >
+              <Settings className="h-5 w-5" />
+            </button>
+            <button type="button" className="rounded-full p-0" onClick={onAvatarClick} aria-label="Menú usuario">
+              <Avatar className="h-11 w-11 min-h-[44px] min-w-[44px]">
+                <AvatarFallback>{initials}</AvatarFallback>
+              </Avatar>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto mt-4 max-w-lg space-y-5 px-1 pb-6">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            icon={<Calendar className="h-4 w-4 text-[#2563eb]" />}
+            iconBg="bg-[#2563eb]/20"
+            value={stats.totalSessions}
+            label={es ? 'Sesiones' : 'Sessions'}
+            sub={es ? 'Total registradas' : 'Total logged'}
+          />
+          <StatCard
+            icon={<Trophy className="h-4 w-4 text-[#4ade80]" />}
+            iconBg="bg-[#4ade80]/20"
+            value={stats.prsThisMonth}
+            label={es ? 'PRs del mes' : 'PRs this month'}
+            sub={es ? 'Nuevos récords' : 'New records'}
+            highlight
+          />
+          <StatCard
+            icon={<Flame className="h-4 w-4 text-[#2563eb]" />}
+            iconBg="bg-[#2563eb]/20"
+            value={`${stats.streak} ${es ? 'días' : 'days'}`}
+            label={es ? 'Racha' : 'Streak'}
+            sub={es ? 'Seguidos' : 'In a row'}
+          />
+          <StatCard
+            icon={<TrendingUp className="h-4 w-4 text-[#4ade80]" />}
+            iconBg="bg-[#4ade80]/20"
+            value={`${stats.overall > 0 ? '+' : ''}${stats.overall}%`}
+            label={es ? 'Mejora total' : 'Overall Δ'}
+            sub={es ? 'Promedio' : 'Average'}
+            highlight
+          />
+        </div>
+
+        <Tabs defaultValue="graficos" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 rounded-xl">
+            <TabsTrigger value="sesiones" className="gap-1.5">
+              <Trophy className="h-4 w-4" />
+              <span className="hidden sm:inline">{es ? 'Sesiones' : 'Sessions'}</span>
+              <span className="sm:hidden">Ses.</span>
+            </TabsTrigger>
+            <TabsTrigger value="fotos" className="gap-1.5">
+              <ImageIcon className="h-4 w-4" />
+              {es ? 'Fotos' : 'Photos'}
+            </TabsTrigger>
+            <TabsTrigger value="graficos" className="gap-1.5">
+              <BarChart3 className="h-4 w-4" />
+              {es ? 'Gráficos' : 'Charts'}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sesiones" className="sp-fade-in mt-4">
+            <ProgressSessionsPanel
+              sharedParam={sharedParam}
+              sb={sb}
+              EX={EX}
+              es={es}
+              sesiones={sesiones}
+              expectedDaysPerWeek={expectedDaysPerWeek}
+            />
+          </TabsContent>
+
+          <TabsContent value="fotos" className="sp-fade-in mt-4">
+            <ProgressPhotosPanel sharedParam={sharedParam} sb={sb} es={es} esEntrenador={esEntrenador} />
+          </TabsContent>
+
+          <TabsContent value="graficos" className="sp-fade-in mt-4">
+            <ProgressChartsPanel
+              progress={progress}
+              EX={EX}
+              allEx={allEx}
+              es={es}
+              sbData={sbData}
+              loadingSb={loadingSb}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
+}
+
+function StatCard({ icon, iconBg, value, label, sub, highlight }) {
+  return (
+    <div
+      className={cn(
+        'rounded-xl border border-[#1e3050] bg-[#131b2e] p-3 transition-colors hover:bg-[#162038]',
+        highlight && 'animate-pulse-pr border-[#4ade80]/30 bg-[#4ade80]/5'
+      )}
+    >
+      <div className={cn('mb-2 flex h-9 w-9 items-center justify-center rounded-full', iconBg)}>{icon}</div>
+      <div className="text-2xl font-extrabold tabular-nums text-[#f0f6ff]">{value}</div>
+      <div className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-[#f0f6ff]">{label}</div>
+      <div className="mt-0.5 text-[11px] text-[#7c8db0]">{sub}</div>
+    </div>
+  )
+}

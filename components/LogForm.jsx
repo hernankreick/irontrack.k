@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Ic } from './Ic.jsx';
 
 export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onClose, darkMode, PATS}) {
@@ -27,6 +27,45 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
   const rpeLabels={6:es?"Muy facil":"Easy",7:es?"Controlado":"Moderate",8:es?"Exigente":"Hard",9:es?"Muy duro":"Very Hard",10:es?"Al limite":"Max"};
   const kgNum = parseFloat(kg)||0;
   const adjustKg = (delta) => setKg(v=>String(Math.max(0,(parseFloat(v)||0)+delta)));
+  const holdTimer = useRef(null);
+  const holdInterval = useRef(null);
+  const suppressKgClick = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      if (holdInterval.current) clearInterval(holdInterval.current);
+    };
+  }, []);
+
+  const stopKgHold = () => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    if (holdInterval.current) {
+      clearInterval(holdInterval.current);
+      holdInterval.current = null;
+    }
+  };
+
+  const startKgHold = (sign) => {
+    stopKgHold();
+    suppressKgClick.current = false;
+    holdTimer.current = setTimeout(() => {
+      suppressKgClick.current = true;
+      adjustKg(5 * sign);
+      holdInterval.current = setInterval(() => adjustKg(5 * sign), 150);
+    }, 500);
+  };
+
+  const onKgStepClick = (sign) => {
+    if (suppressKgClick.current) {
+      suppressKgClick.current = false;
+      return;
+    }
+    adjustKg(sign);
+  };
 
   return(
     <div style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:"20px 16px 28px",width:"100%"}} onClick={e=>e.stopPropagation()}>
@@ -63,6 +102,17 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
             {lastSet&&<span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{es?"Último":"Last"}: {lastSet.kg}kg</span>}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <button type="button" className="hov"
+              style={{width:48,height:48,background:"#2563EB",border:"none",borderRadius:10,
+                fontSize:22,fontWeight:900,color:"#fff",cursor:"pointer",flexShrink:0,
+                display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}
+              onClick={()=>onKgStepClick(-1)}
+              onPointerDown={()=>startKgHold(-1)}
+              onPointerUp={stopKgHold}
+              onPointerLeave={stopKgHold}
+              onPointerCancel={stopKgHold}
+              aria-label={es?"Menos 1 kg":"Decrease 1 kg"}
+            >−</button>
             <div style={{flex:1,position:"relative"}}>
               <input
                 type="number" value={kg} onChange={e=>setKg(e.target.value)}
@@ -72,16 +122,19 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
                   fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
               <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:14,fontWeight:600,color:"#475569",pointerEvents:"none"}}>kg</span>
             </div>
-            <button className="hov"
+            <button type="button" className="hov"
               style={{width:48,height:48,background:"#2563EB",border:"none",borderRadius:10,
                 fontSize:22,fontWeight:900,color:"#fff",cursor:"pointer",flexShrink:0,
-                display:"flex",alignItems:"center",justifyContent:"center"}}
-              onClick={()=>adjustKg(2.5)}
-              onTouchStart={function(){var self=this;self._ht=setTimeout(function(){adjustKg(5)},400)}}
-              onTouchEnd={function(){clearTimeout(this._ht)}}
-              >+</button>
+                display:"flex",alignItems:"center",justifyContent:"center",touchAction:"manipulation"}}
+              onClick={()=>onKgStepClick(1)}
+              onPointerDown={()=>startKgHold(1)}
+              onPointerUp={stopKgHold}
+              onPointerLeave={stopKgHold}
+              onPointerCancel={stopKgHold}
+              aria-label={es?"Más 1 kg":"Increase 1 kg"}
+            >+</button>
           </div>
-          <div style={{fontSize:9,color:"#374151",marginTop:3}}>{es?"Hold + para +5kg":"Hold + for +5kg"}</div>
+          <div style={{fontSize:9,color:"#374151",marginTop:3}}>{es?"Tocá ±1 kg · mantené ±5 kg":"Tap ±1 kg · hold ±5 kg"}</div>
         </div>
         {/* REPS pills */}
         <div>
