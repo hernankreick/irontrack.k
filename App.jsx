@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { Ic } from './components/Ic.jsx';
 import { LogForm } from './components/LogForm.jsx';
 import { RutinaView } from './components/RutinaView.jsx';
@@ -11,14 +11,17 @@ import { getYTVideoId, getYoutubeEmbedSrc } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
 import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVideoUrl, isValidHttpUrlString, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from './lib/exerciseResolve.js';
 import { fmt, fmtP } from './lib/timeFormat.js';
+import { exportRoutinePdfHtml } from './lib/routinePdfExport.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboard from './components/CoachDashboard';
 import IronTrackLogo from './components/IronTrackLogo.jsx';
+import StudentProgressSection from './components/student-progress/StudentProgressSection.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import SettingsPage from './components/settings/SettingsPage.jsx';
 import { applyItPrefsToDocument } from './components/settings/SectionPreferencias.jsx';
 import { supabase } from './lib/supabaseClient.js';
+import { Calendar as CalNavIcon, Dumbbell, TrendingUp as TrendNavIcon } from 'lucide-react';
 
 
 /** Barra de pausa del alumno (fuera de sesión): el countdown vive aquí para no re-renderizar GymApp cada tick. */
@@ -722,8 +725,65 @@ const IconSettings = ({size=18, color="currentColor"}) => (
   </svg>
 );
 
+/**
+ * ── Plan alumno: diagnóstico scroll / micro-saltos (Chrome mobile) ─────────────────
+ * Se lee una vez al montar (sin setState). Para cambiar flags: localStorage + recarga.
+ *
+ *   localStorage.setItem("it_plan_scroll_diag", JSON.stringify({
+ *     headerCollapseOnScroll: false,
+ *     headerResizeObserver: true,
+ *     hoyCard: true,
+ *     routineMetaPdf: true,
+ *     dayList: true,
+ *     completedTodayBanner: true,
+ *     pagoAlumnoBanner: true,
+ *     planAnimationsGlobalCss: true,
+ *     planHeaderLayerTransitions: false
+ *   })); location.reload();
+ *
+ * Causas típicas ya mitigadas en código (ver también comentarios en plan-main-scroll y scroll handler):
+ * - 100dvh en el área scroll: al mostrar/ocultar la barra de URL, dvh cambia → el contenedor
+ *   cambia de altura y el scroll “salta”. Mitigación: usar 100svh (viewport pequeño, más estable).
+ * - Colapso del header a ~60px de scroll: coincide con cruzar HOY → Día 1; transform+opacity
+ *   animados compiten con el gesto. Mitigación: umbrales más altos (p. ej. 120px) y transiciones
+ *   del header desactivadas por defecto (planHeaderLayerTransitions: false).
+ * - ResizeObserver escribiendo minHeight: ya va en rAF y solo si cambia el px; se puede cortar con
+ *   headerResizeObserver: false para aislar.
+ */
+var PLAN_SCROLL_DIAG_DEFAULT = {
+  /** false por defecto: el colapso por scroll competía con el layout; el slot del header ya es fijo con altura monótona. Activar en localStorage si se quiere. */
+  headerCollapseOnScroll: false,
+  headerResizeObserver: true,
+  hoyCard: true,
+  routineMetaPdf: true,
+  dayList: true,
+  completedTodayBanner: true,
+  pagoAlumnoBanner: true,
+  /** Si false, desactiva animaciones en .hov dentro del área plan (reduce transition:all). */
+  planAnimationsGlobalCss: true,
+  /** false = cambio instantáneo expand/mini (recomendado contra jitter al scroll). */
+  planHeaderLayerTransitions: false,
+};
+
+function readPlanScrollDiag() {
+  try {
+    var raw = localStorage.getItem("it_plan_scroll_diag");
+    var parsed = raw ? JSON.parse(raw) : {};
+    var out = {};
+    for (var k in PLAN_SCROLL_DIAG_DEFAULT) {
+      if (Object.prototype.hasOwnProperty.call(PLAN_SCROLL_DIAG_DEFAULT, k)) {
+        out[k] = parsed[k] !== undefined ? parsed[k] : PLAN_SCROLL_DIAG_DEFAULT[k];
+      }
+    }
+    return out;
+  } catch (e) {
+    return Object.assign({}, PLAN_SCROLL_DIAG_DEFAULT);
+  }
+}
 
 function GymApp() {
+  /** Flags de diagnóstico (lectura única; recargar tras editar localStorage). */
+  const planScrollDiag = useMemo(function () { return readPlanScrollDiag(); }, []);
   const [tab, setTab] = useState("plan");
   const [tabMain, setTabMain] = useState("entrenador"); // entrenador | alumno
       const [onboardStep, setOnboardStep] = useState(0);
@@ -872,9 +932,24 @@ function GymApp() {
   const headerCollapsedRef = useRef(false);
   const studentHeaderExpandRef = useRef(null);
   const studentHeaderMiniRef = useRef(null);
+  const studentHeaderShellRef = useRef(null);
+  /** Altura layout de la capa expandida (px) para translate3d estable; evita % y subpíxeles. */
+  const studentHeaderExpandHeightRef = useRef(0);
+  /** Último minHeight aplicado al shell (evita escrituras RO que disparan scroll anchoring). */
+  const shellMinHeightPxRef = useRef(-1);
+  /**
+   * Altura máxima medida del bloque header expandido + mini (px). Solo crece: nunca bajar evita
+   * que al colapsar con transform/opacity el RO vuelva a medir menos y el shell encoja → CLS.
+   */
+  const studentHeaderShellLockedHeightPxRef = useRef(0);
+  const shellMeasureRafRef = useRef(null);
   const scrollRef = useRef(null);
   const profileFileRef = useRef(null);
   const lastScrollY = useRef(0);
+  const tickingRef = useRef(false);
+  const scrollRafIdRef = useRef(null);
+  /** Actualizado cada render tras conocer tab/esAlumno: el scroll handler no debe depender de closure viejo. */
+  const planScrollCtxRef = useRef({ alumnoPlan: false, headerCollapse: true });
   const [resumenSesion, setResumenSesion] = useState(null);
   const [chatOpenId, setChatOpenId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -884,7 +959,6 @@ function GymApp() {
   const [showWelcome, setShowWelcome] = useState(()=>{ try{ const v=localStorage.getItem("it_show_welcome"); if(v){localStorage.removeItem("it_show_welcome");return true;} return false; }catch(e){return false;} });
   const [currentWeek, setCurrentWeek] = useState(() => { try{return parseInt(localStorage.getItem("it_week")||"0")}catch(e){return 0} });
   const [completedDays, setCompletedDays] = useState(() => { try{return JSON.parse(localStorage.getItem("it_cd")||"[]")}catch(e){return []} });
-  const [pdfRoutine, setPdfRoutine] = useState(null);
   const [libQ, setLibQ] = useState("");
   const [filtPat, setFiltPat] = useState(null);
   const [editExModal, setEditExModal] = useState(null);
@@ -913,6 +987,101 @@ function GymApp() {
   const [aliasForm, setAliasForm] = useState({alias:"",cbu:"",monto:"",banco:"",nota:""});
   const [timer, setTimer] = useState(null);
   const timerRef = useRef(null);
+
+  var ALUMNO_HEADER_MINI_PX = 56;
+  /** Colapso visual únicamente: NO quitar nodos ni height:0. La caja real la fija studentHeaderShellRef (altura monótona). */
+  function applyAlumnoHeaderLayerStyles(collapsed) {
+    var exp = studentHeaderExpandRef.current;
+    var mini = studentHeaderMiniRef.current;
+    if (exp) {
+      var hLay = exp.offsetHeight;
+      if (hLay > 0) studentHeaderExpandHeightRef.current = hLay;
+      var h = studentHeaderExpandHeightRef.current > 0 ? studentHeaderExpandHeightRef.current : Math.max(hLay, 1);
+      exp.style.transform = collapsed
+        ? "translate3d(0,-" + h + "px,0)"
+        : "translate3d(0,0,0)";
+      exp.style.opacity = collapsed ? "0" : "1";
+      exp.style.pointerEvents = collapsed ? "none" : "auto";
+    }
+    if (mini) {
+      var hm = mini.offsetHeight > 0 ? mini.offsetHeight : ALUMNO_HEADER_MINI_PX;
+      mini.style.transform = collapsed
+        ? "translate3d(0,0,0)"
+        : "translate3d(0," + hm + "px,0)";
+      mini.style.opacity = collapsed ? "1" : "0";
+      mini.style.pointerEvents = collapsed ? "auto" : "none";
+    }
+  }
+
+  /** Plan alumno: scroll vía requestAnimationFrame + listener pasivo (sin setState en el hilo de scroll). */
+  useLayoutEffect(function () {
+    var cancelled = false;
+    var waitRafId = null;
+    var attachedEl = null;
+
+    function applyScrollHeaderFrame() {
+      scrollRafIdRef.current = null;
+      if (!attachedEl) {
+        tickingRef.current = false;
+        return;
+      }
+      var ctx = planScrollCtxRef.current;
+      if (!ctx.headerCollapse || !ctx.alumnoPlan) {
+        tickingRef.current = false;
+        return;
+      }
+      var y = attachedEl.scrollTop;
+      var dir = y > lastScrollY.current;
+      lastScrollY.current = y;
+      var nextCollapsed = headerCollapsedRef.current;
+      /** Umbrales por encima del tramo HOY→Día 1 (~60–100px) para no colapsar el header justo al cruzar esa unión. */
+      var COLLAPSE_AFTER_Y = 120;
+      var EXPAND_BELOW_Y = 36;
+      if (dir && y > COLLAPSE_AFTER_Y && !headerCollapsedRef.current) nextCollapsed = true;
+      if (!dir && y < EXPAND_BELOW_Y && headerCollapsedRef.current) nextCollapsed = false;
+      if (nextCollapsed !== headerCollapsedRef.current) {
+        headerCollapsedRef.current = nextCollapsed;
+        applyAlumnoHeaderLayerStyles(nextCollapsed);
+      }
+      tickingRef.current = false;
+    }
+
+    function onScroll() {
+      if (tickingRef.current) return;
+      tickingRef.current = true;
+      scrollRafIdRef.current = requestAnimationFrame(applyScrollHeaderFrame);
+    }
+
+    function tryAttachToScrollEl() {
+      if (cancelled) return;
+      var el = scrollRef.current;
+      if (el) {
+        attachedEl = el;
+        el.addEventListener("scroll", onScroll, { passive: true });
+        return;
+      }
+      waitRafId = requestAnimationFrame(tryAttachToScrollEl);
+    }
+
+    waitRafId = requestAnimationFrame(tryAttachToScrollEl);
+
+    return function () {
+      cancelled = true;
+      if (waitRafId != null) {
+        cancelAnimationFrame(waitRafId);
+        waitRafId = null;
+      }
+      if (attachedEl) {
+        attachedEl.removeEventListener("scroll", onScroll);
+        attachedEl = null;
+      }
+      if (scrollRafIdRef.current != null) {
+        cancelAnimationFrame(scrollRafIdRef.current);
+        scrollRafIdRef.current = null;
+      }
+      tickingRef.current = false;
+    };
+  }, []);
 
   /** Después de login/logout (localStorage ya actualizado): sincroniza sesión y datos persistidos sin recargar. */
   function syncStateWithLocalStorage() {
@@ -1509,9 +1678,9 @@ function GymApp() {
   const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
-        {k:"plan",    icon:(c)=><Ic name="calendar" size={20} color={c}/>,      lbl:es?"PLAN":"PLAN"},
-        {k:"library", icon:(c)=><Ic name="activity" size={20} color={c}/>, lbl:es?"EJERCICIOS":"EXERCISES"},
-        {k:"progress",icon:(c)=><Ic name="trending-up" size={20} color={c}/>,  lbl:es?"PROGRESO":"PROGRESS"}
+        {k:"plan",    icon:(c)=><CalNavIcon size={20} color={c} strokeWidth={2}/>,      lbl:es?"PLAN":"PLAN"},
+        {k:"library", icon:(c)=><Dumbbell size={20} color={c} strokeWidth={2}/>, lbl:es?"EJERCICIOS":"EXERCISES"},
+        {k:"progress",icon:(c)=><TrendNavIcon size={20} color={c} strokeWidth={2}/>,  lbl:es?"PROGRESO":"PROGRESS"}
       ]
     : [
         {k:"plan",      icon:(c)=><Ic name="bar-chart-2" size={20} color={c}/>, lbl:es?"DASHBOARD":"DASHBOARD"},
@@ -1522,7 +1691,82 @@ function GymApp() {
 
   const hideGlobalBottomNavCoachDash = !esAlumno && sessionData?.role==="entrenador" && tab==="plan";
 
-  const generatePDF = (r) => {
+  planScrollCtxRef.current = {
+    alumnoPlan: !!(esAlumno && tab === "plan"),
+    headerCollapse: !!planScrollDiag.headerCollapseOnScroll,
+  };
+
+  /** Altura del shell: medición monótona (solo crece) + height fija = slot estable; el colapso es solo transform/opacity. */
+  useLayoutEffect(function () {
+    if (!planScrollDiag.headerResizeObserver) return undefined;
+    if (typeof ResizeObserver === "undefined") return undefined;
+    if (!esAlumno || tab !== "plan") return undefined;
+    studentHeaderShellLockedHeightPxRef.current = 0;
+    shellMinHeightPxRef.current = -1;
+    var cancelled = false;
+    var ro = null;
+    var waitId = null;
+    var attempts = 0;
+    function flushShellMeasure() {
+      shellMeasureRafRef.current = null;
+      if (cancelled) return;
+      var expand = studentHeaderExpandRef.current;
+      var shell = studentHeaderShellRef.current;
+      if (!expand || !shell) return;
+      var contentH = Math.max(expand.offsetHeight, expand.scrollHeight);
+      var measuredPx = Math.ceil(contentH + ALUMNO_HEADER_MINI_PX);
+      var lockedPx = Math.max(studentHeaderShellLockedHeightPxRef.current, measuredPx);
+      if (lockedPx < 1) return;
+      studentHeaderShellLockedHeightPxRef.current = lockedPx;
+      if (lockedPx === shellMinHeightPxRef.current) {
+        if (expand.offsetHeight > 0) studentHeaderExpandHeightRef.current = expand.offsetHeight;
+        applyAlumnoHeaderLayerStyles(headerCollapsedRef.current);
+        return;
+      }
+      shellMinHeightPxRef.current = lockedPx;
+      shell.style.minHeight = lockedPx + "px";
+      shell.style.height = lockedPx + "px";
+      shell.style.boxSizing = "border-box";
+      if (expand.offsetHeight > 0) studentHeaderExpandHeightRef.current = expand.offsetHeight;
+      applyAlumnoHeaderLayerStyles(headerCollapsedRef.current);
+    }
+    function scheduleShellMeasure() {
+      if (shellMeasureRafRef.current != null) return;
+      shellMeasureRafRef.current = requestAnimationFrame(flushShellMeasure);
+    }
+    function onResizeObserver() {
+      scheduleShellMeasure();
+    }
+    function tryConnect() {
+      if (cancelled) return;
+      attempts++;
+      var expand = studentHeaderExpandRef.current;
+      var shell = studentHeaderShellRef.current;
+      if (expand && shell) {
+        shellMinHeightPxRef.current = -1;
+        scheduleShellMeasure();
+        ro = new ResizeObserver(onResizeObserver);
+        ro.observe(expand);
+        return;
+      }
+      if (attempts < 120) waitId = requestAnimationFrame(tryConnect);
+    }
+    waitId = requestAnimationFrame(tryConnect);
+    return function () {
+      cancelled = true;
+      if (waitId != null) cancelAnimationFrame(waitId);
+      if (shellMeasureRafRef.current != null) {
+        cancelAnimationFrame(shellMeasureRafRef.current);
+        shellMeasureRafRef.current = null;
+      }
+      if (ro) ro.disconnect();
+      shellMinHeightPxRef.current = -1;
+      studentHeaderShellLockedHeightPxRef.current = 0;
+    };
+  }, [tab, esAlumno, routines.length, planScrollDiag.headerResizeObserver]);
+
+  /** Filas del plan para imprimir/PDF — misma estructura que antes; el HTML se arma en `exportRoutinePdfHtml` (sin vista previa en pantalla). */
+  const downloadRoutinePdf = (r) => {
     const patColors = {pierna:"#22C55E",empuje:"#2563EB",traccion:"#2563EB",core:"#8B9AB2",movil:"#8B9AB2"};
     const weeks4 = [0,1,2,3];
     let rows = [];
@@ -1556,7 +1800,7 @@ function GymApp() {
         });
       }
     });
-    setPdfRoutine({r, rows});
+    exportRoutinePdfHtml(r, rows, es, toast2, { textMain, bgCard, border, darkMode, textMuted });
   };
 
   // Pantalla de login
@@ -1676,7 +1920,17 @@ function GymApp() {
         "@keyframes rippleOut{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)}100%{box-shadow:0 0 0 20px rgba(34,197,94,0)}}" +
 
         ".num{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}" +
-        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch;scroll-behavior:smooth}.card-ex{will-change:transform;contain:layout style paint}" +
+        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch}.plan-main-scroll{scroll-behavior:auto!important;overflow-anchor:none;overscroll-behavior-y:contain}" +
+        ".plan-scroll-diag-no-hov .hov{transition:none!important;filter:none!important}" +
+        ".plan-hoy-cta-wrap{min-height:228px;touch-action:manipulation;box-sizing:border-box;background-clip:padding-box;border-style:solid;border-width:1px;filter:none;box-shadow:none}" +
+        ".plan-hoy-cta-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px;min-height:128px;flex-shrink:0}" +
+        ".plan-hoy-cta-kicker{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:4px;line-height:1.2}" +
+        ".plan-hoy-cta-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:22px;font-weight:900;line-height:1.2;word-break:break-word}" +
+        ".plan-hoy-cta-sub{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;line-height:1.35;margin-top:4px;margin-bottom:14px;word-break:break-word}" +
+        ".plan-hoy-cta-badge{flex-shrink:0;align-self:flex-start;white-space:nowrap;font-size:12px;font-weight:700;border-radius:8px;padding:3px 10px;border-style:solid;border-width:1px;line-height:1.2;filter:none;box-shadow:none;transition:none}" +
+        ".plan-hoy-cta-btn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:none!important;box-sizing:border-box;height:52px;flex-shrink:0;filter:none;box-shadow:none;outline:none}" +
+        ".plan-hoy-cta-btn svg{flex-shrink:0;display:block}" +
+        ".card-ex{will-change:transform;contain:layout style paint}" +
         "@keyframes checkPop{0%{transform:scale(0.3) rotate(-15deg);opacity:0}60%{transform:scale(1.3) rotate(5deg);opacity:1}80%{transform:scale(0.9) rotate(-3deg)}100%{transform:scale(1) rotate(0deg);opacity:1}}@keyframes slideUpFade{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}@keyframes prGlow{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.6);transform:scale(1)}50%{box-shadow:0 0 0 12px rgba(34,197,94,0);transform:scale(1.05)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0);transform:scale(1)}}@keyframes rowComplete{0%{background:rgba(34,197,94,0.0)}15%{background:rgba(34,197,94,0.3)}100%{background:transparent}}" +
         "select{background:"+bgSub+";color:"+textMain+";border:1px solid "+border+";border-radius:8px;padding:8px 12px;font-family:Inter,sans-serif;font-size:13px;width:100%}" +
         ".app-inner{max-width:1200px;margin:0 auto;width:100%}" +
@@ -1709,6 +1963,7 @@ function GymApp() {
           )}
         </div>
       )}
+      {!(esAlumno && tab === "progress") && (
       <div style={{padding:"16px 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057")}}>
         <div>
           <IronTrackLogo
@@ -1758,6 +2013,7 @@ function GymApp() {
           }
         </div>
       </div>
+      )}
       {timer&&!session&&(
         <AlumnoRestTimerBar
           timer={timer}
@@ -1771,27 +2027,26 @@ function GymApp() {
       )}
 
       <div
-        ref={scrollRef}
-        onScroll={e=>{
-          const y = e.target.scrollTop;
-          const dir = y > lastScrollY.current;
-          var nextCollapsed = headerCollapsedRef.current;
-          if(dir && y > 60 && !headerCollapsedRef.current) nextCollapsed = true;
-          if(!dir && y < 20 && headerCollapsedRef.current) nextCollapsed = false;
-          lastScrollY.current = y;
-          if(nextCollapsed === headerCollapsedRef.current) return;
-          headerCollapsedRef.current = nextCollapsed;
-          var exp = studentHeaderExpandRef.current;
-          var mini = studentHeaderMiniRef.current;
-          if(exp) {
-            exp.style.maxHeight = nextCollapsed ? "0px" : "500px";
-            exp.style.opacity = nextCollapsed ? "0" : "1";
-            exp.style.marginBottom = nextCollapsed ? "0px" : "10px";
-          }
-          if(mini) mini.style.display = nextCollapsed ? "flex" : "none";
+        className={"plan-main-scroll" + (planScrollDiag.planAnimationsGlobalCss === false ? " plan-scroll-diag-no-hov" : "")}
+        ref={function (node) {
+          scrollRef.current = node;
         }}
-        style={{padding:"12px 16px",overflowY:"auto",height:"calc(100dvh - 130px)",paddingBottom:100,paddingTop:12,display:session&&activeDay?"none":"block",WebkitOverflowScrolling:"touch",scrollBehavior:"smooth",background:darkMode?"#0B1120":"#F1F5F9"}}>
-        {tab==="plan"&&esAlumno&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
+        style={{
+          padding:"12px 16px",
+          overflowY:"auto",
+          /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
+          height:"calc(100svh - 130px)",
+          /** Tab bar + safe area + margen para el CTA “Descargar PDF” al final del plan sin quedar bajo la nav. */
+          paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px) + 32px)",
+          paddingTop:12,
+          display:(session&&activeDay)?"none":"block",
+          WebkitOverflowScrolling:"touch",
+          scrollBehavior:"auto",
+          overflowAnchor:"none",
+          overscrollBehavior:"contain",
+          background:darkMode?(esAlumno&&tab==="progress"?"#0d1117":"#0B1120"):"#F1F5F9",
+        }}>
+        {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&(
           <div>
             {!esAlumno&&sessionData?.role==="entrenador"&&(
@@ -1859,19 +2114,40 @@ function GymApp() {
               const todayDay = nextDayIdx !== null ? r0?.days?.[nextDayIdx] : null;
               const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeek)));
               return (
-                <div style={{marginBottom:16}}>
-                  <div ref={(el) => {
-                    studentHeaderExpandRef.current = el;
-                    if (el) {
-                      var c = headerCollapsedRef.current;
-                      el.style.maxHeight = c ? "0px" : "500px";
-                      el.style.opacity = c ? "0" : "1";
-                      el.style.marginBottom = c ? "0px" : "10px";
-                    }
-                  }} style={{
-                    overflow:"hidden",
-                    transition:"max-height 0.35s cubic-bezier(.4,0,.2,1), opacity 0.25s ease",
-                  }}>
+                <div style={{ marginBottom: 0 }}>
+                  {/*
+                    Slot de altura FIJA (minHeight + height monótonos vía RO): el colapso del header solo
+                    usa transform/opacity en las capas internas; este contenedor NO debe encogerse al
+                    hacer scroll — si encoge, Full body / Día 1 suben (CLS). Ver studentHeaderShellLockedHeightPxRef.
+                  */}
+                  <div
+                    ref={function (el) {
+                      studentHeaderShellRef.current = el;
+                    }}
+                    style={{
+                      position: "relative",
+                      overflow: "hidden",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                  <div
+                    ref={function (el) {
+                      studentHeaderExpandRef.current = el;
+                      if (el) applyAlumnoHeaderLayerStyles(headerCollapsedRef.current);
+                    }}
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      top: 0,
+                      zIndex: 2,
+                      backfaceVisibility: "hidden",
+                      WebkitBackfaceVisibility: "hidden",
+                      transition: planScrollDiag.planHeaderLayerTransitions
+                        ? "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease"
+                        : "none",
+                    }}
+                  >
                   <div style={{marginBottom:12}}>
                     <div style={{fontSize:13,color:textMuted,fontWeight:500,letterSpacing:0.3}}>
                       {new Date().getHours()<12?(es?"BUENOS DÍAS":"GOOD MORNING"):new Date().getHours()<18?(es?"BUENAS TARDES":"GOOD AFTERNOON"):(es?"BUENAS NOCHES":"GOOD EVENING")}
@@ -1944,39 +2220,65 @@ function GymApp() {
                     </div>
                   </div>
 
-                  {/* HOY */}
-                  {todayDay&&!yaEntrenoHoy&&!session&&(
-                    <div style={{
-                      background:"rgba(37,99,235,.07)",borderRadius:14,padding:"16px",marginBottom:8,
-                      border:"1px solid rgba(37,99,235,.18)",position:"relative",overflow:"hidden",
-                    }}>
-                      <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:"#2563EB",borderRadius:"3px 0 0 3px"}}/>
-                      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:4}}>
-                        <div>
-                          <div style={{fontSize:10,fontWeight:700,color:"#2563EB",letterSpacing:1.2,textTransform:"uppercase",marginBottom:4}}>{es?"HOY":"TODAY"}</div>
-                          <div style={{fontSize:22,fontWeight:900,color:textMain,lineHeight:1}}>
+                  {/* HOY — sin transition:all; altura acotada con line-clamp; contain:layout; sin backface (menos capas) */}
+                  {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&(
+                    <div
+                      className="plan-hoy-cta-wrap"
+                      style={{
+                        background:"rgba(37,99,235,.07)",
+                        borderRadius:14,
+                        padding:"16px",
+                        marginBottom:0,
+                        border:"1px solid rgba(37,99,235,.18)",
+                        position:"relative",
+                        overflow:"hidden",
+                      }}
+                    >
+                      <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:"#2563EB",borderRadius:"3px 0 0 3px",pointerEvents:"none",zIndex:0}}/>
+                      <div className="plan-hoy-cta-head" style={{ position: "relative", zIndex: 1 }}>
+                        <div style={{minWidth:0,flex:1}}>
+                          <div className="plan-hoy-cta-kicker" style={{ color: "#2563EB" }}>{es?"HOY":"TODAY"}</div>
+                          <div className="plan-hoy-cta-title" style={{ color: textMain }}>
                             {todayDay.label||("Día "+(nextDayIdx+1))}
                           </div>
-                          <div style={{fontSize:13,color:textMuted,marginTop:4,marginBottom:14}}>
+                          <div className="plan-hoy-cta-sub" style={{ color: textMuted }}>
                             {((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {es?"ejercicios":"exercises"} · {r0?.name}
                           </div>
                         </div>
-                        <div style={{
-                          background:"rgba(37,99,235,.15)",border:"1px solid rgba(37,99,235,.25)",
-                          borderRadius:8,padding:"3px 10px",
-                          fontSize:12,fontWeight:700,color:"#2563EB",flexShrink:0,
-                        }}>
+                        <div
+                          className="plan-hoy-cta-badge"
+                          style={{
+                            background:"rgba(37,99,235,.15)",
+                            borderColor:"rgba(37,99,235,.25)",
+                            color:"#2563EB",
+                          }}
+                        >
                           {es?"Sem":"Wk"} {currentWeek+1}
                         </div>
                       </div>
                       <button
-                        className="hov"
+                        type="button"
+                        className="plan-hoy-cta-btn"
                         style={{
-                          width:"100%",padding:"15px",background:"#2563EB",color:"#fff",
-                          border:"none",borderRadius:12,fontSize:16,fontWeight:800,
-                          cursor:"pointer",fontFamily:"inherit",letterSpacing:.5,
-                          display:"flex",alignItems:"center",justifyContent:"center",gap:8,
-                          textTransform:"uppercase",minHeight:52,
+                          width:"100%",
+                          padding:"0 15px",
+                          background:"#2563EB",
+                          color:"#fff",
+                          border:"none",
+                          borderRadius:12,
+                          fontSize:16,
+                          fontWeight:800,
+                          cursor:"pointer",
+                          fontFamily:"inherit",
+                          letterSpacing:.5,
+                          display:"flex",
+                          alignItems:"center",
+                          justifyContent:"center",
+                          gap:8,
+                          textTransform:"uppercase",
+                          whiteSpace:"nowrap",
+                          position:"relative",
+                          zIndex:1,
                         }}
                         onClick={()=>{
                           const snap={};
@@ -1992,7 +2294,7 @@ function GymApp() {
                   )}
 
                   {/* DÍA YA ENTRENADO */}
-                  {yaEntrenoHoy&&!session&&(
+                  {planScrollDiag.completedTodayBanner&&yaEntrenoHoy&&!session&&(
                     <div style={{
                       background:"rgba(34,197,94,.08)",borderRadius:14,padding:"14px 16px",
                       marginBottom:8,display:"flex",alignItems:"center",gap:12,
@@ -2009,12 +2311,30 @@ function GymApp() {
                     </div>
                   )}
                   </div>
-                  <div ref={(el) => {
-                    studentHeaderMiniRef.current = el;
-                    if (el) el.style.display = headerCollapsedRef.current ? "flex" : "none";
-                  }} style={{
-                    alignItems:"center",justifyContent:"space-between",
-                    marginBottom:8,animation:"fadeIn 0.2s ease"}}>
+                  <div
+                    ref={function (el) {
+                      studentHeaderMiniRef.current = el;
+                      if (el) applyAlumnoHeaderLayerStyles(headerCollapsedRef.current);
+                    }}
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: ALUMNO_HEADER_MINI_PX,
+                      boxSizing: "border-box",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingBottom: 8,
+                      zIndex: 1,
+                      backfaceVisibility: "hidden",
+                      WebkitBackfaceVisibility: "hidden",
+                      transition: planScrollDiag.planHeaderLayerTransitions
+                        ? "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease"
+                        : "none",
+                    }}
+                  >
                       <div style={{fontSize:15,fontWeight:700,color:textMain}}>
                         {sessionData?.name?.split(" ")[0]||"Atleta"}
                       </div>
@@ -2034,7 +2354,7 @@ function GymApp() {
                       )}
                       {yaEntrenoHoy&&<span style={{fontSize:13,color:"#22C55E",fontWeight:600}}>✅ {es?"Listo hoy":"Done today"}</span>}
                     </div>
-                  <div style={{display:"none"}}/>
+                  </div>
                 </div>
               );
             })()}
@@ -2047,17 +2367,36 @@ function GymApp() {
               </div>
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
-              return (<div key={r.id} style={{marginBottom:16}}>
-                  <div style={{fontSize:28,fontWeight:800,letterSpacing:1,marginBottom:4}}>{r.name}</div>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                    <div style={{fontSize:15,color:textMuted}}>{r.created} · {r.days.length} {es?"dias":"days"}{r.note?" · "+r.note:""}</div>
-                    <div style={{display:"flex",gap:8}}>
-                      <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",border:"1px solid "+border,color:textMain,borderRadius:8,padding:"8px 12px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:8}} onClick={()=>generatePDF(r)}>
-                        <Ic name="file-text" size={14}/> PDF
-                      </button>
-                    </div>
+              return (<div key={r.id} style={{marginBottom:16,marginTop:16}}>
+                  {/* Título + meta (sin botón PDF arriba: exportación solo al final del plan) */}
+                  {planScrollDiag.routineMetaPdf&&(
+                  <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
+                    <div style={{
+                      fontSize:28,
+                      fontWeight:800,
+                      letterSpacing:1,
+                      lineHeight:1.2,
+                      margin:0,
+                      wordBreak:"break-word",
+                      display:"-webkit-box",
+                      WebkitLineClamp:2,
+                      WebkitBoxOrient:"vertical",
+                      overflow:"hidden",
+                    }}>{r.name}</div>
+                    <div style={{
+                      fontSize:15,
+                      color:textMuted,
+                      lineHeight:1.35,
+                      minWidth:0,
+                      display:"-webkit-box",
+                      WebkitLineClamp:2,
+                      WebkitBoxOrient:"vertical",
+                      overflow:"hidden",
+                      paddingTop:2,
+                    }}>{r.created} · {r.days.length} {es?"dias":"days"}{r.note?" · "+r.note:""}</div>
                   </div>
-                  {r.days.map((d,di)=>{
+                  )}
+                  {planScrollDiag.dayList&&r.days.map((d,di)=>{
                     const dayKey=r.id+"-"+di+"-w"+currentWeek;
                     const isDayDone=completedDays.includes(dayKey);
                     const daysCompletedR=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length;
@@ -2164,6 +2503,36 @@ function GymApp() {
                       </div>
                     );
                   })}
+                  {/* Export PDF: no usa planScrollDiag (el bloque meta sí); solo rutina con días — mismo tab Plan que envuelve este mapa. */}
+                  {(r.days||[]).length>0&&(
+                    <button
+                      type="button"
+                      onClick={function(){ downloadRoutinePdf(r); }}
+                      style={{
+                        width:"100%",
+                        marginTop:12,
+                        marginBottom:12,
+                        padding:"16px 18px",
+                        background:"#2563EB",
+                        color:"#fff",
+                        border:"none",
+                        borderRadius:12,
+                        fontFamily:"Barlow Condensed,sans-serif",
+                        fontSize:17,
+                        fontWeight:900,
+                        letterSpacing:0.5,
+                        cursor:"pointer",
+                        display:"flex",
+                        alignItems:"center",
+                        justifyContent:"center",
+                        gap:10,
+                        boxSizing:"border-box",
+                      }}
+                    >
+                      <Ic name="download" size={20} color="#fff"/>
+                      {es?"Descargar Rutina en PDF":"Download routine as PDF"}
+                    </button>
+                  )}
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
                     background:bgCard,borderRadius:12,padding:"8px 16px",border:"1px solid "+border,
                     marginBottom:4}}>
@@ -2316,16 +2685,20 @@ function GymApp() {
           </div>
         )}
         {tab==="progress"&&showAlumnoProgressStack&&(
-          <div style={{marginBottom:24}}>
-            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:8,color:textMain}}><Ic name="bar-chart-2" size={16}/> {es?"GRÁFICO DE PROGRESO":"PROGRESS CHART"}</div>
-            <GraficoProgreso allEx={allEx} es={es} darkMode={darkMode} progress={progress} EX={EX} readOnly={readOnly||esAlumno} sharedParam={sharedParam} sb={sb} sessionData={sessionData} sesiones={sesiones}/>
-            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,margin:"20px 0 10px",color:textMain}}><Ic name="image" size={16}/> {es?"FOTOS DE PROGRESO":"PROGRESS PHOTOS"}</div>
-            <FotosProgreso darkMode={darkMode} sharedParam={sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId}))} sb={sb} esEntrenador={false}
-          es={es} toast2={toast2} sessionData={sessionData} progress={progress}/>
-            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,margin:"20px 0 10px",color:textMain}}>🏋️ {es?"MIS SESIONES":"MY SESSIONS"}</div>
-            <HistorialSesiones sessionData={sessionData} darkMode={darkMode} sharedParam={sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId}))} sb={sb} EX={EX}
-          es={es} sesiones={sesiones} expectedDaysPerWeek={routineDaysCount}/>
-          </div>
+          <StudentProgressSection
+            progress={progress}
+            EX={EX}
+            allEx={allEx}
+            sesiones={sesiones}
+            sessionData={sessionData}
+            sb={sb}
+            sharedParam={sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId}))}
+            es={es}
+            expectedDaysPerWeek={routineDaysCount}
+            onSettings={()=>setSettingsOpen(true)}
+            onAvatarClick={()=>setUserMenuOpen(true)}
+            esEntrenador={false}
+          />
         )}
         {tab==="scanner"&&!esAlumno&&(
           <div>
@@ -2353,7 +2726,7 @@ function GymApp() {
             <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
           </div>
         )}
-        {tab==="progress"&&(
+        {tab==="progress"&&!showAlumnoProgressStack&&(
           <div>
             {EX.filter(ex=>progress[ex.id]?.sets?.length>0).map(ex=>{
               const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"}; const pg=progress[ex.id];
@@ -3759,119 +4132,6 @@ function GymApp() {
           </div>
         </div>
       )}
-      {pdfRoutine&&(
-        <div style={{position:"fixed",inset:0,background:bg,zIndex:200,overflowY:"auto",padding:"0 0 80px"}}>
-          <div style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),position:"sticky",top:0,background:bg,zIndex:10}}>
-            <span style={{fontSize:22,fontWeight:800,letterSpacing:1,color:"#2563EB"}}>IRON TRACK · PDF</span>
-            <div style={{display:"flex",gap:8}}>
-              <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>{
-                const el = document.getElementById("pdf-content");
-                if(!el) return;
-                const styles = [
-                  "*{box-sizing:border-box;margin:0;padding:0}",
-                  "body{background:#07080d;color:#e2e8f0;font-family:'Arial Narrow',Arial,sans-serif;padding:16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}",
-                  ".tag{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;margin-right:4px}",
-                  "@media print{@page{margin:5mm;size:A4}button{display:none!important}}"
-                ].join("");
-                const fullHtml = "<!DOCTYPE html><html><head><meta charset=utf-8><title>"+pdfRoutine.r.name+" - Iron Track</title><style>"+styles+"</style></head><body>"+el.innerHTML+"<scr"+"ipt>window.onload=function(){window.print();}</"+"script></body></html>";
-                const blob = new Blob([fullHtml],{type:"text/html"});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "IronTrack-"+pdfRoutine.r.name.replace(/\s+/g,"-")+".html";
-                a.click();
-                URL.revokeObjectURL(url);
-                toast2("Archivo descargado - abrilo y se imprime solo");
-              }}>
-                ⬇️ DESCARGAR PDF
-              </button>
-              <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",color:textMain,border:"none",borderRadius:8,padding:"8px 12px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setPdfRoutine(null)}>
-                ✕
-              </button>
-            </div>
-          </div>
-          <div id="pdf-content" style={{padding:"16px"}}>
-            <div style={{background:"#2563EB",borderRadius:12,padding:"8px 16px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:22,fontWeight:900,letterSpacing:2,color:"#fff"}}>IRON TRACK</span>
-              <span style={{fontSize:13,color:"#1E2D40",fontWeight:700}}>PLAN DE ENTRENAMIENTO</span>
-            </div>
-            <div style={{fontSize:28,fontWeight:900,letterSpacing:1,marginBottom:4}}>{pdfRoutine.r.name}</div>
-            <div style={{fontSize:13,color:"#8B9AB2",marginBottom:16}}>{pdfRoutine.r.created} · {pdfRoutine.r.days.length} dias{pdfRoutine.r.note?" · "+pdfRoutine.r.note:""}</div>
-            {pdfRoutine.rows.map((row,ri)=>{
-              const pdfRowKey = (pdfRoutine.r?.id||"rut")+"-pdf-"+ri+"-"+row.type+"-"+(row.ex?.id||row.exName||row.label||"");
-              if(row.type==="day") return(
-                <div key={pdfRowKey} style={{fontSize:15,fontWeight:700,color:textMain,letterSpacing:2,borderBottom:"2px solid #243040",paddingBottom:4,margin:"16px 0 8px"}}>
-                  {row.label}
-                </div>
-              );
-              if(row.type==="warmup-header") return(
-                <div key={pdfRowKey} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",background:"#2563EB11",border:"1px solid #243040",borderRadius:8,marginBottom:8}}>
-                  <div style={{width:3,height:14,background:"#8B9AB2",borderRadius:2}}/>
-                  <span style={{fontSize:15,fontWeight:800,color:"#8B9AB2",letterSpacing:1}}>ENTRADA EN CALOR</span>
-                </div>
-              );
-              if(row.type==="warmup-ex") return(
-                <div key={pdfRowKey} style={{background:bgCard,borderRadius:12,padding:"8px 12px",marginBottom:8,border:"1px solid "+border}}>
-                  <div style={{fontSize:15,fontWeight:700,color:textMain,marginBottom:8}}>{row.exName}</div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
-                    {(row.wks||[{s:row.ex.sets||"-",r:row.ex.reps||"-",kg:"",filled:false,active:false},{s:row.ex.sets||"-",r:row.ex.reps||"-",kg:"",filled:false,active:false},{s:row.ex.sets||"-",r:row.ex.reps||"-",kg:"",filled:false,active:false},{s:row.ex.sets||"-",r:row.ex.reps||"-",kg:"",filled:false,active:false}]).map((w,wi)=>(
-                      <div key={(row.ex?.id||"ex")+"-pdf-wu-sem-"+wi} style={{background:w.active?"#2563EB":"#162234",borderRadius:8,padding:w.active?"10px 4px":"7px 4px",textAlign:"center",border:w.active?"2px solid #2563EB":w.filled?"1px solid #243040":"1px solid "+border}}>
-                        <div style={{fontSize:w.active?10:8,fontWeight:700,letterSpacing:1,color:w.active?"#FFFFFF":"#8B9AB2",marginBottom:w.active?5:3}}>{w.active?"→ ":" "}SEM {wi+1}</div>
-                        <div style={{fontSize:w.active?16:13,fontWeight:800,color:w.active?"#FFFFFF":w.filled?"#FFFFFF":"#8B9AB2"}}>{w.s}×{w.r}</div>
-                        {w.kg&&<div style={{fontSize:11,fontWeight:700,color:w.active?"#FFFFFF":"#8B9AB2",marginTop:4}}>{w.kg}kg</div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-              if(row.type==="main-header") return(
-                <div key={pdfRowKey} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 8px",background:"#2563EB11",border:"2px solid #243040",borderRadius:8,marginBottom:8,marginTop:8}}>
-                  <div style={{width:3,height:16,background:"#8B9AB2",borderRadius:2}}/>
-                  <span style={{fontSize:15,fontWeight:800,color:"#8B9AB2",letterSpacing:1}}>BLOQUE PRINCIPAL</span>
-                </div>
-              );
-              const {exName,col,ex,wks,pat,lastRpe} = row;
-              const rpeColors2={6:"#22C55E",7:"#22C55E",8:"#60A5FA",9:"#8B9AB2",10:"#2563EB"};
-              return(
-                <div key={pdfRowKey} style={{background:"#1E2D40",border:"1px solid "+col+"44",borderRadius:12,padding:"12px",marginBottom:8}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                    <div style={{width:3,alignSelf:"stretch",borderRadius:2,background:col,flexShrink:0}}/>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:22,fontWeight:800,color:textMain,marginBottom:4}}>{exName}</div>
-                      <div style={{fontSize:13,color:"#8B9AB2"}}>{row.info?.muscle||""} · {row.info?.equip||""}</div>
-                    </div>
-                    <div style={{display:"flex",gap:4,flexShrink:0,alignItems:"center"}}>
-                      {ex.kg&&<span style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700,color:textMain}}>{ex.kg}kg</span>}
-                      {ex.pause&&<span style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:6,padding:"4px 8px",fontSize:13,color:textMuted}}>{fmtP(ex.pause)}</span>}
-                      {lastRpe&&<span style={{background:rpeColors2[lastRpe]+"33",border:"1px solid "+rpeColors2[lastRpe]+"66",borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:800,color:rpeColors2[lastRpe]}}>RPE {lastRpe}</span>}
-                    </div>
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
-                    {wks.map((w,wi)=>(
-                      <div key={(ex?.id||"ex")+"-pdf-main-sem-"+wi} style={{background:w.active?"#2563EB":"#162234",borderRadius:8,padding:"8px 4px",textAlign:"center",border:w.active?"2px solid #2563EB":w.filled?"1px solid #243040":"1px solid "+border}}>
-                        <div style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:w.active?"#FFFFFF":"#8B9AB2",marginBottom:4}}>{w.active?"→ ":" "}SEM {wi+1}</div>
-                        <div style={{fontSize:18,fontWeight:900,color:w.active?"#fff":w.filled?"#FFFFFF":"#8B9AB2"}}>{w.s}x{w.r}</div>
-                        {w.kg&&<div style={{fontSize:13,fontWeight:700,color:w.active?"#FFFFFF":"#8B9AB2",marginTop:4}}>{w.kg}kg</div>}
-                        {w.note&&<div style={{fontSize:11,color:"#8B9AB2",marginTop:4}}>{w.note}</div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            <div style={{textAlign:"center",color:"#8B9AB2",fontSize:11,marginTop:20,paddingTop:8,borderTop:"1px solid "+border}}>
-              Generado con IRON TRACK
-            </div>
-          </div>
-          <style dangerouslySetInnerHTML={{__html:
-            "@media print{" +
-            "nav,#pdf-header{display:none!important}" +
-            "body{background:#07080d!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}" +
-            "@page{margin:6mm;background:#07080d}" +
-            "}"
-          }}/>
-        </div>
-      )}
       {addExModal&&(
         <>
         <div
@@ -4138,6 +4398,8 @@ function GymApp() {
       }}>
         {tabs2.map(tb=>{
           const isActive = tab===tb.k;
+          const activeCol = esAlumno ? "#3b82f6" : "#2563EB";
+          const inactiveCol = darkMode?"#8B9AB2":"#64748B";
           return(
             <button key={tb.k} onClick={()=>setTab(tb.k)}
               style={{flex:1,background:"none",border:"none",
@@ -4149,22 +4411,22 @@ function GymApp() {
                 position:"absolute",top:0,left:"50%",
                 transform:"translateX(-50%)",
                 height:3,width:isActive?28:0,
-                background:"#2563EB",borderRadius:"0 0 3px 3px",
+                background:activeCol,borderRadius:"0 0 3px 3px",
                 transition:"width .25s cubic-bezier(.4,0,.2,1)"
               }}/>
               <div style={{
-                background:isActive?(darkMode?"#2563EB22":"#2563EB15"):"transparent",
-                borderRadius:8,
-                padding:"4px 12px",
+                background:isActive?(darkMode?"rgba(59,130,246,0.2)":"rgba(59,130,246,0.12)"):esAlumno?"transparent":(darkMode?"transparent":"transparent"),
+                borderRadius:esAlumno?8:8,
+                padding:esAlumno?"6px 14px":"4px 12px",
                 transition:"all .2s ease",
                 display:"flex",alignItems:"center",justifyContent:"center"
               }}>
-                {tb.icon(isActive?"#2563EB":(darkMode?"#8B9AB2":"#64748B"))}
+                {tb.icon(isActive?activeCol:inactiveCol)}
               </div>
               <span style={{
                 fontSize:11,fontWeight:isActive?700:500,
                 letterSpacing:0.3,
-                color:isActive?"#2563EB":(darkMode?"#8B9AB2":"#64748B"),
+                color:isActive?activeCol:inactiveCol,
                 transition:"color .2s"
               }}>{tb.lbl}</span>
             </button>
@@ -5970,8 +6232,8 @@ const BackArrowSVG = () => (
 /* ═══════════════════════ SHARED UI ════════════════════════ */
 
 /* Dots — total visible según rol */
-const Dots = ({total,current}) => (
-  <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:18}}>
+const Dots = ({total,current,marginBottom=18}) => (
+  <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom}}>
     {Array.from({length:total}).map((_,i)=>(
       <div key={i} style={{
         height:4,borderRadius:2,transition:"all .35s",
@@ -6066,7 +6328,8 @@ const Step0 = ({onNext, onYaTengoCuenta}) => {
       <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(5,12,24,0.4) 0%,rgba(5,12,24,0.05) 20%,rgba(5,12,24,0.68) 56%,rgba(5,12,24,1) 86%)"}}/>
       <div style={{position:"absolute",top:-80,left:"50%",transform:"translateX(-50%)",width:440,height:440,borderRadius:"50%",background:"radial-gradient(circle,rgba(37,99,235,0.2) 0%,transparent 70%)",pointerEvents:"none"}}/>
 
-      <div style={{position:"relative",zIndex:5,flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"68px 28px 36px",boxSizing:"border-box"}}>
+      <div style={{position:"relative",zIndex:5,flex:1,minHeight:0,display:"flex",flexDirection:"column",boxSizing:"border-box"}}>
+        <div className="box-border flex w-full flex-1 min-h-0 flex-col items-center overflow-y-auto px-7 pt-[68px] pb-[140px]">
 
         {/* Logo */}
         <div style={{...a(0),display:"flex",flexDirection:"column",alignItems:"center",gap:16,marginBottom:18}}>
@@ -6094,7 +6357,7 @@ const Step0 = ({onNext, onYaTengoCuenta}) => {
         </div>
 
         {/* Feature pills */}
-        <div style={{...a(210),width:"100%",display:"flex",flexDirection:"column",gap:10,marginBottom:"auto"}}>
+        <div style={{...a(210),width:"100%",display:"flex",flexDirection:"column",gap:10,marginBottom:0}}>
           {[
             {icon:<CoachSVG  color="#3B82F6" size={16}/>, text:"Panel de alumnos con seguimiento en tiempo real"},
             {icon:<ChartSVG  color="#60A5FA" size={16}/>, text:"Progresión de cargas y PRs automáticos"},
@@ -6109,28 +6372,41 @@ const Step0 = ({onNext, onYaTengoCuenta}) => {
           ))}
         </div>
 
-        {/* CTA */}
-        <div style={{...a(300),width:"100%",display:"flex",flexDirection:"column",gap:8,marginTop:28}}>
-          <Dots total={5} current={0}/>
-          <BtnPrimary onClick={onNext}>Empezar gratis</BtnPrimary>
-          {/* ✅ Botón "ya tengo cuenta" funcional */}
-          <button
-            onClick={onYaTengoCuenta}
-            style={{
-              background:"none",border:"none",
-              color:"rgba(255,255,255,0.35)",
-              fontFamily:"system-ui,sans-serif",fontSize:12,fontWeight:600,
-              letterSpacing:"1.5px",textTransform:"uppercase",
-              cursor:"pointer",height:40,
-              transition:"color .2s",
-            }}
-            onMouseEnter={e=>e.target.style.color="rgba(255,255,255,0.65)"}
-            onMouseLeave={e=>e.target.style.color="rgba(255,255,255,0.35)"}
-          >
-            Ya tengo cuenta — ingresar
-          </button>
+        <div style={{...a(300),width:"100%",marginTop:16}}>
+          <Dots total={5} current={0} marginBottom={8}/>
         </div>
+        </div>
+
+      <div
+        className="fixed bottom-0 left-0 z-50 w-full bg-gradient-to-t from-black/95 via-black/70 to-transparent backdrop-blur-md px-4 pt-4 pb-6"
+      >
+        <button
+          type="button"
+          onClick={onNext}
+          className="flex h-16 w-full items-center justify-center gap-2 rounded-2xl border-0 font-bold shadow-lg transition-all duration-200 active:scale-95"
+          style={{
+            background:BLUE_GRAD,
+            color:C.text,
+            fontFamily:"system-ui,sans-serif",
+            fontSize:13,
+            letterSpacing:"1px",
+            textTransform:"uppercase",
+            cursor:"pointer",
+          }}
+        >
+          <ArrowSVG size={16}/>
+          Empezar gratis
+        </button>
+        <button
+          type="button"
+          onClick={onYaTengoCuenta}
+          className="mt-2 w-full cursor-pointer border-0 bg-transparent p-0 text-center text-sm opacity-70"
+          style={{fontFamily:"system-ui,sans-serif",fontWeight:600,color:C.text}}
+        >
+          Ya tengo cuenta — ingresar
+        </button>
       </div>
+    </div>
     </div>
   );
 };
