@@ -1690,7 +1690,7 @@ function GymApp() {
   const green=darkMode?"#22C55E":"#16A34A";
   const greenSoft=darkMode?"rgba(34,197,94,0.12)":"rgba(22,163,74,0.1)";
   const greenBorder=darkMode?"rgba(34,197,94,0.25)":"rgba(22,163,74,0.25)";
-  const card={background:bgCard,borderRadius:16,padding:"16px 18px",marginBottom:8,border:"1px solid "+border,boxShadow:darkMode?"0 4px 16px rgba(0,0,0,0.5)":"0 2px 8px rgba(0,0,0,0.08)"};
+  const card={background:bgCard,borderRadius:16,padding:"22px 24px",marginBottom:12,border:"1px solid "+border,boxShadow:darkMode?"0 4px 16px rgba(0,0,0,0.5)":"0 2px 8px rgba(0,0,0,0.08)"};
   const inp={background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"8px 12px",fontSize:15,fontFamily:"Inter,sans-serif",width:"100%",boxSizing:"border-box"};
   const lbl={fontSize:13,fontWeight:600,letterSpacing:0.3,color:textMuted,marginBottom:4,display:"block"};
   const btn=(col,txt)=>({background:col||(darkMode?"#2D4057":"#E2E8F0"),color:txt||(darkMode?"#FFFFFF":"#0F1923"),border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",letterSpacing:1});
@@ -1974,7 +1974,7 @@ function GymApp() {
         "@keyframes rippleOut{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)}100%{box-shadow:0 0 0 20px rgba(34,197,94,0)}}" +
 
         ".num{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}" +
-        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch}.plan-main-scroll{scroll-behavior:auto!important;overflow-anchor:none;overscroll-behavior-y:contain}" +
+        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch}.plan-main-scroll{scroll-behavior:auto!important;overflow-anchor:none;overscroll-behavior-y:contain;scrollbar-width:none;-ms-overflow-style:none}.plan-main-scroll::-webkit-scrollbar{display:none;width:0;height:0}" +
         ".plan-scroll-diag-no-hov .hov{transition:none!important;filter:none!important}" +
         ".plan-hoy-cta-wrap{min-height:228px;touch-action:manipulation;box-sizing:border-box;background-clip:padding-box;border-style:solid;border-width:1px;filter:none;box-shadow:none}" +
         ".plan-hoy-cta-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px;min-height:128px;flex-shrink:0}" +
@@ -2018,7 +2018,7 @@ function GymApp() {
         </div>
       )}
       {!(esAlumno && tab === "progress") && (
-      <div style={{padding:"16px 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057")}}>
+      <div className="sticky top-0 z-50" style={{padding:"16px 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),background:darkMode?"#0F1923":bg,boxSizing:"border-box"}}>
         <div>
           <IronTrackLogo
             size={22}
@@ -2032,41 +2032,88 @@ function GymApp() {
           {session&&<span style={{...tag("#22C55E"),fontSize:13}}>✓ Sesion activa</span>}
           <button className="hov" style={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSettingsOpen(true)}><Ic name="settings" size={18} color={textMuted}/></button>
           {sessionData&&esAlumno
-            ? <>
-              <button className="hov" style={{width:36,height:36,background:"linear-gradient(135deg,#1E3A5F,#2563EB)",border:"none",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff"}} onClick={()=>setUserMenuOpen(!userMenuOpen)}>
+            ? <button className="hov" style={{width:36,height:36,background:"linear-gradient(135deg,#1E3A5F,#2563EB)",border:"none",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff"}} onClick={()=>setUserMenuOpen(!userMenuOpen)}>
                 {(sessionData.name||"U").slice(0,2).toUpperCase()}
               </button>
-              {userMenuOpen&&(
-                <>
-                <div style={{position:"fixed",inset:0,zIndex:40}} onClick={()=>setUserMenuOpen(false)}/>
-                <div style={{position:"absolute",top:44,right:0,background:"#0a1628",border:"1px solid rgba(59,130,246,.25)",borderRadius:14,width:240,overflow:"hidden",zIndex:50,boxShadow:"0 12px 40px rgba(0,0,0,.55)",animation:"fadeIn .2s ease"}}>
-                  <div style={{padding:"14px 16px",background:"linear-gradient(180deg,#0f1f3a 0%,#0a1628 100%)",borderBottom:"1px solid rgba(59,130,246,.15)"}}>
-                    <div style={{fontSize:15,fontWeight:800,color:"#fff",lineHeight:1.3}}>{sessionData.name}</div>
-                    <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{sessionData.email||""}</div>
-                  </div>
-                  <div style={{padding:"6px 0"}}>
-                  <div className="hov" style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:600,color:"#e2e8f0"}} onClick={()=>{setUserMenuOpen(false);const n=(sessionData.name||"").trim().split(/\s+/);setProfileEdit({nombre:n[0]||"",apellido:n.slice(1).join(" ")||"",email:sessionData.email||"",phone:sessionData.phone||"",avatarDataUrl:sessionData.avatarUrl||null});setProfileModalOpen(true);}}>
-                    <Ic name="user" size={17} color="#3b82f6"/> {es?"Mi perfil":"My profile"}
-                  </div>
-                  <div className="hov" style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:600,color:"#e2e8f0"}} onClick={()=>{setUserMenuOpen(false);setSettingsOpen(true);}}>
-                    <Ic name="settings" size={17} color="#94a3b8"/> {es?"Configuración":"Settings"}
-                  </div>
-                  </div>
-                  <div style={{borderTop:"1px solid rgba(239,68,68,.2)",padding:"4px 0"}}>
-                  <div className="hov" style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:700,color:"#f87171"}} onClick={()=>{setUserMenuOpen(false);if(confirm(es?"¿Cerrar sesión?":"Log out?")){clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}}>
-                    <Ic name="log-out" size={17} color="#f87171"/> {es?"Cerrar sesión":"Log out"}
-                  </div>
-                  </div>
-                </div>
-                </>
-              )}
-              </>
             : sessionData
               ? <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}>SALIR</button>
               : <button className="hov" style={{...btn(),padding:"4px 8px",fontSize:13}} onClick={()=>setLoginModal(true)}><Ic name="user" size={18}/></button>
           }
         </div>
       </div>
+      )}
+      {sessionData && esAlumno && userMenuOpen && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 600 }} onClick={() => setUserMenuOpen(false)} />
+          <div
+            style={{
+              position: "fixed",
+              zIndex: 610,
+              top:
+                esAlumno && tab === "progress" && showAlumnoProgressStack
+                  ? "calc(max(2rem, env(safe-area-inset-top, 0px)) + 5.25rem)"
+                  : "calc(env(safe-area-inset-top, 0px) + 56px)",
+              right: 16,
+              background: "#0a1628",
+              border: "1px solid rgba(59,130,246,.25)",
+              borderRadius: 14,
+              width: 240,
+              overflow: "hidden",
+              boxShadow: "0 12px 40px rgba(0,0,0,.55)",
+              animation: "fadeIn .2s ease",
+            }}
+          >
+            <div style={{ padding: "14px 16px", background: "linear-gradient(180deg,#0f1f3a 0%,#0a1628 100%)", borderBottom: "1px solid rgba(59,130,246,.15)" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.3 }}>{sessionData.name}</div>
+              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{sessionData.email || ""}</div>
+            </div>
+            <div style={{ padding: "6px 0" }}>
+              <div
+                className="hov"
+                style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#e2e8f0" }}
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  const n = (sessionData.name || "").trim().split(/\s+/);
+                  setProfileEdit({
+                    nombre: n[0] || "",
+                    apellido: n.slice(1).join(" ") || "",
+                    email: sessionData.email || "",
+                    phone: sessionData.phone || "",
+                    avatarDataUrl: sessionData.avatarUrl || null,
+                  });
+                  setProfileModalOpen(true);
+                }}
+              >
+                <Ic name="user" size={17} color="#3b82f6" /> {es ? "Mi perfil" : "My profile"}
+              </div>
+              <div
+                className="hov"
+                style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, fontWeight: 600, color: "#e2e8f0" }}
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  setSettingsOpen(true);
+                }}
+              >
+                <Ic name="settings" size={17} color="#94a3b8" /> {es ? "Configuración" : "Settings"}
+              </div>
+            </div>
+            <div style={{ borderTop: "1px solid rgba(239,68,68,.2)", padding: "4px 0" }}>
+              <div
+                className="hov"
+                style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, fontWeight: 700, color: "#f87171" }}
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  if (confirm(es ? "¿Cerrar sesión?" : "Log out?")) {
+                    clearAllIronTrackPrefixedKeys();
+                    syncStateWithLocalStorage();
+                  }
+                }}
+              >
+                <Ic name="log-out" size={17} color="#f87171" /> {es ? "Cerrar sesión" : "Log out"}
+              </div>
+            </div>
+          </div>
+        </>
       )}
       {timer&&!session&&(
         <AlumnoRestTimerBar
@@ -2081,12 +2128,15 @@ function GymApp() {
       )}
 
       <div
-        className={"plan-main-scroll" + (planScrollDiag.planAnimationsGlobalCss === false ? " plan-scroll-diag-no-hov" : "")}
+        className={"plan-main-scroll relative z-0" + (planScrollDiag.planAnimationsGlobalCss === false ? " plan-scroll-diag-no-hov" : "")}
         ref={function (node) {
           scrollRef.current = node;
         }}
         style={{
-          padding: tab === "progress" ? "12px 20px" : "12px 16px",
+          paddingLeft: tab === "progress" ? 20 : 16,
+          /** Progreso (stack alumno): simétrico para no descentrar; resto: gutter extra a la derecha. */
+          paddingRight:
+            tab === "progress" && alumnoProgressInnerScroll ? 20 : tab === "progress" ? 36 : 32,
           overflowY: alumnoProgressInnerScroll ? "hidden" : "auto",
           flexDirection: alumnoProgressInnerScroll ? "column" : undefined,
           minHeight: alumnoProgressInnerScroll ? 0 : undefined,
@@ -2244,15 +2294,15 @@ function GymApp() {
                     </div>
                   )}
                   {/* ESTA SEMANA */}
-                  <div style={{background:bgCard,borderRadius:14,padding:"14px 16px",marginBottom:8,border:"1px solid "+border}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                  <div style={{background:bgCard,borderRadius:14,padding:"20px 22px",marginBottom:12,border:"1px solid "+border}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
                       <span style={{fontSize:11,fontWeight:700,color:textMuted,letterSpacing:1,textTransform:"uppercase"}}>{es?"Esta semana":"This week"}</span>
                       <div style={{textAlign:"right"}}>
                         <div style={{fontSize:12,fontWeight:700,color:"#2563EB"}}>{es?"Semana":"Week"} {currentWeek+1} {es?"de":"of"} 4</div>
                         <div style={{fontSize:11,color:textMuted}}>{daysCompletedThisWeek}/{totalDays} {es?"días":"days"}</div>
                       </div>
                     </div>
-                    <div style={{display:"flex",gap:8}}>
+                    <div style={{display:"flex",gap:10}}>
                       {(r0?.days||[]).map((d,i)=>{
                         const done = completedDays.includes((r0?.id||"")+"-"+i+"-w"+currentWeek);
                         const isNext = i===nextDayIdx;
@@ -2288,7 +2338,7 @@ function GymApp() {
                       style={{
                         background:"rgba(37,99,235,.07)",
                         borderRadius:14,
-                        padding:"16px",
+                        padding:"22px 20px",
                         marginBottom:0,
                         border:"1px solid rgba(37,99,235,.18)",
                         position:"relative",
@@ -2428,10 +2478,10 @@ function GymApp() {
               </div>
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
-              return (<div key={r.id} style={{marginBottom:16,marginTop:16}}>
+              return (<div key={r.id} style={{marginBottom:20,marginTop:20}}>
                   {/* Título + meta (sin botón PDF arriba: exportación solo al final del plan) */}
                   {planScrollDiag.routineMetaPdf&&(
-                  <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
+                  <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
                     <div style={{
                       fontSize:28,
                       fontWeight:800,
@@ -2469,9 +2519,9 @@ function GymApp() {
                     const exNames=(d.exercises||[]).slice(0,3).map(function(ex){var inf=allEx.find(function(e){return e.id===ex.id});return resolveExerciseTitle(inf||null,ex,es);}).join(", ");
 
                     return(
-                      <div key={r.id+"-plan-day-"+di} style={{background:bgCard,border:"1px solid "+(isNextDay?"#2563EB":isDayDone?"#22C55E44":border),borderRadius:12,marginBottom:8,overflow:"hidden"}}>
+                      <div key={r.id+"-plan-day-"+di} style={{background:bgCard,border:"1px solid "+(isNextDay?"#2563EB":isDayDone?"#22C55E44":border),borderRadius:12,marginBottom:12,overflow:"hidden"}}>
                         {/* Header del día - siempre visible */}
-                        <div onClick={function(){setExpandedPlanDay(isOpen?null:r.id+"-"+di)}} style={{padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
+                        <div onClick={function(){setExpandedPlanDay(isOpen?null:r.id+"-"+di)}} style={{padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
                           <div style={{width:36,height:36,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0,
                             background:isDayDone?"#22C55E22":isNextDay?"#2563EB22":bgSub,
                             color:isDayDone?"#22C55E":isNextDay?"#2563EB":textMuted,
@@ -2491,10 +2541,10 @@ function GymApp() {
 
                         {/* Contenido expandido */}
                         {isOpen&&(
-                          <div style={{padding:"0 14px 14px",borderTop:"1px solid "+border}}>
+                          <div style={{padding:"0 20px 20px",borderTop:"1px solid "+border}}>
                             {(d.warmup||[]).length>0&&(
-                              <div style={{marginTop:8,marginBottom:8}}>
-                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                              <div style={{marginTop:12,marginBottom:12}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
                                   <span style={{width:3,height:12,borderRadius:2,background:"#F59E0B"}}/>
                                   <span style={{fontSize:11,fontWeight:700,color:"#F59E0B",letterSpacing:1}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</span>
                                 </div>
@@ -2503,7 +2553,7 @@ function GymApp() {
                                   var nombre=resolveExerciseTitle(inf||null,ex,es);
                                   var vUrl=resolveVideoUrl(inf||null,ex,videoOverrides);
                                   return(
-                                    <div key={r.id+"-d"+di+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
+                                    <div key={r.id+"-d"+di+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 0",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
                                       <div style={{width:3,height:20,borderRadius:2,background:"#F59E0B44",flexShrink:0}}/>
                                       <div style={{flex:1,fontSize:16,fontWeight:700,color:textMain}}>{nombre}</div>
                                       <span style={{fontSize:13,color:"#A3B4CC",fontWeight:600}}>{ex.sets||"-"}×{ex.reps||"-"}</span>
@@ -2513,8 +2563,8 @@ function GymApp() {
                                 })}
                               </div>
                             )}
-                            <div style={{marginBottom:8}}>
-                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                            <div style={{marginBottom:12}}>
+                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
                                 <span style={{width:3,height:12,borderRadius:2,background:"#2563EB"}}/>
                                 <span style={{fontSize:11,fontWeight:700,color:"#2563EB",letterSpacing:1}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
                               </div>
@@ -2527,7 +2577,7 @@ function GymApp() {
                                 var rp=w.reps||ex.reps||"-";
                                 var kg2=w.kg||ex.kg||"";
                                 return(
-                                  <div key={r.id+"-d"+di+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 0",borderBottom:ei<d.exercises.length-1?"1px solid "+border:"none"}}>
+                                  <div key={r.id+"-d"+di+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:10,padding:"16px 0",borderBottom:ei<d.exercises.length-1?"1px solid "+border:"none"}}>
                                     <div style={{width:3,height:24,borderRadius:2,background:border,flexShrink:0}}/>
                                     <div style={{flex:1,minWidth:0}}>
                                       <div style={{fontSize:17,fontWeight:800,color:textMain}}>{nombre}</div>
@@ -2595,8 +2645,8 @@ function GymApp() {
                     </button>
                   )}
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                    background:bgCard,borderRadius:12,padding:"8px 16px",border:"1px solid "+border,
-                    marginBottom:4}}>
+                    background:bgCard,borderRadius:12,padding:"14px 20px",border:"1px solid "+border,
+                    marginBottom:8}}>
                     <button className="hov"
                       onClick={()=>currentWeek>0&&setCurrentWeek(w=>w-1)}
                       style={{width:36,height:36,borderRadius:8,border:"1px solid "+border,
@@ -2757,7 +2807,7 @@ function GymApp() {
             es={es}
             expectedDaysPerWeek={routineDaysCount}
             onSettings={()=>setSettingsOpen(true)}
-            onAvatarClick={()=>setUserMenuOpen(true)}
+            onAvatarClick={()=>setUserMenuOpen(function(v){ return !v; })}
             esEntrenador={false}
           />
         )}
@@ -6233,9 +6283,10 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
 
   return (
     <div>
-      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>
+      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:16,textTransform:"uppercase"}}>
         {es?"MIS EJERCICIOS":"MY EXERCISES"} ({lista.length})
       </div>
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
       {lista.map(function(item) {
         var info = item.info;
         var ex = item.ex;
@@ -6248,8 +6299,8 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
         var barColor = PAT_COLORS[patron] || "#2563EB";
 
         return (
-          <div key={item.id} style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"14px",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div key={item.id} style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"22px 24px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
               <div style={{width:4,alignSelf:"stretch",borderRadius:2,background:barColor,flexShrink:0,minHeight:36}}/>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:16,fontWeight:800,color:textMain,marginBottom:2}}>{nombre}</div>
@@ -6270,6 +6321,7 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
           </div>
         );
       })}
+      </div>
     </div>
   );
 });

@@ -8,7 +8,7 @@ export default function StatCard({ icon, iconBg, value, label, sub, highlight })
   return (
     <div
       className={cn(
-        'flex flex-col items-start gap-5 rounded-2xl border border-[#1e3050] bg-[#131b2e] !p-6 transition-colors hover:bg-[#162038]',
+        'flex flex-col items-start gap-5 rounded-2xl border border-[#1e3050] bg-[#131b2e] px-[24px] py-[22px] transition-colors hover:bg-[#162038]',
         highlight && 'animate-pulse-pr border-[#4ade80]/30 bg-[#4ade80]/5'
       )}
     >

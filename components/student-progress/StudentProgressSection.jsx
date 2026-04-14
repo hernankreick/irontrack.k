@@ -1,7 +1,6 @@
 import React from 'react'
 import { Trophy, Image as ImageIcon, BarChart3, Settings, Calendar, Flame, TrendingUp } from 'lucide-react'
 import IronTrackLogo from '@/components/IronTrackLogo.jsx'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProgressChartsPanel } from './ProgressChartsPanel.jsx'
 import { ProgressSessionsPanel } from './ProgressSessionsPanel.jsx'
@@ -85,7 +84,10 @@ export default function StudentProgressSection({
         ['--warning']: '#f59e0b',
       }}
     >
-      <header className="relative z-[500] shrink-0 border-b border-[#1e3050] bg-[#0B1120] px-5 pb-5 pt-[max(2rem,env(safe-area-inset-top,0px))] sm:px-8">
+      <header
+        className="relative isolate z-[520] shrink-0 border-b border-[#1e3050] bg-[#0F1923] px-5 pb-5 pt-[max(2rem,env(safe-area-inset-top,0px))] sm:px-8"
+        style={{ pointerEvents: 'auto' }}
+      >
         <div className="mx-auto flex max-w-lg items-center justify-between gap-4">
           <div className="ml-1 min-w-0 shrink sm:ml-2">
             <IronTrackLogo
@@ -97,29 +99,46 @@ export default function StudentProgressSection({
               modeColor="#4ade80"
             />
           </div>
-          <div className="mr-1 flex shrink-0 items-center gap-5 sm:mr-2">
+          <div className="mr-1 flex shrink-0 items-center gap-2 sm:mr-2">
+            {/* Mismas formas que Plan / Ejercicios (App.jsx): settings = btn rounded-lg; avatar = 36×36 rounded 10px */}
             <button
               type="button"
-              className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-[#1a2540] text-[#7c8db0] transition-colors hover:bg-[#162038]"
+              className="hov flex items-center justify-center rounded-lg border-0 bg-[#2D4057] p-2 text-[#FFFFFF]"
               aria-label={es ? 'Configuración' : 'Settings'}
-              onClick={onSettings}
+              onClick={function (e) {
+                e.stopPropagation()
+                onSettings?.()
+              }}
             >
-              <Settings className="h-5 w-5" />
+              <Settings className="h-[18px] w-[18px]" strokeWidth={2} />
             </button>
-            <button type="button" className="rounded-full p-0" onClick={onAvatarClick} aria-label="Menú usuario">
-              <Avatar className="h-11 w-11 min-h-[44px] min-w-[44px]">
-                <AvatarFallback>{initials}</AvatarFallback>
-              </Avatar>
+            <button
+              type="button"
+              className="hov flex shrink-0 items-center justify-center border-0 text-[13px] font-extrabold leading-none text-white"
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: 'linear-gradient(135deg,#1E3A5F,#2563EB)',
+                cursor: 'pointer',
+              }}
+              onClick={function (e) {
+                e.stopPropagation()
+                onAvatarClick?.()
+              }}
+              aria-label={es ? 'Menú usuario' : 'User menu'}
+            >
+              {initials}
             </button>
           </div>
         </div>
       </header>
 
       <div
-        className="relative z-0 mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col gap-8 overflow-x-hidden overflow-y-auto overscroll-y-contain px-2 pb-8 pt-2 sm:px-4"
+        className="relative z-0 mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col gap-8 overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 pb-8 pt-2 sm:px-4"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <div className="mb-12 grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 lg:gap-5">
+        <div className="mb-12 grid grid-cols-2 gap-5 sm:gap-6 lg:grid-cols-4 lg:gap-6">
           <StatCard
             icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
             iconBg="bg-[#2563eb]/20"
