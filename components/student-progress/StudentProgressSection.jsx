@@ -113,8 +113,8 @@ export default function StudentProgressSection({
         </div>
       </div>
 
-      <div className="mx-auto mt-4 max-w-lg space-y-5 px-1 pb-6">
-        <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 lg:gap-5">
+      <div className="mx-auto mt-4 flex max-w-lg flex-col gap-8 px-1 pb-6">
+        <div className="mb-12 grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 lg:gap-5">
           <StatCard
             icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
             iconBg="bg-[#2563eb]/20"
@@ -147,8 +147,9 @@ export default function StudentProgressSection({
           />
         </div>
 
-        <Tabs defaultValue="graficos" className="mt-12 mb-10 flex w-full flex-col gap-5">
-          <TabsList className="grid h-auto min-h-12 w-full grid-cols-3 gap-1 rounded-xl py-4">
+        <div className="mt-16 mb-10 w-full">
+        <Tabs defaultValue="graficos" className="flex w-full flex-col gap-5">
+          <TabsList className="grid h-auto min-h-12 w-full grid-cols-3 gap-8 rounded-xl py-4">
             <TabsTrigger value="sesiones" className="gap-1.5 px-4 py-4">
               <Trophy className="h-4 w-4" />
               <span className="hidden sm:inline">{es ? 'Sesiones' : 'Sessions'}</span>
@@ -190,6 +191,7 @@ export default function StudentProgressSection({
             />
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </div>
   )
