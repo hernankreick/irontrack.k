@@ -70,7 +70,7 @@ export default function StudentProgressSection({
 
   return (
     <div
-      className="student-progress-scope text-[#f0f6ff]"
+      className="student-progress-scope isolate text-[#f0f6ff]"
       style={{
         fontFamily:
           "'Geist Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
@@ -85,17 +85,19 @@ export default function StudentProgressSection({
         ['--warning']: '#f59e0b',
       }}
     >
-      <div className="sticky top-0 z-30 -mx-4 border-b border-[#1e3050] bg-[#0d1117]/95 px-4 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-lg items-start justify-between gap-3">
-          <IronTrackLogo
-            size={20}
-            color="#2563eb"
-            barColor="#4ade80"
-            showBar
-            mode={es ? 'MODO ALUMNO' : 'ATHLETE MODE'}
-            modeColor="#4ade80"
-          />
-          <div className="flex shrink-0 items-center gap-2">
+      <div className="sticky top-0 z-30 mb-14 border-b border-[#1e3050] bg-[#0d1117]/95 px-5 pb-5 pt-8 backdrop-blur-md sm:px-8">
+        <div className="mx-auto flex max-w-lg items-center justify-between gap-4">
+          <div className="ml-1 min-w-0 shrink sm:ml-2">
+            <IronTrackLogo
+              size={20}
+              color="#2563eb"
+              barColor="#4ade80"
+              showBar
+              mode={es ? 'MODO ALUMNO' : 'ATHLETE MODE'}
+              modeColor="#4ade80"
+            />
+          </div>
+          <div className="mr-1 flex shrink-0 items-center gap-5 sm:mr-2">
             <button
               type="button"
               className="flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-[#1a2540] text-[#7c8db0] transition-colors hover:bg-[#162038]"
@@ -113,7 +115,7 @@ export default function StudentProgressSection({
         </div>
       </div>
 
-      <div className="mx-auto mt-4 flex max-w-lg flex-col gap-8 px-1 pb-6">
+      <div className="mx-auto flex max-w-lg flex-col gap-8 px-2 pb-8 pt-4 sm:px-4">
         <div className="mb-12 grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 lg:gap-5">
           <StatCard
             icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}

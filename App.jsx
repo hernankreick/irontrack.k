@@ -2084,13 +2084,13 @@ function GymApp() {
           scrollRef.current = node;
         }}
         style={{
-          padding: tab === "progress" ? "0px" : "12px 16px",
+          padding: tab === "progress" ? "12px 20px" : "12px 16px",
           overflowY:"auto",
           /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
           height:"calc(100svh - 130px)",
           /** Tab bar + safe area + margen para el CTA “Descargar PDF” al final del plan sin quedar bajo la nav. */
           paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px) + 32px)",
-          paddingTop:12,
+          paddingTop: tab === "progress" ? "max(28px, env(safe-area-inset-top, 0px))" : 12,
           display:(session&&activeDay)?"none":"block",
           WebkitOverflowScrolling:"touch",
           scrollBehavior:"auto",
