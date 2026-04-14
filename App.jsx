@@ -2084,7 +2084,7 @@ function GymApp() {
           scrollRef.current = node;
         }}
         style={{
-          padding:"12px 16px",
+          padding: tab === "progress" ? "0px" : "12px 16px",
           overflowY:"auto",
           /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
           height:"calc(100svh - 130px)",
@@ -2099,29 +2099,17 @@ function GymApp() {
           background:darkMode?(esAlumno&&tab==="progress"?"#0d1117":"#0B1120"):"#F1F5F9",
         }}>
         {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
-        {tab==="plan"&&(
-          <div>
-            {!esAlumno&&sessionData?.role==="entrenador"&&(
+        {tab==="plan"&&!esAlumno&&sessionData?.role==="entrenador"&&(
               <CoachDashboard
                 alumnos={alumnos}
                 coachAvatarUrl={sessionData?.avatarUrl}
                 coachName={sessionData?.name}
-                activeNav={
-                  tab === "plan" ? "dashboard" :
-                  tab === "routines" ? "routines" :
-                  tab === "biblioteca" ? "exercises" :
-                  tab === "alumnos" ? "alumnos" :
-                  tab === "progress" ? "progreso" :
-                  "dashboard"
-                }
+                activeNav="dashboard"
                 setActiveNav={function(nav){
                   if(nav==="dashboard") setTab("plan");
                   else if(nav==="routines") setTab("routines");
                   else if(nav==="exercises") setTab("biblioteca");
                   else if(nav==="alumnos") setTab("alumnos");
-                  else if(nav==="progreso") setTab("progress");
-                  else if(nav==="mensajes") setTab("plan");
-                  else if(nav==="settings") setTab("plan");
                 }}
                 onRevisar={async function(alumnoId){
                   var alum=(alumnos||[]).find(function(x){ return String(x.id)===String(alumnoId); });
@@ -2151,8 +2139,9 @@ function GymApp() {
                 onCrearRutina={function(){ setTab("routines"); }}
                 onRevisarAlumnos={function(){ setTab("alumnos"); }}
               />
-            )}
-            
+        )}
+        {tab==="plan"&&(
+          <div>
             {esAlumno&&routines.length>0&&(()=>{
               const r0 = routines[0];
               const hoy = new Date().toLocaleDateString("es-AR");
@@ -2773,8 +2762,7 @@ function GymApp() {
           </div>
         )}
         {tab==="progress"&&!showAlumnoProgressStack&&(
-          <div style={{marginBottom:24}}>
-            <div style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:8,color:textMain}}><Ic name="bar-chart-2" size={16}/> {es?"GRÁFICO DE PROGRESO":"PROGRESS CHART"}</div>
+          <div style={{width:"100%",maxWidth:480,margin:"0 auto"}}>
             <GraficoProgreso allEx={allEx} es={es} darkMode={darkMode} progress={progress} EX={EX} readOnly={readOnly||esAlumno} sharedParam={sharedParam} sb={sb} sessionData={sessionData} sesiones={sesiones}/>
           </div>
         )}
