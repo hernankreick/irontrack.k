@@ -4441,11 +4441,15 @@ function GymApp() {
 
 function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, es, darkMode, sesiones, allEx}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bgCard = _dm?"#162234":"#FFFFFF";
-  const bgSub = _dm?"#162234":"#EEF2F7";
-  const border = _dm?"#2D4057":"#E2E8F0";
-  const textMain = _dm?"#FFFFFF":"#0F1923";
-  const textMuted = _dm?"#8B9AB2":"#64748B";
+  const bgCard   = _dm ? "#111827" : "#FFFFFF";
+  const bgSub    = _dm ? "#0D1520" : "#EEF2F7";
+  const border   = _dm ? "#1a2535" : "#E2E8F0";
+  const textMain = _dm ? "#FFFFFF" : "#0F1923";
+  const textMuted = _dm ? "#6b7280" : "#64748B";
+  const green    = "#22C55E";
+  const blue     = "#3B82F6";
+  const amber    = "#F59E0B";
+  const red      = "#EF4444";
 
   const [sbData, setSbData] = React.useState([]);
   const [loadingGrafico, setLoadingGrafico] = React.useState(true);
@@ -4472,131 +4476,404 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
     return todos.filter(d=>{ const k=d.fecha+d.kg; if(seen.has(k))return false; seen.add(k); return true; }).slice(-20);
   };
 
+  if(loadingGrafico) return (
+    <div style={{padding:"0 16px"}}>
+      {[0,1,2].map(i=>(
+        <div key={i} className="sk" style={{
+          height:64, borderRadius:14, marginBottom:10,
+          background:"linear-gradient(90deg,#111827 25%,#1a2535 50%,#111827 75%)"
+        }}/>
+      ))}
+    </div>
+  );
+
+  const S = {
+    page: {
+      background: "transparent",
+      paddingBottom: 24,
+    },
+    sectionHeader: {
+      display:"flex", alignItems:"center", gap:8,
+      padding:"4px 20px 16px",
+    },
+    sectionTitle: {
+      fontFamily:"'Bebas Neue', sans-serif",
+      fontSize:24, color:"#FFFFFF", letterSpacing:".5px", margin:0,
+    },
+    statGrid: {
+      display:"grid", gridTemplateColumns:"1fr 1fr",
+      gap:10, padding:"0 16px", marginBottom:16,
+    },
+    statCard: (accent) => ({
+      background: accent==="green"
+        ? "rgba(34,197,94,.05)"
+        : "rgba(37,99,235,.05)",
+      border: `1px solid ${accent==="green"
+        ? "rgba(34,197,94,.25)"
+        : "rgba(37,99,235,.25)"}`,
+      borderRadius:16,
+      padding:"18px 16px 16px",
+      display:"flex", flexDirection:"column", gap:10,
+      cursor:"pointer",
+    }),
+    statIcon: (accent) => ({
+      width:36, height:36, borderRadius:10,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      background: accent==="green"
+        ? "rgba(34,197,94,.18)"
+        : "rgba(37,99,235,.18)",
+    }),
+    statNumber: (accent) => ({
+      fontFamily:"'DM Mono',monospace",
+      fontSize:34, fontWeight:600, lineHeight:1,
+      color: accent==="green" ? "#22C55E" : "#FFFFFF",
+    }),
+    statLabel: {
+      fontSize:11, fontWeight:700, letterSpacing:".8px",
+      textTransform:"uppercase", color:"#6b7280",
+    },
+    statSublabel: (accent) => ({
+      fontSize:11, marginTop:1,
+      color: accent==="green" ? "#22C55E" : "#6b7280",
+    }),
+    subsectionLabel: {
+      display:"flex", alignItems:"center", gap:8,
+      padding:"0 20px", marginBottom:14,
+    },
+    subsectionText: {
+      fontSize:11, fontWeight:700, letterSpacing:"1px",
+      textTransform:"uppercase", color:"#22C55E",
+    },
+    subsectionBadge: {
+      background:"rgba(34,197,94,.15)", color:"#22C55E",
+      fontSize:10, fontWeight:700,
+      padding:"2px 7px", borderRadius:20,
+    },
+    filterRow: {
+      display:"flex", gap:8,
+      padding:"0 16px", marginBottom:14,
+    },
+    filterBtn: {
+      flex:1,
+      display:"flex", alignItems:"center",
+      justifyContent:"space-between",
+      padding:"10px 12px",
+      background:"#111827",
+      border:"1px solid #1a2535",
+      borderRadius:10,
+      fontSize:13, color:"#94a3b8",
+      cursor:"pointer",
+      fontFamily:"'DM Sans',sans-serif",
+    },
+    exList: {
+      display:"flex", flexDirection:"column",
+      gap:8, padding:"0 16px",
+    },
+    exCard: (expanded) => ({
+      background:"#111827",
+      border: expanded
+        ? "1px solid rgba(34,197,94,.35)"
+        : "1px solid #1a2535",
+      borderRadius:14,
+      overflow:"hidden",
+      cursor:"pointer",
+    }),
+    exRow: {
+      display:"flex", alignItems:"center",
+      gap:12, padding:"14px 14px",
+    },
+    exArrow: (up) => ({
+      width:36, height:36, borderRadius:"50%", flexShrink:0,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      background: up
+        ? "rgba(34,197,94,.15)"
+        : "rgba(239,68,68,.15)",
+    }),
+    exName: {
+      fontSize:14, fontWeight:700, color:"#FFFFFF",
+      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+    },
+    exSub: {
+      fontSize:12, color:"#6b7280", marginTop:2,
+      display:"flex", alignItems:"center", gap:6,
+    },
+    exKg: (up) => ({
+      fontFamily:"'DM Mono',monospace",
+      fontSize:18, fontWeight:600,
+      color: up ? "#22C55E" : "#EF4444",
+    }),
+    prBadge: {
+      fontSize:9, fontWeight:800, letterSpacing:".5px",
+      background:"rgba(245,158,11,.2)", color:"#F59E0B",
+      padding:"2px 6px", borderRadius:4,
+      border:"1px solid rgba(245,158,11,.35)",
+    },
+    exDetail: {
+      padding:"0 14px 14px",
+    },
+    historyRow: {
+      display:"flex", justifyContent:"space-between",
+      alignItems:"center", padding:"7px 0",
+      borderTop:"1px solid #1a2535",
+      fontSize:12,
+    },
+  };
+
   // Ejercicios con datos (de la rutina del alumno + cualquiera con registros)
   const exConDatos = (allEx||EX||[]).filter(function(e){
     return (progress[e.id]?.sets||[]).some(function(s){return parseFloat(s.kg)>0}) ||
            sbData.some(function(d){return d.ejercicio_id===e.id&&parseFloat(d.kg)>0});
   });
 
-  if(loadingGrafico) return (
-    <div style={{textAlign:"center",padding:"40px 0"}}>
-      <div className="sk" style={{height:80,borderRadius:12,marginBottom:8}}/>
-      <div className="sk" style={{height:80,borderRadius:12,marginBottom:8}}/>
-      <div className="sk" style={{height:80,borderRadius:12}}/>
-    </div>
-  );
-
-  if(exConDatos.length===0) return (
-    <div style={{textAlign:"center",padding:"40px 16px"}}>
-      <div style={{fontSize:44,marginBottom:12}}>📊</div>
-      <div style={{fontSize:17,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin datos aún":"No data yet"}</div>
-      <div style={{fontSize:13,color:textMuted,lineHeight:1.6}}>{es?"Registrá sets con peso para ver tu progreso.":"Log sets with weight to see your progress."}</div>
-    </div>
-  );
-
   return (
-    <div>
-      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>
-        {es?"PROGRESO POR EJERCICIO":"PROGRESS BY EXERCISE"} ({exConDatos.length})
+    <div style={S.page}>
+
+      {/* TÍTULO */}
+      <div style={S.sectionHeader}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+          stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round"
+          strokeLinejoin="round">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+          <polyline points="17 6 23 6 23 12"/>
+        </svg>
+        <h2 style={S.sectionTitle}>Tu Progreso</h2>
       </div>
-      {exConDatos.map(function(e){
-        var datos = getDatos(e.id);
-        if(datos.length===0) return null;
-        var pr = Math.max.apply(null, datos.map(function(d){return d.kg}));
-        var ultimo = datos[datos.length-1];
-        var primero = datos[0];
-        var diff = datos.length>=2 ? Math.round((ultimo.kg-primero.kg)*10)/10 : 0;
-        var pct = primero.kg>0 ? Math.round((ultimo.kg-primero.kg)/primero.kg*100) : 0;
-        var isExpanded = expandedEx===e.id;
-        var tendDir = pct>0?"sube":pct<0?"baja":"estable";
 
-        return (
-          <div key={e.id} style={{background:bgCard,border:"1px solid "+(isExpanded?"#2563EB":border),borderRadius:12,marginBottom:8,overflow:"hidden",transition:"all .2s"}}>
-            {/* Card compacta - siempre visible */}
-            <div onClick={function(){setExpandedEx(isExpanded?null:e.id)}} style={{padding:"12px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
-              <div style={{width:40,height:40,borderRadius:10,background:tendDir==="sube"?"#22C55E15":tendDir==="baja"?"#EF444415":"#2563EB15",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>
-                {tendDir==="sube"?"↑":tendDir==="baja"?"↓":"→"}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:textMain,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{es?e.name:(e.nameEn||e.name)}</div>
-                <div style={{display:"flex",gap:8,alignItems:"center",marginTop:2}}>
-                  <span style={{fontSize:12,color:textMuted}}>{es?"Último":"Last"}: {ultimo.kg}kg×{ultimo.reps}</span>
-                  {datos.length>=2&&<span style={{fontSize:11,fontWeight:700,color:tendDir==="sube"?"#22C55E":tendDir==="baja"?"#EF4444":"#8B9AB2"}}>{pct>0?"+":""}{pct}%</span>}
-                </div>
-              </div>
-              <div style={{textAlign:"right",flexShrink:0}}>
-                <div style={{fontSize:18,fontWeight:900,color:"#fbbf24"}}>{pr}kg</div>
-                <div style={{fontSize:10,fontWeight:700,color:"#fbbf24"}}>PR</div>
-              </div>
-              <div style={{fontSize:13,color:textMuted,flexShrink:0}}>{isExpanded?"▲":"▼"}</div>
-            </div>
+      {/* STAT GRID */}
+      <div style={S.statGrid}>
 
-            {/* Gráfico expandido */}
-            {isExpanded&&(
-              <div style={{padding:"0 14px 14px",borderTop:"1px solid "+border}}>
-                {/* Mini gráfico SVG inline */}
-                <div style={{height:120,position:"relative",marginTop:8}}>
-                  {(function(){
-                    var W=300,H=100,padL=40,padR=10,padT=10,padB=20;
-                    var pts=datos;
-                    if(pts.length<2) return <div style={{textAlign:"center",padding:"20px 0",fontSize:13,color:textMuted}}>{es?"Necesitás al menos 2 registros":"Need at least 2 records"}</div>;
-                    var kgs=pts.map(function(p){return p.kg});
-                    var minK=Math.min.apply(null,kgs);
-                    var maxK=Math.max.apply(null,kgs);
-                    var rangeK=maxK-minK||1;
-                    var points=pts.map(function(p,i){
-                      var x=padL+(W-padL-padR)*i/(pts.length-1);
-                      var y=padT+(H-padT-padB)*(1-(p.kg-minK)/rangeK);
-                      return{x:x,y:y,kg:p.kg,reps:p.reps,fecha:p.fecha};
-                    });
-                    var pathD="M"+points.map(function(p){return p.x+","+p.y}).join("L");
-                    var areaD=pathD+"L"+points[points.length-1].x+","+(H-padB)+"L"+points[0].x+","+(H-padB)+"Z";
-                    return(
-                      <svg width="100%" viewBox={"0 0 "+W+" "+H} style={{overflow:"visible"}}>
-                        <defs><linearGradient id={"grad-"+e.id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#2563EB" stopOpacity="0.3"/><stop offset="100%" stopColor="#2563EB" stopOpacity="0"/></linearGradient></defs>
-                        {[0,0.25,0.5,0.75,1].map(function(f,i){
-                          var y2=padT+(H-padT-padB)*f;
-                          var val=Math.round(maxK-(maxK-minK)*f);
-                          return(<g key={e.id+"-chart-grid-y-"+val}><line x1={padL} y1={y2} x2={W-padR} y2={y2} stroke={border} strokeWidth="0.5"/><text x={padL-4} y={y2+3} textAnchor="end" fill={textMuted} fontSize="9">{val}</text></g>);
-                        })}
-                        <path d={areaD} fill={"url(#grad-"+e.id+")"}/>
-                        <path d={pathD} fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        {points.map(function(p,i){return(
-                          <g key={e.id+"-chart-pt-"+(p.fecha||"")+"-"+p.kg+"-"+i}>
-                            <circle cx={p.x} cy={p.y} r={i===points.length-1?5:3} fill={p.kg>=pr?"#fbbf24":"#2563EB"} stroke={_dm?"#0F1923":"#fff"} strokeWidth="2"/>
-                            {i===points.length-1&&<text x={p.x} y={p.y-10} textAnchor="middle" fill="#2563EB" fontSize="11" fontWeight="700">{p.kg}kg</text>}
-                          </g>
-                        )})}
-                        {pts.length<=8&&points.map(function(p,i){return(
-                          <text key={e.id+"-xaxis-"+(p.fecha||"")+"-"+i} x={p.x} y={H-padB+12} textAnchor="middle" fill={textMuted} fontSize="8">{(p.fecha||"").split("/").slice(0,2).join("/")}</text>
-                        )})}
-                      </svg>
-                    );
-                  })()}
+        {/* Sesiones */}
+        <div style={S.statCard("blue")}>
+          <div style={S.statIcon("blue")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div style={S.statNumber("blue")}>
+            {sesiones?.length || 0}
+          </div>
+          <div>
+            <div style={S.statLabel}>Sesiones</div>
+            <div style={S.statSublabel("blue")}>completadas</div>
+          </div>
+        </div>
+
+        {/* PRs */}
+        <div style={S.statCard("green")}>
+          <div style={S.statIcon("green")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="#22C55E" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 9H4.5a2.5 2.5 0 010-5H6"/>
+              <path d="M18 9h1.5a2.5 2.5 0 000-5H18"/>
+              <path d="M4 22h16"/>
+              <path d="M18 2H6v7a6 6 0 0012 0V2z"/>
+            </svg>
+          </div>
+          <div style={S.statNumber("green")}>
+            {(() => {
+              const mesActual = new Date().getMonth();
+              return sbData.filter(d => {
+                const f = d.fecha ? new Date(d.fecha) : null;
+                return f && f.getMonth() === mesActual;
+              }).length;
+            })()}
+          </div>
+          <div>
+            <div style={S.statLabel}>PRs del mes</div>
+            <div style={S.statSublabel("green")}>nuevos récords</div>
+          </div>
+        </div>
+
+        {/* Racha */}
+        <div style={S.statCard("blue")}>
+          <div style={S.statIcon("blue")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+          <div style={S.statNumber("blue")}>
+            {(() => {
+              if(!sesiones?.length) return 0;
+              const dias = [...new Set(
+                sesiones.map(s => (s.created_at||"").slice(0,10))
+              )].sort().reverse();
+              let racha = 0;
+              let hoy = new Date();
+              for(let i=0; i<dias.length; i++){
+                const d = new Date(dias[i]);
+                const diff = Math.round((hoy - d)/(1000*60*60*24));
+                if(diff === i) racha++;
+                else break;
+              }
+              return racha;
+            })()}
+          </div>
+          <div>
+            <div style={S.statLabel}>Racha</div>
+            <div style={S.statSublabel("blue")}>días consecutivos</div>
+          </div>
+        </div>
+
+        {/* Mejora */}
+        <div style={S.statCard("green")}>
+          <div style={S.statIcon("green")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+              <polyline points="17 6 23 6 23 12"/>
+            </svg>
+          </div>
+          <div style={S.statNumber("green")}>
+            {(() => {
+              if(!exConDatos.length) return "—";
+              const mejoras = exConDatos.map(e => {
+                const datos = getDatos(e.id);
+                if(datos.length < 2) return null;
+                const primero = datos[0].kg;
+                const ultimo  = datos[datos.length-1].kg;
+                if(!primero) return null;
+                return ((ultimo - primero) / primero) * 100;
+              }).filter(v => v !== null);
+              if(!mejoras.length) return "—";
+              const avg = mejoras.reduce((a,b)=>a+b,0)/mejoras.length;
+              return (avg>=0?"+":"")+avg.toFixed(0)+"%";
+            })()}
+          </div>
+          <div>
+            <div style={S.statLabel}>Mejora total</div>
+            <div style={S.statSublabel("green")}>promedio</div>
+          </div>
+        </div>
+
+      </div>{/* /stat-grid */}
+
+      {/* LABEL SECCIÓN */}
+      <div style={S.subsectionLabel}>
+        <span style={S.subsectionText}>PROGRESO POR EJERCICIO</span>
+        <span style={S.subsectionBadge}>{exConDatos.length}</span>
+      </div>
+
+      {/* ESTADO VACÍO */}
+      {exConDatos.length === 0 && (
+        <div style={{
+          textAlign:"center", padding:"40px 20px",
+          color:"#6b7280", fontSize:14,
+        }}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+            stroke="#1a2535" strokeWidth="1.5" strokeLinecap="round"
+            style={{marginBottom:12, display:"block", margin:"0 auto 12px"}}>
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+          Todavía no hay registros de progreso
+        </div>
+      )}
+
+      {/* LISTA EJERCICIOS */}
+      <div style={S.exList}>
+        {exConDatos.map(function(ex){
+          const datos    = getDatos(ex.id);
+          const ultimo   = datos[datos.length-1];
+          const primero  = datos[0];
+          const subio    = !primero || !ultimo || ultimo.kg >= primero.kg;
+          const pct      = primero?.kg && ultimo?.kg
+            ? (((ultimo.kg - primero.kg) / primero.kg)*100).toFixed(0)
+            : null;
+          const esPR     = datos.length >= 2 && ultimo?.kg > primero?.kg;
+          const expanded = expandedEx === ex.id;
+
+          return (
+            <div key={ex.id}
+              style={S.exCard(expanded)}
+              onClick={()=> setExpandedEx(expanded ? null : ex.id)}
+            >
+              {/* ROW PRINCIPAL */}
+              <div style={S.exRow}>
+
+                {/* Flecha */}
+                <div style={S.exArrow(subio)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke={subio?"#22C55E":"#EF4444"}
+                    strokeWidth="2.5" strokeLinecap="round">
+                    {subio
+                      ? <><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></>
+                      : <><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></>
+                    }
+                  </svg>
                 </div>
-                {/* Historial de registros */}
-                <div style={{marginTop:8}}>
-                  <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{es?"HISTORIAL":"HISTORY"} ({datos.length})</div>
-                  <div style={{display:"flex",flexDirection:"column",gap:3}}>
-                    {datos.slice().reverse().slice(0,6).map(function(d,i){
-                      var esPR=d.kg>=pr;
-                      return(
-                        <div key={e.id+"-exp-hist-"+(d.fecha||"")+"-"+d.kg+"-"+d.reps+"-"+i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",background:esPR?"#fbbf2410":bgSub,borderRadius:6,border:esPR?"1px solid #fbbf2433":"none"}}>
-                          <span style={{fontSize:12,color:textMuted}}>{d.fecha}</span>
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            <span style={{fontSize:13,fontWeight:700,color:esPR?"#fbbf24":textMain}}>{d.kg}kg × {d.reps}</span>
-                            {esPR&&<span style={{fontSize:9,fontWeight:700,color:"#fbbf24"}}>🏆</span>}
-                          </div>
-                        </div>
-                      );
-                    })}
+
+                {/* Info */}
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={S.exName}>{ex.nombre||ex.name||"Ejercicio"}</div>
+                  <div style={S.exSub}>
+                    {ultimo
+                      ? `Último: ${ultimo.kg}kg × ${ultimo.reps}`
+                      : "Sin registros"
+                    }
+                    {pct !== null && (
+                      <span style={{
+                        color: subio ? "#22C55E" : "#EF4444",
+                        fontWeight:600,
+                      }}>
+                        {subio?"+":""}{pct}%
+                      </span>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
+
+                {/* Kg + PR */}
+                <div style={{display:"flex",flexDirection:"column",
+                  alignItems:"flex-end",gap:4,flexShrink:0}}>
+                  {ultimo && (
+                    <div style={S.exKg(subio)}>{ultimo.kg}kg</div>
+                  )}
+                  {esPR && <div style={S.prBadge}>PR</div>}
+                </div>
+
+                {/* Chevron */}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round"
+                  style={{
+                    flexShrink:0,
+                    transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+                    transition:"transform .25s",
+                  }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+
+              </div>{/* /ex-row */}
+
+              {/* DETALLE EXPANDIDO */}
+              {expanded && (
+                <div style={S.exDetail}>
+                  {datos.slice(-5).reverse().map(function(d, i){
+                    return (
+                      <div key={i} style={S.historyRow}>
+                        <span style={{color:"#6b7280"}}>{d.fecha||"—"}</span>
+                        <span style={{color:"#94a3b8",fontWeight:500}}>
+                          {d.reps ? `× ${d.reps}` : ""}
+                        </span>
+                        <span style={{
+                          fontFamily:"'DM Mono',monospace",
+                          fontWeight:600, color:"#FFFFFF",
+                        }}>{d.kg}kg</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+            </div>
+          );
+        })}
+      </div>{/* /ex-list */}
+
     </div>
   );
 }
