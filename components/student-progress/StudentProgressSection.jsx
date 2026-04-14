@@ -85,7 +85,7 @@ export default function StudentProgressSection({
         ['--warning']: '#f59e0b',
       }}
     >
-      <div className="sticky top-0 z-30 mb-14 border-b border-[#1e3050] bg-[#0d1117]/95 px-5 pb-5 pt-8 backdrop-blur-md sm:px-8">
+      <div className="sticky top-0 z-[100] mb-14 border-b border-[#1e3050] bg-[#0B1120] px-5 pb-5 pt-8 sm:px-8">
         <div className="mx-auto flex max-w-lg items-center justify-between gap-4">
           <div className="ml-1 min-w-0 shrink sm:ml-2">
             <IronTrackLogo
