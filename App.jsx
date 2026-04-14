@@ -21,6 +21,7 @@ import { WelcomeModal } from './components/WelcomeModal.jsx';
 import SettingsPage from './components/settings/SettingsPage.jsx';
 import { applyItPrefsToDocument } from './components/settings/SectionPreferencias.jsx';
 import { supabase } from './lib/supabaseClient.js';
+import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { Calendar as CalNavIcon, Dumbbell, TrendingUp as TrendNavIcon } from 'lucide-react';
 
 
@@ -802,6 +803,8 @@ function GymApp() {
   const [loginPass, setLoginPass] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  /** Evita mostrar onboarding/login hasta leer `it_session` / flags en localStorage (post-login, refresh). */
+  const [authLoading, setAuthLoading] = useState(function () { return !sharedParam; });
   const [webAuthnAvail] = useState(()=> typeof window!=="undefined" && !!window.PublicKeyCredential);
   const [savedCredential] = useState(()=>{ try{return localStorage.getItem("it_biometric_cred")}catch(e){return null} });
   const [lang, setLang] = useState(()=>{try{return localStorage.getItem("it_lang")||"es"}catch(e){return "es"}});
@@ -1105,7 +1108,14 @@ function GymApp() {
     try { setCustomEx(JSON.parse(localStorage.getItem("it_cex") || "[]")); } catch (e) { setCustomEx([]); }
     try { setPendingSync(JSON.parse(localStorage.getItem("it_pending_sync") || "[]")); } catch (e) { setPendingSync([]); }
     try { setPagosEstado(JSON.parse(localStorage.getItem("it_pagos_estado") || "{}")); } catch (e) { setPagosEstado({}); }
-    try { setOnboardDone(!!localStorage.getItem("it_onboard_done")); } catch (e) { setOnboardDone(false); }
+    try {
+      if (sess && (sess.role === "entrenador" || sess.role === "alumno")) {
+        try { localStorage.setItem("it_onboard_done", "1"); } catch (e) {}
+        setOnboardDone(true);
+      } else {
+        setOnboardDone(!!localStorage.getItem("it_onboard_done"));
+      }
+    } catch (e) { setOnboardDone(false); }
     setTab("plan");
     setSession(null);
     setAlumnos([]);
@@ -1130,6 +1140,33 @@ function GymApp() {
     }
     setTimer(null);
   }
+
+  useLayoutEffect(function () {
+    if (sharedParam) {
+      setAuthLoading(false);
+      return;
+    }
+    try {
+      var raw = localStorage.getItem("it_session");
+      var parsed = null;
+      if (raw) {
+        try { parsed = JSON.parse(raw); } catch (e1) { parsed = null; }
+      }
+      setSessionData(parsed);
+      setLoginScreen(!raw);
+      var fromLs = !!localStorage.getItem("it_onboard_done");
+      if (parsed && (parsed.role === "entrenador" || parsed.role === "alumno")) {
+        fromLs = true;
+        try { localStorage.setItem("it_onboard_done", "1"); } catch (e2) {}
+      }
+      setOnboardDone(fromLs);
+    } catch (e) {
+      setSessionData(null);
+      setLoginScreen(true);
+      try { setOnboardDone(!!localStorage.getItem("it_onboard_done")); } catch (e2) { setOnboardDone(false); }
+    }
+    setAuthLoading(false);
+  }, [sharedParam]);
 
   // OneSignal Web Push
 
@@ -1805,15 +1842,24 @@ function GymApp() {
 
   // Pantalla de login
 
+  const hasAppSession = !!(sessionData && (sessionData.role === "entrenador" || sessionData.role === "alumno"));
+
   // ── Onboarding de 3 pasos ─────────────────────────────────────────────
-  if(!sharedParam && !onboardDone) return (
+  if (!sharedParam && authLoading) return (
+    <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
+      <IronTrackLogo size={40} color="#2563EB" showBar={false}/>
+      <div style={{marginTop:20,fontSize:14,fontWeight:600,color:textMuted,letterSpacing:0.5}}>{es?"Cargando…":"Loading…"}</div>
+    </div>
+  );
+
+  if (!sharedParam && !hasAppSession && !onboardDone) return (
     <OnboardingScreen es={es} darkMode={darkMode} onDone={()=>{
       try{localStorage.setItem('it_onboard_done','1');}catch(e){}
       setOnboardDone(true);
     }}/>
   );
 
-  if(!sharedParam && loginScreen) return (
+  if (!sharedParam && !hasAppSession && loginScreen) return (
     <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
       <div style={{marginBottom:40,textAlign:"center"}}>
         <IronTrackLogo size={32} color="#2563EB" showBar={false}/>
@@ -1839,17 +1885,19 @@ function GymApp() {
             const isEntrenador = loginEmail.trim().toLowerCase()==="entrenador@irontrack.app";
             if(isEntrenador){
               if(loginEmail==="entrenador@irontrack.app"&&loginPass===sp){
-                localStorage.clear();
+                clearIronTrackStorageForNewLogin();
                 const s={role:"entrenador",name:"Entrenador"};
                 localStorage.setItem("it_session",JSON.stringify(s));
                 syncStateWithLocalStorage();
+                setLoginEmail("");
+                setLoginPass("");
               } else setLoginError("Email o contraseña incorrectos");
             } else {
               const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmail)+"&password=eq."+encodeURIComponent(loginPass)+"&select=*");
               if(res&&res.length>0){
                 const alumno=res[0];
                 const ruts=await sbFetch("rutinas?alumno_id=eq."+alumno.id+"&select=*&order=created_at.desc&limit=1");
-                localStorage.clear();
+                clearIronTrackStorageForNewLogin();
                 const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id,entrenadorId:alumno.entrenador_id};
                 localStorage.setItem("it_session",JSON.stringify(s));
                 localStorage.setItem("it_show_welcome","1");
@@ -1864,6 +1912,8 @@ function GymApp() {
                   });
                 } catch(e) {}
                 syncStateWithLocalStorage();
+                setLoginEmail("");
+                setLoginPass("");
               } else setLoginError("Email o contraseña incorrectos");
             }
           } finally {
@@ -1890,6 +1940,8 @@ function GymApp() {
                     setTimeout(function(){
                       try { localStorage.setItem("it_session", JSON.stringify(saved)); } catch(e) {}
                       syncStateWithLocalStorage();
+                      setLoginEmail("");
+                      setLoginPass("");
                       setLoginLoading(false);
                     }, 500);
                   }
@@ -1999,7 +2051,7 @@ function GymApp() {
                   </div>
                   </div>
                   <div style={{borderTop:"1px solid rgba(239,68,68,.2)",padding:"4px 0"}}>
-                  <div className="hov" style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:700,color:"#f87171"}} onClick={()=>{setUserMenuOpen(false);if(confirm(es?"¿Cerrar sesión?":"Log out?")){localStorage.clear();syncStateWithLocalStorage();}}}>
+                  <div className="hov" style={{padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:700,color:"#f87171"}} onClick={()=>{setUserMenuOpen(false);if(confirm(es?"¿Cerrar sesión?":"Log out?")){clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}}>
                     <Ic name="log-out" size={17} color="#f87171"/> {es?"Cerrar sesión":"Log out"}
                   </div>
                   </div>
@@ -2008,7 +2060,7 @@ function GymApp() {
               )}
               </>
             : sessionData
-              ? <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{localStorage.clear();syncStateWithLocalStorage();}}>SALIR</button>
+              ? <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}>SALIR</button>
               : <button className="hov" style={{...btn(),padding:"4px 8px",fontSize:13}} onClick={()=>setLoginModal(true)}><Ic name="user" size={18}/></button>
           }
         </div>
@@ -2054,12 +2106,22 @@ function GymApp() {
                 alumnos={alumnos}
                 coachAvatarUrl={sessionData?.avatarUrl}
                 coachName={sessionData?.name}
-                activeNav="dashboard"
+                activeNav={
+                  tab === "plan" ? "dashboard" :
+                  tab === "routines" ? "routines" :
+                  tab === "biblioteca" ? "exercises" :
+                  tab === "alumnos" ? "alumnos" :
+                  tab === "progress" ? "progreso" :
+                  "dashboard"
+                }
                 setActiveNav={function(nav){
                   if(nav==="dashboard") setTab("plan");
                   else if(nav==="routines") setTab("routines");
                   else if(nav==="exercises") setTab("biblioteca");
                   else if(nav==="alumnos") setTab("alumnos");
+                  else if(nav==="progreso") setTab("progress");
+                  else if(nav==="mensajes") setTab("plan");
+                  else if(nav==="settings") setTab("plan");
                 }}
                 onRevisar={async function(alumnoId){
                   var alum=(alumnos||[]).find(function(x){ return String(x.id)===String(alumnoId); });
@@ -3579,7 +3641,7 @@ function GymApp() {
                 <div style={{marginTop:22,paddingTop:16,borderTop:"1px solid rgba(239,68,68,.25)"}}>
                   <div style={{fontSize:11,fontWeight:700,color:"#f87171",letterSpacing:1.2,marginBottom:10}}>{es?"ZONA DE PELIGRO":"DANGER ZONE"}</div>
                   <button type="button" className="hov" style={{width:"100%",padding:"14px",background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.35)",borderRadius:12,color:"#f87171",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
-                    onClick={()=>{if(confirm(es?"¿Cerrar sesión?":"Log out?")){setSettingsOpen(false);localStorage.clear();syncStateWithLocalStorage();}}}>
+                    onClick={()=>{if(confirm(es?"¿Cerrar sesión?":"Log out?")){setSettingsOpen(false);clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}}>
                     <Ic name="log-out" size={18} color="#f87171"/> {es?"Cerrar sesión":"Log out"}
                   </button>
                 </div>

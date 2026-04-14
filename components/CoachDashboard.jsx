@@ -1,13 +1,14 @@
 import React, { useMemo } from "react";
 import { Ic } from "./Ic.jsx";
 import IronTrackLogo from "./IronTrackLogo.jsx";
+import { useBreakpoint } from "./hooks/useBreakpoint";
 
 const S = {
   root: {
     fontFamily: "'DM Sans', sans-serif",
     background: "#0B0E11",
     color: "#F1F5F9",
-    paddingBottom: 100,
+    paddingBottom: 0,
     minHeight: "100%",
     boxSizing: "border-box",
     width: "100%",
@@ -305,6 +306,7 @@ export default function CoachDashboard({
 }) {
   const gradId = useMemo(() => "wk-grad-" + Math.random().toString(36).slice(2, 9), []);
   const ringAnimId = useMemo(() => "coachWkRing_" + Math.random().toString(36).slice(2, 9), []);
+  const { isMobile, isDesktop } = useBreakpoint();
 
   const teamRows = useMemo(() => {
     if (alumnos && alumnos.length > 0) {
@@ -333,9 +335,296 @@ export default function CoachDashboard({
   ];
   const dayLabels = ["L", "M", "X", "J", "V", "S", "D"];
 
+  const equipoMetricasOuterStyle = isMobile
+    ? { display: "flex", gap: 8, marginBottom: 14 }
+    : {
+        display: "grid",
+        gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : "repeat(2, 1fr)",
+        gap: 12,
+        marginBottom: 20,
+      };
+
+  const renderAlertasCards = () => (
+    <div className="coach-dash-alerts">
+      {alerts.map((a) => (
+        <div
+          key={a.id}
+          className="coach-dash-alert-card"
+          style={{
+            minWidth: 260,
+            maxWidth: 280,
+            flexShrink: 0,
+            background: "#141820",
+            border: "1px solid rgba(255,255,255,0.06)",
+            borderRadius: 18,
+            padding: 14,
+            marginBottom: 14,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.06)",
+                color: "#F1F5F9",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+                fontWeight: 800,
+              }}
+            >
+              {a.initials}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 800, fontSize: 15, color: "#F1F5F9" }}>{a.name}</div>
+              <div
+                style={{
+                  display: "inline-block",
+                  marginTop: 4,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: 0.5,
+                  color: a.color,
+                  border: "1px solid " + a.color,
+                  borderRadius: 8,
+                  padding: "2px 8px",
+                }}
+              >
+                {a.badge}
+              </div>
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.45, margin: "0 0 14px" }}>{a.msg}</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => onRevisar && onRevisar(a.id)}
+              style={{
+                flex: 1,
+                padding: "10px 8px",
+                borderRadius: 12,
+                border: "none",
+                fontWeight: 800,
+                fontSize: 11,
+                letterSpacing: 0.6,
+                cursor: "pointer",
+                fontFamily: "'DM Sans', sans-serif",
+                background: a.color,
+                color: "#0B0E11",
+              }}
+            >
+              REVISAR
+            </button>
+            <button
+              type="button"
+              onClick={() => onVerPerfil && onVerPerfil(a.id)}
+              style={{
+                flex: 1,
+                padding: "10px 8px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.1)",
+                fontWeight: 800,
+                fontSize: 11,
+                letterSpacing: 0.6,
+                cursor: "pointer",
+                fontFamily: "'DM Sans', sans-serif",
+                background: "rgba(255,255,255,0.04)",
+                color: "#94A3B8",
+              }}
+            >
+              VER PERFIL
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderAlertasInteligentes = () => (
+    <>
+      <div style={{ ...S.sectionLabel, marginTop: 4 }}>
+        <IconStar />
+        Alertas inteligentes
+      </div>
+      {renderAlertasCards()}
+    </>
+  );
+
+  const renderEquipoMetricas = () => (
+    <>
+      <div style={{ ...S.sectionLabel, marginTop: 8 }}>
+        <IconUsers />
+        Equipo de un vistazo
+      </div>
+      <div style={equipoMetricasOuterStyle}>
+        {[
+          { label: "Cumpliendo", n: "5", sub: "≥70% sesiones", color: "#22C55E", Icon: IconCheckCircle },
+          { label: "En progreso", n: "2", sub: "30–69%", color: "#F59E0B", Icon: IconClock },
+          { label: "Sin actividad", n: "1", sub: "<30%", color: "#EF4444", Icon: IconAlertCircle },
+        ].map((row) => {
+          const StatusIco = row.Icon;
+          return (
+          <div
+            key={row.label}
+            style={{
+              flex: 1,
+              background: "#141820",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 12,
+              padding: "10px 8px",
+              textAlign: "center",
+            }}
+          >
+            <StatusIco />
+            <div style={{ fontSize: 20, fontWeight: 900, color: row.color, marginTop: 6 }}>{row.n}</div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#F1F5F9", marginTop: 2 }}>{row.label}</div>
+            <div style={{ fontSize: 9, color: "#64748B", marginTop: 2 }}>{row.sub}</div>
+          </div>
+        );
+        })}
+      </div>
+    </>
+  );
+
+  const renderListaAlumnos = () => (
+    <div style={S.card}>
+      {teamRows.map((t) => (
+        <div
+          key={t.id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "10px 0",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "rgba(37,99,235,0.15)",
+              color: "#F1F5F9",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 12,
+              fontWeight: 800,
+              flexShrink: 0,
+            }}
+          >
+            {t.initials}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#F1F5F9" }}>{t.name}</div>
+            <div style={{ height: 6, borderRadius: 4, background: "rgba(255,255,255,0.08)", marginTop: 8, overflow: "hidden" }}>
+              <div style={{ width: t.pct + "%", height: "100%", background: t.color, borderRadius: 4 }} />
+            </div>
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: t.color, minWidth: 40, textAlign: "right" }}>{t.pct}%</div>
+          <span style={{ color: "#64748B", display: "flex" }}>
+            <IconChevronRight />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
+    <div style={{ display: "flex", minHeight: "100vh", background: "#0B0E11" }}>
+      {isDesktop && (
+        <div
+          style={{
+            width: 220,
+            background: "#0D1520",
+            borderRight: "1px solid #1a2535",
+            display: "flex",
+            flexDirection: "column",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            zIndex: 50,
+            padding: "24px 0",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'Bebas Neue',sans-serif",
+              fontSize: 20,
+              letterSpacing: 2,
+              padding: "0 20px 24px",
+              borderBottom: "1px solid #1a2535",
+            }}
+          >
+            IRON<span style={{ color: "#3B82F6" }}>TRACK</span>
+            <div
+              style={{
+                fontFamily: "'DM Sans',sans-serif",
+                fontSize: 10,
+                color: "#64748B",
+                fontWeight: 600,
+                letterSpacing: 1,
+                marginTop: 4,
+              }}
+            >
+              MODO COACH
+            </div>
+          </div>
+          {[
+            { label: "DASHBOARD", key: "dashboard" },
+            { label: "ALUMNOS", key: "alumnos" },
+            { label: "RUTINAS", key: "routines" },
+            { label: "EJERCICIOS", key: "exercises" },
+            { label: "PROGRESO", key: "progreso" },
+            { label: "MENSAJES", key: "mensajes" },
+            { label: "SETTINGS", key: "settings" },
+          ].map((item) => (
+            <div
+              key={item.key}
+              onClick={() => setActiveNav && setActiveNav(item.key)}
+              style={{
+                padding: "10px 20px",
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: 1,
+                color: activeNav === item.key ? "#3B82F6" : "#64748B",
+                background: activeNav === item.key ? "rgba(37,99,235,0.12)" : "transparent",
+                cursor: "pointer",
+                fontFamily: "'DM Sans',sans-serif",
+                borderLeft: activeNav === item.key ? "2px solid #3B82F6" : "2px solid transparent",
+                transition: "all .15s",
+              }}
+            >
+              {item.label}
+            </div>
+          ))}
+          <div
+            style={{
+              marginTop: "auto",
+              padding: "16px 20px",
+              borderTop: "1px solid #1a2535",
+              fontSize: 13,
+              color: "#94A3B8",
+            }}
+          >
+            Coach · Admin
+          </div>
+        </div>
+      )}
+      <div
+        style={{
+          flex: 1,
+          marginLeft: isDesktop ? 220 : 0,
+          minWidth: 0,
+        }}
+      >
     <div
-      style={S.root}
+      style={{ ...S.root, paddingBottom: isDesktop ? 40 : 100 }}
       className="w-full max-w-[480px] px-4 sm:px-5 md:max-w-3xl md:px-6 lg:max-w-5xl lg:px-8 xl:max-w-6xl"
     >
       <style>
@@ -395,39 +684,58 @@ export default function CoachDashboard({
               background: rgba(148, 163, 184, 0.55);
             }
           }
+          @media (min-width: 1024px) {
+            .coach-dash-alerts {
+              display: flex;
+              flex-direction: column;
+              overflow-x: unset;
+              overflow-y: visible;
+              gap: 12px;
+              padding: 12px 14px;
+              margin: 0;
+              scroll-snap-type: none;
+            }
+            .coach-dash-alert-card {
+              min-width: unset;
+              max-width: unset;
+              width: 100%;
+            }
+          }
         `}
       </style>
 
-      <header style={S.header}>
-        <IronTrackLogo size={22} color="#2563EB" showBar={true} mode="Modo entrenador" modeColor="#2563EB" />
-        {(coachAvatarUrl || coachName) ? (
-          <div
-            role="img"
-            aria-label={coachName ? "Entrenador " + coachName : "Avatar"}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              overflow: "hidden",
-              flexShrink: 0,
-              background: "linear-gradient(135deg,#1E3A5F,#2563EB)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 13,
-              fontWeight: 800,
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-          >
-            {coachAvatarUrl ? (
-              <img src={coachAvatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              (coachName || "?").slice(0, 2).toUpperCase()
-            )}
-          </div>
-        ) : null}
-      </header>
+      {!isDesktop && (
+        <header style={S.header}>
+          <IronTrackLogo size={22} color="#2563EB" showBar={true} mode="Modo entrenador" modeColor="#2563EB" />
+          {(coachAvatarUrl || coachName) ? (
+            <div
+              role="img"
+              aria-label={coachName ? "Entrenador " + coachName : "Avatar"}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                overflow: "hidden",
+                flexShrink: 0,
+                background: "linear-gradient(135deg,#1E3A5F,#2563EB)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+                fontWeight: 800,
+                color: "#fff",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              {coachAvatarUrl ? (
+                <img src={coachAvatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                (coachName || "?").slice(0, 2).toUpperCase()
+              )}
+            </div>
+          ) : null}
+        </header>
+      )}
 
       <div style={S.greeting}>Hola, Coach</div>
 
@@ -464,7 +772,17 @@ export default function CoachDashboard({
             <WeeklyRing gradId={gradId} animId={ringAnimId} pct={68} />
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 6, marginTop: 20, height: 72 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            alignItems: "flex-end",
+            justifyContent: "flex-start",
+            maxWidth: isDesktop ? 480 : "100%",
+            marginTop: 20,
+            height: 72,
+          }}
+        >
           {dayBars.map((d, i) => (
             <div key={dayLabels[i]} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
               <div
@@ -483,181 +801,48 @@ export default function CoachDashboard({
         </div>
       </div>
 
-      <div style={{ ...S.sectionLabel, marginTop: 4 }}>
-        <IconStar />
-        Alertas inteligentes
-      </div>
-      <div className="coach-dash-alerts">
-        {alerts.map((a) => (
-          <div
-            key={a.id}
-            className="coach-dash-alert-card"
-            style={{
-              minWidth: 260,
-              maxWidth: 280,
-              flexShrink: 0,
-              background: "#141820",
-              border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 18,
-              padding: 14,
-              marginBottom: 14,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.06)",
-                  color: "#F1F5F9",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 13,
-                  fontWeight: 800,
-                }}
-              >
-                {a.initials}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 800, fontSize: 15, color: "#F1F5F9" }}>{a.name}</div>
-                <div
-                  style={{
-                    display: "inline-block",
-                    marginTop: 4,
-                    fontSize: 10,
-                    fontWeight: 800,
-                    letterSpacing: 0.5,
-                    color: a.color,
-                    border: "1px solid " + a.color,
-                    borderRadius: 8,
-                    padding: "2px 8px",
-                  }}
-                >
-                  {a.badge}
-                </div>
-              </div>
-            </div>
-            <p style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.45, margin: "0 0 14px" }}>{a.msg}</p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => onRevisar && onRevisar(a.id)}
-                style={{
-                  flex: 1,
-                  padding: "10px 8px",
-                  borderRadius: 12,
-                  border: "none",
-                  fontWeight: 800,
-                  fontSize: 11,
-                  letterSpacing: 0.6,
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  background: a.color,
-                  color: "#0B0E11",
-                }}
-              >
-                REVISAR
-              </button>
-              <button
-                type="button"
-                onClick={() => onVerPerfil && onVerPerfil(a.id)}
-                style={{
-                  flex: 1,
-                  padding: "10px 8px",
-                  borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  fontWeight: 800,
-                  fontSize: 11,
-                  letterSpacing: 0.6,
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  background: "rgba(255,255,255,0.04)",
-                  color: "#94A3B8",
-                }}
-              >
-                VER PERFIL
-              </button>
-            </div>
+      {isDesktop ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 20, alignItems: "flex-start" }}>
+          <div>
+            {renderEquipoMetricas()}
+            {renderListaAlumnos()}
           </div>
-        ))}
-      </div>
-
-      <div style={{ ...S.sectionLabel, marginTop: 8 }}>
-        <IconUsers />
-        Equipo de un vistazo
-      </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        {[
-          { label: "Cumpliendo", n: "5", sub: "≥70% sesiones", color: "#22C55E", Icon: IconCheckCircle },
-          { label: "En progreso", n: "2", sub: "30–69%", color: "#F59E0B", Icon: IconClock },
-          { label: "Sin actividad", n: "1", sub: "<30%", color: "#EF4444", Icon: IconAlertCircle },
-        ].map((row) => {
-          const StatusIco = row.Icon;
-          return (
           <div
-            key={row.label}
             style={{
-              flex: 1,
-              background: "#141820",
-              border: "1px solid rgba(255,255,255,0.06)",
+              background: "#0D1520",
+              border: "1px solid #1a2535",
               borderRadius: 12,
-              padding: "10px 8px",
-              textAlign: "center",
-            }}
-          >
-            <StatusIco />
-            <div style={{ fontSize: 20, fontWeight: 900, color: row.color, marginTop: 6 }}>{row.n}</div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#F1F5F9", marginTop: 2 }}>{row.label}</div>
-            <div style={{ fontSize: 9, color: "#64748B", marginTop: 2 }}>{row.sub}</div>
-          </div>
-        );
-        })}
-      </div>
-
-      <div style={S.card}>
-        {teamRows.map((t) => (
-          <div
-            key={t.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "10px 0",
-              borderBottom: "1px solid rgba(255,255,255,0.06)",
+              overflow: "hidden",
+              position: "sticky",
+              top: 20,
             }}
           >
             <div
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                background: "rgba(37,99,235,0.15)",
-                color: "#F1F5F9",
+                padding: "14px 18px",
+                borderBottom: "1px solid #1a2535",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 1,
+                textTransform: "uppercase",
+                color: "#64748B",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                fontSize: 12,
-                fontWeight: 800,
-                flexShrink: 0,
+                gap: 7,
               }}
             >
-              {t.initials}
+              ★ ALERTAS INTELIGENTES
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "#F1F5F9" }}>{t.name}</div>
-              <div style={{ height: 6, borderRadius: 4, background: "rgba(255,255,255,0.08)", marginTop: 8, overflow: "hidden" }}>
-                <div style={{ width: t.pct + "%", height: "100%", background: t.color, borderRadius: 4 }} />
-              </div>
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: t.color, minWidth: 40, textAlign: "right" }}>{t.pct}%</div>
-            <span style={{ color: "#64748B", display: "flex" }}>
-              <IconChevronRight />
-            </span>
+            {renderAlertasCards()}
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div>
+          {renderEquipoMetricas()}
+          {renderAlertasInteligentes()}
+          {renderListaAlumnos()}
+        </div>
+      )}
 
       <div style={{ ...S.sectionLabel, marginTop: 4 }}>
         <IconLightning />
@@ -747,7 +932,7 @@ export default function CoachDashboard({
         <CoachScoreRing pct={72} />
       </div>
 
-      <nav style={S.bottomNav}>
+      <nav style={{ ...S.bottomNav, display: isDesktop ? "none" : "flex" }}>
         {navItems.map(({ key, label, ic }) => {
           const active = activeNav === key;
           return (
@@ -777,6 +962,8 @@ export default function CoachDashboard({
           );
         })}
       </nav>
+    </div>
+      </div>
     </div>
   );
 }

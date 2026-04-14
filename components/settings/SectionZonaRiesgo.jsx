@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import SectionCard from './ui/SectionCard.jsx';
 import Btn from './ui/Btn.jsx';
 import { supabase } from '../../lib/supabaseClient.js';
+import { clearAllIronTrackPrefixedKeys } from '../../lib/irontrackLocalStorage.js';
 
 function Modal({ children, onBackdrop }) {
   return (
@@ -71,7 +72,7 @@ export default function SectionZonaRiesgo({ toast2, syncStateWithLocalStorage, o
       if (supabase) await supabase.auth.signOut();
     } catch (e) {}
     try {
-      localStorage.clear();
+      clearAllIronTrackPrefixedKeys();
     } catch (e) {}
     syncStateWithLocalStorage();
     onClose && onClose();
@@ -84,7 +85,7 @@ export default function SectionZonaRiesgo({ toast2, syncStateWithLocalStorage, o
       if (supabase) await supabase.auth.signOut();
     } catch (e) {}
     try {
-      localStorage.clear();
+      clearAllIronTrackPrefixedKeys();
     } catch (e) {}
     syncStateWithLocalStorage();
     onClose && onClose();
