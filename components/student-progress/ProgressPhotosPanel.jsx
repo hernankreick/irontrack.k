@@ -44,7 +44,7 @@ export function ProgressPhotosPanel({ sharedParam, sb, es, esEntrenador }) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={`sk-ph-${i}`} className="sk aspect-square rounded-xl" />
         ))}
@@ -90,7 +90,7 @@ export function ProgressPhotosPanel({ sharedParam, sb, es, esEntrenador }) {
       )}
 
       {fotos.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
           {fotos.map((f, i) => (
             <div
               key={f.id != null ? String(f.id) : `foto-${i}`}

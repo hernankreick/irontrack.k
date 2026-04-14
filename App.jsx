@@ -2762,7 +2762,7 @@ function GymApp() {
           </div>
         )}
         {tab==="progress"&&!showAlumnoProgressStack&&(
-          <div style={{width:"100%",maxWidth:480,margin:"0 auto"}}>
+          <div className="mx-auto w-full max-w-[480px]">
             <GraficoProgreso allEx={allEx} es={es} darkMode={darkMode} progress={progress} EX={EX} readOnly={readOnly||esAlumno} sharedParam={sharedParam} sb={sb} sessionData={sessionData} sesiones={sesiones}/>
           </div>
         )}
@@ -4490,17 +4490,6 @@ function GymApp() {
 }
 
 function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, es, darkMode, sesiones, allEx}) {
-  const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bgCard   = _dm ? "#111827" : "#FFFFFF";
-  const bgSub    = _dm ? "#0D1520" : "#EEF2F7";
-  const border   = _dm ? "#1a2535" : "#E2E8F0";
-  const textMain = _dm ? "#FFFFFF" : "#0F1923";
-  const textMuted = _dm ? "#6b7280" : "#64748B";
-  const green    = "#22C55E";
-  const blue     = "#3B82F6";
-  const amber    = "#F59E0B";
-  const red      = "#EF4444";
-
   const [sbData, setSbData] = React.useState([]);
   const [loadingGrafico, setLoadingGrafico] = React.useState(true);
   const [expandedEx, setExpandedEx] = React.useState(null);
@@ -4527,149 +4516,15 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
   };
 
   if(loadingGrafico) return (
-    <div style={{padding:"0 16px"}}>
+    <div className="px-4">
       {[0,1,2].map(i=>(
-        <div key={i} className="sk" style={{
-          height:64, borderRadius:14, marginBottom:10,
-          background:"linear-gradient(90deg,#111827 25%,#1a2535 50%,#111827 75%)"
-        }}/>
+        <div key={i} className="sk mb-2.5 rounded-2xl py-8"
+          style={{
+            background:"linear-gradient(90deg,#111827 25%,#1a2535 50%,#111827 75%)"
+          }}/>
       ))}
     </div>
   );
-
-  const S = {
-    page: {
-      background: "transparent",
-      paddingBottom: 24,
-    },
-    sectionHeader: {
-      display:"flex", alignItems:"center", gap:8,
-      padding:"4px 20px 16px",
-    },
-    sectionTitle: {
-      fontFamily:"'Bebas Neue', sans-serif",
-      fontSize:24, color:"#FFFFFF", letterSpacing:".5px", margin:0,
-    },
-    statGrid: {
-      display:"grid", gridTemplateColumns:"1fr 1fr",
-      gap:10, padding:"0 16px", marginBottom:16,
-    },
-    statCard: (accent) => ({
-      background: accent==="green"
-        ? "rgba(34,197,94,.05)"
-        : "rgba(37,99,235,.05)",
-      border: `1px solid ${accent==="green"
-        ? "rgba(34,197,94,.25)"
-        : "rgba(37,99,235,.25)"}`,
-      borderRadius:18,
-      padding:"22px 18px 20px",
-      display:"flex", flexDirection:"column", gap:14,
-      cursor:"pointer",
-      minHeight:140,
-    }),
-    statIcon: (accent) => ({
-      width:42, height:42, borderRadius:12,
-      display:"flex", alignItems:"center", justifyContent:"center",
-      alignSelf:"flex-start",
-      background: accent==="green"
-        ? "rgba(34,197,94,.18)"
-        : "rgba(37,99,235,.18)",
-    }),
-    statNumber: (accent) => ({
-      fontFamily:"'DM Mono',monospace",
-      fontSize:34, fontWeight:600, lineHeight:1,
-      color: accent==="green" ? "#22C55E" : "#FFFFFF",
-    }),
-    statLabel: {
-      fontSize:11, fontWeight:700, letterSpacing:".8px",
-      textTransform:"uppercase", color:"#6b7280",
-    },
-    statSublabel: (accent) => ({
-      fontSize:11, marginTop:1,
-      color: accent==="green" ? "#22C55E" : "#6b7280",
-    }),
-    subsectionLabel: {
-      display:"flex", alignItems:"center", gap:8,
-      padding:"0 20px", marginBottom:14,
-    },
-    subsectionText: {
-      fontSize:11, fontWeight:700, letterSpacing:"1px",
-      textTransform:"uppercase", color:"#22C55E",
-    },
-    subsectionBadge: {
-      background:"rgba(34,197,94,.15)", color:"#22C55E",
-      fontSize:10, fontWeight:700,
-      padding:"2px 7px", borderRadius:20,
-    },
-    filterRow: {
-      display:"flex", gap:8,
-      padding:"0 16px", marginBottom:14,
-    },
-    filterBtn: {
-      flex:1,
-      display:"flex", alignItems:"center",
-      justifyContent:"space-between",
-      padding:"10px 12px",
-      background:"#111827",
-      border:"1px solid #1a2535",
-      borderRadius:10,
-      fontSize:13, color:"#94a3b8",
-      cursor:"pointer",
-      fontFamily:"'DM Sans',sans-serif",
-    },
-    exList: {
-      display:"flex", flexDirection:"column",
-      gap:8, padding:"0 16px",
-    },
-    exCard: (expanded) => ({
-      background:"#111827",
-      border: expanded
-        ? "1px solid rgba(34,197,94,.35)"
-        : "1px solid #1a2535",
-      borderRadius:14,
-      overflow:"hidden",
-      cursor:"pointer",
-    }),
-    exRow: {
-      display:"flex", alignItems:"center",
-      gap:12, padding:"16px 16px",
-    },
-    exArrow: (up) => ({
-      width:36, height:36, borderRadius:"50%", flexShrink:0,
-      display:"flex", alignItems:"center", justifyContent:"center",
-      background: up
-        ? "rgba(34,197,94,.15)"
-        : "rgba(239,68,68,.15)",
-    }),
-    exName: {
-      fontSize:14, fontWeight:700, color:"#FFFFFF",
-      whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
-    },
-    exSub: {
-      fontSize:12, color:"#6b7280", marginTop:2,
-      display:"flex", alignItems:"center", gap:6,
-    },
-    exKg: (up) => ({
-      fontFamily:"'DM Mono',monospace",
-      fontSize:18, fontWeight:600,
-      color: up ? "#22C55E" : "#EF4444",
-    }),
-    prBadge: {
-      fontSize:9, fontWeight:800, letterSpacing:".5px",
-      background:"rgba(245,158,11,.2)", color:"#F59E0B",
-      padding:"2px 6px", borderRadius:4,
-      border:"1px solid rgba(245,158,11,.35)",
-    },
-    exDetail: {
-      padding:"4px 14px 16px",
-    },
-    historyRow: {
-      display:"flex", justifyContent:"space-between",
-      alignItems:"center", padding:"11px 0",
-      borderTop:"1px solid #1a2535",
-      fontSize:12,
-    },
-  };
 
   // Ejercicios con datos (de la rutina del alumno + cualquiera con registros)
   const exConDatos = (allEx||EX||[]).filter(function(e){
@@ -4678,25 +4533,25 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
   });
 
   return (
-    <div style={S.page}>
+    <div className="bg-transparent pb-6">
 
       {/* TÍTULO */}
-      <div style={S.sectionHeader}>
+      <div className="flex items-center gap-2 px-5 pb-4 pt-1">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
           stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round"
           strokeLinejoin="round">
           <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
           <polyline points="17 6 23 6 23 12"/>
         </svg>
-        <h2 style={S.sectionTitle}>Tu Progreso</h2>
+        <h2 className="m-0 font-['Bebas_Neue',sans-serif] text-2xl tracking-wide text-white">Tu Progreso</h2>
       </div>
 
       {/* STAT GRID */}
-      <div style={S.statGrid}>
+      <div className="grid grid-cols-2 gap-5 mb-8">
 
         {/* Sesiones */}
-        <div style={S.statCard("blue")}>
-          <div style={S.statIcon("blue")}>
+        <div className="flex flex-col items-start gap-4 rounded-2xl border border-[#1e3050] bg-[#131b2e] p-6">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
               stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
               <rect x="3" y="4" width="18" height="18" rx="2"/>
@@ -4705,18 +4560,18 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
               <line x1="3" y1="10" x2="21" y2="10"/>
             </svg>
           </div>
-          <div style={S.statNumber("blue")}>
+          <div className="font-['DM_Mono',monospace] text-[34px] font-semibold leading-none text-white">
             {sesiones?.length || 0}
           </div>
           <div>
-            <div style={S.statLabel}>Sesiones</div>
-            <div style={S.statSublabel("blue")}>completadas</div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Sesiones</div>
+            <div className="mt-0.5 text-[11px] text-slate-500">completadas</div>
           </div>
         </div>
 
         {/* PRs */}
-        <div style={S.statCard("green")}>
-          <div style={S.statIcon("green")}>
+        <div className="flex flex-col items-start gap-4 rounded-2xl border border-[#1e3050] bg-[#131b2e] p-6">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
               stroke="#22C55E" strokeWidth="2" strokeLinecap="round">
               <path d="M6 9H4.5a2.5 2.5 0 010-5H6"/>
@@ -4725,7 +4580,7 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
               <path d="M18 2H6v7a6 6 0 0012 0V2z"/>
             </svg>
           </div>
-          <div style={S.statNumber("green")}>
+          <div className="font-['DM_Mono',monospace] text-[34px] font-semibold leading-none text-green-500">
             {(() => {
               const mesActual = new Date().getMonth();
               return sbData.filter(d => {
@@ -4735,20 +4590,20 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
             })()}
           </div>
           <div>
-            <div style={S.statLabel}>PRs del mes</div>
-            <div style={S.statSublabel("green")}>nuevos récords</div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">PRs del mes</div>
+            <div className="mt-0.5 text-[11px] text-green-500">nuevos récords</div>
           </div>
         </div>
 
         {/* Racha */}
-        <div style={S.statCard("blue")}>
-          <div style={S.statIcon("blue")}>
+        <div className="flex flex-col items-start gap-4 rounded-2xl border border-[#1e3050] bg-[#131b2e] p-6">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
               stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
             </svg>
           </div>
-          <div style={S.statNumber("blue")}>
+          <div className="font-['DM_Mono',monospace] text-[34px] font-semibold leading-none text-white">
             {(() => {
               if(!sesiones?.length) return 0;
               const dias = [...new Set(
@@ -4766,21 +4621,21 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
             })()}
           </div>
           <div>
-            <div style={S.statLabel}>Racha</div>
-            <div style={S.statSublabel("blue")}>días consecutivos</div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Racha</div>
+            <div className="mt-0.5 text-[11px] text-slate-500">días consecutivos</div>
           </div>
         </div>
 
         {/* Mejora */}
-        <div style={S.statCard("green")}>
-          <div style={S.statIcon("green")}>
+        <div className="flex flex-col items-start gap-4 rounded-2xl border border-[#1e3050] bg-[#131b2e] p-6">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
               stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round">
               <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
               <polyline points="17 6 23 6 23 12"/>
             </svg>
           </div>
-          <div style={S.statNumber("green")}>
+          <div className="font-['DM_Mono',monospace] text-[34px] font-semibold leading-none text-green-500">
             {(() => {
               if(!exConDatos.length) return "—";
               const mejoras = exConDatos.map(e => {
@@ -4797,28 +4652,24 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
             })()}
           </div>
           <div>
-            <div style={S.statLabel}>Mejora total</div>
-            <div style={S.statSublabel("green")}>promedio</div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Mejora total</div>
+            <div className="mt-0.5 text-[11px] text-green-500">promedio</div>
           </div>
         </div>
 
       </div>{/* /stat-grid */}
 
       {/* LABEL SECCIÓN */}
-      <div style={S.subsectionLabel}>
-        <span style={S.subsectionText}>PROGRESO POR EJERCICIO</span>
-        <span style={S.subsectionBadge}>{exConDatos.length}</span>
+      <div className="mb-3.5 flex items-center gap-2 px-5">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-green-500">PROGRESO POR EJERCICIO</span>
+        <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-bold text-green-500">{exConDatos.length}</span>
       </div>
 
       {/* ESTADO VACÍO */}
       {exConDatos.length === 0 && (
-        <div style={{
-          textAlign:"center", padding:"40px 20px",
-          color:"#6b7280", fontSize:14,
-        }}>
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
-            stroke="#1a2535" strokeWidth="1.5" strokeLinecap="round"
-            style={{marginBottom:12, display:"block", margin:"0 auto 12px"}}>
+        <div className="px-5 py-10 text-center text-sm text-slate-500">
+          <svg className="mx-auto mb-3 block h-9 w-9" width="36" height="36" viewBox="0 0 24 24" fill="none"
+            stroke="#1a2535" strokeWidth="1.5" strokeLinecap="round">
             <line x1="18" y1="20" x2="18" y2="10"/>
             <line x1="12" y1="20" x2="12" y2="4"/>
             <line x1="6" y1="20" x2="6" y2="14"/>
@@ -4828,7 +4679,7 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
       )}
 
       {/* LISTA EJERCICIOS */}
-      <div style={S.exList}>
+      <div className="flex flex-col px-4">
         {exConDatos.map(function(ex){
           const datos    = getDatos(ex.id);
           const ultimo   = datos[datos.length-1];
@@ -4842,14 +4693,20 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
 
           return (
             <div key={ex.id}
-              style={S.exCard(expanded)}
+              className={
+                "cursor-pointer overflow-hidden rounded-2xl border bg-[#111827] py-6 px-2 border-b border-white/5 "+
+                (expanded?"border-emerald-400/35":"border-[#1a2535]")
+              }
               onClick={()=> setExpandedEx(expanded ? null : ex.id)}
             >
               {/* ROW PRINCIPAL */}
-              <div style={S.exRow}>
+              <div className="flex items-center gap-5">
 
                 {/* Flecha */}
-                <div style={S.exArrow(subio)}>
+                <div className={
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full "+
+                  (subio?"bg-green-500/15":"bg-red-500/15")
+                }>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                     stroke={subio?"#22C55E":"#EF4444"}
                     strokeWidth="2.5" strokeLinecap="round">
@@ -4861,18 +4718,15 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
                 </div>
 
                 {/* Info */}
-                <div style={{flex:1, minWidth:0}}>
-                  <div style={S.exName}>{ex.nombre||ex.name||"Ejercicio"}</div>
-                  <div style={S.exSub}>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-bold text-white">{ex.nombre||ex.name||"Ejercicio"}</div>
+                  <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
                     {ultimo
                       ? `Último: ${ultimo.kg}kg × ${ultimo.reps}`
                       : "Sin registros"
                     }
                     {pct !== null && (
-                      <span style={{
-                        color: subio ? "#22C55E" : "#EF4444",
-                        fontWeight:600,
-                      }}>
+                      <span className={subio ? "font-semibold text-green-500" : "font-semibold text-red-500"}>
                         {subio?"+":""}{pct}%
                       </span>
                     )}
@@ -4880,22 +4734,19 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
                 </div>
 
                 {/* Kg + PR */}
-                <div style={{display:"flex",flexDirection:"column",
-                  alignItems:"flex-end",gap:4,flexShrink:0}}>
+                <div className="flex shrink-0 flex-col items-end gap-1">
                   {ultimo && (
-                    <div style={S.exKg(subio)}>{ultimo.kg}kg</div>
+                    <div className={"font-['DM_Mono',monospace] text-lg font-semibold "+(subio?"text-green-500":"text-red-500")}>{ultimo.kg}kg</div>
                   )}
-                  {esPR && <div style={S.prBadge}>PR</div>}
+                  {esPR && (
+                    <div className="rounded border border-amber-500/35 bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-extrabold tracking-wide text-amber-500">PR</div>
+                  )}
                 </div>
 
                 {/* Chevron */}
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                   stroke="#6b7280" strokeWidth="2.5" strokeLinecap="round"
-                  style={{
-                    flexShrink:0,
-                    transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-                    transition:"transform .25s",
-                  }}>
+                  className={"h-4 w-4 shrink-0 transition-transform duration-200 "+(expanded?"rotate-180":"")}>
                   <polyline points="6 9 12 15 18 9"/>
                 </svg>
 
@@ -4903,18 +4754,15 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
 
               {/* DETALLE EXPANDIDO */}
               {expanded && (
-                <div style={S.exDetail}>
+                <div className="px-3 pb-4 pt-1">
                   {datos.slice(-5).reverse().map(function(d, i){
                     return (
-                      <div key={i} style={S.historyRow}>
-                        <span style={{color:"#6b7280"}}>{d.fecha||"—"}</span>
-                        <span style={{color:"#94a3b8",fontWeight:500}}>
+                      <div key={i} className="flex items-center justify-between border-b border-[#1e3050]/50 px-3 py-4 text-xs">
+                        <span className="text-slate-500">{d.fecha||"—"}</span>
+                        <span className="font-medium text-slate-400">
                           {d.reps ? `× ${d.reps}` : ""}
                         </span>
-                        <span style={{
-                          fontFamily:"'DM Mono',monospace",
-                          fontWeight:600, color:"#FFFFFF",
-                        }}>{d.kg}kg</span>
+                        <span className="font-['DM_Mono',monospace] font-semibold text-white">{d.kg}kg</span>
                       </div>
                     );
                   })}

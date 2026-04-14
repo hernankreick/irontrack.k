@@ -61,7 +61,7 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
 
   if (loading) {
     return (
-      <div className="space-y-2">
+      <div className="flex flex-col gap-6">
         {[1, 2, 3].map((i) => (
           <div key={`sk-ses-${i}`} className="sk h-16 rounded-xl" />
         ))}
@@ -88,7 +88,7 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
     .sort((a, b) => b - a)
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-6">
       {weekKeys.map((wk) => {
         const list = byWeek[wk]
         const dayLabels = list.map((s) => (s.dia_label || '').trim()).filter(Boolean)
@@ -107,7 +107,7 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
             <button
               type="button"
               className={cn(
-                'flex min-h-[48px] w-full items-center justify-between gap-2 px-4 py-3 text-left transition-colors',
+                'flex min-h-[48px] w-full items-center justify-between gap-2 px-4 py-4 text-left transition-colors',
                 expanded ? 'bg-[#162038]' : 'bg-[#131b2e]'
               )}
               onClick={() => setOpenWeek(expanded ? null : wk)}
@@ -135,7 +135,7 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
             </button>
 
             {expanded && (
-              <div className="space-y-2 border-t border-[#1e3050] bg-[#0d1117]/50 px-2 py-3">
+              <div className="flex flex-col gap-6 border-t border-[#1e3050] bg-[#0d1117]/50 px-2 py-4">
                 {list.map((s, i) => (
                   <div
                     key={s.id || `sesion-${wk}-${i}`}

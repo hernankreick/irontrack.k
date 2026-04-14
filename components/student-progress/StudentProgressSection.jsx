@@ -3,10 +3,10 @@ import { Trophy, Image as ImageIcon, BarChart3, Settings, Calendar, Flame, Trend
 import IronTrackLogo from '@/components/IronTrackLogo.jsx'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { cn } from '@/lib/utils'
 import { ProgressChartsPanel } from './ProgressChartsPanel.jsx'
 import { ProgressSessionsPanel } from './ProgressSessionsPanel.jsx'
 import { ProgressPhotosPanel } from './ProgressPhotosPanel.jsx'
+import StatCard from './StatCard.jsx'
 import {
   averageImprovementPercent,
   computeDayStreak,
@@ -114,16 +114,16 @@ export default function StudentProgressSection({
       </div>
 
       <div className="mx-auto mt-4 max-w-lg space-y-5 px-1 pb-6">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 lg:gap-5">
           <StatCard
-            icon={<Calendar className="h-4 w-4 text-[#2563eb]" />}
+            icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
             iconBg="bg-[#2563eb]/20"
             value={stats.totalSessions}
             label={es ? 'Sesiones' : 'Sessions'}
             sub={es ? 'Total registradas' : 'Total logged'}
           />
           <StatCard
-            icon={<Trophy className="h-4 w-4 text-[#4ade80]" />}
+            icon={<Trophy className="h-6 w-6 text-[#4ade80]" strokeWidth={2.5} />}
             iconBg="bg-[#4ade80]/20"
             value={stats.prsThisMonth}
             label={es ? 'PRs del mes' : 'PRs this month'}
@@ -131,14 +131,14 @@ export default function StudentProgressSection({
             highlight
           />
           <StatCard
-            icon={<Flame className="h-4 w-4 text-[#2563eb]" />}
+            icon={<Flame className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
             iconBg="bg-[#2563eb]/20"
             value={`${stats.streak} ${es ? 'días' : 'days'}`}
             label={es ? 'Racha' : 'Streak'}
             sub={es ? 'Seguidos' : 'In a row'}
           />
           <StatCard
-            icon={<TrendingUp className="h-4 w-4 text-[#4ade80]" />}
+            icon={<TrendingUp className="h-6 w-6 text-[#4ade80]" strokeWidth={2.5} />}
             iconBg="bg-[#4ade80]/20"
             value={`${stats.overall > 0 ? '+' : ''}${stats.overall}%`}
             label={es ? 'Mejora total' : 'Overall Δ'}
@@ -147,24 +147,24 @@ export default function StudentProgressSection({
           />
         </div>
 
-        <Tabs defaultValue="graficos" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 rounded-xl">
-            <TabsTrigger value="sesiones" className="gap-1.5">
+        <Tabs defaultValue="graficos" className="mt-12 mb-10 flex w-full flex-col gap-5">
+          <TabsList className="grid h-auto min-h-12 w-full grid-cols-3 gap-1 rounded-xl py-4">
+            <TabsTrigger value="sesiones" className="gap-1.5 px-4 py-4">
               <Trophy className="h-4 w-4" />
               <span className="hidden sm:inline">{es ? 'Sesiones' : 'Sessions'}</span>
               <span className="sm:hidden">Ses.</span>
             </TabsTrigger>
-            <TabsTrigger value="fotos" className="gap-1.5">
+            <TabsTrigger value="fotos" className="gap-1.5 px-4 py-4">
               <ImageIcon className="h-4 w-4" />
               {es ? 'Fotos' : 'Photos'}
             </TabsTrigger>
-            <TabsTrigger value="graficos" className="gap-1.5">
+            <TabsTrigger value="graficos" className="gap-1.5 px-4 py-4">
               <BarChart3 className="h-4 w-4" />
               {es ? 'Gráficos' : 'Charts'}
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="sesiones" className="sp-fade-in mt-4">
+          <TabsContent value="sesiones" className="sp-fade-in mt-2">
             <ProgressSessionsPanel
               sharedParam={sharedParam}
               sb={sb}
@@ -175,11 +175,11 @@ export default function StudentProgressSection({
             />
           </TabsContent>
 
-          <TabsContent value="fotos" className="sp-fade-in mt-4">
+          <TabsContent value="fotos" className="sp-fade-in mt-2">
             <ProgressPhotosPanel sharedParam={sharedParam} sb={sb} es={es} esEntrenador={esEntrenador} />
           </TabsContent>
 
-          <TabsContent value="graficos" className="sp-fade-in mt-4">
+          <TabsContent value="graficos" className="sp-fade-in mt-2">
             <ProgressChartsPanel
               progress={progress}
               EX={EX}
@@ -191,22 +191,6 @@ export default function StudentProgressSection({
           </TabsContent>
         </Tabs>
       </div>
-    </div>
-  )
-}
-
-function StatCard({ icon, iconBg, value, label, sub, highlight }) {
-  return (
-    <div
-      className={cn(
-        'rounded-xl border border-[#1e3050] bg-[#131b2e] p-3 transition-colors hover:bg-[#162038]',
-        highlight && 'animate-pulse-pr border-[#4ade80]/30 bg-[#4ade80]/5'
-      )}
-    >
-      <div className={cn('mb-2 flex h-9 w-9 items-center justify-center rounded-full', iconBg)}>{icon}</div>
-      <div className="text-2xl font-extrabold tabular-nums text-[#f0f6ff]">{value}</div>
-      <div className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-[#f0f6ff]">{label}</div>
-      <div className="mt-0.5 text-[11px] text-[#7c8db0]">{sub}</div>
     </div>
   )
 }

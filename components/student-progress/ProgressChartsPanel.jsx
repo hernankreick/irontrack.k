@@ -197,7 +197,7 @@ export function ProgressChartsPanel({ progress, EX, allEx, es, sbData, loadingSb
 
   if (loadingSb) {
     return (
-      <div className="space-y-2 py-4">
+      <div className="flex flex-col gap-6 py-4">
         <div className="sk h-20 rounded-xl" />
         <div className="sk h-20 rounded-xl" />
         <div className="sk h-20 rounded-xl" />
@@ -218,12 +218,12 @@ export function ProgressChartsPanel({ progress, EX, allEx, es, sbData, loadingSb
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.2em] text-[#4ade80]">
+    <div className="flex flex-col gap-6">
+      <div className="py-4">
+        <h2 className="mb-6 text-sm font-semibold uppercase tracking-widest text-slate-400">
           {es ? 'PROGRESO POR EJERCICIO' : 'PROGRESS BY EXERCISE'} ({items.length})
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        </h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <Select value={muscle} onValueChange={setMuscle}>
             <SelectTrigger className="h-11 w-full sm:w-[200px]">
               <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -257,6 +257,7 @@ export function ProgressChartsPanel({ progress, EX, allEx, es, sbData, loadingSb
         </div>
       </div>
 
+      <div className="flex flex-col gap-6">
       {items.map(({ ex, datos, pr, ultimo, pct, trend, name, improvement }) => {
         const isOpen = expandedEx === ex.id
         const strong = improvement >= 10
@@ -314,10 +315,10 @@ export function ProgressChartsPanel({ progress, EX, allEx, es, sbData, loadingSb
               <div className="sp-slide-down border-t border-[#1e3050] px-3 pb-3 pt-2">
                 <ChartBlock datos={datos} exId={ex.id} />
                 <div className="mt-3">
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[#7c8db0]">
+                  <div className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
                     {es ? 'HISTORIAL' : 'HISTORY'} ({datos.length})
                   </div>
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-3">
                     {[...datos].reverse().slice(0, 8).map((d, i) => {
                       const esPR = d.kg >= pr && pr > 0
                       return (
@@ -345,6 +346,7 @@ export function ProgressChartsPanel({ progress, EX, allEx, es, sbData, loadingSb
           </div>
         )
       })}
+      </div>
     </div>
   )
 }
