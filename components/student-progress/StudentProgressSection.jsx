@@ -70,7 +70,7 @@ export default function StudentProgressSection({
 
   return (
     <div
-      className="student-progress-scope isolate text-[#f0f6ff]"
+      className="student-progress-scope flex min-h-0 flex-1 flex-col text-[#f0f6ff]"
       style={{
         fontFamily:
           "'Geist Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
@@ -85,7 +85,7 @@ export default function StudentProgressSection({
         ['--warning']: '#f59e0b',
       }}
     >
-      <div className="sticky top-0 z-[100] mb-14 border-b border-[#1e3050] bg-[#0B1120] px-5 pb-5 pt-8 sm:px-8">
+      <header className="relative z-[500] shrink-0 border-b border-[#1e3050] bg-[#0B1120] px-5 pb-5 pt-[max(2rem,env(safe-area-inset-top,0px))] sm:px-8">
         <div className="mx-auto flex max-w-lg items-center justify-between gap-4">
           <div className="ml-1 min-w-0 shrink sm:ml-2">
             <IronTrackLogo
@@ -113,9 +113,12 @@ export default function StudentProgressSection({
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="mx-auto flex max-w-lg flex-col gap-8 px-2 pb-8 pt-4 sm:px-4">
+      <div
+        className="relative z-0 mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col gap-8 overflow-x-hidden overflow-y-auto overscroll-y-contain px-2 pb-8 pt-2 sm:px-4"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         <div className="mb-12 grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4 lg:gap-5">
           <StatCard
             icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}

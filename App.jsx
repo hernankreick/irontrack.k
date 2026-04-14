@@ -1712,6 +1712,8 @@ function GymApp() {
   const activeDay = activeR ? activeR.days[session.dIdx] : null;
   const esAlumno = readOnly || sessionData?.role==="alumno";
   const showAlumnoProgressStack = (readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId);
+  /** Progreso alumno: header fuera del scroll; el scroll vive dentro de StudentProgressSection (evita que el contenido pase por debajo de la barra fija). */
+  const alumnoProgressInnerScroll = tab === "progress" && showAlumnoProgressStack;
   const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
@@ -2085,13 +2087,21 @@ function GymApp() {
         }}
         style={{
           padding: tab === "progress" ? "12px 20px" : "12px 16px",
-          overflowY:"auto",
+          overflowY: alumnoProgressInnerScroll ? "hidden" : "auto",
+          flexDirection: alumnoProgressInnerScroll ? "column" : undefined,
+          minHeight: alumnoProgressInnerScroll ? 0 : undefined,
           /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
           height:"calc(100svh - 130px)",
           /** Tab bar + safe area + margen para el CTA “Descargar PDF” al final del plan sin quedar bajo la nav. */
           paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px) + 32px)",
-          paddingTop: tab === "progress" ? "max(28px, env(safe-area-inset-top, 0px))" : 12,
-          display:(session&&activeDay)?"none":"block",
+          paddingTop:
+            tab === "progress"
+              ? alumnoProgressInnerScroll
+                ? 12
+                : "max(28px, env(safe-area-inset-top, 0px))"
+              : 12,
+          display:
+            session && activeDay ? "none" : alumnoProgressInnerScroll ? "flex" : "block",
           WebkitOverflowScrolling:"touch",
           scrollBehavior:"auto",
           overflowAnchor:"none",
