@@ -31,7 +31,7 @@ const S = {
     color: "#F1F5F9",
   },
   card: {
-    background: "#141820",
+    background: "#111827",
     border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: 18,
     padding: 16,
@@ -60,7 +60,7 @@ const S = {
     right: 0,
     bottom: 0,
     zIndex: 50,
-    background: "#0D1117",
+    background: "#0B0E11",
     borderTop: "1px solid rgba(255,255,255,0.07)",
     display: "flex",
     paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -354,7 +354,7 @@ export default function CoachDashboard({
             minWidth: 260,
             maxWidth: 280,
             flexShrink: 0,
-            background: "#141820",
+            background: "#111827",
             border: "1px solid rgba(255,255,255,0.06)",
             borderRadius: 18,
             padding: 14,
@@ -471,7 +471,7 @@ export default function CoachDashboard({
             key={row.label}
             style={{
               flex: 1,
-              background: "#141820",
+              background: "#111827",
               border: "1px solid rgba(255,255,255,0.06)",
               borderRadius: 12,
               padding: "10px 8px",
@@ -535,97 +535,17 @@ export default function CoachDashboard({
   );
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#0B0E11" }}>
-      {isDesktop && (
-        <div
-          style={{
-            width: 220,
-            background: "#0D1520",
-            borderRight: "1px solid #1a2535",
-            display: "flex",
-            flexDirection: "column",
-            position: "fixed",
-            top: 0,
-            left: 0,
-            bottom: 0,
-            zIndex: 50,
-            padding: "24px 0",
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "'Bebas Neue',sans-serif",
-              fontSize: 20,
-              letterSpacing: 2,
-              padding: "0 20px 24px",
-              borderBottom: "1px solid #1a2535",
-            }}
-          >
-            IRON<span style={{ color: "#3B82F6" }}>TRACK</span>
-            <div
-              style={{
-                fontFamily: "'DM Sans',sans-serif",
-                fontSize: 10,
-                color: "#64748B",
-                fontWeight: 600,
-                letterSpacing: 1,
-                marginTop: 4,
-              }}
-            >
-              MODO COACH
-            </div>
-          </div>
-          {[
-            { label: "DASHBOARD", key: "dashboard" },
-            { label: "ALUMNOS", key: "alumnos" },
-            { label: "RUTINAS", key: "routines" },
-            { label: "EJERCICIOS", key: "exercises" },
-            { label: "PROGRESO", key: "progreso" },
-            { label: "MENSAJES", key: "mensajes" },
-            { label: "SETTINGS", key: "settings" },
-          ].map((item) => (
-            <div
-              key={item.key}
-              onClick={() => setActiveNav && setActiveNav(item.key)}
-              style={{
-                padding: "10px 20px",
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 1,
-                color: activeNav === item.key ? "#3B82F6" : "#64748B",
-                background: activeNav === item.key ? "rgba(37,99,235,0.12)" : "transparent",
-                cursor: "pointer",
-                fontFamily: "'DM Sans',sans-serif",
-                borderLeft: activeNav === item.key ? "2px solid #3B82F6" : "2px solid transparent",
-                transition: "all .15s",
-              }}
-            >
-              {item.label}
-            </div>
-          ))}
-          <div
-            style={{
-              marginTop: "auto",
-              padding: "16px 20px",
-              borderTop: "1px solid #1a2535",
-              fontSize: 13,
-              color: "#94A3B8",
-            }}
-          >
-            Coach · Admin
-          </div>
-        </div>
-      )}
-      <div
-        style={{
-          flex: 1,
-          marginLeft: isDesktop ? 220 : 0,
-          minWidth: 0,
-        }}
-      >
+    <>
+      <div style={{ flex: 1, minWidth: 0, background: "#0B0E11" }}>
     <div
-      style={{ ...S.root, paddingBottom: isDesktop ? 40 : 100 }}
-      className="w-full max-w-[480px] px-4 sm:px-5 md:max-w-3xl md:px-6 lg:max-w-5xl lg:px-8 xl:max-w-6xl"
+      className=""
+      style={{
+        ...S.root,
+        paddingBottom: isDesktop ? 40 : 100,
+        padding: isDesktop ? "0 32px 40px 32px" : "0 16px 100px 16px",
+        maxWidth: "none",
+        width: "100%",
+      }}
     >
       <style>
         {`
@@ -739,7 +659,7 @@ export default function CoachDashboard({
 
       <div style={S.greeting}>Hola, Coach</div>
 
-      <div style={S.card}>
+      <div style={{ ...S.card, width: "100%" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <div style={{ ...S.cardTitleRow, marginBottom: 4 }}>
@@ -809,7 +729,7 @@ export default function CoachDashboard({
           </div>
           <div
             style={{
-              background: "#0D1520",
+              background: "#111827",
               border: "1px solid #1a2535",
               borderRadius: 12,
               overflow: "hidden",
@@ -932,7 +852,7 @@ export default function CoachDashboard({
         <CoachScoreRing pct={72} />
       </div>
 
-      <nav style={{ ...S.bottomNav, display: isDesktop ? "none" : "flex" }}>
+      <nav style={S.bottomNav}>
         {navItems.map(({ key, label, ic }) => {
           const active = activeNav === key;
           return (
@@ -964,6 +884,6 @@ export default function CoachDashboard({
       </nav>
     </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -4561,14 +4561,16 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
       border: `1px solid ${accent==="green"
         ? "rgba(34,197,94,.25)"
         : "rgba(37,99,235,.25)"}`,
-      borderRadius:16,
-      padding:"18px 16px 16px",
-      display:"flex", flexDirection:"column", gap:10,
+      borderRadius:18,
+      padding:"22px 18px 20px",
+      display:"flex", flexDirection:"column", gap:14,
       cursor:"pointer",
+      minHeight:140,
     }),
     statIcon: (accent) => ({
-      width:36, height:36, borderRadius:10,
+      width:42, height:42, borderRadius:12,
       display:"flex", alignItems:"center", justifyContent:"center",
+      alignSelf:"flex-start",
       background: accent==="green"
         ? "rgba(34,197,94,.18)"
         : "rgba(37,99,235,.18)",
@@ -4630,7 +4632,7 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
     }),
     exRow: {
       display:"flex", alignItems:"center",
-      gap:12, padding:"14px 14px",
+      gap:12, padding:"16px 16px",
     },
     exArrow: (up) => ({
       width:36, height:36, borderRadius:"50%", flexShrink:0,
@@ -4659,11 +4661,11 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
       border:"1px solid rgba(245,158,11,.35)",
     },
     exDetail: {
-      padding:"0 14px 14px",
+      padding:"4px 14px 16px",
     },
     historyRow: {
       display:"flex", justifyContent:"space-between",
-      alignItems:"center", padding:"7px 0",
+      alignItems:"center", padding:"11px 0",
       borderTop:"1px solid #1a2535",
       fontSize:12,
     },
