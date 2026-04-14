@@ -223,37 +223,47 @@ export function ProgressChartsPanel({ progress, EX, allEx, es, sbData, loadingSb
         <h2 className="mb-6 text-sm font-semibold uppercase tracking-widest text-slate-400">
           {es ? 'PROGRESO POR EJERCICIO' : 'PROGRESS BY EXERCISE'} ({items.length})
         </h2>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <Select value={muscle} onValueChange={setMuscle}>
-            <SelectTrigger className="h-11 w-full sm:w-[200px]">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <Filter className="h-4 w-4 shrink-0 text-[#7c8db0]" />
-                <SelectValue placeholder={es ? 'Grupo muscular' : 'Muscle group'} />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {MUSCLE_FILTERS.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="h-11 w-full sm:w-[200px]">
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <ArrowUpDown className="h-4 w-4 shrink-0 text-[#7c8db0]" />
-                <SelectValue placeholder={es ? 'Ordenar' : 'Sort'} />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {SORT_OPTS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-6 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="w-full sm:w-[220px]">
+            <label className="mb-3 block text-sm font-medium text-[#7c8db0]" htmlFor="sp-filter-muscle">
+              {es ? 'Músculo' : 'Muscle'}
+            </label>
+            <Select value={muscle} onValueChange={setMuscle}>
+              <SelectTrigger id="sp-filter-muscle" className="w-full sm:w-[200px]">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <Filter className="h-5 w-5 shrink-0 text-[#7c8db0]" strokeWidth={2.25} />
+                  <SelectValue placeholder={es ? 'Grupo muscular' : 'Muscle group'} />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {MUSCLE_FILTERS.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full sm:w-[220px]">
+            <label className="mb-3 block text-sm font-medium text-[#7c8db0]" htmlFor="sp-filter-sort">
+              {es ? 'Orden' : 'Sort'}
+            </label>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger id="sp-filter-sort" className="w-full sm:w-[200px]">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <ArrowUpDown className="h-5 w-5 shrink-0 text-[#7c8db0]" strokeWidth={2.25} />
+                  <SelectValue placeholder={es ? 'Ordenar' : 'Sort'} />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
