@@ -3532,9 +3532,9 @@ function GymApp() {
         />
       )}
       {settingsOpen && esAlumno && (
-        <div style={{position:"fixed",inset:0,background:"rgba(10,22,40,.75)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+        <div style={{position:"fixed",inset:0,background:"rgba(10,22,40,.75)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center",overflow:"hidden"}}
           onClick={()=>setSettingsOpen(false)}>
-          <div style={{background:"#0a1628",borderRadius:"16px 16px 0 0",padding:"20px 16px 36px",width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.2)",animation:"slideUpFade 0.3s ease",maxHeight:"92dvh",overflowY:"auto"}}
+          <div style={{background:"#0a1628",borderRadius:"16px 16px 0 0",paddingTop:20,paddingLeft:16,paddingRight:16,paddingBottom:120,width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.2)",animation:"slideUpFade 0.3s ease",maxHeight:"92dvh",overflowX:"hidden",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}
             onClick={e=>e.stopPropagation()}>
             <div style={{width:40,height:4,background:"#3b82f6",borderRadius:2,margin:"0 auto 20px"}}/>
             <div style={{fontSize:18,fontWeight:800,letterSpacing:1,marginBottom:20,color:"#fff"}}><Ic name="settings" size={18} color="#3b82f6"/> {es?"CONFIGURACIÓN":"SETTINGS"}</div>
@@ -3585,7 +3585,7 @@ function GymApp() {
                 </div>
               </>
             <button className="hov"
-              style={{width:"100%",padding:"12px",marginTop:16,background:"rgba(148,163,184,.12)",border:"1px solid rgba(148,163,184,.2)",borderRadius:12,color:"#cbd5e1",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
+              style={{width:"100%",padding:"12px",marginTop:16,marginBottom:32,background:"rgba(148,163,184,.12)",border:"1px solid rgba(148,163,184,.2)",borderRadius:12,color:"#cbd5e1",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
               onClick={()=>setSettingsOpen(false)}>
               {es?"CERRAR":"CLOSE"}
             </button>
