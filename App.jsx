@@ -2016,7 +2016,13 @@ function GymApp() {
         </div>
       )}
       {!(esAlumno && tab === "progress") && (
-      <div className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] px-4 pb-2.5 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}>
+      <div
+        className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] pb-3 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}
+        style={{
+          paddingLeft: esAlumno ? 20 : 16,
+          paddingRight: esAlumno ? 20 : 16,
+        }}
+      >
         <div>
           <IronTrackLogo
             size={22}
@@ -2128,14 +2134,20 @@ function GymApp() {
       <div
         className={
           "plan-main-scroll relative z-0 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] " +
-          (tab === "progress" && showAlumnoProgressStack ? "px-5 " : "px-6 ") +
+          (tab === "progress" && showAlumnoProgressStack
+            ? "px-5 "
+            : esAlumno && (tab === "plan" || tab === "library")
+              ? "px-7 "
+              : "px-6 ") +
           (!(esAlumno && tab === "progress") ? "mt-6 " : "") +
           (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
           (tab === "progress" && showAlumnoProgressStack
             ? "pt-0 "
             : tab === "progress"
               ? "pt-[max(0.75rem,env(safe-area-inset-top,0px))] "
-              : "pt-6 ")
+              : esAlumno && (tab === "plan" || tab === "library")
+                ? "pt-8 "
+                : "pt-6 ")
         }
         ref={function (node) {
           scrollRef.current = node;
@@ -2144,6 +2156,9 @@ function GymApp() {
           /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
           height: esAlumno && tab === "progress" && showAlumnoProgressStack ? "calc(100svh - 70px)" : "calc(100svh - 130px)",
           display: session && activeDay ? "none" : "block",
+          paddingLeft: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
+          paddingRight: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
+          paddingTop: esAlumno && (tab === "plan" || tab === "library") ? 32 : undefined,
           WebkitOverflowScrolling: "touch",
           scrollBehavior: "auto",
           overflowAnchor: "none",
@@ -2194,7 +2209,7 @@ function GymApp() {
               />
         )}
         {tab==="plan"&&(
-          <div>
+          <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : ""}>
             {esAlumno&&routines.length>0&&(()=>{
               const r0 = routines[0];
               const hoy = new Date().toLocaleDateString("es-AR");
@@ -2244,6 +2259,8 @@ function GymApp() {
                       left: 0,
                       right: 0,
                       top: 0,
+                      paddingLeft: 16,
+                      paddingRight: 16,
                       zIndex: 2,
                       backfaceVisibility: "hidden",
                       WebkitBackfaceVisibility: "hidden",
@@ -2430,6 +2447,8 @@ function GymApp() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
+                      paddingLeft: 16,
+                      paddingRight: 16,
                       paddingBottom: 8,
                       zIndex: 1,
                       backfaceVisibility: "hidden",
@@ -2742,7 +2761,7 @@ function GymApp() {
           </div>
         )}
         {tab==="library"&&(
-          <div>
+          <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : ""}>
             {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal}/>}
             {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>}
           </div>
@@ -6275,7 +6294,7 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
   );
 
   return (
-    <div>
+    <div style={{paddingTop:8,paddingLeft:2,paddingRight:2}}>
       <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:16,textTransform:"uppercase"}}>
         {es?"MIS EJERCICIOS":"MY EXERCISES"} ({lista.length})
       </div>
