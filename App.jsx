@@ -2128,7 +2128,7 @@ function GymApp() {
       <div
         className={
           "plan-main-scroll relative z-0 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] " +
-          (tab === "progress" && showAlumnoProgressStack ? "px-0 " : "px-6 ") +
+          (tab === "progress" && showAlumnoProgressStack ? "px-4 " : "px-6 ") +
           (!(esAlumno && tab === "progress") ? "mt-6 " : "") +
           (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
           (tab === "progress" && showAlumnoProgressStack
