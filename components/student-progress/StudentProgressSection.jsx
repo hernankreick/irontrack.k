@@ -84,7 +84,7 @@ export default function StudentProgressSection({
         ['--warning']: '#f59e0b',
       }}
     >
-      <header className="shrink-0 bg-[#0d1117] px-6 pb-2 pt-[max(1rem,env(safe-area-inset-top,0px))]">
+      <header className="shrink-0 bg-[#0d1117] pb-2 pt-[max(1rem,env(safe-area-inset-top,0px))]">
         <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-4">
           <div className="min-w-0 shrink">
             <IronTrackLogo
@@ -118,7 +118,7 @@ export default function StudentProgressSection({
         </div>
       </header>
 
-      <div className="relative z-0 mx-auto flex w-full max-w-lg flex-col gap-5 px-6 pb-6 pt-4">
+      <div className="relative z-0 mx-auto flex w-full max-w-lg flex-col gap-5 pb-6 pt-4">
         <div className="mx-auto mb-0 grid w-full max-w-md grid-cols-2 gap-3 sm:gap-4 lg:max-w-none lg:grid-cols-4 lg:gap-5">
           <StatCard
             icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
