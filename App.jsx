@@ -2141,9 +2141,8 @@ function GymApp() {
           scrollRef.current = node;
         }}
         style={{
-          height: esAlumno && tab === "progress" && showAlumnoProgressStack
-            ? "calc(100svh - 70px)"
-            : "calc(100svh - 130px)",
+          /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
+          height: esAlumno && tab === "progress" && showAlumnoProgressStack ? "calc(100svh - 70px)" : "calc(100svh - 130px)",
           display: session && activeDay ? "none" : "block",
           WebkitOverflowScrolling: "touch",
           scrollBehavior: "auto",
