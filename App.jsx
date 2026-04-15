@@ -1712,8 +1712,6 @@ function GymApp() {
   const activeDay = activeR ? activeR.days[session.dIdx] : null;
   const esAlumno = readOnly || sessionData?.role==="alumno";
   const showAlumnoProgressStack = (readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId);
-  /** Progreso alumno: header fuera del scroll; el scroll vive dentro de StudentProgressSection (evita que el contenido pase por debajo de la barra fija). */
-  const alumnoProgressInnerScroll = tab === "progress" && showAlumnoProgressStack;
   const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
@@ -1974,7 +1972,7 @@ function GymApp() {
         "@keyframes rippleOut{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)}100%{box-shadow:0 0 0 20px rgba(34,197,94,0)}}" +
 
         ".num{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}" +
-        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch}.plan-main-scroll{scroll-behavior:auto!important;overflow-anchor:none;overscroll-behavior-y:contain;scrollbar-width:none;-ms-overflow-style:none}.plan-main-scroll::-webkit-scrollbar{display:none;width:0;height:0}" +
+        "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch}.plan-main-scroll{scroll-behavior:auto!important;overflow-anchor:none;overscroll-behavior-y:contain}" +
         ".plan-scroll-diag-no-hov .hov{transition:none!important;filter:none!important}" +
         ".plan-hoy-cta-wrap{min-height:228px;touch-action:manipulation;box-sizing:border-box;background-clip:padding-box;border-style:solid;border-width:1px;filter:none;box-shadow:none}" +
         ".plan-hoy-cta-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:4px;min-height:128px;flex-shrink:0}" +
@@ -2018,7 +2016,7 @@ function GymApp() {
         </div>
       )}
       {!(esAlumno && tab === "progress") && (
-      <div className="sticky top-0 z-50" style={{padding:"16px 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),background:darkMode?"#0F1923":bg,boxSizing:"border-box"}}>
+      <div className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] px-4 pb-2.5 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}>
         <div>
           <IronTrackLogo
             size={22}
@@ -2028,7 +2026,7 @@ function GymApp() {
             modeColor={(readOnly||esAlumno)?"#22C55E":"#2563EB"}
           />
         </div>
-        <div style={{display:"flex",gap:8,alignItems:"center",position:"relative"}}>
+        <div className="relative flex items-center gap-2">
           {session&&<span style={{...tag("#22C55E"),fontSize:13}}>✓ Sesion activa</span>}
           <button className="hov" style={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSettingsOpen(true)}><Ic name="settings" size={18} color={textMuted}/></button>
           {sessionData&&esAlumno
@@ -2128,36 +2126,32 @@ function GymApp() {
       )}
 
       <div
-        className={"plan-main-scroll relative z-0" + (planScrollDiag.planAnimationsGlobalCss === false ? " plan-scroll-diag-no-hov" : "")}
+        className={
+          "plan-main-scroll relative z-0 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] " +
+          (tab === "progress" && showAlumnoProgressStack ? "px-0 " : "px-6 ") +
+          (!(esAlumno && tab === "progress") ? "mt-6 " : "") +
+          (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
+          (tab === "progress" && showAlumnoProgressStack
+            ? "pt-0 "
+            : tab === "progress"
+              ? "pt-[max(0.75rem,env(safe-area-inset-top,0px))] "
+              : "pt-6 ")
+        }
         ref={function (node) {
           scrollRef.current = node;
         }}
         style={{
-          paddingLeft: tab === "progress" ? 20 : 16,
-          /** Progreso (stack alumno): simétrico para no descentrar; resto: gutter extra a la derecha. */
-          paddingRight:
-            tab === "progress" && alumnoProgressInnerScroll ? 20 : tab === "progress" ? 36 : 32,
-          overflowY: alumnoProgressInnerScroll ? "hidden" : "auto",
-          flexDirection: alumnoProgressInnerScroll ? "column" : undefined,
-          minHeight: alumnoProgressInnerScroll ? 0 : undefined,
-          /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
-          height:"calc(100svh - 130px)",
-          /** Tab bar + safe area + margen para el CTA “Descargar PDF” al final del plan sin quedar bajo la nav. */
-          paddingBottom:"calc(100px + env(safe-area-inset-bottom, 0px) + 32px)",
-          paddingTop:
-            tab === "progress"
-              ? alumnoProgressInnerScroll
-                ? 12
-                : "max(28px, env(safe-area-inset-top, 0px))"
-              : 12,
-          display:
-            session && activeDay ? "none" : alumnoProgressInnerScroll ? "flex" : "block",
-          WebkitOverflowScrolling:"touch",
-          scrollBehavior:"auto",
-          overflowAnchor:"none",
-          overscrollBehavior:"contain",
-          background:darkMode?(esAlumno&&tab==="progress"?"#0d1117":"#0B1120"):"#F1F5F9",
-        }}>
+          height: esAlumno && tab === "progress" && showAlumnoProgressStack
+            ? "calc(100svh - 70px)"
+            : "calc(100svh - 130px)",
+          display: session && activeDay ? "none" : "block",
+          WebkitOverflowScrolling: "touch",
+          scrollBehavior: "auto",
+          overflowAnchor: "none",
+          overscrollBehavior: "contain",
+          background: darkMode ? (esAlumno && tab === "progress" ? "#0d1117" : "#0B1120") : "#F1F5F9",
+        }}
+      >
         {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&!esAlumno&&sessionData?.role==="entrenador"&&(
               <CoachDashboard
