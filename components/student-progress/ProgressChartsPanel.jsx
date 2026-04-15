@@ -218,14 +218,14 @@ export function ProgressChartsPanel({ progress, EX, allEx, es, sbData, loadingSb
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="py-4">
-        <h2 className="mb-6 text-sm font-semibold uppercase tracking-widest text-slate-400">
+    <div className="flex flex-col gap-5 px-1">
+      <div className="py-3">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">
           {es ? 'PROGRESO POR EJERCICIO' : 'PROGRESS BY EXERCISE'} ({items.length})
         </h2>
-        <div className="flex flex-col gap-6 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="flex flex-row flex-wrap items-end gap-3">
           <div className="w-full sm:w-[220px]">
-            <label className="mb-3 block text-sm font-medium text-[#7c8db0]" htmlFor="sp-filter-muscle">
+            <label className="mb-1.5 block text-xs font-medium text-[#7c8db0]" htmlFor="sp-filter-muscle">
               {es ? 'Músculo' : 'Muscle'}
             </label>
             <Select value={muscle} onValueChange={setMuscle}>
@@ -245,7 +245,7 @@ export function ProgressChartsPanel({ progress, EX, allEx, es, sbData, loadingSb
             </Select>
           </div>
           <div className="w-full sm:w-[220px]">
-            <label className="mb-3 block text-sm font-medium text-[#7c8db0]" htmlFor="sp-filter-sort">
+            <label className="mb-1.5 block text-xs font-medium text-[#7c8db0]" htmlFor="sp-filter-sort">
               {es ? 'Orden' : 'Sort'}
             </label>
             <Select value={sortBy} onValueChange={setSortBy}>

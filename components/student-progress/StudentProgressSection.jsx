@@ -69,7 +69,7 @@ export default function StudentProgressSection({
 
   return (
     <div
-      className="student-progress-scope flex min-h-0 flex-1 flex-col text-[#f0f6ff]"
+      className="student-progress-scope min-h-screen bg-[#0d1117] text-[#f0f6ff]"
       style={{
         fontFamily:
           "'Geist Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
@@ -84,12 +84,9 @@ export default function StudentProgressSection({
         ['--warning']: '#f59e0b',
       }}
     >
-      <header
-        className="relative isolate z-[520] shrink-0 border-b border-[#1e3050] bg-[#0F1923] px-5 pb-5 pt-[max(2rem,env(safe-area-inset-top,0px))] sm:px-8"
-        style={{ pointerEvents: 'auto' }}
-      >
-        <div className="mx-auto flex max-w-lg items-center justify-between gap-4">
-          <div className="ml-1 min-w-0 shrink sm:ml-2">
+      <header className="shrink-0 border-b border-[#1e3050] bg-[#0d1117] px-6 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))]">
+        <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-4">
+          <div className="min-w-0 shrink">
             <IronTrackLogo
               size={20}
               color="#2563eb"
@@ -99,33 +96,20 @@ export default function StudentProgressSection({
               modeColor="#4ade80"
             />
           </div>
-          <div className="mr-1 flex shrink-0 items-center gap-2 sm:mr-2">
+          <div className="flex shrink-0 items-center gap-2">
             {/* Mismas formas que Plan / Ejercicios (App.jsx): settings = btn rounded-lg; avatar = 36×36 rounded 10px */}
             <button
               type="button"
-              className="hov flex items-center justify-center rounded-lg border-0 bg-[#2D4057] p-2 text-[#FFFFFF]"
+              className="hov flex items-center justify-center rounded-lg border-0 bg-[#2D4057] p-2 text-white"
               aria-label={es ? 'Configuración' : 'Settings'}
-              onClick={function (e) {
-                e.stopPropagation()
-                onSettings?.()
-              }}
+              onClick={() => onSettings?.()}
             >
               <Settings className="h-[18px] w-[18px]" strokeWidth={2} />
             </button>
             <button
               type="button"
-              className="hov flex shrink-0 items-center justify-center border-0 text-[13px] font-extrabold leading-none text-white"
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                background: 'linear-gradient(135deg,#1E3A5F,#2563EB)',
-                cursor: 'pointer',
-              }}
-              onClick={function (e) {
-                e.stopPropagation()
-                onAvatarClick?.()
-              }}
+              className="hov flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border-0 bg-gradient-to-br from-[#1E3A5F] to-[#2563EB] text-[13px] font-extrabold leading-none text-white"
+              onClick={() => onAvatarClick?.()}
               aria-label={es ? 'Menú usuario' : 'User menu'}
             >
               {initials}
@@ -134,11 +118,8 @@ export default function StudentProgressSection({
         </div>
       </header>
 
-      <div
-        className="relative z-0 mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col gap-8 overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 pb-8 pt-2 sm:px-4"
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
-        <div className="mb-12 grid grid-cols-2 gap-5 sm:gap-6 lg:grid-cols-4 lg:gap-6">
+      <div className="relative z-0 mx-auto flex w-full max-w-lg flex-col gap-6 px-6 pb-8 pt-8">
+        <div className="mx-auto mb-4 grid w-full max-w-md grid-cols-2 gap-4 sm:gap-5 lg:max-w-none lg:grid-cols-4 lg:gap-5">
           <StatCard
             icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
             iconBg="bg-[#2563eb]/20"
@@ -171,7 +152,7 @@ export default function StudentProgressSection({
           />
         </div>
 
-        <div className="mt-16 mb-10 w-full">
+        <div className="mt-2 mb-6 w-full">
         <Tabs defaultValue="graficos" className="flex w-full flex-col gap-5">
           <TabsList className="grid h-auto min-h-12 w-full grid-cols-3 gap-8 rounded-xl py-4">
             <TabsTrigger value="sesiones" className="gap-1.5 px-4 py-4">
