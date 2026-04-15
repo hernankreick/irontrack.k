@@ -69,7 +69,7 @@ export default function StudentProgressSection({
 
   return (
     <div
-      className="student-progress-scope min-h-screen bg-[#0d1117] text-[#f0f6ff]"
+      className="student-progress-scope flex h-full min-h-screen flex-col overflow-y-auto bg-[#0d1117] text-[#f0f6ff]"
       style={{
         fontFamily:
           "'Geist Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
@@ -84,7 +84,7 @@ export default function StudentProgressSection({
         ['--warning']: '#f59e0b',
       }}
     >
-      <header className="shrink-0 border-b border-[#1e3050] bg-[#0d1117] px-6 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))]">
+      <header className="shrink-0 bg-[#0d1117] px-6 pb-2 pt-[max(1rem,env(safe-area-inset-top,0px))]">
         <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-4">
           <div className="min-w-0 shrink">
             <IronTrackLogo
@@ -118,7 +118,7 @@ export default function StudentProgressSection({
         </div>
       </header>
 
-      <div className="relative z-0 mx-auto flex w-full max-w-lg flex-col gap-6 px-6 pb-8 pt-8">
+      <div className="relative z-0 mx-auto flex w-full max-w-lg flex-1 flex-col gap-5 px-6 pb-28 pt-6">
         <div className="mx-auto mb-4 grid w-full max-w-md grid-cols-2 gap-4 sm:gap-5 lg:max-w-none lg:grid-cols-4 lg:gap-5">
           <StatCard
             icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
