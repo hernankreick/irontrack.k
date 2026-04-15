@@ -2159,7 +2159,7 @@ function GymApp() {
 
       <div
         className={
-          "plan-main-scroll relative z-0 overflow-y-auto pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] " +
+          "plan-main-scroll relative z-0 overflow-y-auto " +
           (tab === "progress" && showAlumnoProgressStack
             ? "px-5 "
             : esAlumno && (tab === "plan" || tab === "library")
@@ -2188,6 +2188,9 @@ function GymApp() {
           flex: alumnoFullScreenShell ? 1 : undefined,
           minHeight: alumnoFullScreenShell ? 0 : undefined,
           display: session && activeDay ? "none" : "block",
+          paddingBottom: esAlumno
+            ? "calc(8.5rem + env(safe-area-inset-bottom, 0px))"
+            : "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
           paddingLeft: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
           paddingRight: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
           paddingTop: esAlumno && (tab === "plan" || tab === "library") ? 32 : undefined,
