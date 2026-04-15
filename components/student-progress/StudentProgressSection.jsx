@@ -69,7 +69,7 @@ export default function StudentProgressSection({
 
   return (
     <div
-      className="student-progress-scope flex h-full min-h-screen flex-col overflow-y-auto bg-[#0d1117] text-[#f0f6ff]"
+      className="student-progress-scope flex flex-col bg-[#0d1117] text-[#f0f6ff]"
       style={{
         fontFamily:
           "'Geist Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
@@ -118,8 +118,8 @@ export default function StudentProgressSection({
         </div>
       </header>
 
-      <div className="relative z-0 mx-auto flex w-full max-w-lg flex-1 flex-col gap-5 px-6 pb-28 pt-6">
-        <div className="mx-auto mb-4 grid w-full max-w-md grid-cols-2 gap-4 sm:gap-5 lg:max-w-none lg:grid-cols-4 lg:gap-5">
+      <div className="relative z-0 mx-auto flex w-full max-w-lg flex-col gap-5 px-6 pb-6 pt-4">
+        <div className="mx-auto mb-0 grid w-full max-w-md grid-cols-2 gap-3 sm:gap-4 lg:max-w-none lg:grid-cols-4 lg:gap-5">
           <StatCard
             icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
             iconBg="bg-[#2563eb]/20"
