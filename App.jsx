@@ -1727,6 +1727,8 @@ function GymApp() {
       ];
 
   const hideGlobalBottomNavCoachDash = !esAlumno && sessionData?.role==="entrenador" && tab==="plan";
+  const alumnoTopBarFixed = !!(esAlumno && (tab === "plan" || tab === "library"));
+  const alumnoTopBarHeight = alumnoTopBarFixed ? 74 : 0;
 
   planScrollCtxRef.current = {
     alumnoPlan: !!(esAlumno && tab === "plan"),
@@ -1958,8 +1960,23 @@ function GymApp() {
     </div>
   );
 
+  const alumnoFullScreenShell = !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress"));
+
   return (
-    <div style={{minHeight:"100dvh",background:bg,color:textMain,fontFamily:"Inter,sans-serif","--sk1":darkMode?"#1E2D40":"#E8EEF4","--sk2":darkMode?"#2D4057":"#D1DCE8",paddingBottom:72,position:"relative"}}>
+    <div style={{
+      minHeight:"100dvh",
+      height: alumnoFullScreenShell ? "100svh" : undefined,
+      overflow: alumnoFullScreenShell ? "hidden" : undefined,
+      background:bg,
+      color:textMain,
+      fontFamily:"Inter,sans-serif",
+      "--sk1":darkMode?"#1E2D40":"#E8EEF4",
+      "--sk2":darkMode?"#2D4057":"#D1DCE8",
+      paddingBottom: alumnoFullScreenShell ? 0 : 72,
+      position:"relative",
+      display: alumnoFullScreenShell ? "flex" : undefined,
+      flexDirection: alumnoFullScreenShell ? "column" : undefined,
+    }}>
       <style dangerouslySetInnerHTML={{__html:
         "@import url(https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap);" +
         "*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased}input,textarea,select{outline:none!important}" +
@@ -1998,7 +2015,7 @@ function GymApp() {
         "}"
       }}/>
 
-      <div className="app-inner">
+      <div className="app-inner" style={alumnoFullScreenShell ? {display:"flex",flexDirection:"column",flex:1,minHeight:0} : undefined}>
       {!isOnline&&(
         <div style={{
           background:"#1f1500",borderBottom:"1px solid #F59E0B44",
@@ -2019,8 +2036,16 @@ function GymApp() {
       <div
         className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] pb-3 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}
         style={{
+          position: alumnoTopBarFixed ? "fixed" : "relative",
+          top: alumnoTopBarFixed ? 0 : undefined,
+          left: alumnoTopBarFixed ? 0 : undefined,
+          right: alumnoTopBarFixed ? 0 : undefined,
+          zIndex: alumnoTopBarFixed ? 80 : undefined,
           paddingLeft: esAlumno ? 20 : 16,
           paddingRight: esAlumno ? 20 : 16,
+          backdropFilter: alumnoTopBarFixed ? "blur(10px)" : undefined,
+          WebkitBackdropFilter: alumnoTopBarFixed ? "blur(10px)" : undefined,
+          boxShadow: alumnoTopBarFixed ? "0 8px 24px rgba(0,0,0,.18)" : undefined,
         }}
       >
         <div>
@@ -2046,6 +2071,7 @@ function GymApp() {
         </div>
       </div>
       )}
+      {alumnoTopBarFixed && <div style={{height: alumnoTopBarHeight}} />}
       {sessionData && esAlumno && userMenuOpen && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 600 }} onClick={() => setUserMenuOpen(false)} />
@@ -2154,7 +2180,13 @@ function GymApp() {
         }}
         style={{
           /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
-          height: esAlumno && tab === "progress" && showAlumnoProgressStack ? "calc(100svh - 70px)" : "calc(100svh - 130px)",
+          height: esAlumno && tab === "progress" && showAlumnoProgressStack
+            ? "calc(100svh - 70px)"
+            : alumnoTopBarFixed
+              ? "calc(100svh - 204px)"
+              : "calc(100svh - 130px)",
+          flex: alumnoFullScreenShell ? 1 : undefined,
+          minHeight: alumnoFullScreenShell ? 0 : undefined,
           display: session && activeDay ? "none" : "block",
           paddingLeft: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
           paddingRight: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
@@ -6295,7 +6327,7 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
 
   return (
     <div style={{paddingTop:8,paddingLeft:2,paddingRight:2}}>
-      <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:16,textTransform:"uppercase"}}>
+      <div style={{fontSize:11,fontWeight:800,color:textMain,letterSpacing:2,marginBottom:16,textTransform:"uppercase"}}>
         {es?"MIS EJERCICIOS":"MY EXERCISES"} ({lista.length})
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -6319,7 +6351,7 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
                   {musculo&&<span style={{fontSize:11,color:textMuted}}>{musculo}</span>}
                   <span style={{fontSize:10,color:textMuted,background:bgSub,borderRadius:4,padding:"1px 5px"}}>{item.dia}</span>
-                  {ex.sets&&ex.reps&&<span style={{fontSize:11,fontWeight:700,color:"#2563EB"}}>{ex.sets}×{ex.reps}</span>}
+                  {ex.sets&&ex.reps&&<span style={{fontSize:11,fontWeight:700,color:"#A3B4CC"}}>{ex.sets}×{ex.reps}</span>}
                   {ex.kg&&<span style={{fontSize:11,color:textMuted}}>{ex.kg}kg</span>}
                 </div>
               </div>
