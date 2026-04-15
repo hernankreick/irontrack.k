@@ -8,12 +8,12 @@ export default function StatCard({ icon, iconBg, value, label, sub, highlight })
   return (
     <div
       className={cn(
-        'flex min-h-[120px] w-full flex-col items-center justify-between gap-2 p-4 text-center transition-colors',
+        'flex min-h-[132px] w-full flex-col items-center justify-start gap-4 px-4 pb-4 pt-7 text-center transition-colors',
         'rounded-2xl border border-[#1e3050] bg-[#131b2e] hover:bg-[#162038]',
         highlight && 'animate-pulse-pr border-[#4ade80]/30 bg-[#4ade80]/5'
       )}
     >
-      <div className="mx-auto flex w-full shrink-0 justify-center">
+      <div className="mx-auto mb-1 flex w-full shrink-0 justify-center">
         <div
           className={cn(
             'mx-auto flex items-center justify-center rounded-xl p-3',
