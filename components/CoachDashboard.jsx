@@ -1,4 +1,5 @@
 import React from "react";
+import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import {
   AlertCircle,
   BarChart3,
@@ -458,6 +459,8 @@ export default function CoachDashboard({
   onVerPerfil,
   onEnviarMensaje,
   onCrearRutina,
+  onNuevoAlumno,
+  onNuevoEjercicio,
   onRevisarAlumnos,
   coachAvatarUrl,
   coachName,
@@ -1482,22 +1485,11 @@ export default function CoachDashboard({
               >
                 <Bell size={18} color="#9CA3AF" />
               </button>
-              <button
-                type="button"
-                style={actionButtonStyle({
-                  background: DS.primary,
-                  color: "#fff",
-                  padding: "12px 20px",
-                  fontSize: 13,
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                })}
-              >
-                <Plus size={16} strokeWidth={2.5} />
-                CREAR
-              </button>
+              <GlobalCreateMenu
+                onNuevoAlumno={onNuevoAlumno}
+                onNuevaRutina={onCrearRutina}
+                onNuevoEjercicio={onNuevoEjercicio}
+              />
             </div>
           </header>
 

@@ -842,6 +842,8 @@ function GymApp() {
   const [sugsOpen, setSugsOpen] = useState({});
   const [rutinasSBEntrenador, setRutinasSBEntrenador] = useState([]);
   const [filtroRut, setFiltroRut] = useState("todas");
+  /** Incrementar para abrir la pestaña «+ Nuevo» en GestionBiblioteca (ej. desde menú Crear del dashboard). */
+  const [bibOpenNewExerciseTick, setBibOpenNewExerciseTick] = useState(0);
 
   
 
@@ -2240,6 +2242,14 @@ function GymApp() {
                   else toast2(es?"No hay alumnos para contactar":"No athletes to message");
                 }}
                 onCrearRutina={function(){ setTab("routines"); }}
+                onNuevoAlumno={function(){
+                  setTab("alumnos");
+                  setNewAlumnoForm(true);
+                }}
+                onNuevoEjercicio={function(){
+                  setTab("biblioteca");
+                  setBibOpenNewExerciseTick(function (t) { return t + 1; });
+                }}
                 onRevisarAlumnos={function(){ setTab("alumnos"); }}
               />
         )}
@@ -2798,7 +2808,7 @@ function GymApp() {
         {tab==="library"&&(
           <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : ""}>
             {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal}/>}
-            {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>}
+            {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>}
           </div>
         )}
         {tab==="routines"&&!esAlumno&&(
@@ -2839,7 +2849,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
           </div>
         )}
         {tab==="progress"&&showAlumnoProgressStack&&(
@@ -2865,7 +2875,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
           </div>
         )}
         {tab==="progress"&&!showAlumnoProgressStack&&(
@@ -2880,7 +2890,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
           </div>
         )}
         {tab==="progress"&&!showAlumnoProgressStack&&(
@@ -5163,7 +5173,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
   );
 }
 
-function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, videoOverrides, setVideoOverrides, setVideoModal}) {
+function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, videoOverrides, setVideoOverrides, setVideoModal, openNewExerciseTick = 0}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
@@ -5178,6 +5188,12 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
     return catalog.concat(custom);
   }, [customEx]);
   const [tab, setTab] = React.useState(0);
+  React.useEffect(
+    function () {
+      if (openNewExerciseTick > 0) setTab(1);
+    },
+    [openNewExerciseTick]
+  );
   const [busq, setBusq] = React.useState("");
   const [filtPat, setFiltPat] = React.useState("todos");
   const [filtMus, setFiltMus] = React.useState("todos");
