@@ -464,6 +464,7 @@ export default function CoachDashboard({
   onRevisarAlumnos,
   coachAvatarUrl,
   coachName,
+  embedded = false,
 }) {
   useIronTrackDashboardFonts();
 
@@ -529,26 +530,38 @@ export default function CoachDashboard({
         });
 
   const shellStyle = {
-    minHeight: "100vh",
+    minHeight: embedded ? 0 : "100vh",
+    flex: embedded ? 1 : undefined,
+    width: "100%",
+    minWidth: 0,
     background: DS.bg,
     color: DS.text,
     fontFamily: FONTS.body,
     boxSizing: "border-box",
   };
 
-  const layoutGrid = {
-    display: "grid",
-    gridTemplateColumns: "220px minmax(0, 1fr)",
-    width: "100%",
-    minHeight: "100vh",
-  };
+  const layoutGrid = embedded
+    ? {
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+        minHeight: 0,
+        flex: 1,
+      }
+    : {
+        display: "grid",
+        gridTemplateColumns: "220px minmax(0, 1fr)",
+        width: "100%",
+        minHeight: "100vh",
+      };
 
   const mainScroll = {
     background: DS.bg,
     display: "flex",
     flexDirection: "column",
-    minHeight: "100vh",
+    minHeight: embedded ? 0 : "100vh",
     minWidth: 0,
+    flex: embedded ? 1 : undefined,
   };
 
   const headerSticky = {
@@ -1344,6 +1357,7 @@ export default function CoachDashboard({
   return (
     <div style={shellStyle}>
       <div style={layoutGrid}>
+        {!embedded ? (
         <aside
           style={{
             width: 220,
@@ -1425,6 +1439,7 @@ export default function CoachDashboard({
             </button>
           </div>
         </aside>
+        ) : null}
 
         <main style={mainScroll}>
           <header style={headerSticky}>

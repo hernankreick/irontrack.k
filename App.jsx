@@ -15,6 +15,7 @@ import { exportRoutinePdfHtml } from './lib/routinePdfExport.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboard from './components/CoachDashboard';
+import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import IronTrackLogo from './components/IronTrackLogo.jsx';
 import StudentProgressSection from './components/student-progress/StudentProgressSection.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
@@ -1714,6 +1715,8 @@ function GymApp() {
   const activeDay = activeR ? activeR.days[session.dIdx] : null;
   const esAlumno = readOnly || sessionData?.role==="alumno";
   const showAlumnoProgressStack = (readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId);
+  const coachDesktop1024 = useDesktopMin1024();
+  const showCoachDesktopShell = !esAlumno && sessionData?.role === "entrenador" && coachDesktop1024;
   const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
@@ -2017,7 +2020,7 @@ function GymApp() {
         "}"
       }}/>
 
-      <div className="app-inner" style={alumnoFullScreenShell ? {display:"flex",flexDirection:"column",flex:1,minHeight:0} : undefined}>
+      <div className="app-inner" style={alumnoFullScreenShell ? {display:"flex",flexDirection:"column",flex:1,minHeight:0} : showCoachDesktopShell ? {display:"flex",flexDirection:"column",minHeight:"100vh",width:"100%",flex:1} : undefined}>
       {!isOnline&&(
         <div style={{
           background:"#1f1500",borderBottom:"1px solid #F59E0B44",
@@ -2034,6 +2037,34 @@ function GymApp() {
           )}
         </div>
       )}
+      <div
+        style={
+          showCoachDesktopShell
+            ? { display: "flex", width: "100%", flex: 1, minHeight: 0, alignItems: "stretch", alignSelf: "stretch" }
+            : { display: "contents" }
+        }
+      >
+        {showCoachDesktopShell ? (
+          <DesktopSidebar
+            activeTab={tab}
+            onNavigate={setTab}
+            onSettings={function () {
+              setSettingsOpen(true);
+            }}
+            onPerfil={function () {
+              setSettingsOpen(true);
+            }}
+            coachAvatarUrl={sessionData?.avatarUrl}
+            coachName={sessionData?.name}
+          />
+        ) : null}
+        <div
+          style={
+            showCoachDesktopShell
+              ? { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }
+              : { display: "contents" }
+          }
+        >
       {!(esAlumno && tab === "progress") && (
       <div
         className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] pb-3 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}
@@ -2182,17 +2213,23 @@ function GymApp() {
         }}
         style={{
           /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
-          height: esAlumno && tab === "progress" && showAlumnoProgressStack
-            ? "calc(100svh - 70px)"
-            : alumnoTopBarFixed
-              ? "calc(100svh - 204px)"
-              : "calc(100svh - 130px)",
-          flex: alumnoFullScreenShell ? 1 : undefined,
-          minHeight: alumnoFullScreenShell ? 0 : undefined,
+          height:
+            showCoachDesktopShell && !esAlumno
+              ? undefined
+              : esAlumno && tab === "progress" && showAlumnoProgressStack
+                ? "calc(100svh - 70px)"
+                : alumnoTopBarFixed
+                  ? "calc(100svh - 204px)"
+                  : "calc(100svh - 130px)",
+          flex: alumnoFullScreenShell ? 1 : showCoachDesktopShell && !esAlumno ? 1 : undefined,
+          minHeight: alumnoFullScreenShell ? 0 : showCoachDesktopShell && !esAlumno ? 0 : undefined,
+          maxHeight: showCoachDesktopShell && !esAlumno ? "100%" : undefined,
           display: session && activeDay ? "none" : "block",
           paddingBottom: esAlumno
             ? "calc(8.5rem + env(safe-area-inset-bottom, 0px))"
-            : "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
+            : showCoachDesktopShell
+              ? "calc(1rem + env(safe-area-inset-bottom, 0px))"
+              : "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
           paddingLeft: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
           paddingRight: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
           paddingTop: esAlumno && (tab === "plan" || tab === "library") ? 32 : undefined,
@@ -2206,6 +2243,7 @@ function GymApp() {
         {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&!esAlumno&&sessionData?.role==="entrenador"&&(
               <CoachDashboard
+                embedded={!!showCoachDesktopShell}
                 alumnos={alumnos}
                 coachAvatarUrl={sessionData?.avatarUrl}
                 coachName={sessionData?.name}
@@ -4477,6 +4515,8 @@ function GymApp() {
       })()}
 
       </div>
+        </div>
+      </div>
       {/* Modal video: fuera del scroll (display:none con sesión ocultaba el overlay) + portal a body */}
       {videoModal &&
         typeof document !== "undefined" &&
@@ -4554,7 +4594,7 @@ function GymApp() {
           setVideoModal={setVideoModal}
         />
       )}
-      {!hideGlobalBottomNavCoachDash && (
+      {!hideGlobalBottomNavCoachDash && !showCoachDesktopShell && (
       <nav style={{
         position:"fixed",bottom:0,left:0,right:0,
         background:darkMode?"rgba(15,25,35,0.96)":"rgba(255,255,255,0.96)",
