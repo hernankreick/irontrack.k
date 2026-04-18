@@ -1714,6 +1714,9 @@ function GymApp() {
   /** Datos normalizados para GlobalSearch (coach). */
   const coachGlobalSearchData = React.useMemo(
     function () {
+      if (sessionData?.role !== "entrenador") {
+        return { alumnos: [], rutinas: [], ejercicios: [], sesiones: [] };
+      }
       var weekMs = 7 * 24 * 60 * 60 * 1000;
       var weekAgo = Date.now() - weekMs;
       var sg = sesionesGlobales || [];
@@ -1788,7 +1791,7 @@ function GymApp() {
         sesiones: sesionesSearch,
       };
     },
-    [alumnos, sesionesGlobales, rutinasSBEntrenador, allEx, coachAlumnoCategoria]
+    [sessionData, alumnos, sesionesGlobales, rutinasSBEntrenador, allEx, coachAlumnoCategoria]
   );
 
   var coachGlobalSearchNavigate = React.useCallback(
