@@ -15,6 +15,7 @@ import {
 import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import GlobalSearch from "./GlobalSearch.jsx";
 import ProgresoView from "./ProgresoView.jsx";
+import { coachType as T, coachSpace as S } from "./coachUiScale.js";
 
 const C = {
   card: "#12121a",
@@ -217,20 +218,20 @@ export default function CoachDashboard({
       >
         <header
           style={{
-            padding: "14px 18px",
+            padding: S.headerPadding,
             borderBottom: `1px solid ${C.brd}`,
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             flexWrap: "wrap",
-            gap: 12,
+            gap: S.gridGapTight,
           }}
         >
           <div>
-            <h2 style={{ fontSize: 20, lineHeight: 1.25, fontWeight: 700, color: C.t, margin: 0 }}>
+            <h2 style={{ ...T.screenTitle, color: C.t, margin: 0 }}>
               Buenas noches, Entrenador
             </h2>
-            <p style={{ fontSize: 15, lineHeight: 1.45, color: C.t2, margin: "4px 0 0 0" }}>
+            <p style={{ ...T.screenSubtitle, color: C.t2, margin: "6px 0 0 0" }}>
               Acá tenés el resumen de tu equipo
             </p>
           </div>
@@ -318,41 +319,40 @@ export default function CoachDashboard({
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 13,
-            padding: 15,
+            gap: S.pageGap,
+            padding: S.pagePadding,
           }}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 260px)", gap: 13, alignItems: "start" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 260px)", gap: S.gridGap, alignItems: "start" }}>
             <div
               style={{
                 background: C.card,
                 border: `1px solid ${C.brd}`,
                 borderRadius: 12,
-                padding: 16,
+                padding: S.cardPadding,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: S.blockGap }}>
                 <Info size={16} color={C.t2} strokeWidth={2} />
-                <span style={{ fontSize: 17, lineHeight: 1.25, fontWeight: 600, color: C.t }}>
+                <span style={{ ...T.cardTitleSemibold, color: C.t }}>
                   Cumplimiento semanal
                 </span>
               </div>
-              <div style={{ fontSize: 52, lineHeight: 1.15, fontWeight: 800, letterSpacing: -1, color: C.t }}>
+              <div style={{ ...T.numberHero, color: C.t }}>
                 16 / 24
               </div>
-              <div style={{ fontSize: 15, lineHeight: 1.45, color: C.t2, marginTop: 4 }}>
+              <div style={{ ...T.subtitle, color: C.t2, marginTop: 6 }}>
                 sesiones completadas
               </div>
               <div
                 style={{
-                  marginTop: 8,
+                  marginTop: S.blockGap,
                   display: "inline-block",
                   background: C.greenDim,
                   color: C.green,
                   borderRadius: 99,
-                  padding: "4px 10px",
-                  fontSize: 14,
-                  fontWeight: 600,
+                  padding: "5px 12px",
+                  ...T.bodySemibold,
                 }}
               >
                 Quedan 2 días para completar
@@ -378,7 +378,7 @@ export default function CoachDashboard({
                     >
                       <span
                         style={{
-                          fontSize: 13,
+                          ...T.labelMd,
                           color: C.t2,
                           width: 15,
                           fontFamily: "ui-monospace, monospace",
@@ -406,7 +406,7 @@ export default function CoachDashboard({
                       </div>
                       <span
                         style={{
-                          fontSize: 13,
+                          ...T.labelMd,
                           color: C.t2,
                           width: 34,
                           textAlign: "right",
@@ -440,9 +440,7 @@ export default function CoachDashboard({
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 24,
-                      lineHeight: 1.2,
-                      fontWeight: 800,
+                      ...T.numberGauge,
                       color: C.t,
                       pointerEvents: "none",
                     }}
@@ -453,13 +451,13 @@ export default function CoachDashboard({
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 13, minWidth: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: S.gridGap, minWidth: 0 }}>
               <div
                 style={{
                   background: C.card,
                   border: `1px solid ${C.brd}`,
                   borderRadius: 12,
-                  padding: 16,
+                  padding: S.cardPadding,
                 }}
               >
                 <div
@@ -467,10 +465,10 @@ export default function CoachDashboard({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginBottom: 12,
+                    marginBottom: S.blockGap,
                   }}
                 >
-                  <span style={{ fontSize: 17, lineHeight: 1.25, fontWeight: 600, color: C.t }}>
+                  <span style={{ ...T.cardTitleSemibold, color: C.t }}>
                     Equipo de un vistazo
                   </span>
                   <button
@@ -479,8 +477,7 @@ export default function CoachDashboard({
                       background: "none",
                       border: "none",
                       color: C.blue,
-                      fontSize: 14,
-                      lineHeight: 1.35,
+                      ...T.link,
                       cursor: "pointer",
                       padding: 0,
                     }}
@@ -500,17 +497,17 @@ export default function CoachDashboard({
                         textAlign: "center",
                       }}
                     >
-                      <div style={{ fontSize: 23, fontWeight: 800, color: C.t }}>{num}</div>
+                      <div style={{ ...T.numberStat, color: C.t }}>{num}</div>
                       <Mi
                         size={16}
                         color={color}
                         strokeWidth={2}
                         style={{ display: "block", margin: "6px auto 0 auto" }}
                       />
-                      <div style={{ fontSize: 15, lineHeight: 1.35, color: C.t2, marginTop: 6 }}>
+                      <div style={{ ...T.bodySemibold, color: C.t2, marginTop: 6 }}>
                         {label}
                       </div>
-                      <div style={{ fontSize: 14, lineHeight: 1.45, color: "#2a2a3a", marginTop: 4 }}>
+                      <div style={{ ...T.meta, color: C.t2, marginTop: 4 }}>
                         {sub}
                       </div>
                     </div>
@@ -523,12 +520,12 @@ export default function CoachDashboard({
                   background: C.card,
                   border: `1px solid ${C.brd}`,
                   borderRadius: 12,
-                  padding: 16,
+                  padding: S.cardPadding,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: S.blockGap }}>
                   <Info size={16} color={C.t2} strokeWidth={2} />
-                  <span style={{ fontSize: 17, lineHeight: 1.25, fontWeight: 600, color: C.t }}>
+                  <span style={{ ...T.cardTitleSemibold, color: C.t }}>
                     Tu rendimiento
                   </span>
                 </div>
@@ -536,19 +533,18 @@ export default function CoachDashboard({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                       <Star size={18} color="#eab308" fill="#eab308" strokeWidth={1.5} />
-                      <span style={{ fontSize: 40, lineHeight: 1.15, fontWeight: 800, color: C.t }}>
+                      <span style={{ ...T.numberScore, color: C.t }}>
                         72
                       </span>
-                      <span style={{ fontSize: 17, lineHeight: 1.25, color: C.t2 }}>/100</span>
+                      <span style={{ ...T.cardTitleSemibold, color: C.t2 }}>/100</span>
                     </div>
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
-                        marginTop: 8,
-                        fontSize: 14,
-                        lineHeight: 1.45,
+                        marginTop: S.blockGap,
+                        ...T.body,
                         color: C.green,
                       }}
                     >
@@ -579,9 +575,7 @@ export default function CoachDashboard({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 20,
-                        lineHeight: 1.2,
-                        fontWeight: 800,
+                        ...T.numberStat,
                         color: C.t,
                         pointerEvents: "none",
                       }}
@@ -599,7 +593,7 @@ export default function CoachDashboard({
               background: C.card,
               border: `1px solid ${C.brd}`,
               borderRadius: 12,
-              padding: 16,
+              padding: S.cardPadding,
             }}
           >
             <div
@@ -607,12 +601,12 @@ export default function CoachDashboard({
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 12,
+                marginBottom: S.blockGap,
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <AlertCircle size={17} color={C.yel} strokeWidth={2} />
-                <span style={{ fontSize: 17, lineHeight: 1.25, fontWeight: 600, color: C.t }}>
+                <span style={{ ...T.cardTitleSemibold, color: C.t }}>
                   Alertas inteligentes
                 </span>
               </div>
@@ -622,8 +616,7 @@ export default function CoachDashboard({
                   background: "none",
                   border: "none",
                   color: C.blue,
-                  fontSize: 15,
-                  lineHeight: 1.35,
+                  ...T.link,
                   cursor: "pointer",
                   padding: 0,
                 }}
@@ -667,7 +660,7 @@ export default function CoachDashboard({
                       {a.i}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 16, lineHeight: 1.3, fontWeight: 600, color: "#fff" }}>
+                      <div style={{ ...T.bodyLg, color: "#fff" }}>
                         {a.n}
                       </div>
                       <div
@@ -685,7 +678,7 @@ export default function CoachDashboard({
                       </div>
                     </div>
                   </div>
-                  <p style={{ fontSize: 14, lineHeight: 1.45, color: C.t2, margin: "4px 0 0 0" }}>
+                  <p style={{ ...T.body, color: C.t2, margin: "6px 0 0 0" }}>
                     {a.d}
                   </p>
                   <div style={{ display: "flex", gap: 7, marginTop: 9 }}>
@@ -743,13 +736,9 @@ export default function CoachDashboard({
           <div>
             <div
               style={{
-                textTransform: "uppercase",
-                fontSize: 14,
-                lineHeight: 1.45,
+                ...T.sectionEyebrow,
                 color: C.t2,
-                fontWeight: 600,
-                letterSpacing: 0.6,
-                marginBottom: 9,
+                marginBottom: S.blockGap,
               }}
             >
               ACCIONES RÁPIDAS
@@ -779,13 +768,12 @@ export default function CoachDashboard({
                   }}
                 >
                   <Qi size={22} color={iconColor} strokeWidth={2} />
-                  <p style={{ fontSize: 16, lineHeight: 1.3, fontWeight: 600, color: "#fff", margin: "8px 0 0 0" }}>
+                  <p style={{ ...T.bodyLg, color: "#fff", margin: "8px 0 0 0" }}>
                     {title}
                   </p>
                   <small
                     style={{
-                      fontSize: 14,
-                      lineHeight: 1.45,
+                      ...T.subtitle,
                       color: "#94a3b8",
                       display: "block",
                       marginTop: 4,
@@ -803,7 +791,7 @@ export default function CoachDashboard({
               background: C.card,
               border: `1px solid ${C.brd}`,
               borderRadius: 12,
-              padding: 16,
+              padding: S.cardPadding,
             }}
           >
             <div
@@ -811,10 +799,10 @@ export default function CoachDashboard({
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 12,
+                marginBottom: S.blockGap,
               }}
             >
-              <span style={{ fontSize: 17, lineHeight: 1.25, fontWeight: 600, color: C.t }}>
+              <span style={{ ...T.cardTitleSemibold, color: C.t }}>
                 Alumnos activos
               </span>
               <button
@@ -823,8 +811,7 @@ export default function CoachDashboard({
                   background: "none",
                   border: "none",
                   color: C.blue,
-                  fontSize: 15,
-                  lineHeight: 1.35,
+                  ...T.link,
                   cursor: "pointer",
                   padding: 0,
                 }}
@@ -845,12 +832,9 @@ export default function CoachDashboard({
                 <div
                   key={h}
                   style={{
-                    fontSize: 13,
-                    lineHeight: 1.35,
+                    ...T.tableHeader,
                     color: C.t2,
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.8,
+                    letterSpacing: 0.08,
                   }}
                 >
                   {h}
@@ -891,8 +875,7 @@ export default function CoachDashboard({
                     </div>
                     <span
                       style={{
-                        fontSize: 16,
-                        lineHeight: 1.35,
+                        ...T.body,
                         color: C.t,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -903,7 +886,7 @@ export default function CoachDashboard({
                     </span>
                   </div>
                   <div>
-                    <div style={{ fontSize: 14, lineHeight: 1.35, color: col, fontWeight: 700 }}>
+                    <div style={{ ...T.bodySemibold, color: col, fontWeight: 700 }}>
                       {row.p}%
                     </div>
                     <div
@@ -925,7 +908,7 @@ export default function CoachDashboard({
                       />
                     </div>
                   </div>
-                  <div style={{ fontSize: 15, lineHeight: 1.35, color: sesionColor(row.s) }}>
+                  <div style={{ ...T.subtitle, color: sesionColor(row.s) }}>
                     {row.s}
                   </div>
                 </div>
