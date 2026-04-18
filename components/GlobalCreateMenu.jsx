@@ -35,11 +35,28 @@ function useMinWidth(minPx) {
 }
 
 /**
- * Botón "Crear" con menú (desktop, min-width 1024px).
- * En viewport más angosto muestra el mismo botón y delega en onNuevaRutina (sin romper layout).
+ * Botón "Crear" con menú (desktop, min-width 1024px por defecto).
+ * En viewport más angosto muestra el mismo botón y delega en onNuevaRutina (sin romper layout),
+ * salvo que alwaysShowDropdown fuerce el menú completo (p. ej. CoachDashboard).
+ *
+ * Opcional: triggerStyle / label / plusSize / showChevron para integrar otro diseño de botón.
  */
-export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevoEjercicio }) {
+export default function GlobalCreateMenu({
+  onNuevoAlumno,
+  onNuevaRutina,
+  onNuevoEjercicio,
+  triggerStyle,
+  showChevron = true,
+  plusSize = 16,
+  label = "CREAR",
+  /** Si true, siempre muestra el dropdown (no solo rutina en &lt;1024). */
+  alwaysShowDropdown = false,
+}) {
   var isDesktop = useMinWidth(1024);
+  var showMenuUi = alwaysShowDropdown || isDesktop;
+  var uid = React.useId().replace(/:/g, "");
+  var btnId = "global-create-btn-" + uid;
+  var menuId = "global-create-dropdown-" + uid;
   var [open, setOpen] = React.useState(false);
   var [focusedIdx, setFocusedIdx] = React.useState(0);
   var wrapRef = React.useRef(null);
@@ -99,11 +116,11 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
 
   React.useLayoutEffect(
     function () {
-      if (!open || !isDesktop) return;
+      if (!open || !showMenuUi) return;
       var el = itemRefs.current[focusedIdx];
       if (el && typeof el.focus === "function") el.focus();
     },
-    [open, focusedIdx, isDesktop]
+    [open, focusedIdx, showMenuUi]
   );
 
   function runAndClose(idx) {
@@ -114,7 +131,7 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
   }
 
   function onTriggerKeyDown(e) {
-    if (!isDesktop) return;
+    if (!showMenuUi) return;
     if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
       if (e.key === "ArrowDown" || e.key === "Enter") {
         e.preventDefault();
@@ -147,7 +164,7 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
     }
   }
 
-  var btnStyle = {
+  var btnStyleDefault = {
     textTransform: "uppercase",
     letterSpacing: "0.5px",
     fontWeight: 700,
@@ -165,8 +182,9 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
     outline: "none",
     boxSizing: "border-box",
   };
+  var btnStyle = triggerStyle ? triggerStyle : btnStyleDefault;
 
-  if (!isDesktop) {
+  if (!showMenuUi) {
     return (
       <button
         type="button"
@@ -175,8 +193,8 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
           if (typeof onNuevaRutina === "function") onNuevaRutina();
         }}
       >
-        <Plus size={16} strokeWidth={2.5} aria-hidden />
-        CREAR
+        <Plus size={plusSize} strokeWidth={2.5} aria-hidden />
+        {label}
       </button>
     );
   }
@@ -186,10 +204,10 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
       <button
         ref={btnRef}
         type="button"
-        id="global-create-menu-button"
+        id={btnId}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls="global-create-dropdown"
+        aria-controls={menuId}
         style={btnStyle}
         onClick={function () {
           setOpen(function (o) {
@@ -199,25 +217,27 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
         }}
         onKeyDown={onTriggerKeyDown}
       >
-        <Plus size={16} strokeWidth={2.5} aria-hidden />
-        CREAR
-        <ChevronDown
-          size={16}
-          aria-hidden
-          style={{
-            opacity: 0.9,
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.18s ease",
-          }}
-        />
+        <Plus size={plusSize} strokeWidth={2.5} aria-hidden />
+        {label}
+        {showChevron ? (
+          <ChevronDown
+            size={16}
+            aria-hidden
+            style={{
+              opacity: 0.9,
+              transform: open ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.18s ease",
+            }}
+          />
+        ) : null}
       </button>
 
       {open ? (
         <div
           ref={menuRef}
-          id="global-create-dropdown"
+          id={menuId}
           role="menu"
-          aria-labelledby="global-create-menu-button"
+          aria-labelledby={btnId}
           tabIndex={-1}
           onKeyDown={onMenuKeyDown}
           style={{
@@ -237,8 +257,12 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
           <style>
             {
               "@keyframes globalCreateMenuIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } } " +
-                "#global-create-dropdown button:focus-visible { outline: 2px solid #3B82F6; outline-offset: -2px; } " +
-                "#global-create-menu-button:focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; }"
+                "#" +
+                menuId +
+                " button:focus-visible { outline: 2px solid #3B82F6; outline-offset: -2px; } " +
+                "#" +
+                btnId +
+                ":focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; }"
             }
           </style>
           {items.map(function (it, idx) {

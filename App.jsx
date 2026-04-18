@@ -1711,6 +1711,144 @@ function GymApp() {
     return e.name.toLowerCase().includes(q)||e.nameEn.toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
   });
 
+  /** Datos normalizados para GlobalSearch (coach). */
+  const coachGlobalSearchData = React.useMemo(
+    function () {
+      var weekMs = 7 * 24 * 60 * 60 * 1000;
+      var weekAgo = Date.now() - weekMs;
+      var sg = sesionesGlobales || [];
+      var alumnosSearch = (alumnos || []).map(function (a) {
+        var cat = coachAlumnoCategoria(a);
+        var estado = cat === "activo" ? "ok" : cat === "inactivo" ? "inactivo" : "riesgo";
+        var sesCount = sg.filter(function (s) {
+          return s.alumno_id === a.id;
+        }).length;
+        var weekSessions = sg.filter(function (s) {
+          if (s.alumno_id !== a.id) return false;
+          var t = new Date(s.created_at || 0).getTime();
+          return !isNaN(t) && t >= weekAgo;
+        }).length;
+        var pct = Math.min(100, Math.round((weekSessions / 3) * 100));
+        return {
+          id: a.id,
+          nombre: a.nombre || a.email || "Sin nombre",
+          pctSemanal: pct,
+          sesionesCompletadas: sesCount,
+          estado: estado,
+        };
+      });
+      var rutinasSearch = (rutinasSBEntrenador || []).map(function (rSB) {
+        var dias = rSB.datos?.days || [];
+        var ejCount = dias.reduce(function (acc, d) {
+          return acc + (d.warmup || []).length + (d.exercises || []).length;
+        }, 0);
+        var alum = alumnos.find(function (al) {
+          return al.id === rSB.alumno_id;
+        });
+        return {
+          id: rSB.id,
+          nombre: rSB.nombre || "Rutina",
+          ejerciciosCount: ejCount,
+          semanaActual: dias.length ? String(dias.length) : "—",
+          alumnosAsignados: alum ? alum.nombre || alum.email : "—",
+        };
+      });
+      var ejerciciosSearch = allEx.slice(0, 280).map(function (e) {
+        var pat = String(e.pattern || "").toLowerCase();
+        var tipo = /compound|multi|push|pull|squat|hinge/i.test(pat) ? "compuesto" : "aislado";
+        return {
+          id: e.id,
+          nombre: e.name || e.nameEn || e.id,
+          grupoMuscular: e.muscle || "—",
+          tipo: tipo,
+        };
+      });
+      var sesionesSearch = sg.slice(0, 150).map(function (s, idx) {
+        var alum = alumnos.find(function (al) {
+          return al.id === s.alumno_id;
+        });
+        var raw = s.created_at || s.fecha || "";
+        var fechaLabel = raw
+          ? new Date(raw).toLocaleDateString("es-AR", { day: "2-digit", month: "short" })
+          : "—";
+        var pend = s.estado === "pendiente" || s.completada === false;
+        return {
+          id: s.id != null ? s.id : "ses-" + String(s.alumno_id) + "-" + idx,
+          alumnoId: s.alumno_id,
+          alumnoNombre: alum ? alum.nombre || alum.email : "Alumno",
+          tipoSesion: s.tipo || s.nota || "Entrenamiento",
+          fechaLabel: fechaLabel,
+          estado: pend ? "pendiente" : "completada",
+        };
+      });
+      return {
+        alumnos: alumnosSearch,
+        rutinas: rutinasSearch,
+        ejercicios: ejerciciosSearch,
+        sesiones: sesionesSearch,
+      };
+    },
+    [alumnos, sesionesGlobales, rutinasSBEntrenador, allEx, coachAlumnoCategoria]
+  );
+
+  var coachGlobalSearchNavigate = React.useCallback(
+    function (seccion, id) {
+      if (seccion === "alumnos") {
+        var alum = (alumnos || []).find(function (x) {
+          return String(x.id) === String(id);
+        });
+        if (!alum) return;
+        setAlumnoActivo(alum);
+        setTab("alumnos");
+        setLoadingSB(true);
+        Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)])
+          .then(function (r) {
+            setRutinasSB(r[0] || []);
+            setAlumnoProgreso(r[1] || []);
+            setAlumnoSesiones(r[2] || []);
+          })
+          .catch(function (e) {
+            console.error("[GlobalSearch alumnos]", e);
+          })
+          .finally(function () {
+            setLoadingSB(false);
+          });
+        return;
+      }
+      if (seccion === "rutinas") {
+        setTab("routines");
+        return;
+      }
+      if (seccion === "ejercicios") {
+        setTab("biblioteca");
+        return;
+      }
+      if (seccion === "sesiones") {
+        var aid = id;
+        var alum2 = (alumnos || []).find(function (x) {
+          return String(x.id) === String(aid);
+        });
+        if (!alum2) return;
+        setAlumnoActivo(alum2);
+        setTab("alumnos");
+        setLoadingSB(true);
+        Promise.all([sb.getRutinas(alum2.id), sb.getProgreso(alum2.id), sb.getSesiones(alum2.id)])
+          .then(function (r) {
+            setRutinasSB(r[0] || []);
+            setAlumnoProgreso(r[1] || []);
+            setAlumnoSesiones(r[2] || []);
+          })
+          .catch(function (e) {
+            console.error("[GlobalSearch sesiones]", e);
+          })
+          .finally(function () {
+            setLoadingSB(false);
+          });
+      }
+    },
+    [alumnos, sesionesGlobales, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones]
+  );
+
   const activeR = session ? routines.find(r=>r.id===session.rId) : null;
   const activeDay = activeR ? activeR.days[session.dIdx] : null;
   const esAlumno = readOnly || sessionData?.role==="alumno";
@@ -2316,6 +2454,21 @@ function GymApp() {
                   }
                   setLoadingSB(false);
                 }}
+                onNuevoAlumno={function () {
+                  setTab("alumnos");
+                  setNewAlumnoForm(true);
+                }}
+                onNuevaRutina={function () {
+                  setTab("routines");
+                }}
+                onNuevoEjercicio={function () {
+                  setTab("biblioteca");
+                  setBibOpenNewExerciseTick(function (t) {
+                    return t + 1;
+                  });
+                }}
+                globalSearchData={coachGlobalSearchData}
+                onGlobalSearchNavigate={coachGlobalSearchNavigate}
               />
         )}
         {tab==="plan"&&(

@@ -10,10 +10,10 @@ import {
   FilePlus,
   Info,
   MessageSquare,
-  Plus,
-  Search,
   Star,
 } from "lucide-react";
+import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
+import GlobalSearch from "./GlobalSearch.jsx";
 
 const C = {
   card: "#12121a",
@@ -167,6 +167,11 @@ export default function CoachDashboard({
   onRevisarAlumnos,
   onRevisar,
   onVerPerfil,
+  onNuevoAlumno,
+  onNuevaRutina,
+  onNuevoEjercicio,
+  globalSearchData = { alumnos: [], rutinas: [], ejercicios: [], sesiones: [] },
+  onGlobalSearchNavigate,
 }) {
   function runQuick(action) {
     if (action === "message" && typeof onEnviarMensaje === "function") onEnviarMensaje();
@@ -212,45 +217,20 @@ export default function CoachDashboard({
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
             <div
               style={{
-                background: C.card,
-                border: `1px solid ${C.brd}`,
-                borderRadius: 8,
-                height: 36,
-                width: 188,
-                maxWidth: "100%",
-                padding: "0 12px",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                boxSizing: "border-box",
+                position: "relative",
+                flex: 1,
+                minWidth: 0,
+                maxWidth: 440,
               }}
             >
-              <Search size={15} color={C.t2} strokeWidth={2} />
-              <input
-                placeholder="Buscar alumnos, rutina..."
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  outline: "none",
-                  color: C.t,
-                  fontSize: 15,
-                  flex: 1,
-                  minWidth: 0,
-                }}
+              <GlobalSearch
+                alumnos={globalSearchData.alumnos}
+                rutinas={globalSearchData.rutinas}
+                ejercicios={globalSearchData.ejercicios}
+                sesiones={globalSearchData.sesiones}
+                onNavigate={onGlobalSearchNavigate}
+                placeholder="Buscar alumno, rutina, ejercicio..."
               />
-              <kbd
-                style={{
-                  background: "#1e1e2e",
-                  border: "1px solid #334155",
-                  borderRadius: 4,
-                  padding: "2px 6px",
-                  fontSize: 13,
-                  color: C.t2,
-                  fontFamily: "inherit",
-                }}
-              >
-                ⌘K
-              </kbd>
             </div>
             <button
               type="button"
@@ -283,9 +263,15 @@ export default function CoachDashboard({
                 }}
               />
             </button>
-            <button
-              type="button"
-              style={{
+            <GlobalCreateMenu
+              onNuevoAlumno={onNuevoAlumno}
+              onNuevaRutina={onNuevaRutina}
+              onNuevoEjercicio={onNuevoEjercicio}
+              alwaysShowDropdown={true}
+              showChevron={false}
+              plusSize={15}
+              label="+ CREAR"
+              triggerStyle={{
                 background: C.blue,
                 color: "#fff",
                 borderRadius: 7,
@@ -300,10 +286,11 @@ export default function CoachDashboard({
                 letterSpacing: 0.4,
                 border: "none",
                 cursor: "pointer",
+                fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+                outline: "none",
+                boxSizing: "border-box",
               }}
-            >
-              <Plus size={15} strokeWidth={2.5} />+ CREAR
-            </button>
+            />
           </div>
         </header>
 
