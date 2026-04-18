@@ -1,55 +1,38 @@
 import React from "react";
 import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import {
-  AlertCircle,
   BarChart3,
   Bell,
-  Bot,
-  ChevronLeft,
+  CheckCircle2,
   ChevronRight,
+  CircleAlert,
   ClipboardList,
-  Clock,
+  Clock3,
   Dumbbell,
   Eye,
   Info,
   LayoutDashboard,
   MessageSquare,
-  Plus,
-  Search,
-  Send,
   Settings,
   Trophy,
   User,
   Users,
 } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  RadialBar,
-  RadialBarChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, Cell, RadialBar, RadialBarChart, ResponsiveContainer, XAxis } from "recharts";
 
 const DS = {
-  bg: "#0B0E11",
-  card: "#111827",
-  border: "#1a2535",
-  primary: "#2563EB",
-  primaryLight: "#3B82F6",
+  bg: "#08101d",
+  panel: "#0f172a",
+  panelSoft: "#111c31",
+  border: "rgba(62, 84, 120, 0.35)",
+  line: "rgba(255,255,255,0.06)",
+  text: "#f8fafc",
+  muted: "#93a4c2",
+  primary: "#2f6cf6",
+  primarySoft: "#3b82f6",
   green: "#22c55e",
-  yellow: "#f59e0b",
-  red: "#ef4444",
-  textMuted: "#9CA3AF",
-  text: "#F3F4F6",
+  yellow: "#fbbf24",
+  red: "#ff4d4f",
 };
 
 const FONTS = {
@@ -58,7 +41,7 @@ const FONTS = {
   mono: "'DM Mono', monospace",
 };
 
-function useIronTrackDashboardFonts() {
+function useDashboardFonts() {
   React.useEffect(function () {
     const id = "irontrack-coach-dashboard-fonts";
     if (typeof document === "undefined" || document.getElementById(id)) return;
@@ -66,7 +49,7 @@ function useIronTrackDashboardFonts() {
     link.id = id;
     link.rel = "stylesheet";
     link.href =
-      "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap";
+      "https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;700&display=swap";
     document.head.appendChild(link);
   }, []);
 }
@@ -75,24 +58,18 @@ function initialsFromName(name) {
   return String(name || "Coach")
     .trim()
     .split(/\s+/)
-    .map(function (p) {
-      return p.charAt(0);
+    .map(function (part) {
+      return part.charAt(0);
     })
     .join("")
     .slice(0, 2)
     .toUpperCase();
 }
 
-function sparklineData(seed) {
-  return seed.map(function (value, index) {
-    return { i: index, v: value };
-  });
-}
-
 function greetingLabel() {
-  const h = new Date().getHours();
-  if (h < 12) return "Buenos días";
-  if (h < 19) return "Buenas tardes";
+  const hour = new Date().getHours();
+  if (hour < 12) return "Buenos dias";
+  if (hour < 19) return "Buenas tardes";
   return "Buenas noches";
 }
 
@@ -112,180 +89,53 @@ const navItems = [
 ];
 
 const weekBarData = [
-  { day: "L", value: 4, fill: "#3B82F6" },
-  { day: "M", value: 5, fill: "#3B82F6" },
-  { day: "X", value: 4, fill: "#3B82F6" },
-  { day: "J", value: 5, fill: "#3B82F6" },
-  { day: "V", value: 3, fill: "#3B82F6" },
-  { day: "S", value: 1, fill: "#25314A" },
-  { day: "D", value: 0, fill: "#1F2739" },
+  { day: "L", value: 4, fill: "#3168f5" },
+  { day: "M", value: 5, fill: "#3b78ff" },
+  { day: "X", value: 4.2, fill: "#3772fb" },
+  { day: "J", value: 5.5, fill: "#4b81ff" },
+  { day: "V", value: 2.8, fill: "#213b89" },
+  { day: "S", value: 1.2, fill: "#1a243d" },
+  { day: "D", value: 1.1, fill: "#1a243d" },
 ];
 
-const monthlyAreaData = [
-  { m: "E", sessions: 42 },
-  { m: "F", sessions: 48 },
-  { m: "M", sessions: 51 },
-  { m: "A", sessions: 46 },
-  { m: "M", sessions: 55 },
-  { m: "J", sessions: 58 },
+const teamStats = [
+  { id: "ok", value: 5, label: "Cumpliendo", detail: ">= 70% sesiones", color: DS.green, Icon: CheckCircle2 },
+  { id: "mid", value: 2, label: "En progreso", detail: "30% - 69%", color: DS.yellow, Icon: Clock3 },
+  { id: "low", value: 1, label: "Sin actividad", detail: "< 30%", color: DS.red, Icon: CircleAlert },
 ];
 
-const performanceRing = [{ name: "score", value: 72, fill: "#2563EB" }];
-
-const quickActionPages = [
-  [
-    {
-      id: "msg",
-      title: "Enviar mensaje a tu equipo",
-      icon: MessageSquare,
-      bg: "rgba(37, 99, 235, 0.18)",
-      border: "rgba(59, 130, 246, 0.35)",
-      iconColor: "#3B82F6",
-    },
-    {
-      id: "routine",
-      title: "Crear rutina personalizada",
-      icon: Plus,
-      bg: "rgba(139, 92, 246, 0.18)",
-      border: "rgba(167, 139, 250, 0.35)",
-      iconColor: "#A78BFA",
-    },
-    {
-      id: "review",
-      title: "Revisar alumnos que necesitan atención",
-      icon: Eye,
-      bg: "rgba(34, 197, 94, 0.16)",
-      border: "rgba(34, 197, 94, 0.35)",
-      iconColor: "#22C55E",
-    },
-  ],
-  [
-    {
-      id: "msg2",
-      title: "Recordatorio de hidratación",
-      icon: MessageSquare,
-      bg: "rgba(37, 99, 235, 0.18)",
-      border: "rgba(59, 130, 246, 0.35)",
-      iconColor: "#3B82F6",
-    },
-    {
-      id: "routine2",
-      title: "Duplicar semana anterior",
-      icon: Plus,
-      bg: "rgba(139, 92, 246, 0.18)",
-      border: "rgba(167, 139, 250, 0.35)",
-      iconColor: "#A78BFA",
-    },
-    {
-      id: "review2",
-      title: "Ver informe semanal",
-      icon: Eye,
-      bg: "rgba(34, 197, 94, 0.16)",
-      border: "rgba(34, 197, 94, 0.35)",
-      iconColor: "#22C55E",
-    },
-  ],
+const alertCards = [
+  { id: "1", alumnoId: "1", name: "Agustin Torres", initials: "AT", badge: "1 de 3 sesiones", badgeColor: DS.red, copy: "Podria no completar la semana.", buttonColor: DS.red },
+  { id: "2", alumnoId: "2", name: "Sofia Gomez", initials: "SG", badge: "Sin actividad", badgeColor: DS.yellow, copy: "Aun tiene tiempo para ponerse al dia.", buttonColor: DS.yellow },
+  { id: "3", alumnoId: "3", name: "Lucas Diaz", initials: "LD", badge: "2 de 4 sesiones", badgeColor: DS.red, copy: "Necesita seguimiento de esta semana.", buttonColor: DS.red },
 ];
 
-const aiAlerts = [
-  {
-    id: "a1",
-    title: "Agustín bajó el volumen un 18%",
-    detail: "Sugerencia: revisar fatiga o deload.",
-  },
-  {
-    id: "a2",
-    title: "3 alumnos sin registrar sesión en 5 días",
-    detail: "Enviar mensaje de seguimiento.",
-  },
+const quickActions = [
+  { id: "message", title: "Enviar mensaje", subtitle: "a tu equipo", icon: MessageSquare, bg: "linear-gradient(180deg,#2f6cf6 0%,#295ad0 100%)" },
+  { id: "routine", title: "Crear rutina", subtitle: "personalizada", icon: ClipboardList, bg: "linear-gradient(180deg,#6d28d9 0%,#7c3aed 100%)" },
+  { id: "review", title: "Revisar alumnos", subtitle: "que necesitan atencion", icon: Eye, bg: "linear-gradient(180deg,#0f8a5d 0%,#129b67 100%)" },
 ];
 
-const routinesMock = [
-  { id: "r1", name: "Fuerza — Tren superior", week: "Semana 3 de 4", status: "activa" },
-  { id: "r2", name: "Hipertrofia — Full body", week: "Semana 1 de 6", status: "activa" },
-  { id: "r3", name: "Deload — Movilidad", week: "Semana 4 de 4", status: "cierre" },
-];
-
-const muscleGroups = ["Todos", "Pecho", "Espalda", "Piernas", "Hombros", "Brazos", "Core"];
-
-const exercisesMock = [
-  { id: "e1", name: "Press banca", group: "Pecho" },
-  { id: "e2", name: "Remo con barra", group: "Espalda" },
-  { id: "e3", name: "Sentadilla", group: "Piernas" },
-  { id: "e4", name: "Press militar", group: "Hombros" },
-  { id: "e5", name: "Curl martillo", group: "Brazos" },
-  { id: "e6", name: "Plancha", group: "Core" },
-];
-
-const teamProgressArea = [
-  { w: "S1", load: 62 },
-  { w: "S2", load: 68 },
-  { w: "S3", load: 71 },
-  { w: "S4", load: 74 },
-  { w: "S5", load: 77 },
-  { w: "S6", load: 80 },
-];
-
-const exerciseVolumeBars = [
-  { name: "Sentadilla", vol: 92 },
-  { name: "Press banca", vol: 86 },
-  { name: "Peso muerto", vol: 81 },
-  { name: "Remo", vol: 74 },
-];
-
-const complianceByStudent = [
-  { name: "Julieta L.", pct: 88 },
-  { name: "Agustín T.", pct: 41 },
-  { name: "Hernán K.", pct: 12 },
-  { name: "Martín S.", pct: 72 },
-];
-
-const conversationsMock = [
-  { id: "c1", peer: "Julieta Laroze", initials: "JL", last: "¿Cambio el peso en remo?", time: "10:24", unread: 2 },
-  { id: "c2", peer: "Agustín Torres", initials: "AT", last: "Listo el día de piernas.", time: "Ayer", unread: 0 },
-  { id: "c3", peer: "Hernán Kreick", initials: "HK", last: "No pude entrenar el lunes.", time: "Lun", unread: 1 },
-];
+const performanceRing = [{ name: "score", value: 72, fill: DS.primary }];
 
 function buildStudents(alumnos) {
   const fallback = [
-    { id: "1", nombre: "Julieta Laroze", progreso: 82 },
-    { id: "2", nombre: "Agustín Torres", progreso: 45 },
-    { id: "3", nombre: "Hernán Kreick", progreso: 0 },
-    { id: "4", nombre: "Martín Sosa", progreso: 67 },
+    { id: "1", nombre: "Julieta Laroze", progreso: 82, last: "Hoy" },
+    { id: "2", nombre: "Agustin", progreso: 45, last: "Hace 2 dias" },
+    { id: "3", nombre: "Hernan", progreso: 0, last: "Sin actividad" },
   ];
   const base = Array.isArray(alumnos) && alumnos.length ? alumnos : fallback;
-  const seeds = [
-    [58, 65, 71, 76, 80, 82],
-    [72, 64, 58, 54, 50, 45],
-    [28, 18, 10, 5, 2, 0],
-    [51, 54, 61, 63, 65, 67],
-  ];
-  return base.slice(0, 8).map(function (alumno, index) {
-    const pct = typeof alumno.progreso === "number" ? alumno.progreso : [82, 45, 0, 67][index % 4];
+  return base.slice(0, 6).map(function (alumno, index) {
+    const pct = typeof alumno.progreso === "number" ? alumno.progreso : [82, 45, 0][index % 3];
     return {
       id: alumno.id || String(index + 1),
       name: alumno.nombre || alumno.email || "Alumno",
       initials: initialsFromName(alumno.nombre || alumno.email || "Alumno"),
       pct: pct,
       color: pctColor(pct),
-      trend: sparklineData(seeds[index % seeds.length]),
+      last: alumno.last || ["Hoy", "Hace 2 dias", "Sin actividad"][index % 3],
     };
   });
-}
-
-function actionButtonStyle(overrides) {
-  return Object.assign(
-    {
-      textTransform: "uppercase",
-      letterSpacing: "0.5px",
-      fontWeight: 700,
-      fontFamily: FONTS.body,
-      border: "none",
-      cursor: "pointer",
-      borderRadius: 8,
-    },
-    overrides || {}
-  );
 }
 
 function Card(props) {
@@ -293,10 +143,10 @@ function Card(props) {
     <section
       style={Object.assign(
         {
-          borderRadius: 16,
+          background: DS.panel,
           border: "1px solid " + DS.border,
-          background: DS.card,
-          boxSizing: "border-box",
+          borderRadius: 18,
+          boxShadow: "0 18px 40px rgba(0,0,0,0.22)",
         },
         props.style || {}
       )}
@@ -308,24 +158,20 @@ function Card(props) {
 
 function BrandMark() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 28 }}>
-        <div style={{ width: 4, height: 22, background: DS.primaryLight, borderRadius: 2 }} />
-        <div style={{ width: 4, height: 28, background: DS.primary, borderRadius: 2 }} />
-        <div style={{ width: 4, height: 16, background: "#1D4ED8", borderRadius: 2 }} />
-      </div>
-      <div
-        style={{
-          fontFamily: FONTS.title,
-          fontSize: 26,
-          letterSpacing: 2,
-          color: "#fff",
-          lineHeight: 0.95,
-        }}
-      >
-        IRON
-        <br />
-        TRACK
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ display: "flex", gap: 4, paddingTop: 2 }}>
+          <div style={{ width: 4, height: 34, borderRadius: 999, background: DS.primarySoft }} />
+          <div style={{ width: 4, height: 28, borderRadius: 999, background: "#6aa1ff" }} />
+        </div>
+        <div>
+          <div style={{ fontFamily: FONTS.title, fontSize: 28, lineHeight: 0.92, letterSpacing: 1.2, color: "#2d6fff" }}>
+            IRON
+            <br />
+            TRACK
+          </div>
+          <div style={{ marginTop: 12, fontSize: 12, fontWeight: 700, letterSpacing: 2, color: "#4f86ff" }}>MODO ENTRENADOR</div>
+        </div>
       </div>
     </div>
   );
@@ -339,119 +185,130 @@ function SidebarItem({ item, active, onClick }) {
       onClick={onClick}
       style={{
         position: "relative",
-        width: "100%",
         display: "flex",
         alignItems: "center",
-        gap: 12,
-        padding: "12px 14px",
-        borderRadius: 12,
+        gap: 14,
+        width: "100%",
         border: "none",
+        background: active ? "rgba(47,108,246,0.14)" : "transparent",
+        color: active ? "#fff" : DS.muted,
+        padding: "14px 16px",
+        borderRadius: 14,
         cursor: "pointer",
-        background: active ? "rgba(37, 99, 235, 0.12)" : "transparent",
-        color: active ? "#fff" : DS.textMuted,
-        fontFamily: FONTS.body,
-        fontSize: 14,
-        fontWeight: active ? 600 : 500,
         textAlign: "left",
-        transition: "background 0.15s, color 0.15s",
+        fontFamily: FONTS.body,
+        fontSize: 15,
+        fontWeight: active ? 700 : 500,
       }}
     >
-      {active ? (
-        <span
-          style={{
-            position: "absolute",
-            left: 0,
-            top: "50%",
-            width: 3,
-            height: 22,
-            marginTop: -11,
-            borderRadius: "0 4px 4px 0",
-            background: DS.primary,
-          }}
-        />
-      ) : null}
-      <Icon size={18} color={active ? DS.primaryLight : "#6B7280"} strokeWidth={2} />
+      {active ? <span style={{ position: "absolute", left: -16, top: "50%", transform: "translateY(-50%)", width: 4, height: 40, borderRadius: 999, background: DS.primarySoft }} /> : null}
+      <Icon size={20} color={active ? DS.primarySoft : "#7c8fb0"} />
       <span>{item.label}</span>
     </button>
   );
 }
 
-function StudentRow({ student, onClick }) {
+function OverviewStat({ stat }) {
+  const Icon = stat.Icon;
+  return (
+    <div style={{ borderRadius: 16, border: "1px solid " + DS.border, background: DS.panelSoft, padding: 18, minHeight: 156 }}>
+      <Icon size={20} color={stat.color} />
+      <div style={{ marginTop: 18, fontFamily: FONTS.mono, fontSize: 22, fontWeight: 700, color: stat.color }}>{stat.value}</div>
+      <div style={{ marginTop: 10, fontSize: 15, fontWeight: 700, color: "#fff" }}>{stat.label}</div>
+      <div style={{ marginTop: 8, fontSize: 13, color: DS.muted }}>{stat.detail}</div>
+    </div>
+  );
+}
+
+function AlertCard({ alert, onRevisar, onVerPerfil }) {
+  return (
+    <div className="flex-shrink-0" style={{ minWidth: 274, borderRadius: 18, border: "1px solid " + DS.border, background: DS.panelSoft, padding: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+        <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#172443", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 18, color: "#d7e3ff" }}>
+          {alert.initials}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 8 }}>{alert.name}</div>
+          <div style={{ display: "inline-flex", alignItems: "center", padding: "5px 10px", borderRadius: 999, border: "1px solid " + alert.badgeColor, color: alert.badgeColor, fontSize: 12, fontWeight: 700 }}>
+            {alert.badge}
+          </div>
+        </div>
+      </div>
+      <div style={{ minHeight: 54, color: DS.muted, fontSize: 15, lineHeight: 1.45 }}>{alert.copy}</div>
+      <div className="mt-[18px] grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={function () {
+            onRevisar && onRevisar(alert.alumnoId);
+          }}
+          style={{ border: "none", borderRadius: 14, background: alert.buttonColor, color: alert.buttonColor === DS.yellow ? "#101522" : "#fff", fontFamily: FONTS.body, fontSize: 14, fontWeight: 800, letterSpacing: 0.5, padding: "14px 12px", cursor: "pointer" }}
+        >
+          REVISAR
+        </button>
+        <button
+          type="button"
+          onClick={function () {
+            onVerPerfil && onVerPerfil(alert.alumnoId);
+          }}
+          style={{ border: "1px solid " + DS.border, borderRadius: 14, background: "#18243d", color: "#90a1bf", fontFamily: FONTS.body, fontSize: 14, fontWeight: 700, padding: "14px 12px", cursor: "pointer" }}
+        >
+          VER PERFIL
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function QuickActionCard({ action, onClick }) {
+  const Icon = action.icon;
   return (
     <button
       type="button"
       onClick={onClick}
-      style={{
-        display: "grid",
-        gridTemplateColumns: "52px 1fr 140px 20px",
-        alignItems: "center",
-        gap: 16,
-        width: "100%",
-        padding: "16px 18px",
-        borderRadius: 12,
-        border: "1px solid " + DS.border,
-        background: "#0f1624",
-        cursor: "pointer",
-        textAlign: "left",
-        fontFamily: FONTS.body,
-      }}
+      style={{ border: "none", borderRadius: 18, background: action.bg, color: "#fff", minHeight: 170, padding: "24px 20px", cursor: "pointer", textAlign: "left", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)" }}
     >
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: "50%",
-          background: "#1e3a5f",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontWeight: 700,
-          fontSize: 13,
-          color: "#E5E7EB",
-        }}
-      >
-        {student.initials}
+      <div style={{ width: 50, height: 50, borderRadius: 16, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
+        <Icon size={22} color="#fff" />
       </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 600, color: "#fff", marginBottom: 8, fontSize: 15 }}>{student.name}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ flex: 1, height: 8, borderRadius: 999, background: "#1F2937" }}>
-            <div
-              style={{
-                height: "100%",
-                width: student.pct + "%",
-                borderRadius: 999,
-                background: student.color,
-              }}
-            />
-          </div>
-          <span
-            style={{
-              width: 40,
-              textAlign: "right",
-              fontFamily: FONTS.mono,
-              fontSize: 14,
-              fontWeight: 600,
-              color: student.color,
-            }}
-          >
-            {student.pct}%
-          </span>
-        </div>
-      </div>
-      <div style={{ height: 36, width: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={student.trend}>
-            <Line type="monotone" dataKey="v" stroke={DS.primaryLight} strokeWidth={2} dot={false} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-      <ChevronRight size={18} color="#6B7280" />
+      <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 10 }}>{action.title}</div>
+      <div style={{ fontSize: 14, color: "rgba(255,255,255,0.82)", lineHeight: 1.45 }}>{action.subtitle}</div>
     </button>
   );
 }
 
+function StudentTableRow({ student, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="grid w-full min-w-[640px] cursor-pointer grid-cols-[56px_minmax(0,1.4fr)_minmax(240px,1fr)_150px_24px] items-center gap-3.5 border-none border-t bg-transparent py-5 pl-0.5 pr-0.5 text-left lg:min-w-0"
+      style={{ borderTop: "1px solid " + DS.line }}
+    >
+      <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#14234a", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, color: "#d6e2ff" }}>{student.initials}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{student.name}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <div style={{ flex: 1, height: 10, borderRadius: 999, background: "#1a2340" }}>
+          <div style={{ height: "100%", width: student.pct + "%", borderRadius: 999, background: student.color }} />
+        </div>
+        <div style={{ minWidth: 46, textAlign: "right", fontFamily: FONTS.mono, fontSize: 16, fontWeight: 700, color: student.color }}>{student.pct}%</div>
+      </div>
+      <div style={{ fontSize: 15, color: student.pct === 0 ? DS.muted : "#e7eefc" }}>{student.last}</div>
+      <ChevronRight size={20} color="#7b8dac" />
+    </button>
+  );
+}
+
+function PlaceholderView({ title }) {
+  return (
+    <Card style={{ margin: 24, padding: 24 }}>
+      <div style={{ fontFamily: FONTS.title, fontSize: 34, letterSpacing: 1.2, color: "#fff", marginBottom: 12 }}>{title}</div>
+      <div style={{ color: DS.muted, fontSize: 15 }}>Esta vista queda disponible desde la navegacion principal de la app.</div>
+    </Card>
+  );
+}
+
 export default function CoachDashboard({
+  embedded = false,
   alumnos = [],
   activeNav: activeNavProp = "dashboard",
   setActiveNav,
@@ -464,13 +321,13 @@ export default function CoachDashboard({
   onRevisarAlumnos,
   coachAvatarUrl,
   coachName,
-  embedded = false,
 }) {
-  useIronTrackDashboardFonts();
+  useDashboardFonts();
 
   const isControlled = typeof setActiveNav === "function";
   const [uncontrolledNav, setUncontrolledNav] = React.useState(activeNavProp);
   const activeNav = isControlled ? activeNavProp : uncontrolledNav;
+  const [query, setQuery] = React.useState("");
 
   React.useEffect(
     function () {
@@ -484,13 +341,6 @@ export default function CoachDashboard({
     else setUncontrolledNav(id);
   }
 
-  const [query, setQuery] = React.useState("");
-  const [quickPage, setQuickPage] = React.useState(0);
-  const [muscleFilter, setMuscleFilter] = React.useState("Todos");
-  const [expandedAlumnoId, setExpandedAlumnoId] = React.useState(null);
-  const [selectedConvId, setSelectedConvId] = React.useState(conversationsMock[0].id);
-  const [replyText, setReplyText] = React.useState("");
-
   const students = React.useMemo(function () {
     return buildStudents(alumnos);
   }, [alumnos]);
@@ -498,36 +348,183 @@ export default function CoachDashboard({
   const filteredStudents = React.useMemo(
     function () {
       if (!query.trim()) return students;
-      return students.filter(function (s) {
-        return s.name.toLowerCase().includes(query.trim().toLowerCase());
+      return students.filter(function (student) {
+        return student.name.toLowerCase().includes(query.trim().toLowerCase());
       });
     },
     [students, query]
   );
 
-  const riskStudent =
-    filteredStudents.find(function (s) {
-      return s.pct < 50;
-    }) ||
-    filteredStudents[1] ||
-    students[1] || { id: "risk", name: "Agustín Torres", initials: "AT", pct: 45, color: DS.yellow };
-
-  const selectedConv = conversationsMock.find(function (c) {
-    return c.id === selectedConvId;
-  });
-
-  function handleQuickTile(id) {
-    if (id === "msg" || id === "msg2") onEnviarMensaje && onEnviarMensaje();
-    else if (id === "routine" || id === "routine2") onCrearRutina && onCrearRutina();
-    else if (id === "review" || id === "review2") onRevisarAlumnos && onRevisarAlumnos();
+  function handleQuickAction(id) {
+    if (id === "message") onEnviarMensaje && onEnviarMensaje();
+    if (id === "routine") onCrearRutina && onCrearRutina();
+    if (id === "review") onRevisarAlumnos && onRevisarAlumnos();
   }
 
-  const filteredExercises =
-    muscleFilter === "Todos"
-      ? exercisesMock
-      : exercisesMock.filter(function (e) {
-          return e.group === muscleFilter;
-        });
+  function renderDashboard() {
+    return (
+      <div className="box-border max-w-full min-w-0 px-4 pb-7 pt-[18px] sm:px-5 md:px-[22px]">
+        <div className="mb-[18px] grid grid-cols-1 gap-[18px] lg:grid-cols-2">
+          <Card style={{ padding: 24 }}>
+            <div className="mb-[18px] flex min-w-0 items-center justify-between gap-3">
+              <div className="min-w-0 text-[20px] font-bold leading-tight text-white sm:text-[24px]">Cumplimiento semanal</div>
+              <Info size={19} color="#8ba0c4" />
+            </div>
+            <div className="grid grid-cols-1 items-center gap-[18px] md:grid-cols-[1fr_210px]">
+              <div>
+                <div style={{ fontFamily: FONTS.mono, fontSize: 62, fontWeight: 700, lineHeight: 1, color: "#fff" }}>16 / 24</div>
+                <div style={{ marginTop: 10, marginBottom: 22, color: DS.muted, fontSize: 17 }}>sesiones completadas</div>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 16, background: "rgba(16, 105, 63, 0.32)", color: "#3ee082", fontSize: 16, fontWeight: 700, marginBottom: 24 }}>
+                  <Clock3 size={17} />
+                  Quedan 2 dias para completar
+                </div>
+                <div style={{ height: 132, width: "100%" }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={weekBarData} barCategoryGap={14} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
+                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: "#8ba0c4", fontSize: 13, fontFamily: FONTS.body }} />
+                      <Bar dataKey="value" radius={[12, 12, 12, 12]}>
+                        {weekBarData.map(function (entry) {
+                          return <Cell key={entry.day} fill={entry.fill} />;
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div style={{ position: "relative", width: 196, height: 196, margin: "0 auto" }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart innerRadius="78%" outerRadius="100%" data={[{ name: "pct", value: 68, fill: "url(#coachGauge)" }]} startAngle={90} endAngle={-270} barSize={14}>
+                    <defs>
+                      <linearGradient id="coachGauge" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor="#39e079" />
+                        <stop offset="100%" stopColor="#2f6cf6" />
+                      </linearGradient>
+                    </defs>
+                    <RadialBar dataKey="value" background={{ fill: "#1a2340" }} cornerRadius={999} />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONTS.mono, fontSize: 32, fontWeight: 700, color: "#fff" }}>68%</div>
+              </div>
+            </div>
+          </Card>
+
+          <Card style={{ overflow: "hidden" }}>
+            <div style={{ padding: "22px 22px 18px", borderBottom: "1px solid " + DS.line }}>
+              <div className="mb-[18px] min-w-0 text-[20px] font-bold leading-tight text-white sm:text-[24px]">Equipo de un vistazo</div>
+              <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-3">
+                {teamStats.map(function (stat) {
+                  return <OverviewStat key={stat.id} stat={stat} />;
+                })}
+              </div>
+            </div>
+            <div style={{ padding: 22 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <AlertCircle size={18} color={DS.yellow} />
+                  <span style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Alertas inteligentes</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <button type="button" style={{ border: "none", background: "none", color: DS.primarySoft, cursor: "pointer", fontSize: 15, fontWeight: 700 }}>Ver todas</button>
+                  <div style={{ display: "flex", gap: 10, color: "#8ba0c4" }}>
+                    <ChevronRight size={18} style={{ transform: "rotate(180deg)" }} />
+                    <ChevronRight size={18} />
+                  </div>
+                </div>
+              </div>
+              <div className="-mx-2 flex gap-[14px] overflow-x-auto px-2 pb-1 lg:mx-0 lg:flex-wrap lg:overflow-visible">
+                {alertCards.map(function (alert) {
+                  return <AlertCard key={alert.id} alert={alert} onRevisar={onRevisar} onVerPerfil={onVerPerfil} />;
+                })}
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-[minmax(0,1fr)_330px]">
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 12 }}>Acciones rapidas</div>
+            <div className="mb-[18px] grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {quickActions.map(function (action) {
+                return (
+                  <QuickActionCard
+                    key={action.id}
+                    action={action}
+                    onClick={function () {
+                      handleQuickAction(action.id);
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "22px 24px", borderBottom: "1px solid " + DS.line }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Alumnos activos</div>
+                <button type="button" style={{ border: "none", background: "none", color: DS.primarySoft, cursor: "pointer", fontSize: 15, fontWeight: 700 }}>Ver todos</button>
+              </div>
+              <div style={{ padding: "16px 24px 10px" }}>
+                <div
+                  className="hidden gap-[14px] px-0.5 pb-3.5 text-[12px] font-bold uppercase tracking-wide text-[#7f93b5] lg:grid lg:grid-cols-[56px_minmax(0,1.4fr)_minmax(240px,1fr)_150px_24px]"
+                >
+                  <div />
+                  <div>Alumno</div>
+                  <div>Cumplimiento</div>
+                  <div>Ultima sesion</div>
+                  <div />
+                </div>
+                <div className="-mx-2 overflow-x-auto px-2 lg:mx-0">
+                {filteredStudents.slice(0, 3).map(function (student) {
+                  return (
+                    <StudentTableRow
+                      key={student.id}
+                      student={student}
+                      onClick={function () {
+                        onVerPerfil && onVerPerfil(student.id);
+                      }}
+                    />
+                  );
+                })}
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <Card style={{ padding: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 22 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>Tu rendimiento</div>
+              <Info size={16} color="#8ba0c4" />
+            </div>
+            <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_140px]">
+              <div>
+                <div style={{ width: 68, height: 68, borderRadius: 18, background: "#0f2142", display: "flex", alignItems: "center", justifyContent: "center", color: DS.primarySoft, marginBottom: 22 }}>
+                  <Trophy size={36} />
+                </div>
+                <div style={{ fontFamily: FONTS.mono, fontSize: 54, fontWeight: 700, lineHeight: 1, color: "#fff", marginBottom: 14 }}>72 / 100</div>
+                <div style={{ color: "#2be27e", fontSize: 18, fontWeight: 700, lineHeight: 1.45 }}>+ 8 pts vs semana pasada</div>
+              </div>
+              <div style={{ width: 140, height: 140, marginLeft: "auto" }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart data={performanceRing} innerRadius="80%" outerRadius="100%" startAngle={90} endAngle={-270} barSize={12}>
+                    <RadialBar dataKey="value" background={{ fill: "#1a2340" }} cornerRadius={999} fill={DS.primary} />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  function renderMain() {
+    if (activeNav === "dashboard") return renderDashboard();
+    if (activeNav === "alumnos") return <PlaceholderView title="Alumnos" />;
+    if (activeNav === "routines") return <PlaceholderView title="Rutinas" />;
+    if (activeNav === "exercises") return <PlaceholderView title="Ejercicios" />;
+    if (activeNav === "progress") return <PlaceholderView title="Progreso" />;
+    if (activeNav === "messages") return <PlaceholderView title="Mensajes" />;
+    return <PlaceholderView title="Dashboard" />;
+  }
 
   const shellStyle = {
     minHeight: embedded ? 0 : "100vh",
@@ -540,976 +537,179 @@ export default function CoachDashboard({
     boxSizing: "border-box",
   };
 
-  const layoutGrid = embedded
-    ? {
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        minHeight: 0,
-        flex: 1,
-      }
-    : {
-        display: "grid",
-        gridTemplateColumns: "220px minmax(0, 1fr)",
-        width: "100%",
-        minHeight: "100vh",
-      };
-
-  const mainScroll = {
-    background: DS.bg,
-    display: "flex",
-    flexDirection: "column",
-    minHeight: embedded ? 0 : "100vh",
-    minWidth: 0,
-    flex: embedded ? 1 : undefined,
-  };
-
-  const headerSticky = {
-    position: "sticky",
-    top: 0,
-    zIndex: 20,
-    background: DS.bg,
-    borderBottom: "1px solid " + DS.border,
-    padding: "20px 28px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 20,
-  };
-
-  const dashboardGrid = {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 2fr) minmax(280px, 1fr)",
-    gap: 24,
-    alignItems: "start",
-    padding: "24px 28px 40px",
-  };
-
-  const viewBody = { padding: "24px 28px 40px", flex: 1 };
-
-  function renderDashboard() {
-    return (
-      <div style={dashboardGrid}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
-          <Card style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontFamily: FONTS.title, fontSize: 28, letterSpacing: 1, color: "#fff" }}>Cumplimiento semanal</span>
-                <Info size={18} color="#6B7280" />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "stretch" }}>
-              <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                <div style={{ fontFamily: FONTS.mono, fontSize: 52, fontWeight: 700, color: "#fff", lineHeight: 1 }}>16 / 24</div>
-                <div style={{ color: DS.textMuted, fontSize: 15, marginTop: 6, marginBottom: 16 }}>sesiones completadas</div>
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    background: "rgba(34, 197, 94, 0.2)",
-                    color: DS.green,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    marginBottom: 20,
-                  }}
-                >
-                  <Clock size={16} />
-                  Quedan 2 días para completar
-                </div>
-                <div style={{ height: 160, width: "100%" }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={weekBarData} barCategoryGap={14} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                      <XAxis dataKey="day" tick={{ fill: "#6B7280", fontSize: 12, fontFamily: FONTS.body }} axisLine={false} tickLine={false} />
-                      <Bar dataKey="value" radius={[0, 0, 0, 0]}>
-                        {weekBarData.map(function (e) {
-                          return <Cell key={e.day} fill={e.fill} />;
-                        })}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div
-                style={{
-                  position: "relative",
-                  width: 220,
-                  height: 220,
-                  flexShrink: 0,
-                  marginLeft: "auto",
-                  marginRight: "auto",
-                }}
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadialBarChart
-                    innerRadius="78%"
-                    outerRadius="100%"
-                    data={[{ name: "pct", value: 68, fill: "url(#gaugeGrad)" }]}
-                    startAngle={90}
-                    endAngle={-270}
-                    barSize={12}
-                  >
-                    <defs>
-                      <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#3B82F6" />
-                        <stop offset="100%" stopColor="#22C55E" />
-                      </linearGradient>
-                    </defs>
-                    <RadialBar dataKey="value" background={{ fill: "#1F2937" }} cornerRadius={6} />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    pointerEvents: "none",
-                    fontFamily: FONTS.mono,
-                    fontSize: 36,
-                    fontWeight: 700,
-                    color: "#fff",
-                  }}
-                >
-                  68%
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <span style={{ fontFamily: FONTS.title, fontSize: 24, letterSpacing: 1, color: "#fff" }}>Tendencia mensual</span>
-            </div>
-            <div style={{ height: 200, width: "100%" }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyAreaData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="#1F2937" vertical={false} />
-                  <XAxis dataKey="m" tick={{ fill: "#9CA3AF", fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "#9CA3AF", fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ background: "#111827", border: "1px solid " + DS.border, borderRadius: 8, fontFamily: FONTS.body }}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Area type="monotone" dataKey="sessions" stroke="#3B82F6" fill="url(#areaFill)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontFamily: FONTS.title, fontSize: 26, letterSpacing: 1, color: "#fff" }}>Alumnos activos</span>
-            <button
-              type="button"
-              style={{ background: "none", border: "none", color: DS.textMuted, cursor: "pointer", fontFamily: FONTS.body, fontSize: 14 }}
-            >
-              Ver todos &gt;
-            </button>
-          </div>
-
-          <Card style={{ padding: 20 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {filteredStudents.slice(0, 3).map(function (student) {
-                return (
-                  <StudentRow
-                    key={student.id}
-                    student={student}
-                    onClick={function () {
-                      onVerPerfil && onVerPerfil(student.id);
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </Card>
-
-          <Card style={{ padding: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <Bot size={20} color={DS.primaryLight} />
-              <span style={{ fontFamily: FONTS.title, fontSize: 24, letterSpacing: 1, color: "#fff" }}>Alertas IA</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {aiAlerts.map(function (a) {
-                return (
-                  <div
-                    key={a.id}
-                    style={{
-                      padding: 14,
-                      borderRadius: 10,
-                      border: "1px solid " + DS.border,
-                      background: "#0c1220",
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, color: "#fff", marginBottom: 6, fontSize: 14 }}>{a.title}</div>
-                    <div style={{ color: DS.textMuted, fontSize: 13, lineHeight: 1.45 }}>{a.detail}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 20, position: "sticky", top: 96, alignSelf: "start" }}>
-          <Card>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid " + DS.border, fontWeight: 600, color: "#E5E7EB", fontSize: 16 }}>
-              Equipo de un vistazo
-            </div>
-            <div style={{ padding: 20 }}>
-              <div style={{ borderRadius: 12, border: "1px solid " + DS.border, background: "#0c1220", padding: 16 }}>
-                <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: "50%",
-                      background: "#1e3a5f",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 700,
-                      fontSize: 13,
-                    }}
-                  >
-                    {riskStudent.initials || "AT"}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, color: "#fff", fontSize: 15 }}>{riskStudent.name || "Agustín Torres"}</div>
-                    <div
-                      style={{
-                        marginTop: 6,
-                        display: "inline-block",
-                        padding: "4px 10px",
-                        borderRadius: 999,
-                        background: "rgba(239, 68, 68, 0.15)",
-                        color: DS.red,
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}
-                    >
-                      1 de 3 sesiones
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, color: DS.textMuted, fontSize: 14, marginBottom: 16 }}>
-                  <AlertCircle size={16} color={DS.yellow} />
-                  Podría no completar la semana
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <button
-                    type="button"
-                    onClick={function () {
-                      onRevisar && onRevisar(riskStudent.id);
-                    }}
-                    style={actionButtonStyle({
-                      background: DS.red,
-                      color: "#fff",
-                      padding: "12px 10px",
-                      fontSize: 12,
-                    })}
-                  >
-                    Revisar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={function () {
-                      onVerPerfil && onVerPerfil(riskStudent.id);
-                    }}
-                    style={actionButtonStyle({
-                      background: "#1F2937",
-                      color: "#F9FAFB",
-                      padding: "12px 10px",
-                      fontSize: 12,
-                    })}
-                  >
-                    Ver perfil
-                  </button>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card style={{ padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <span style={{ fontWeight: 600, color: "#E5E7EB", fontSize: 16 }}>Acciones rápidas</span>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button
-                  type="button"
-                  onClick={function () {
-                    setQuickPage(function (p) {
-                      return Math.max(0, p - 1);
-                    });
-                  }}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: "1px solid " + DS.border,
-                    background: "#0f1624",
-                    color: "#fff",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={function () {
-                    setQuickPage(function (p) {
-                      return Math.min(quickActionPages.length - 1, p + 1);
-                    });
-                  }}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    border: "1px solid " + DS.border,
-                    background: "#0f1624",
-                    color: "#fff",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {quickActionPages[quickPage].map(function (tile) {
-                const Icon = tile.icon;
-                return (
-                  <button
-                    key={tile.id}
-                    type="button"
-                    onClick={function () {
-                      handleQuickTile(tile.id);
-                    }}
-                    style={{
-                      borderRadius: 12,
-                      border: "1px solid " + tile.border,
-                      background: tile.bg,
-                      padding: "14px 10px",
-                      cursor: "pointer",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 10,
-                      color: "#fff",
-                      minHeight: 110,
-                    }}
-                  >
-                    <Icon size={22} color={tile.iconColor} />
-                    <span style={{ fontSize: 11, fontWeight: 600, textAlign: "center", lineHeight: 1.35, fontFamily: FONTS.body }}>{tile.title}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-
-          <Card style={{ padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-              <span style={{ fontWeight: 600, color: "#E5E7EB", fontSize: 16 }}>Tu rendimiento</span>
-              <Info size={16} color="#6B7280" />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: 12, alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 12,
-                    background: "#0c1a2e",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: DS.primaryLight,
-                  }}
-                >
-                  <Trophy size={28} />
-                </div>
-                <div>
-                  <div style={{ fontFamily: FONTS.mono, fontSize: 40, fontWeight: 700, color: "#fff", lineHeight: 1 }}>72 / 100</div>
-                  <div style={{ color: DS.green, fontSize: 14, fontWeight: 600, marginTop: 6 }}>+ 8 pts vs semana pasada</div>
-                </div>
-              </div>
-              <div style={{ width: 100, height: 100 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadialBarChart data={performanceRing} innerRadius="78%" outerRadius="100%" startAngle={90} endAngle={-270} barSize={10}>
-                    <RadialBar dataKey="value" background={{ fill: "#1F2937" }} cornerRadius={6} fill="#2563EB" />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  function renderAlumnos() {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontFamily: FONTS.title, fontSize: 32, letterSpacing: 1, color: "#fff" }}>Alumnos</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {filteredStudents.map(function (s) {
-            const open = expandedAlumnoId === s.id;
-            return (
-              <Card key={s.id} style={{ overflow: "hidden" }}>
-                <button
-                  type="button"
-                  onClick={function () {
-                    setExpandedAlumnoId(open ? null : s.id);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: 18,
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    color: "#fff",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: "50%",
-                          background: "#1e3a5f",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {s.initials}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 16 }}>{s.name}</div>
-                        <div style={{ fontFamily: FONTS.mono, fontSize: 13, color: s.color, marginTop: 4 }}>Cumplimiento {s.pct}%</div>
-                      </div>
-                    </div>
-                    <ChevronRight
-                      size={20}
-                      color="#9CA3AF"
-                      style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}
-                    />
-                  </div>
-                  <div style={{ marginTop: 14, height: 8, borderRadius: 999, background: "#1F2937" }}>
-                    <div style={{ width: s.pct + "%", height: "100%", borderRadius: 999, background: s.color }} />
-                  </div>
-                </button>
-                {open ? (
-                  <div style={{ padding: "0 18px 18px", borderTop: "1px solid " + DS.border, background: "#0c1220" }}>
-                    <div style={{ paddingTop: 14, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                      <div>
-                        <div style={{ color: DS.textMuted, fontSize: 12, marginBottom: 4 }}>Sesiones semana</div>
-                        <div style={{ fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700 }}>3 / 4</div>
-                      </div>
-                      <div>
-                        <div style={{ color: DS.textMuted, fontSize: 12, marginBottom: 4 }}>Racha</div>
-                        <div style={{ fontFamily: FONTS.mono, fontSize: 18, fontWeight: 700 }}>12 días</div>
-                      </div>
-                      <div>
-                        <div style={{ color: DS.textMuted, fontSize: 12, marginBottom: 4 }}>Estado</div>
-                        <div style={{ fontWeight: 700, color: s.color, fontSize: 14 }}>
-                          {s.pct >= 70 ? "En objetivo" : s.pct >= 30 ? "En riesgo" : "Inactivo"}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-                      <button
-                        type="button"
-                        onClick={function (e) {
-                          e.stopPropagation();
-                          onVerPerfil && onVerPerfil(s.id);
-                        }}
-                        style={actionButtonStyle({ background: DS.primary, color: "#fff", padding: "10px 14px", fontSize: 12 })}
-                      >
-                        Ver perfil
-                      </button>
-                      <button
-                        type="button"
-                        onClick={function (e) {
-                          e.stopPropagation();
-                          onRevisar && onRevisar(s.id);
-                        }}
-                        style={actionButtonStyle({ background: "#1F2937", color: "#fff", padding: "10px 14px", fontSize: 12 })}
-                      >
-                        Revisar plan
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  function renderRoutines() {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontFamily: FONTS.title, fontSize: 32, letterSpacing: 1, color: "#fff" }}>Rutinas</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {routinesMock.map(function (r) {
-            return (
-              <Card key={r.id} style={{ padding: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 16, color: "#fff", marginBottom: 6 }}>{r.name}</div>
-                  <div style={{ color: DS.textMuted, fontSize: 14 }}>{r.week}</div>
-                </div>
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: 999,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    fontFamily: FONTS.body,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    background: r.status === "activa" ? "rgba(34, 197, 94, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                    color: r.status === "activa" ? DS.green : DS.yellow,
-                    border: "1px solid " + (r.status === "activa" ? "rgba(34,197,94,0.35)" : "rgba(245,158,11,0.35)"),
-                  }}
-                >
-                  {r.status}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  function renderExercises() {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontFamily: FONTS.title, fontSize: 32, letterSpacing: 1, color: "#fff" }}>Ejercicios</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {muscleGroups.map(function (g) {
-            const active = muscleFilter === g;
-            return (
-              <button
-                key={g}
-                type="button"
-                onClick={function () {
-                  setMuscleFilter(g);
-                }}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 999,
-                  border: "1px solid " + (active ? DS.primary : DS.border),
-                  background: active ? "rgba(37, 99, 235, 0.2)" : "#0f1624",
-                  color: active ? "#fff" : DS.textMuted,
-                  cursor: "pointer",
-                  fontFamily: FONTS.body,
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                {g}
-              </button>
-            );
-          })}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filteredExercises.map(function (ex) {
-            return (
-              <Card key={ex.id} style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontWeight: 600, color: "#fff" }}>{ex.name}</span>
-                <span style={{ color: DS.textMuted, fontSize: 13 }}>{ex.group}</span>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  function renderProgress() {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ fontFamily: FONTS.title, fontSize: 32, letterSpacing: 1, color: "#fff" }}>Progreso del equipo</div>
-        <Card style={{ padding: 20 }}>
-          <div style={{ marginBottom: 12, fontWeight: 600, color: "#E5E7EB" }}>Volumen relativo (área)</div>
-          <div style={{ height: 240, width: "100%" }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={teamProgressArea} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="teamArea" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#2563EB" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#2563EB" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="#1F2937" vertical={false} />
-                <XAxis dataKey="w" tick={{ fill: "#9CA3AF", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#9CA3AF", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Area type="monotone" dataKey="load" stroke="#2563EB" fill="url(#teamArea)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-        <Card style={{ padding: 20 }}>
-          <div style={{ marginBottom: 12, fontWeight: 600, color: "#E5E7EB" }}>Ejercicios con mayor volumen</div>
-          <div style={{ height: 220, width: "100%" }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={exerciseVolumeBars} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
-                <XAxis type="number" tick={{ fill: "#9CA3AF", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="name" width={100} tick={{ fill: "#E5E7EB", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Bar dataKey="vol" radius={[0, 4, 4, 0]}>
-                  {exerciseVolumeBars.map(function (_, i) {
-                    return <Cell key={i} fill={DS.primaryLight} />;
-                  })}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-        <Card style={{ padding: 20 }}>
-          <div style={{ marginBottom: 14, fontWeight: 600, color: "#E5E7EB" }}>Cumplimiento por alumno</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {complianceByStudent.map(function (row) {
-              const c = pctColor(row.pct);
-              return (
-                <div key={row.name}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>{row.name}</span>
-                    <span style={{ fontFamily: FONTS.mono, fontSize: 14, fontWeight: 700, color: c }}>{row.pct}%</span>
-                  </div>
-                  <div style={{ height: 8, borderRadius: 999, background: "#1F2937" }}>
-                    <div style={{ width: row.pct + "%", height: "100%", borderRadius: 999, background: c }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  function renderMessages() {
-    return (
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 340px) minmax(0, 1fr)", gap: 20, alignItems: "stretch", minHeight: 480 }}>
-        <Card style={{ padding: 0, display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "16px 18px", borderBottom: "1px solid " + DS.border, fontWeight: 700, fontSize: 16 }}>Conversaciones</div>
-          <div style={{ overflowY: "auto", flex: 1 }}>
-            {conversationsMock.map(function (c) {
-              const active = c.id === selectedConvId;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={function () {
-                    setSelectedConvId(c.id);
-                  }}
-                  style={{
-                    width: "100%",
-                    padding: "14px 16px",
-                    border: "none",
-                    borderBottom: "1px solid " + DS.border,
-                    background: active ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      background: "#1e3a5f",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 700,
-                      fontSize: 12,
-                      color: "#fff",
-                    }}
-                  >
-                    {c.initials}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                      <span style={{ fontWeight: 600, color: "#fff", fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {c.peer}
-                      </span>
-                      <span style={{ fontSize: 12, color: DS.textMuted, flexShrink: 0 }}>{c.time}</span>
-                    </div>
-                    <div style={{ fontSize: 13, color: DS.textMuted, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {c.last}
-                    </div>
-                  </div>
-                  {c.unread > 0 ? (
-                    <span
-                      style={{
-                        minWidth: 22,
-                        height: 22,
-                        borderRadius: 999,
-                        background: DS.primary,
-                        color: "#fff",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {c.unread}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </Card>
-        <Card style={{ padding: 0, display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid " + DS.border, fontWeight: 700 }}>{selectedConv ? selectedConv.peer : "Mensajes"}</div>
-          <div style={{ flex: 1, padding: 20, overflowY: "auto", color: DS.textMuted, fontSize: 14, lineHeight: 1.6 }}>
-            {selectedConv ? (
-              <div>
-                <div style={{ marginBottom: 12, color: "#E5E7EB" }}>{selectedConv.last}</div>
-                <div style={{ fontSize: 13 }}>Escribí una respuesta abajo para continuar la conversación.</div>
-              </div>
-            ) : (
-              <div>Seleccioná una conversación.</div>
-            )}
-          </div>
-          <div style={{ padding: 16, borderTop: "1px solid " + DS.border, display: "flex", gap: 10, alignItems: "flex-end" }}>
-            <textarea
-              value={replyText}
-              onChange={function (e) {
-                setReplyText(e.target.value);
-              }}
-              placeholder="Escribí un mensaje..."
-              rows={3}
-              style={{
-                flex: 1,
-                resize: "none",
-                borderRadius: 10,
-                border: "1px solid " + DS.border,
-                background: "#0f1624",
-                color: "#fff",
-                padding: "12px 14px",
-                fontFamily: FONTS.body,
-                fontSize: 14,
-                outline: "none",
-              }}
-            />
-            <button
-              type="button"
-              style={actionButtonStyle({
-                background: DS.primary,
-                color: "#fff",
-                padding: "12px 16px",
-                fontSize: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                height: 44,
-              })}
-            >
-              <Send size={16} />
-              Enviar
-            </button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  function renderMain() {
-    if (activeNav === "dashboard") return renderDashboard();
-    if (activeNav === "alumnos") return renderAlumnos();
-    if (activeNav === "routines") return renderRoutines();
-    if (activeNav === "exercises") return renderExercises();
-    if (activeNav === "progress") return renderProgress();
-    if (activeNav === "messages") return renderMessages();
-    return (
-      <div style={{ color: DS.textMuted, fontFamily: FONTS.body }}>
-        Vista en construcción. Usá la navegación lateral.
-      </div>
-    );
-  }
+  const layoutGridStyle = embedded
+    ? { minHeight: 0 }
+    : { minHeight: "100vh" };
 
   return (
     <div style={shellStyle}>
-      <div style={layoutGrid}>
+      <div
+        className={
+          embedded
+            ? "flex min-h-0 w-full min-w-0 flex-1 flex-col"
+            : "grid w-full grid-cols-1 lg:grid-cols-[250px_minmax(0,1fr)]"
+        }
+        style={layoutGridStyle}
+      >
         {!embedded ? (
-        <aside
-          style={{
-            width: 220,
-            boxSizing: "border-box",
-            borderRight: "1px solid " + DS.border,
-            background: DS.bg,
-            padding: "24px 16px",
-            display: "flex",
-            flexDirection: "column",
-            minHeight: "100vh",
-            position: "sticky",
-            top: 0,
-            alignSelf: "start",
-          }}
-        >
-          <div style={{ marginBottom: 28 }}>
+          <aside
+            className="hidden min-h-screen flex-col lg:flex"
+            style={{
+              borderRight: "1px solid " + DS.line,
+              background: DS.bg,
+              padding: "26px 18px 22px",
+              position: "sticky",
+              top: 0,
+              alignSelf: "start",
+            }}
+          >
             <BrandMark />
-          </div>
-          <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {navItems.map(function (item) {
-              return (
-                <SidebarItem
-                  key={item.id}
-                  item={item}
-                  active={activeNav === item.id}
-                  onClick={function () {
-                    navigate(item.id);
-                  }}
-                />
-              );
-            })}
-          </nav>
-          <div style={{ marginTop: "auto", paddingTop: 20, borderTop: "1px solid " + DS.border, display: "flex", flexDirection: "column", gap: 4 }}>
-            <SidebarItem
-              item={{ id: "settings", label: "Settings", icon: Settings }}
-              active={false}
-              onClick={function () {}}
-            />
-            <button
-              type="button"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "12px 14px",
-                borderRadius: 12,
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                color: DS.textMuted,
-                fontFamily: FONTS.body,
-                fontSize: 14,
-                width: "100%",
-                textAlign: "left",
-              }}
-            >
-              {coachAvatarUrl ? (
-                <img src={coachAvatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
-              ) : (
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: "50%",
-                    background: "#1e3a5f",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    color: "#fff",
-                  }}
-                >
-                  {initialsFromName(coachName || "Coach")}
+            <div style={{ marginTop: 34, display: "flex", flexDirection: "column", gap: 8 }}>
+              {navItems.map(function (item) {
+                return (
+                  <SidebarItem
+                    key={item.id}
+                    item={item}
+                    active={activeNav === item.id}
+                    onClick={function () {
+                      navigate(item.id);
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <div style={{ marginTop: "auto", paddingTop: 24, borderTop: "1px solid " + DS.line, display: "flex", flexDirection: "column", gap: 8 }}>
+              <SidebarItem item={{ id: "settings", label: "Settings", icon: Settings }} active={false} onClick={function () {}} />
+              <button type="button" style={{ display: "flex", alignItems: "center", gap: 12, border: "none", background: "transparent", padding: "14px 16px", borderRadius: 14, cursor: "pointer", color: "#fff", textAlign: "left" }}>
+                {coachAvatarUrl ? (
+                  <img src={coachAvatarUrl} alt="" style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover" }} />
+                ) : (
+                  <div style={{ width: 46, height: 46, borderRadius: "50%", background: "#17306a", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 18 }}>
+                    {initialsFromName(coachName || "Coach")}
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{coachName || "Hernan Coach"}</div>
+                  <div style={{ marginTop: 4, fontSize: 14, color: DS.muted }}>Preparador fisico</div>
                 </div>
-              )}
-              <span style={{ flex: 1, fontWeight: 500 }}>Perfil</span>
-              <User size={16} color="#6B7280" />
-            </button>
-          </div>
-        </aside>
+                <ChevronRight size={18} color="#8aa0c4" />
+              </button>
+            </div>
+          </aside>
         ) : null}
 
-        <main style={mainScroll}>
-          <header style={headerSticky}>
-            <div style={{ minWidth: 0 }}>
-              <h1 style={{ margin: 0, fontFamily: FONTS.body, fontSize: 22, fontWeight: 700, color: "#fff" }}>
-                {greetingLabel()}, {coachName || "Coach"}
-              </h1>
-              <p style={{ margin: "6px 0 0", color: DS.textMuted, fontSize: 14 }}>
-                {activeNav === "dashboard" ? "Resumen general del equipo, alertas y rendimiento semanal." : "Gestioná tu equipo desde un solo lugar."}
+        <main className="min-w-0 max-w-full overflow-x-hidden bg-[#08101d]" style={{ minHeight: embedded ? 0 : "100vh" }}>
+          <header
+            className="sticky top-0 z-10 flex flex-col gap-3 border-b px-4 py-4 lg:hidden"
+            style={{ background: DS.bg, borderColor: DS.line }}
+          >
+            <div className="min-w-0">
+              <h1 className="m-0 line-clamp-2 text-[20px] font-bold leading-tight text-white">{greetingLabel()}, {coachName || "Coach"}</h1>
+              <p className="mt-2 text-[14px] leading-snug" style={{ color: DS.muted }}>
+                Aca tenes el resumen de tu equipo
               </p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+            <div className="flex min-w-0 items-center gap-2">
               <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "0 14px",
-                  height: 44,
-                  borderRadius: 10,
-                  border: "1px solid " + DS.border,
-                  background: DS.card,
-                  minWidth: 220,
-                }}
+                className="flex h-[46px] min-w-0 flex-1 items-center gap-3 rounded-2xl border px-3"
+                style={{ borderColor: DS.border, background: DS.panelSoft, color: DS.muted }}
               >
-                <Search size={18} color="#6B7280" />
-                <input
-                  value={query}
-                  onChange={function (e) {
-                    setQuery(e.target.value);
-                  }}
-                  placeholder="Buscar..."
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    background: "transparent",
-                    border: "none",
-                    outline: "none",
-                    color: "#fff",
-                    fontFamily: FONTS.body,
-                    fontSize: 14,
-                  }}
-                />
+                <SearchIcon value={query} onChange={setQuery} />
               </div>
               <button
                 type="button"
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  border: "1px solid " + DS.border,
-                  background: DS.card,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
+                className="relative flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-[14px] border"
+                style={{ borderColor: DS.border, background: DS.panelSoft, cursor: "pointer" }}
               >
-                <Bell size={18} color="#9CA3AF" />
+                <Bell size={19} color="#d3def5" />
+                <span
+                  className="absolute h-2 w-2 rounded-full"
+                  style={{ top: 11, right: 12, background: DS.red }}
+                />
               </button>
-              <GlobalCreateMenu
-                onNuevoAlumno={onNuevoAlumno}
-                onNuevaRutina={onCrearRutina}
-                onNuevoEjercicio={onNuevoEjercicio}
-              />
+              <GlobalCreateMenu onNuevoAlumno={onNuevoAlumno} onNuevaRutina={onCrearRutina} onNuevoEjercicio={onNuevoEjercicio} />
             </div>
           </header>
+          <header
+            className="sticky top-0 z-10 hidden min-w-0 gap-x-4 gap-y-3 border-b px-4 py-5 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-x-5"
+            style={{ background: DS.bg, borderColor: DS.line }}
+          >
+            <div className="min-w-0 pr-1">
+              <h1 className="m-0 truncate text-[20px] font-bold text-white sm:text-[22px]">{greetingLabel()}, {coachName || "Coach"}</h1>
+              <p className="mt-2 line-clamp-2 text-[14px] sm:text-[15px]" style={{ color: DS.muted }}>
+                Aca tenes el resumen de tu equipo
+              </p>
+            </div>
 
-          <div style={activeNav === "dashboard" ? { flex: 1, minHeight: 0 } : viewBody}>{renderMain()}</div>
+            <div className="flex min-w-0 max-w-full items-center justify-end gap-2 sm:gap-3 lg:gap-4">
+              <div
+                className="flex h-[50px] w-full min-w-[160px] max-w-[440px] items-center gap-2 rounded-2xl border px-3 sm:min-w-[200px] sm:gap-3 sm:px-4"
+                style={{ borderColor: DS.border, background: DS.panelSoft, color: DS.muted }}
+              >
+                <MessageSquare size={0} style={{ display: "none" }} />
+                <Info size={0} style={{ display: "none" }} />
+                <Bell size={0} style={{ display: "none" }} />
+                <User size={0} style={{ display: "none" }} />
+                <SearchIcon value={query} onChange={setQuery} />
+              </div>
+              <button
+                type="button"
+                className="relative flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-[14px] border"
+                style={{ borderColor: DS.border, background: DS.panelSoft, cursor: "pointer" }}
+              >
+                <Bell size={19} color="#d3def5" />
+                <span
+                  className="absolute h-2 w-2 rounded-full"
+                  style={{ top: 11, right: 12, background: DS.red }}
+                />
+              </button>
+              <GlobalCreateMenu onNuevoAlumno={onNuevoAlumno} onNuevaRutina={onCrearRutina} onNuevoEjercicio={onNuevoEjercicio} />
+            </div>
+          </header>
+          {renderMain()}
         </main>
+      </div>
+    </div>
+  );
+}
+
+function SearchIcon({ value, onChange }) {
+  return (
+    <>
+      <BarChart3 size={0} style={{ display: "none" }} />
+      <ClipboardList size={0} style={{ display: "none" }} />
+      <Users size={0} style={{ display: "none" }} />
+      <Dumbbell size={0} style={{ display: "none" }} />
+      <Eye size={0} style={{ display: "none" }} />
+      <Clock3 size={0} style={{ display: "none" }} />
+      <CircleAlert size={0} style={{ display: "none" }} />
+      <CheckCircle2 size={0} style={{ display: "none" }} />
+      <Info size={0} style={{ display: "none" }} />
+      <SearchInner value={value} onChange={onChange} />
+    </>
+  );
+}
+
+function SearchInner({ value, onChange }) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+      <MessageSquare size={20} color="transparent" style={{ display: "none" }} />
+      <span className="flex flex-shrink-0 items-center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M21 21L15.8 15.8M17 10.5C17 14.0899 14.0899 17 10.5 17C6.91015 17 4 14.0899 4 10.5C4 6.91015 6.91015 4 10.5 4C14.0899 4 17 6.91015 17 10.5Z" stroke="#8aa0c4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </span>
+      <input
+        value={value}
+        onChange={function (e) {
+          onChange(e.target.value);
+        }}
+        placeholder="Buscar alumnos, rutinas o ejercicios..."
+        className="min-w-0 flex-1 border-none bg-transparent text-[14px] text-white outline-none sm:text-[15px]"
+        style={{ fontFamily: FONTS.body }}
+      />
+      <div className="hidden flex-shrink-0 items-center gap-1.5 rounded-[10px] border border-white/[0.08] px-2.5 py-1.5 text-[12px] font-bold text-[#94a3c3] sm:flex">
+        Cmd<span>K</span>
       </div>
     </div>
   );

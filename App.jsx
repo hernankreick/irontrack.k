@@ -1716,7 +1716,8 @@ function GymApp() {
   const esAlumno = readOnly || sessionData?.role==="alumno";
   const showAlumnoProgressStack = (readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId);
   const coachDesktop1024 = useDesktopMin1024();
-  const showCoachDesktopShell = !esAlumno && sessionData?.role === "entrenador" && coachDesktop1024;
+  /** Shell coach (sidebar App + dashboard embebido): todos los anchos; la barra lateral se oculta por CSS por debajo de lg. */
+  const showCoachDesktopShell = !esAlumno && sessionData?.role === "entrenador";
   const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
@@ -1731,7 +1732,8 @@ function GymApp() {
         {k:"alumnos",   icon:(c)=><Ic name="users" size={20} color={c}/>,  lbl:es?"ALUMNOS":"ATHLETES"}
       ];
 
-  const hideGlobalBottomNavCoachDash = !esAlumno && sessionData?.role==="entrenador" && tab==="plan";
+  /** En desktop el coach usa sidebar App; en móvil necesita la bottom nav también en Dashboard. */
+  const hideGlobalBottomNavCoachDash = !esAlumno && sessionData?.role === "entrenador" && tab === "plan" && coachDesktop1024;
   const alumnoTopBarFixed = !!(esAlumno && (tab === "plan" || tab === "library"));
   const alumnoTopBarHeight = alumnoTopBarFixed ? 74 : 0;
 
@@ -2020,7 +2022,7 @@ function GymApp() {
         "}"
       }}/>
 
-      <div className="app-inner" style={alumnoFullScreenShell ? {display:"flex",flexDirection:"column",flex:1,minHeight:0} : showCoachDesktopShell ? {display:"flex",flexDirection:"column",minHeight:"100vh",width:"100%",flex:1} : undefined}>
+      <div className="app-inner" style={alumnoFullScreenShell ? {display:"flex",flexDirection:"column",flex:1,minHeight:0} : showCoachDesktopShell ? {display:"flex",flexDirection:"column",minHeight:"100vh",width:"100%",flex:1,maxWidth:"none",margin:0} : undefined}>
       {!isOnline&&(
         <div style={{
           background:"#1f1500",borderBottom:"1px solid #F59E0B44",
@@ -2038,11 +2040,8 @@ function GymApp() {
         </div>
       )}
       <div
-        style={
-          showCoachDesktopShell
-            ? { display: "flex", width: "100%", flex: 1, minHeight: 0, alignItems: "stretch", alignSelf: "stretch" }
-            : { display: "contents" }
-        }
+        className={showCoachDesktopShell ? "flex w-full min-h-0 flex-1 flex-col self-stretch items-stretch lg:flex-row" : undefined}
+        style={showCoachDesktopShell ? undefined : { display: "contents" }}
       >
         {showCoachDesktopShell ? (
           <DesktopSidebar
@@ -2054,18 +2053,19 @@ function GymApp() {
             onPerfil={function () {
               setSettingsOpen(true);
             }}
+            onLogout={function () {
+              clearAllIronTrackPrefixedKeys();
+              syncStateWithLocalStorage();
+            }}
             coachAvatarUrl={sessionData?.avatarUrl}
             coachName={sessionData?.name}
           />
         ) : null}
         <div
-          style={
-            showCoachDesktopShell
-              ? { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }
-              : { display: "contents" }
-          }
+          className={showCoachDesktopShell ? "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden" : undefined}
+          style={showCoachDesktopShell ? undefined : { display: "contents" }}
         >
-      {!(esAlumno && tab === "progress") && (
+      {!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && tab === "plan") && (
       <div
         className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] pb-3 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}
         style={{
@@ -2193,17 +2193,22 @@ function GymApp() {
       <div
         className={
           "plan-main-scroll relative z-0 overflow-y-auto " +
+          (showCoachDesktopShell && !esAlumno ? "overflow-x-hidden " : "") +
           (tab === "progress" && showAlumnoProgressStack
             ? "px-5 "
             : esAlumno && (tab === "plan" || tab === "library")
               ? "px-7 "
-              : "px-6 ") +
-          (!(esAlumno && tab === "progress") ? "mt-6 " : "") +
+              : showCoachDesktopShell && !esAlumno && tab === "plan"
+                ? "px-0 "
+                : "px-6 ") +
+          (!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && tab === "plan") ? "mt-6 " : "") +
           (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
           (tab === "progress" && showAlumnoProgressStack
             ? "pt-0 "
             : tab === "progress"
               ? "pt-[max(0.75rem,env(safe-area-inset-top,0px))] "
+              : showCoachDesktopShell && !esAlumno && tab === "plan"
+                ? "pt-0 "
               : esAlumno && (tab === "plan" || tab === "library")
                 ? "pt-8 "
                 : "pt-6 ")
@@ -2228,7 +2233,9 @@ function GymApp() {
           paddingBottom: esAlumno
             ? "calc(8.5rem + env(safe-area-inset-bottom, 0px))"
             : showCoachDesktopShell
-              ? "calc(1rem + env(safe-area-inset-bottom, 0px))"
+              ? coachDesktop1024
+                ? "calc(1rem + env(safe-area-inset-bottom, 0px))"
+                : "calc(5.5rem + env(safe-area-inset-bottom, 0px))"
               : "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
           paddingLeft: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
           paddingRight: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
@@ -2253,6 +2260,7 @@ function GymApp() {
                   else if(nav==="routines") setTab("routines");
                   else if(nav==="exercises") setTab("biblioteca");
                   else if(nav==="alumnos") setTab("alumnos");
+                  else if(nav==="progress") setTab("progress");
                 }}
                 onRevisar={async function(alumnoId){
                   var alum=(alumnos||[]).find(function(x){ return String(x.id)===String(alumnoId); });
@@ -2844,12 +2852,13 @@ function GymApp() {
           </div>
         )}
         {tab==="library"&&(
-          <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : ""}>
+          <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : "min-w-0 max-w-full"}>
             {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal}/>}
             {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>}
           </div>
         )}
         {tab==="routines"&&!esAlumno&&(
+          <div className="min-w-0 max-w-full">
           <RutinaView
             setTab={setTab}
             border={border}
@@ -2879,14 +2888,15 @@ function GymApp() {
             sb={sb}
             setAssignRoutineId={setAssignRoutineId}
           />
+          </div>
         )}
         {tab==="scanner"&&!esAlumno&&(
-          <div>
+          <div className="min-w-0 max-w-full">
             <ScannerRutina darkMode={darkMode} sb={sb} setRoutines={setRoutines} alumnos={alumnos} toast2={toast2} es={es} setTab={setTab} user={user} customEx={customEx}/>
           </div>
         )}
         {tab==="biblioteca"&&!esAlumno&&(
-          <div>
+          <div className="min-w-0 max-w-full">
             <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
           </div>
         )}
@@ -2906,33 +2916,13 @@ function GymApp() {
             esEntrenador={false}
           />
         )}
-        {tab==="scanner"&&!esAlumno&&(
-          <div>
-            <ScannerRutina darkMode={darkMode} sb={sb} setRoutines={setRoutines} alumnos={alumnos} toast2={toast2} es={es} setTab={setTab} user={user} customEx={customEx}/>
-          </div>
-        )}
-        {tab==="biblioteca"&&!esAlumno&&(
-          <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
-          </div>
-        )}
         {tab==="progress"&&!showAlumnoProgressStack&&(
-          <div className="mx-auto w-full max-w-[480px]">
+          <div className="mx-auto w-full min-w-0 max-w-[480px] lg:max-w-3xl">
             <GraficoProgreso allEx={allEx} es={es} darkMode={darkMode} progress={progress} EX={EX} readOnly={readOnly||esAlumno} sharedParam={sharedParam} sb={sb} sessionData={sessionData} sesiones={sesiones}/>
           </div>
         )}
-        {tab==="scanner"&&!esAlumno&&(
-          <div>
-            <ScannerRutina darkMode={darkMode} sb={sb} setRoutines={setRoutines} alumnos={alumnos} toast2={toast2} es={es} setTab={setTab} user={user} customEx={customEx}/>
-          </div>
-        )}
-        {tab==="biblioteca"&&!esAlumno&&(
-          <div>
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
-          </div>
-        )}
         {tab==="progress"&&!showAlumnoProgressStack&&(
-          <div>
+          <div className="min-w-0 max-w-full overflow-x-hidden">
             {EX.filter(ex=>progress[ex.id]?.sets?.length>0).map(ex=>{
               const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"}; const pg=progress[ex.id];
               return(
@@ -2990,10 +2980,10 @@ function GymApp() {
           </div>
         )}
         {tab==="alumnos"&&sessionData?.role==="entrenador"&&(
-          <div style={{background:"#0a0f1a",marginLeft:-4,marginRight:-4,padding:"8px 4px 20px",borderRadius:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-              <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:"#fff"}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
-              <div style={{display:"flex",gap:8}}>
+          <div className="min-w-0 max-w-full" style={{background:"#0a0f1a",marginLeft:showCoachDesktopShell?0:-4,marginRight:showCoachDesktopShell?0:-4,padding:"8px 4px 20px",borderRadius:12}}>
+            <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
+              <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:"#fff",minWidth:0,flex:"1 1 12rem"}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",flexShrink:0}}>
                 <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={es?"Datos de pago":"Payment info"}><Ic name="share" size={16}/></button>
                 <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={es?"Actualizar":"Refresh"}><Ic name="refresh-cw" size={16}/></button>
                 <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {es?"Nuevo":"New"}</button>
@@ -4594,7 +4584,7 @@ function GymApp() {
           setVideoModal={setVideoModal}
         />
       )}
-      {!hideGlobalBottomNavCoachDash && !showCoachDesktopShell && (
+      {!hideGlobalBottomNavCoachDash && !(showCoachDesktopShell && coachDesktop1024) && (
       <nav style={{
         position:"fixed",bottom:0,left:0,right:0,
         background:darkMode?"rgba(15,25,35,0.96)":"rgba(255,255,255,0.96)",
@@ -5325,11 +5315,11 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
   const inpS = {background:bg,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",color:textMain,fontSize:15,width:"100%",fontFamily:"inherit",outline:"none",marginBottom:8};
 
   return (
-    <div>
-      <div style={{display:"flex",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),marginBottom:12}}>
+    <div className="min-w-0 max-w-full">
+      <div style={{display:"flex",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),marginBottom:12,minWidth:0}}>
         {[es?"GESTIONAR":"MANAGE", es?"+ NUEVO":"+ NEW"].map((t,i)=>(
-          <button key={i===0?"bib-tab-manage":"bib-tab-new"} onClick={()=>setTab(i)} style={{flex:1,padding:"16px",border:"none",background:"none",
-            fontFamily:"inherit",fontSize:18,fontWeight:800,cursor:"pointer",
+          <button key={i===0?"bib-tab-manage":"bib-tab-new"} onClick={()=>setTab(i)} style={{flex:1,minWidth:0,padding:"12px 8px",border:"none",background:"none",
+            fontFamily:"inherit",fontSize:16,fontWeight:800,cursor:"pointer",
             color:tab===i?"#2563EB":"#8B9AB2",borderBottom:tab===i?"2px solid #3B82F6":"2px solid transparent"}}>
             {t}{i===0&&dupCount>0?(
               <span
@@ -5387,8 +5377,8 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
             </div>
           )}
 
-          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap"}}>
-            <div style={{fontSize:15,color:textMuted,fontWeight:700,flex:"1 1 auto",minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap",minWidth:0}}>
+            <div style={{fontSize:15,color:textMuted,fontWeight:700,flex:"1 1 8rem",minWidth:0,overflowWrap:"anywhere"}}>
               {es?"Mostrando":"Showing"} {exFiltrados.length} {es?"ejercicios de":"exercises of"} {allEx.length}
             </div>
             <button
@@ -5425,10 +5415,10 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
             const muscleLine = formatBibMuscleDisplay(e.muscle, es);
             const ytUrl = resolveVideoUrl(e, null, ytOverrides);
             return (
-              <div key={e.id} style={{background:bgCard,border:"1px solid #2D4057",borderRadius:12,padding:"16px",marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:8,lineHeight:1.2}}>{nombre}</div>
+              <div key={e.id} style={{background:bgCard,border:"1px solid #2D4057",borderRadius:12,padding:"16px",marginBottom:8,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:8,flexWrap:"wrap"}}>
+                  <div style={{flex:"1 1 140px",minWidth:0}}>
+                    <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:8,lineHeight:1.2,wordBreak:"break-word",overflowWrap:"anywhere"}}>{nombre}</div>
                     <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
                       <span style={{background:"#162234",color:"#8B9AB2",padding:"4px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid #2D4057",letterSpacing:.5}}>{patLabel(e.pattern)}</span>
                       {muscleLine ? <span style={{color:textMuted,fontSize:11,fontWeight:600}}>{muscleLine}</span> : null}

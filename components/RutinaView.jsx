@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { ScanLine, Plus, Save, Pencil } from 'lucide-react';
 import { Ic } from './Ic.jsx';
 import { DaySection } from './DaySection.jsx';
@@ -418,6 +418,31 @@ export function RutinaView(props) {
 
   const [hasUnsaved, setHasUnsaved]           = useState(false);
   const [editingExercise, setEditingExercise] = useState(null);
+  const contentRef = useRef(null);
+  /** Alinea la barra fija al ancho real de la columna (shell coach desktop). */
+  const [saveBarBox, setSaveBarBox] = useState({ left: 0, width: null });
+
+  useLayoutEffect(
+    function () {
+      var el = contentRef.current;
+      if (!el) return undefined;
+      function update() {
+        var r = el.getBoundingClientRect();
+        setSaveBarBox({ left: r.left, width: r.width });
+      }
+      update();
+      var ro = new ResizeObserver(update);
+      ro.observe(el);
+      window.addEventListener('resize', update);
+      document.addEventListener('scroll', update, true);
+      return function () {
+        ro.disconnect();
+        window.removeEventListener('resize', update);
+        document.removeEventListener('scroll', update, true);
+      };
+    },
+    []
+  );
 
   const openLibrary = (routineId, dayIdx, bloque) => {
     setAddExModal({ rId: routineId, dIdx: dayIdx, bloque });
@@ -480,7 +505,7 @@ export function RutinaView(props) {
     <>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      <div style={{ paddingBottom: 140 }}>
+      <div ref={contentRef} className="min-w-0 max-w-full" style={{ paddingBottom: 140 }}>
 
         {/* ── Botón escanear ── */}
         <button className="hov" onClick={() => setTab('scanner')} style={{
@@ -556,18 +581,25 @@ export function RutinaView(props) {
         />
       )}
 
-      {/* ── Sticky save bar ── */}
-      <div style={{
-        position: 'fixed',
-        bottom: 0, left: 0, right: 0,
-        padding: '12px 16px',
-        background: 'rgba(15,23,42,0.95)',
-        backdropFilter: 'blur(12px)',
-        borderTop: `1px solid ${border}`,
-        display: hasUnsaved ? 'flex' : 'none',
-        justifyContent: 'center',
-        zIndex: 35,
-      }}>
+      {/* ── Barra fija alineada al ancho de la columna (evita cubrir sidebar en shell desktop) ── */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          ...(saveBarBox.width != null && saveBarBox.width > 0
+            ? { left: saveBarBox.left, width: saveBarBox.width }
+            : { left: 0, right: 0 }),
+          boxSizing: 'border-box',
+          padding: '12px 16px',
+          paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+          background: 'rgba(15,23,42,0.95)',
+          backdropFilter: 'blur(12px)',
+          borderTop: `1px solid ${border}`,
+          display: hasUnsaved ? 'flex' : 'none',
+          justifyContent: 'center',
+          zIndex: 35,
+        }}
+      >
         <button
           onClick={handleSaveAll}
           disabled={!hasUnsaved}

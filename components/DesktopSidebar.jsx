@@ -1,9 +1,11 @@
 import React from "react";
 import {
   BarChart3,
+  ChevronRight,
   ClipboardList,
   Dumbbell,
   LayoutDashboard,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -120,8 +122,10 @@ export default function DesktopSidebar({
   onNavigate,
   onSettings,
   onPerfil,
+  onLogout,
   coachAvatarUrl,
   coachName,
+  coachSubtitle = "Preparador físico",
 }) {
   useDesktopSidebarFonts();
   const [collapsed, setCollapsed] = React.useState(readCollapsed);
@@ -150,15 +154,12 @@ export default function DesktopSidebar({
 
   return (
     <aside
+      className="hidden box-border lg:flex lg:flex-shrink-0 lg:flex-col"
       style={{
         width: w,
         minWidth: w,
-        flexShrink: 0,
-        boxSizing: "border-box",
         borderRight: "1px solid " + DS.border,
         background: DS.bg,
-        display: "flex",
-        flexDirection: "column",
         minHeight: "100vh",
         position: "sticky",
         top: 0,
@@ -168,7 +169,7 @@ export default function DesktopSidebar({
         zIndex: 30,
       }}
     >
-      <div style={{ padding: "12px 10px", borderBottom: "1px solid " + DS.border, flexShrink: 0 }}>
+      <div style={{ padding: "12px 8px 10px 6px", borderBottom: "1px solid " + DS.border, flexShrink: 0 }}>
         <button
           type="button"
           onClick={function () {
@@ -205,7 +206,7 @@ export default function DesktopSidebar({
         </button>
       </div>
 
-      <div style={{ padding: "12px 12px 20px", flexShrink: 0 }}>{collapsed ? <LogoCompact /> : <LogoFull />}</div>
+      <div style={{ padding: "10px 8px 16px 6px", flexShrink: 0 }}>{collapsed ? <LogoCompact /> : <LogoFull />}</div>
 
       <nav
         style={{
@@ -213,7 +214,7 @@ export default function DesktopSidebar({
           display: "flex",
           flexDirection: "column",
           gap: 4,
-          padding: "4px 8px 12px",
+          padding: "2px 6px 12px 4px",
           justifyContent: "flex-start",
           alignItems: "stretch",
         }}
@@ -235,7 +236,7 @@ export default function DesktopSidebar({
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                padding: collapsed ? "12px 10px" : "12px 14px",
+                padding: collapsed ? "12px 10px" : "10px 10px 10px 6px",
                 justifyContent: collapsed ? "center" : "flex-start",
                 border: "none",
                 borderRadius: 10,
@@ -280,15 +281,16 @@ export default function DesktopSidebar({
         })}
       </nav>
 
+      {/* Mismo padding horizontal que <nav> para alinear iconos y textos con Dashboard, Alumnos, etc. */}
       <div
         style={{
-          marginTop: "auto",
           flexShrink: 0,
-          padding: "12px 8px 20px",
+          padding: "12px 6px 8px 4px",
           borderTop: "1px solid " + DS.border,
           display: "flex",
           flexDirection: "column",
           gap: 4,
+          boxSizing: "border-box",
         }}
       >
         <button
@@ -301,7 +303,7 @@ export default function DesktopSidebar({
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: collapsed ? "12px 10px" : "12px 14px",
+            padding: collapsed ? "12px 10px" : "10px 10px 10px 6px",
             justifyContent: collapsed ? "center" : "flex-start",
             border: "none",
             borderRadius: 10,
@@ -335,8 +337,8 @@ export default function DesktopSidebar({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 10,
-            padding: collapsed ? "10px 10px" : "10px 14px",
+            gap: 12,
+            padding: collapsed ? "10px 10px" : "10px 10px 10px 6px",
             justifyContent: collapsed ? "center" : "flex-start",
             border: "none",
             borderRadius: 10,
@@ -359,19 +361,19 @@ export default function DesktopSidebar({
           }}
         >
           {coachAvatarUrl ? (
-            <img src={coachAvatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+            <img src={coachAvatarUrl} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
           ) : (
             <div
               style={{
-                width: 36,
-                height: 36,
+                width: 20,
+                height: 20,
                 borderRadius: "50%",
                 background: "#1e3a5f",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: 700,
-                fontSize: 12,
+                fontSize: 9,
                 color: "#fff",
                 flexShrink: 0,
               }}
@@ -383,6 +385,121 @@ export default function DesktopSidebar({
             <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Perfil</span>
           ) : null}
           {!collapsed ? <User size={16} color="#6B7280" style={{ flexShrink: 0 }} /> : null}
+        </button>
+        {typeof onLogout === "function" ? (
+          <button
+            type="button"
+            title={collapsed ? "Salir" : undefined}
+            onClick={function () {
+              onLogout();
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: collapsed ? "12px 10px" : "10px 10px 10px 6px",
+              justifyContent: collapsed ? "center" : "flex-start",
+              border: "none",
+              borderRadius: 10,
+              cursor: "pointer",
+              background: "transparent",
+              color: "#f87171",
+              fontFamily: "'DM Sans', system-ui, sans-serif",
+              fontSize: 14,
+              fontWeight: 600,
+              width: "100%",
+              transition: "background 0.18s ease, color 0.18s ease",
+            }}
+            onMouseEnter={function (e) {
+              e.currentTarget.style.background = "rgba(248, 113, 113, 0.12)";
+            }}
+            onMouseLeave={function (e) {
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            <LogOut size={20} strokeWidth={2} style={{ flexShrink: 0 }} />
+            {!collapsed ? <span>Salir</span> : null}
+          </button>
+        ) : null}
+      </div>
+
+      <div style={{ flex: 1, minHeight: 24 }} aria-hidden />
+
+      {/* Tarjeta de usuario al pie (mock) */}
+      <div style={{ flexShrink: 0, padding: "0 6px 16px 4px" }}>
+        <button
+          type="button"
+          title={collapsed ? coachName || "Perfil" : undefined}
+          onClick={function () {
+            if (typeof onPerfil === "function") onPerfil();
+          }}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: collapsed ? "12px 8px" : "14px 12px 14px 8px",
+            justifyContent: collapsed ? "center" : "flex-start",
+            borderRadius: 12,
+            border: "1px solid " + DS.border,
+            background: "rgba(15, 22, 36, 0.85)",
+            cursor: "pointer",
+            boxSizing: "border-box",
+            transition: "border-color 0.18s ease, background 0.18s ease",
+          }}
+          onMouseEnter={function (e) {
+            e.currentTarget.style.borderColor = "rgba(59,130,246,0.35)";
+            e.currentTarget.style.background = "rgba(37, 99, 235, 0.08)";
+          }}
+          onMouseLeave={function (e) {
+            e.currentTarget.style.borderColor = DS.border;
+            e.currentTarget.style.background = "rgba(15, 22, 36, 0.85)";
+          }}
+        >
+          {coachAvatarUrl ? (
+            <img src={coachAvatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+          ) : (
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg,#1e3a5f,#2563eb)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 800,
+                fontSize: 13,
+                color: "#fff",
+                flexShrink: 0,
+              }}
+            >
+              {initials(coachName)}
+            </div>
+          )}
+          {!collapsed ? (
+            <>
+              <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                <div
+                  style={{
+                    fontFamily: "'DM Sans', system-ui, sans-serif",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: DS.text,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {coachName || "Coach"}
+                </div>
+                {coachSubtitle ? (
+                  <div style={{ fontSize: 12, color: DS.muted, marginTop: 2, fontWeight: 500 }}>{coachSubtitle}</div>
+                ) : null}
+              </div>
+              <ChevronRight size={18} color="#6B7280" style={{ flexShrink: 0 }} aria-hidden />
+            </>
+          ) : null}
         </button>
       </div>
     </aside>
