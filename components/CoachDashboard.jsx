@@ -270,7 +270,7 @@ export default function CoachDashboard({
               alwaysShowDropdown={true}
               showChevron={false}
               plusSize={15}
-              label="+ CREAR"
+              label="CREAR"
               triggerStyle={{
                 background: C.blue,
                 color: "#fff",
