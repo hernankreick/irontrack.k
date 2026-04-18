@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart2,
   CheckCircle,
+  ChevronDown,
   PieChart,
   Star,
   TrendingUp,
@@ -125,6 +126,15 @@ export default function ProgresoView({
   const [diaIdx, setDiaIdx] = useState(0);
   const [ejercicioSelId, setEjercicioSelId] = useState(null);
   const [volBarHoverIdx, setVolBarHoverIdx] = useState(null);
+  const [patronExpanded, setPatronExpanded] = useState({});
+
+  function togglePatronRow(key) {
+    setPatronExpanded(function (prev) {
+      var n = Object.assign({}, prev);
+      n[key] = !n[key];
+      return n;
+    });
+  }
 
   var alumnosSorted = useMemo(
     function () {
@@ -726,9 +736,11 @@ export default function ProgresoView({
               minWidth: 0,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <Star size={13} color={C.yel} strokeWidth={2} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: C.t }}>{es ? "PRs recientes" : "Recent PRs"}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <Star size={16} color={C.yel} strokeWidth={2} />
+              <span style={{ fontSize: 17, fontWeight: 700, color: C.t, lineHeight: 1.25, letterSpacing: -0.02 }}>
+                {es ? "PRs recientes" : "Recent PRs"}
+              </span>
             </div>
             {model.prsRecientes.length === 0 ? (
               emptyBox(es, es ? "Todavía no hay PRs registrados" : "No PRs logged yet")
@@ -741,22 +753,22 @@ export default function ProgresoView({
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 10,
-                      padding: "8px 0",
+                      gap: 12,
+                      padding: "11px 0",
                       borderBottom: idx < list.length - 1 ? "1px solid #1e1e2e44" : "none",
                     }}
                   >
                     <div
                       style={{
-                        width: 28,
-                        height: 28,
+                        width: 32,
+                        height: 32,
                         borderRadius: "50%",
                         background: row.color + "22",
                         color: row.color,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: 700,
                         flexShrink: 0,
                       }}
@@ -764,13 +776,13 @@ export default function ProgresoView({
                       {row.initials}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: C.t }}>{row.n}</div>
-                      <div style={{ fontSize: 10, color: C.t2 }}>{row.ex}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.t, lineHeight: 1.35 }}>{row.n}</div>
+                      <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.4, marginTop: 2 }}>{row.ex}</div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: C.green }}>{row.val}</div>
-                      <div style={{ fontSize: 10, color: C.green }}>{row.delta}</div>
-                      <div style={{ fontSize: 10, color: C.t2 }}>{row.date}</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: C.green, lineHeight: 1.2 }}>{row.val}</div>
+                      <div style={{ fontSize: 13, color: C.green, lineHeight: 1.35, marginTop: 2 }}>{row.delta}</div>
+                      <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.35, marginTop: 2 }}>{row.date}</div>
                     </div>
                   </div>
                 );
@@ -787,14 +799,14 @@ export default function ProgresoView({
               minWidth: 0,
             }}
           >
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <BarChart2 size={13} color={C.blue} strokeWidth={2} />
-                <span style={{ fontSize: 14, fontWeight: 600, color: C.t }}>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <BarChart2 size={16} color={C.blue} strokeWidth={2} />
+                <span style={{ fontSize: 17, fontWeight: 700, color: C.t, lineHeight: 1.25, letterSpacing: -0.02 }}>
                   {es ? "Volumen semanal (kg)" : "Weekly volume (kg)"}
                 </span>
               </div>
-              <p style={{ fontSize: 10, color: C.t2, margin: "6px 0 0 0", lineHeight: 1.35 }}>
+              <p style={{ fontSize: 13, color: C.t2, margin: "8px 0 0 0", lineHeight: 1.45 }}>
                 {es
                   ? "Bloque actual (4 semanas, lun–dom) · todos los alumnos"
                   : "Current block (4 weeks, Mon–Sun) · all athletes"}
@@ -879,14 +891,14 @@ export default function ProgresoView({
                     >
                       <div
                         style={{
-                          fontSize: 12,
+                          fontSize: 14,
                           fontWeight: 700,
                           color: bar.v > 0 ? C.t : C.t2,
                           letterSpacing: 0.2,
                           marginBottom: 8,
                           textAlign: "center",
-                          lineHeight: 1.2,
-                          minHeight: 16,
+                          lineHeight: 1.25,
+                          minHeight: 18,
                         }}
                       >
                         {volLabel}
@@ -957,11 +969,11 @@ export default function ProgresoView({
                       </div>
                       <span
                         style={{
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: 600,
                           color: isCurrentWeek ? C.blue : C.t2,
                           textAlign: "center",
-                          lineHeight: 1.25,
+                          lineHeight: 1.35,
                           marginTop: 10,
                         }}
                       >
@@ -973,7 +985,7 @@ export default function ProgresoView({
               </div>
             </div>
             {maxV <= 0 ? (
-              <p style={{ fontSize: 10, color: C.t2, margin: "10px 0 0 0", textAlign: "center" }}>
+              <p style={{ fontSize: 13, color: C.t2, margin: "12px 0 0 0", textAlign: "center", lineHeight: 1.45 }}>
                 {es ? "Sin volumen registrado en este bloque." : "No volume logged in this block."}
               </p>
             ) : null}
@@ -988,9 +1000,11 @@ export default function ProgresoView({
               minWidth: 0,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <Users size={13} color={C.blue} strokeWidth={2} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: C.t }}>{es ? "Ranking de progreso" : "Progress ranking"}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <Users size={16} color={C.blue} strokeWidth={2} />
+              <span style={{ fontSize: 17, fontWeight: 700, color: C.t, lineHeight: 1.25, letterSpacing: -0.02 }}>
+                {es ? "Ranking de progreso" : "Progress ranking"}
+              </span>
             </div>
             {model.ranking.length === 0 ? (
               emptyBox(es, es ? "Sin métricas de adherencia" : "No adherence metrics")
@@ -1003,32 +1017,33 @@ export default function ProgresoView({
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
-                      padding: "7px 0",
+                      gap: 10,
+                      padding: "9px 0",
                       borderBottom: idx < model.ranking.length - 1 ? "1px solid #1e1e2e33" : "none",
                     }}
                   >
                     <div
                       style={{
-                        fontSize: 13,
+                        fontSize: 15,
                         fontWeight: 800,
-                        width: 18,
+                        width: 20,
                         color: medalColor(pos),
+                        lineHeight: 1.2,
                       }}
                     >
                       {pos}
                     </div>
                     <div
                       style={{
-                        width: 24,
-                        height: 24,
+                        width: 26,
+                        height: 26,
                         borderRadius: "50%",
                         background: row.color + "22",
                         color: row.color,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 9,
+                        fontSize: 10,
                         fontWeight: 700,
                         flexShrink: 0,
                       }}
@@ -1037,23 +1052,26 @@ export default function ProgresoView({
                     </div>
                     <div
                       style={{
-                        fontSize: 11,
+                        fontSize: 13,
                         flex: 1,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                         color: C.t,
+                        lineHeight: 1.35,
+                        fontWeight: 500,
                       }}
                     >
                       {row.n}
                     </div>
                     <div
                       style={{
-                        width: 70,
-                        height: 6,
+                        width: 72,
+                        height: 8,
                         background: C.brd,
-                        borderRadius: 3,
+                        borderRadius: 4,
                         overflow: "hidden",
+                        flexShrink: 0,
                       }}
                     >
                       <div
@@ -1061,17 +1079,20 @@ export default function ProgresoView({
                           width: row.p + "%",
                           height: "100%",
                           background: row.color,
+                          borderRadius: 4,
                         }}
                       />
                     </div>
                     <div
                       style={{
-                        fontSize: 11,
+                        fontSize: 13,
                         fontWeight: 700,
-                        width: 30,
+                        width: 36,
                         textAlign: "right",
                         fontFamily: "ui-monospace, monospace",
                         color: row.color,
+                        lineHeight: 1.2,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {row.p}%
@@ -1088,93 +1109,217 @@ export default function ProgresoView({
             background: C.card,
             border: "1px solid " + C.brd,
             borderRadius: 12,
-            padding: 16,
+            padding: 18,
             width: "100%",
             boxSizing: "border-box",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 12,
-              flexWrap: "wrap",
-              gap: 8,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <PieChart size={13} color={C.blue} strokeWidth={2} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: C.t }}>{es ? "Grupos musculares" : "Muscle groups"}</span>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <PieChart size={16} color={C.blue} strokeWidth={2} />
+              <span style={{ fontSize: 17, fontWeight: 700, color: C.t, lineHeight: 1.25, letterSpacing: -0.02 }}>
+                {es ? "Volumen por patrón muscular" : "Volume by movement pattern"}
+              </span>
             </div>
-            <span style={{ fontSize: 10, color: C.t2 }}>{model.muscleSubtitle}</span>
+            <p style={{ fontSize: 13, color: C.t2, margin: 0, lineHeight: 1.45, paddingLeft: 26 }}>
+              {es ? "Bloque actual · 4 semanas" : "Current block · 4 weeks"}
+            </p>
           </div>
-          {model.grupos.length === 0 || model.gruposTotalVol <= 0 ? (
-            emptyBox(es, es ? "Sin volumen por grupo en el período" : "No per-group volume in this period")
-          ) : (
-            <div
+          {(model.patronTotalVol == null ? 0 : model.patronTotalVol) <= 0 ? (
+            <p
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                columnGap: 8,
-                rowGap: 24,
+                fontSize: 13,
+                color: C.t2,
+                margin: "0 0 14px 0",
+                lineHeight: 1.45,
+                padding: "10px 12px",
+                background: C.cardDark,
+                borderRadius: 8,
+                border: "1px solid " + C.brd,
               }}
             >
-              {model.grupos.map(function (g) {
-                return (
-                  <div
-                    key={g.key}
+              {es
+                ? "Sin volumen registrado en el bloque para estos patrones (últimas 4 semanas)."
+                : "No volume logged in this block for these patterns (last 4 weeks)."}
+            </p>
+          ) : null}
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {(model.patronPatterns || []).map(function (g) {
+              var totalV = model.patronTotalVol != null ? model.patronTotalVol : 0;
+              var fillPct =
+                totalV > 0 ? Math.min(100, (100 * g.vol) / totalV) : 0;
+              var isOpen = !!patronExpanded[g.key];
+              return (
+                <div key={g.key}>
+                  <button
+                    type="button"
+                    onClick={function () {
+                      togglePatronRow(g.key);
+                    }}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 7,
+                      width: "100%",
+                      margin: 0,
+                      padding: 0,
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      textAlign: "left",
+                      color: "inherit",
                     }}
                   >
                     <div
                       style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 2,
-                        background: g.color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span style={{ fontSize: 11, color: "#fff", flex: 1 }}>{g.n}</span>
-                    <div
-                      style={{
-                        width: 100,
-                        height: 5,
-                        background: C.brd,
-                        borderRadius: 3,
-                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        marginBottom: 8,
                       }}
                     >
                       <div
                         style={{
-                          width: g.p + "%",
-                          height: "100%",
-                          background: g.color,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          minWidth: 0,
+                          flex: "1 1 140px",
                         }}
-                      />
+                      >
+                        <ChevronDown
+                          size={18}
+                          color={C.t2}
+                          strokeWidth={2}
+                          style={{
+                            flexShrink: 0,
+                            transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                            transition: "transform 0.18s ease",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: C.t,
+                            lineHeight: 1.3,
+                            letterSpacing: 0.02,
+                          }}
+                        >
+                          {g.label}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "baseline",
+                          gap: 10,
+                          flexShrink: 0,
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        <span style={{ fontSize: 14, fontWeight: 700, color: C.t, lineHeight: 1.2 }}>
+                          {formatWeeklyVolKgAbbrev(g.vol)}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: g.color,
+                            minWidth: 44,
+                            textAlign: "right",
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {g.p}%
+                        </span>
+                      </div>
                     </div>
                     <div
                       style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        width: 30,
-                        textAlign: "right",
-                        fontFamily: "ui-monospace, monospace",
-                        color: g.color,
+                        height: 10,
+                        background: "#15151f",
+                        borderRadius: 6,
+                        overflow: "hidden",
+                        border: "1px solid #252536",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
                       }}
                     >
-                      {g.p}%
+                      <div
+                        style={{
+                          width: fillPct + "%",
+                          height: "100%",
+                          borderRadius: 6,
+                          background:
+                            "linear-gradient(90deg, " + g.color + "99 0%, " + g.color + " 55%, " + g.color + "dd 100%)",
+                          boxShadow: "0 0 12px " + g.color + "33",
+                        }}
+                      />
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  </button>
+                  {isOpen ? (
+                    <div
+                      style={{
+                        marginTop: 10,
+                        marginLeft: 26,
+                        paddingLeft: 12,
+                        borderLeft: "2px solid " + C.brd,
+                      }}
+                    >
+                      {(g.exercises || []).length === 0 ? (
+                        <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.45 }}>
+                          {es ? "Sin series registradas en este bloque." : "No sets logged in this block."}
+                        </div>
+                      ) : (
+                        (g.exercises || []).map(function (ex, exi) {
+                          var exList = g.exercises || [];
+                          return (
+                            <div
+                              key={g.key + "-" + ex.ejercicio_id}
+                              style={{
+                                display: "flex",
+                                alignItems: "baseline",
+                                justifyContent: "space-between",
+                                gap: 10,
+                                padding: "6px 0",
+                                borderBottom:
+                                  exi < exList.length - 1 ? "1px solid #1e1e2e44" : "none",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  color: C.t,
+                                  fontWeight: 500,
+                                  lineHeight: 1.35,
+                                  flex: 1,
+                                  minWidth: 0,
+                                }}
+                              >
+                                {ex.name}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  color: C.t2,
+                                  fontWeight: 600,
+                                  whiteSpace: "nowrap",
+                                  fontVariantNumeric: "tabular-nums",
+                                }}
+                              >
+                                {ex.series}{" "}
+                                {es ? (ex.series === 1 ? "serie" : "series") : ex.series === 1 ? "set" : "sets"}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

@@ -8,14 +8,16 @@ import { FALLBACK_EXERCISE_NAME } from "../lib/exerciseResolve.js";
 const DAY_MS = 86400000;
 const PALETTE = ["#22c55e", "#f59e0b", "#3b82f6", "#a78bfa", "#ec4899", "#14b8a6", "#eab308", "#64748b"];
 
-const GRUPO_DEF = [
-  { key: "pierna", label: "Pierna", color: "#3b82f6" },
-  { key: "empuje", label: "Empuje", color: "#a78bfa" },
-  { key: "tiron", label: "Tirón", color: "#22c55e" },
-  { key: "core", label: "Core", color: "#eab308" },
-  { key: "aerobico", label: "Aeróbico", color: "#f59e0b" },
-  { key: "movilidad", label: "Movilidad", color: "#64748b" },
-  { key: "otros", label: "Otros", color: "#94a3b8" },
+/**
+ * Patrones de movimiento reales (campo `pattern` en ejercicios / allEx).
+ * Orden fijo para la card del entrenador.
+ */
+var MOVEMENT_PATTERN_DEF = [
+  { key: "empuje", labelEs: "EMPUJE", labelEn: "PUSH", color: "#a78bfa" },
+  { key: "traccion", labelEs: "TRACCION", labelEn: "PULL", color: "#22c55e" },
+  { key: "rodilla", labelEs: "RODILLA DOMINANTE", labelEn: "KNEE-DOMINANT", color: "#3b82f6" },
+  { key: "bisagra", labelEs: "BISAGRA", labelEn: "HINGE", color: "#f59e0b" },
+  { key: "core", labelEs: "CORE", labelEn: "CORE", color: "#eab308" },
 ];
 
 function periodDurationDays(periodId) {
@@ -96,15 +98,22 @@ function exName(exMap, ejId, es) {
   return FALLBACK_EXERCISE_NAME[es ? "es" : "en"];
 }
 
-function patternToGrupo(pat) {
-  var p = String(pat || "").toLowerCase();
-  if (p === "rodilla" || p === "bisagra") return "pierna";
-  if (p === "empuje") return "empuje";
-  if (p === "traccion" || p === "tracción" || p === "tirón" || p === "tiron") return "tiron";
-  if (p === "core" || p === "abs") return "core";
-  if (p === "cardio") return "aerobico";
-  if (p === "movilidad" || p === "movility") return "movilidad";
-  return "otros";
+/**
+ * Normaliza el valor real de `ex.pattern` al key canónico de MOVEMENT_PATTERN_DEF.
+ * Solo estos 5 patrones; el resto (cardio, movilidad, vacío…) no entra en la card.
+ */
+export function patternToMovementKey(pat) {
+  var raw = String(pat || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (raw === "empuje") return "empuje";
+  if (raw === "traccion" || raw === "tiron") return "traccion";
+  if (raw === "rodilla") return "rodilla";
+  if (raw === "bisagra") return "bisagra";
+  if (raw === "core" || raw === "abs") return "core";
+  return null;
 }
 
 export function getRoutineForAlumno(rutinasSBEntrenador, alumnoId) {
@@ -527,30 +536,60 @@ export function buildCoachProgresoModel(params) {
     };
   });
 
-  /** Grupos musculares: últimas 4 semanas, volumen por patrón */
+  /** Volumen por patrón (5 claves) + series por ejercicio: bloque 4 semanas; 1 fila progreso = 1 serie */
   var gStart = Date.now() - 28 * DAY_MS;
-  var gVol = { pierna: 0, empuje: 0, tiron: 0, core: 0, aerobico: 0, movilidad: 0, otros: 0 };
+  var volByKey = { empuje: 0, traccion: 0, rodilla: 0, bisagra: 0, core: 0 };
+  /** @type {Record<string, Record<string, number>>} patternKey -> ejercicio_id -> series */
+  var seriesByPatternAndEx = {
+    empuje: {},
+    traccion: {},
+    rodilla: {},
+    bisagra: {},
+    core: {},
+  };
   Object.keys(progresoGlobal).forEach(function (aid) {
     (progresoGlobal[aid] || []).forEach(function (r) {
       var d = parseProgresoDate(r.fecha);
       if (!d || d.getTime() < gStart) return;
       var ex = exMap[r.ejercicio_id];
-      var pat = ex ? ex.pattern : "";
-      var g = patternToGrupo(pat);
+      var mk = patternToMovementKey(ex ? ex.pattern : "");
+      if (!mk) return;
       var kg = parseFloat(r.kg) || 0;
       var reps = parseInt(r.reps, 10) || 0;
-      gVol[g] += kg * Math.max(1, reps);
+      volByKey[mk] += kg * Math.max(1, reps);
+      var ejId = r.ejercicio_id;
+      if (ejId == null) return;
+      var sid = String(ejId);
+      var bag = seriesByPatternAndEx[mk];
+      bag[sid] = (bag[sid] || 0) + 1;
     });
   });
-  var gTotal = Object.keys(gVol).reduce(function (acc, k) {
-    return acc + gVol[k];
+  var patronTotalVol = MOVEMENT_PATTERN_DEF.reduce(function (acc, def) {
+    return acc + (volByKey[def.key] || 0);
   }, 0);
-  var grupos = GRUPO_DEF.map(function (def) {
-    var v = gVol[def.key] || 0;
-    var pct = gTotal > 0 ? Math.round((100 * v) / gTotal) : 0;
-    return { n: def.label, p: pct, color: def.color, key: def.key };
-  }).filter(function (g) {
-    return g.p > 0;
+  var patronPatterns = MOVEMENT_PATTERN_DEF.map(function (def) {
+    var v = volByKey[def.key] || 0;
+    var pct = patronTotalVol > 0 ? Math.round((100 * v) / patronTotalVol) : 0;
+    var bag = seriesByPatternAndEx[def.key] || {};
+    var exercises = Object.keys(bag)
+      .map(function (ejId) {
+        return {
+          ejercicio_id: ejId,
+          name: exName(exMap, ejId, es),
+          series: bag[ejId],
+        };
+      })
+      .sort(function (a, b) {
+        return b.series - a.series;
+      });
+    return {
+      key: def.key,
+      label: es ? def.labelEs : def.labelEn,
+      p: pct,
+      vol: v,
+      color: def.color,
+      exercises: exercises,
+    };
   });
 
   /** Chips resumen */
@@ -616,15 +655,14 @@ export function buildCoachProgresoModel(params) {
     prsRecientes: prsRecientes,
     volBars: volBars,
     maxVol: maxVol,
-    grupos: grupos,
-    gruposTotalVol: gTotal,
+    patronPatterns: patronPatterns,
+    patronTotalVol: patronTotalVol,
     summaryChips: summaryChips,
     chartSeries: series,
     chartWeekLabels: weekLabels,
     hasChartData: series.some(function (v) {
       return v != null;
     }),
-    muscleSubtitle: es ? "Últimas 4 semanas · todos los alumnos" : "Last 4 weeks · all athletes",
   };
 }
 
