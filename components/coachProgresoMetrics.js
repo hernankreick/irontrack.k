@@ -373,17 +373,20 @@ export function buildCoachProgresoModel(params) {
     if (countPRsForAlumnoBetween(a.id, cutoffStall, end) === 0) stalled++;
   });
 
-  /** Serie semanal: últimas 8 semanas (lunes), max kg por semana */
-  var chartWeeks = 8;
+  /**
+   * Evolución de carga: bloque actual de 4 semanas (lunes a domingo), alineado a la semana calendario.
+   * Semana 1 = más antigua del bloque; Semana 4 = semana calendario actual (incluye hoy).
+   */
+  var LOAD_BLOCK_WEEKS = 4;
   var now = new Date();
+  var currentMondayMs = weekKeyMon(now);
   var series = [];
   var weekLabels = [];
-  for (var w = chartWeeks - 1; w >= 0; w--) {
-    var weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - w * 7);
-    var wk = weekKeyMon(weekEnd);
-    weekLabels.push("S" + (chartWeeks - w));
-    var wkStart = new Date(wk);
-    var wkEndMs = wkStart.getTime() + 7 * DAY_MS;
+  for (var wi = 0; wi < LOAD_BLOCK_WEEKS; wi++) {
+    var offsetWeeks = wi - (LOAD_BLOCK_WEEKS - 1);
+    var wkStartMs = currentMondayMs + offsetWeeks * 7 * DAY_MS;
+    var wkEndMs = wkStartMs + 7 * DAY_MS;
+    weekLabels.push(es ? "Semana " + (wi + 1) : "Week " + (wi + 1));
     var maxKg = null;
     if (alumnoSel && ejercicioSelId) {
       var rows = progresoGlobal[alumnoSel] || [];
@@ -393,7 +396,7 @@ export function buildCoachProgresoModel(params) {
         var dd = parseProgresoDate(rr.fecha);
         if (!dd) continue;
         var tt = dd.getTime();
-        if (tt >= wkStart.getTime() && tt < wkEndMs) {
+        if (tt >= wkStartMs && tt < wkEndMs) {
           var kgv = parseFloat(rr.kg) || 0;
           if (kgv > 0 && (maxKg == null || kgv > maxKg)) maxKg = kgv;
         }
@@ -480,28 +483,33 @@ export function buildCoachProgresoModel(params) {
     };
   });
 
-  /** Volumen semanal últimas 8 semanas (todos los alumnos) */
+  /**
+   * Volumen semanal (equipo): mismo bloque actual de 4 semanas que Evolución de carga
+   * (lunes–dom, Semana 1 = más antigua, Semana 4 = actual). Suma kg×reps de todos los alumnos.
+   */
   var volBars = [];
   var maxVol = 0;
-  for (var wb = chartWeeks - 1; wb >= 0; wb--) {
-    var weekEndB = new Date(now.getFullYear(), now.getMonth(), now.getDate() - wb * 7);
-    var wkB = weekKeyMon(weekEndB);
-    var wkStartB = new Date(wkB);
-    var wkEndB = wkStartB.getTime() + 7 * DAY_MS;
+  for (var wv = 0; wv < LOAD_BLOCK_WEEKS; wv++) {
+    var offV = wv - (LOAD_BLOCK_WEEKS - 1);
+    var wkStartMsV = currentMondayMs + offV * 7 * DAY_MS;
+    var wkEndMsV = wkStartMsV + 7 * DAY_MS;
     var vsum = 0;
     Object.keys(progresoGlobal).forEach(function (aid) {
       (progresoGlobal[aid] || []).forEach(function (r) {
         var d = parseProgresoDate(r.fecha);
         if (!d) return;
         var t = d.getTime();
-        if (t >= wkStartB.getTime() && t < wkEndB) {
+        if (t >= wkStartMsV && t < wkEndMsV) {
           var kg = parseFloat(r.kg) || 0;
           var reps = parseInt(r.reps, 10) || 0;
           vsum += kg * Math.max(1, reps);
         }
       });
     });
-    volBars.push({ v: vsum, s: "S" + (chartWeeks - wb) });
+    volBars.push({
+      v: vsum,
+      s: es ? "Semana " + (wv + 1) : "Week " + (wv + 1),
+    });
     if (vsum > maxVol) maxVol = vsum;
   }
 

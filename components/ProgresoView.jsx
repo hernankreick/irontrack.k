@@ -55,6 +55,33 @@ function medalColor(pos) {
   return C.t2;
 }
 
+/** Volumen en kg abreviado tipo SaaS: 12400 → "12.4k kg", 850 → "850 kg" */
+function formatWeeklyVolKgAbbrev(v) {
+  var n = Number(v) || 0;
+  if (n <= 0) return "0";
+  if (n >= 1000) {
+    var k = n / 1000;
+    var s;
+    if (k >= 100) {
+      s = String(Math.round(k));
+    } else {
+      s = (Math.round(k * 10) / 10).toFixed(1);
+      if (s.slice(-2) === ".0") s = s.slice(0, -2);
+    }
+    return s + "k kg";
+  }
+  return Math.round(n) + " kg";
+}
+
+/** Número completo para tooltip */
+function formatWeeklyVolKgFull(v) {
+  var n = Number(v) || 0;
+  if (n <= 0) return "0 kg";
+  return (
+    Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 }) + " kg"
+  );
+}
+
 function emptyBox(es, title) {
   return (
     <div
@@ -97,6 +124,7 @@ export default function ProgresoView({
   const [alumnoSel, setAlumnoSel] = useState(null);
   const [diaIdx, setDiaIdx] = useState(0);
   const [ejercicioSelId, setEjercicioSelId] = useState(null);
+  const [volBarHoverIdx, setVolBarHoverIdx] = useState(null);
 
   var alumnosSorted = useMemo(
     function () {
@@ -214,31 +242,39 @@ export default function ProgresoView({
   var chartComputed = useMemo(
     function () {
       var series = model.chartSeries || [];
-      var pts = [];
-      for (var i = 0; i < series.length; i++) {
-        if (series[i] == null) continue;
-        var x = series.length <= 1 ? 150 : (i / (series.length - 1)) * 300;
-        var v = series[i];
-        pts.push({ x: x, y: 0, v: v, idx: i });
+      var n = series.length;
+      if (n === 0) {
+        return { chartPoints: [], polySegments: [], empty: true };
       }
-      if (!pts.length) {
-        return { points: [], poly: "", empty: true };
+      var vals = [];
+      for (var vi = 0; vi < series.length; vi++) {
+        if (series[vi] != null) vals.push(series[vi]);
       }
-      var vals = pts.map(function (p) {
-        return p.v;
-      });
+      if (vals.length === 0) {
+        return { chartPoints: [], polySegments: [], empty: true };
+      }
       var min = Math.min.apply(null, vals) - 5;
       var max = Math.max.apply(null, vals) + 5;
       var range = max - min || 1;
-      pts.forEach(function (p) {
-        p.y = 100 - ((p.v - min) / range) * 100;
-      });
-      var poly = pts
-        .map(function (pt) {
-          return pt.x + "," + pt.y;
-        })
-        .join(" ");
-      return { points: pts, poly: poly, empty: false };
+      var chartPoints = [];
+      for (var i = 0; i < n; i++) {
+        var x = n <= 1 ? 150 : (i / (n - 1)) * 300;
+        if (series[i] == null) {
+          chartPoints.push({ x: x, y: null, v: null, hasData: false });
+        } else {
+          var y = 100 - ((series[i] - min) / range) * 100;
+          chartPoints.push({ x: x, y: y, v: series[i], hasData: true });
+        }
+      }
+      var polySegments = [];
+      for (var j = 0; j < n - 1; j++) {
+        if (series[j] != null && series[j + 1] != null) {
+          var a = chartPoints[j];
+          var b = chartPoints[j + 1];
+          polySegments.push(a.x + "," + a.y + " " + b.x + "," + b.y);
+        }
+      }
+      return { chartPoints: chartPoints, polySegments: polySegments, empty: false };
     },
     [model.chartSeries]
   );
@@ -541,22 +577,40 @@ export default function ProgresoView({
                 emptyBox(es, es ? "No hay registros de carga para este ejercicio" : "No load records for this exercise")
               ) : (
                 <>
+                  <p style={{ fontSize: 10, color: C.t2, margin: "0 0 8px 0", lineHeight: 1.35 }}>
+                    {es
+                      ? "Bloque actual (4 semanas, lun–dom). Máx. kg registrado por semana."
+                      : "Current block (4 weeks, Mon–Sun). Max kg logged per week."}
+                  </p>
                   <svg viewBox="0 0 300 100" width="100%" height={110} style={{ display: "block" }}>
-                    <polyline
-                      fill="none"
-                      stroke={alumnoColor}
-                      strokeWidth={2.5}
-                      strokeLinejoin="round"
-                      strokeLinecap="round"
-                      points={chartComputed.poly}
-                    />
-                    {chartComputed.points.map(function (pt, i) {
+                    {(chartComputed.polySegments || []).map(function (seg, si) {
+                      return (
+                        <polyline
+                          key={"seg-" + si}
+                          fill="none"
+                          stroke={alumnoColor}
+                          strokeWidth={2.5}
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                          points={seg}
+                        />
+                      );
+                    })}
+                    {(chartComputed.chartPoints || []).map(function (pt, i) {
                       return (
                         <g key={"pt-" + i}>
-                          <circle r={3.5} cx={pt.x} cy={pt.y} fill={alumnoColor} />
-                          <text x={pt.x} y={pt.y - 8} fill={C.t} fontSize={8} fontWeight={700} textAnchor="middle">
-                            {pt.v}
-                          </text>
+                          {pt.hasData ? (
+                            <>
+                              <circle r={3.5} cx={pt.x} cy={pt.y} fill={alumnoColor} />
+                              <text x={pt.x} y={pt.y - 8} fill={C.t} fontSize={8} fontWeight={700} textAnchor="middle">
+                                {pt.v}
+                              </text>
+                            </>
+                          ) : (
+                            <text x={pt.x} y={94} fill={C.t2} fontSize={8} fontWeight={600} textAnchor="middle">
+                              —
+                            </text>
+                          )}
                         </g>
                       );
                     })}
@@ -570,9 +624,9 @@ export default function ProgresoView({
                       color: C.t2,
                     }}
                   >
-                    {(model.chartWeekLabels || []).map(function (s) {
+                    {(model.chartWeekLabels || []).map(function (s, idx) {
                       return (
-                        <span key={s}>
+                        <span key={"wl-" + idx}>
                           {s}
                         </span>
                       );
@@ -733,57 +787,196 @@ export default function ProgresoView({
               minWidth: 0,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <BarChart2 size={13} color={C.blue} strokeWidth={2} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: C.t }}>
-                {es ? "Volumen semanal (kg)" : "Weekly volume (kg)"}
-              </span>
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <BarChart2 size={13} color={C.blue} strokeWidth={2} />
+                <span style={{ fontSize: 14, fontWeight: 600, color: C.t }}>
+                  {es ? "Volumen semanal (kg)" : "Weekly volume (kg)"}
+                </span>
+              </div>
+              <p style={{ fontSize: 10, color: C.t2, margin: "6px 0 0 0", lineHeight: 1.35 }}>
+                {es
+                  ? "Bloque actual (4 semanas, lun–dom) · todos los alumnos"
+                  : "Current block (4 weeks, Mon–Sun) · all athletes"}
+              </p>
             </div>
-            {maxV <= 0 ? (
-              emptyBox(es, es ? "Sin volumen registrado en las últimas semanas" : "No volume in recent weeks")
-            ) : (
+            <div
+              style={{
+                marginTop: 10,
+                display: "flex",
+                justifyContent: "center",
+                width: "100%",
+                minHeight: 188,
+                boxSizing: "border-box",
+                padding: "4px 10px 0",
+              }}
+            >
               <div
                 style={{
                   display: "flex",
                   alignItems: "flex-end",
-                  gap: 5,
-                  height: 90,
-                  marginTop: 8,
+                  justifyContent: "center",
+                  gap: 10,
+                  width: "100%",
+                  maxWidth: 420,
+                  minHeight: 168,
                 }}
               >
-                {model.volBars.map(function (bar) {
-                  var h = maxV > 0 ? (bar.v / maxV) * 80 : 0;
-                  var barColor =
-                    maxV <= 0 ? C.blue : bar.v >= 0.85 * maxV ? C.green : bar.v >= 0.5 * maxV ? C.blue : C.yel;
+                {(model.volBars || []).map(function (bar, vidx) {
+                  var chartBarMaxPx = 132;
+                  var h =
+                    maxV > 0 ? (bar.v / maxV) * chartBarMaxPx : 0;
+                  if (maxV > 0 && bar.v <= 0) {
+                    h = Math.max(h, 4);
+                  } else if (maxV <= 0) {
+                    h = 4;
+                  }
+                  var isCurrentWeek = vidx === 3;
+                  var barOpacity = isCurrentWeek ? 1 : 0.42;
+                  var volLabel =
+                    bar.v > 0 ? formatWeeklyVolKgAbbrev(bar.v) : "0";
+                  var prevVol =
+                    vidx > 0 && model.volBars[vidx - 1]
+                      ? model.volBars[vidx - 1].v
+                      : null;
+                  var diffVsPrev =
+                    prevVol != null ? bar.v - prevVol : null;
+                  var diffLine = "";
+                  if (vidx === 0) {
+                    diffLine = es ? "Inicio del bloque" : "Block start";
+                  } else if (diffVsPrev != null) {
+                    var sign = diffVsPrev > 0 ? "+" : "";
+                    diffLine =
+                      sign +
+                      Math.round(diffVsPrev).toLocaleString(undefined, {
+                        maximumFractionDigits: 0,
+                      }) +
+                      " kg " +
+                      (es ? "vs anterior" : "vs prev.");
+                  }
+                  var barGrad =
+                    "linear-gradient(180deg, #7dd3fc 0%, #3b82f6 42%, #1d4ed8 100%)";
+                  var isHover = volBarHoverIdx === vidx;
                   return (
                     <div
-                      key={bar.s}
+                      key={"vol-bar-" + vidx}
                       style={{
-                        flex: 1,
+                        flex: "1 1 0",
+                        minWidth: 0,
+                        maxWidth: 96,
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
-                        gap: 3,
-                        minWidth: 0,
+                        justifyContent: "flex-end",
+                        position: "relative",
+                      }}
+                      onMouseEnter={function () {
+                        setVolBarHoverIdx(vidx);
+                      }}
+                      onMouseLeave={function () {
+                        setVolBarHoverIdx(null);
                       }}
                     >
-                      <span style={{ fontSize: 9, color: C.blue, fontWeight: 600 }}>
-                        {(bar.v / 1000).toFixed(1) + "t"}
-                      </span>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: bar.v > 0 ? C.t : C.t2,
+                          letterSpacing: 0.2,
+                          marginBottom: 8,
+                          textAlign: "center",
+                          lineHeight: 1.2,
+                          minHeight: 16,
+                        }}
+                      >
+                        {volLabel}
+                      </div>
                       <div
                         style={{
                           width: "100%",
-                          height: h + "px",
-                          background: barColor,
-                          borderRadius: "3px 3px 0 0",
+                          flex: 1,
+                          minHeight: chartBarMaxPx + 8,
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "flex-end",
+                          alignItems: "center",
+                          position: "relative",
                         }}
-                      />
-                      <span style={{ fontSize: 9, color: C.t2 }}>{bar.s}</span>
+                      >
+                        {isHover ? (
+                          <div
+                            style={{
+                              position: "absolute",
+                              bottom: "calc(100% + 6px)",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              zIndex: 5,
+                              pointerEvents: "none",
+                              whiteSpace: "nowrap",
+                              background: "#0f172a",
+                              border: "1px solid " + C.brd,
+                              borderRadius: 8,
+                              padding: "8px 10px",
+                              boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
+                              fontSize: 11,
+                              lineHeight: 1.45,
+                              color: C.t,
+                              textAlign: "left",
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                              {formatWeeklyVolKgFull(bar.v)}
+                            </div>
+                            <div style={{ color: C.t2, fontWeight: 500 }}>
+                              {diffLine}
+                            </div>
+                          </div>
+                        ) : null}
+                        <div
+                          style={{
+                            width: isCurrentWeek ? "78%" : "68%",
+                            maxWidth: 56,
+                            height: Math.max(0, h) + "px",
+                            minHeight: maxV <= 0 ? 4 : 0,
+                            borderRadius: 8,
+                            backgroundImage:
+                              maxV <= 0 || bar.v <= 0 ? "none" : barGrad,
+                            backgroundColor:
+                              maxV <= 0 || bar.v <= 0 ? "#2a2a3a" : "transparent",
+                            opacity:
+                              maxV <= 0 && bar.v <= 0 ? 0.35 : barOpacity,
+                            boxShadow: isCurrentWeek
+                              ? "0 0 0 1px rgba(59,130,246,0.45), 0 6px 18px rgba(37,99,235,0.35)"
+                              : "none",
+                            transition:
+                              "opacity 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
+                            transform: isHover ? "scaleY(1.02)" : "none",
+                            transformOrigin: "bottom center",
+                          }}
+                        />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: isCurrentWeek ? C.blue : C.t2,
+                          textAlign: "center",
+                          lineHeight: 1.25,
+                          marginTop: 10,
+                        }}
+                      >
+                        {bar.s}
+                      </span>
                     </div>
                   );
                 })}
               </div>
-            )}
+            </div>
+            {maxV <= 0 ? (
+              <p style={{ fontSize: 10, color: C.t2, margin: "10px 0 0 0", textAlign: "center" }}>
+                {es ? "Sin volumen registrado en este bloque." : "No volume logged in this block."}
+              </p>
+            ) : null}
           </div>
 
           <div
