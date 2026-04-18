@@ -1874,7 +1874,8 @@ function GymApp() {
       ];
 
   /** En desktop el coach usa sidebar App; en móvil necesita la bottom nav también en Dashboard. */
-  const hideGlobalBottomNavCoachDash = !esAlumno && sessionData?.role === "entrenador" && tab === "plan" && coachDesktop1024;
+  const hideGlobalBottomNavCoachDash =
+    !esAlumno && sessionData?.role === "entrenador" && (tab === "plan" || tab === "progress") && coachDesktop1024;
   const alumnoTopBarFixed = !!(esAlumno && (tab === "plan" || tab === "library"));
   const alumnoTopBarHeight = alumnoTopBarFixed ? 74 : 0;
 
@@ -2207,7 +2208,7 @@ function GymApp() {
           className={showCoachDesktopShell ? "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden" : undefined}
           style={showCoachDesktopShell ? undefined : { display: "contents" }}
         >
-      {!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && tab === "plan") && (
+      {!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && (tab === "plan" || tab === "progress")) && (
       <div
         className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] pb-3 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}
         style={{
@@ -2344,13 +2345,13 @@ function GymApp() {
                 ? "px-7 "
                 : "px-6 ") +
           (showCoachDesktopShell && !esAlumno ? "lg:[scrollbar-gutter:stable] " : "") +
-          (!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && tab === "plan") ? "mt-6 " : "") +
+          (!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && (tab === "plan" || tab === "progress")) ? "mt-6 " : "") +
           (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
           (tab === "progress" && showAlumnoProgressStack
             ? "pt-0 "
             : tab === "progress"
               ? "pt-[max(0.75rem,env(safe-area-inset-top,0px))] "
-              : showCoachDesktopShell && !esAlumno && tab === "plan"
+              : showCoachDesktopShell && !esAlumno && (tab === "plan" || tab === "progress")
                 ? "pt-0 "
               : esAlumno && (tab === "plan" || tab === "library")
                 ? "pt-8 "
@@ -2400,8 +2401,9 @@ function GymApp() {
           }
         >
         {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
-        {tab==="plan"&&!esAlumno&&sessionData?.role==="entrenador"&&(
+        {(tab==="plan"||tab==="progress")&&!esAlumno&&sessionData?.role==="entrenador"&&(
               <CoachDashboard
+                activeNav={tab==="progress"?"progreso":"dashboard"}
                 alumnos={alumnos}
                 onEnviarMensaje={function () {
                   var first = (alumnos || [])[0];
@@ -3091,12 +3093,12 @@ function GymApp() {
             esEntrenador={false}
           />
         )}
-        {tab==="progress"&&!showAlumnoProgressStack&&(
+        {tab==="progress"&&!showAlumnoProgressStack&&!(sessionData?.role==="entrenador"&&!esAlumno)&&(
           <div className="mx-auto w-full min-w-0 max-w-[480px] lg:max-w-3xl">
             <GraficoProgreso allEx={allEx} es={es} darkMode={darkMode} progress={progress} EX={EX} readOnly={readOnly||esAlumno} sharedParam={sharedParam} sb={sb} sessionData={sessionData} sesiones={sesiones}/>
           </div>
         )}
-        {tab==="progress"&&!showAlumnoProgressStack&&(
+        {tab==="progress"&&!showAlumnoProgressStack&&!(sessionData?.role==="entrenador"&&!esAlumno)&&(
           <div className="min-w-0 max-w-full overflow-x-hidden">
             {EX.filter(ex=>progress[ex.id]?.sets?.length>0).map(ex=>{
               const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"}; const pg=progress[ex.id];

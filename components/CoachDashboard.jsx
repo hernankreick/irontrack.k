@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import GlobalSearch from "./GlobalSearch.jsx";
+import ProgresoView from "./ProgresoView.jsx";
 
 const C = {
   card: "#12121a",
@@ -161,6 +162,7 @@ function coachFindAlumnoForLabel(alumnos, labelName) {
  * Handlers opcionales — si no se pasan, los botones no hacen nada (útil en tests).
  */
 export default function CoachDashboard({
+  activeNav = "dashboard",
   alumnos = [],
   onEnviarMensaje,
   onCrearRutina,
@@ -173,6 +175,10 @@ export default function CoachDashboard({
   globalSearchData = { alumnos: [], rutinas: [], ejercicios: [], sesiones: [] },
   onGlobalSearchNavigate,
 }) {
+  if (activeNav === "progreso") {
+    return <ProgresoView />;
+  }
+
   function runQuick(action) {
     if (action === "message" && typeof onEnviarMensaje === "function") onEnviarMensaje();
     else if (action === "routine" && typeof onCrearRutina === "function") onCrearRutina();
