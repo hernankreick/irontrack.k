@@ -75,6 +75,7 @@ const ALERTAS = [
 
 const QUICK = [
   {
+    action: "message",
     bg: "#1e3a8a",
     border: "#2563eb33",
     Icon: MessageSquare,
@@ -83,6 +84,7 @@ const QUICK = [
     sub: "a tu equipo",
   },
   {
+    action: "routine",
     bg: "#2e1065",
     border: "#7c3aed33",
     Icon: FilePlus,
@@ -91,6 +93,7 @@ const QUICK = [
     sub: "personalizada",
   },
   {
+    action: "review",
     bg: "#042f2e",
     border: "#0d947533",
     Icon: Eye,
@@ -121,10 +124,56 @@ function sesionColor(s) {
 }
 
 /**
+ * Resuelve un alumno real a partir del nombre mostrado en una tarjeta (coincidencia exacta o parcial).
+ */
+function coachFindAlumnoForLabel(alumnos, labelName) {
+  if (!labelName || !Array.isArray(alumnos) || alumnos.length === 0) return null;
+  var target = String(labelName)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  var exact = alumnos.find(function (a) {
+    var n = String(a.nombre || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    return n === target;
+  });
+  if (exact) return exact;
+  return (
+    alumnos.find(function (a) {
+      var n = String(a.nombre || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+      return n && (n.includes(target) || target.includes(n));
+    }) || null
+  );
+}
+
+/**
  * Contenido del dashboard del coach (sin sidebar ni app shell).
  * El layout global y DesktopSidebar los provee App.jsx.
+ *
+ * Handlers opcionales — si no se pasan, los botones no hacen nada (útil en tests).
  */
-export default function CoachDashboard() {
+export default function CoachDashboard({
+  alumnos = [],
+  onEnviarMensaje,
+  onCrearRutina,
+  onRevisarAlumnos,
+  onRevisar,
+  onVerPerfil,
+}) {
+  function runQuick(action) {
+    if (action === "message" && typeof onEnviarMensaje === "function") onEnviarMensaje();
+    else if (action === "routine" && typeof onCrearRutina === "function") onCrearRutina();
+    else if (action === "review" && typeof onRevisarAlumnos === "function") onRevisarAlumnos();
+  }
+
   return (
     <>
       <style>{`
@@ -571,12 +620,18 @@ export default function CoachDashboard() {
                   cursor: "pointer",
                   padding: 0,
                 }}
+                onClick={function () {
+                  if (typeof onRevisarAlumnos === "function") onRevisarAlumnos();
+                }}
               >
                 Ver todas →
               </button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 11 }}>
-              {ALERTAS.map((a) => (
+              {ALERTAS.map((a) => {
+                var alumAlert = coachFindAlumnoForLabel(alumnos, a.n);
+                var alumId = alumAlert && alumAlert.id != null ? alumAlert.id : null;
+                return (
                 <div
                   key={a.i}
                   style={{
@@ -638,7 +693,13 @@ export default function CoachDashboard() {
                         fontWeight: 700,
                         textTransform: "uppercase",
                         border: "none",
-                        cursor: "pointer",
+                        cursor: alumId ? "pointer" : "not-allowed",
+                        opacity: alumId ? 1 : 0.45,
+                      }}
+                      disabled={!alumId}
+                      onClick={function () {
+                        if (!alumId || typeof onRevisar !== "function") return;
+                        onRevisar(alumId);
                       }}
                     >
                       REVISAR
@@ -654,14 +715,21 @@ export default function CoachDashboard() {
                         fontSize: 13,
                         fontWeight: 700,
                         textTransform: "uppercase",
-                        cursor: "pointer",
+                        cursor: alumId ? "pointer" : "not-allowed",
+                        opacity: alumId ? 1 : 0.45,
+                      }}
+                      disabled={!alumId}
+                      onClick={function () {
+                        if (!alumId || typeof onVerPerfil !== "function") return;
+                        onVerPerfil(alumId);
                       }}
                     >
                       VER PERFIL
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -680,7 +748,7 @@ export default function CoachDashboard() {
               ACCIONES RÁPIDAS
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 11 }}>
-              {QUICK.map(({ bg, border, Icon: Qi, iconColor, title, sub }) => (
+              {QUICK.map(({ action, bg, border, Icon: Qi, iconColor, title, sub }) => (
                 <div
                   key={title}
                   role="button"
@@ -692,6 +760,15 @@ export default function CoachDashboard() {
                     borderRadius: 10,
                     padding: 15,
                     cursor: "pointer",
+                  }}
+                  onClick={function () {
+                    runQuick(action);
+                  }}
+                  onKeyDown={function (ev) {
+                    if (ev.key === "Enter" || ev.key === " ") {
+                      ev.preventDefault();
+                      runQuick(action);
+                    }
                   }}
                 >
                   <Qi size={22} color={iconColor} strokeWidth={2} />

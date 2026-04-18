@@ -2260,7 +2260,63 @@ function GymApp() {
         >
         {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&!esAlumno&&sessionData?.role==="entrenador"&&(
-              <CoachDashboard />
+              <CoachDashboard
+                alumnos={alumnos}
+                onEnviarMensaje={function () {
+                  var first = (alumnos || [])[0];
+                  if (first) {
+                    setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
+                  } else {
+                    toast2(es ? "No hay alumnos para contactar" : "No athletes to message");
+                  }
+                }}
+                onCrearRutina={function () {
+                  setTab("routines");
+                }}
+                onRevisarAlumnos={function () {
+                  setTab("alumnos");
+                }}
+                onRevisar={async function (alumnoId) {
+                  var alum = (alumnos || []).find(function (x) {
+                    return String(x.id) === String(alumnoId);
+                  });
+                  if (!alum) {
+                    return;
+                  }
+                  setAlumnoActivo(alum);
+                  setTab("alumnos");
+                  setLoadingSB(true);
+                  try {
+                    var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
+                    setRutinasSB(r[0] || []);
+                    setAlumnoProgreso(r[1] || []);
+                    setAlumnoSesiones(r[2] || []);
+                  } catch (e) {
+                    console.error("[CoachDashboard onRevisar]", e);
+                  }
+                  setLoadingSB(false);
+                }}
+                onVerPerfil={async function (alumnoId) {
+                  var alum = (alumnos || []).find(function (x) {
+                    return String(x.id) === String(alumnoId);
+                  });
+                  if (!alum) {
+                    return;
+                  }
+                  setAlumnoActivo(alum);
+                  setTab("alumnos");
+                  setLoadingSB(true);
+                  try {
+                    var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
+                    setRutinasSB(r[0] || []);
+                    setAlumnoProgreso(r[1] || []);
+                    setAlumnoSesiones(r[2] || []);
+                  } catch (e) {
+                    console.error("[CoachDashboard onVerPerfil]", e);
+                  }
+                  setLoadingSB(false);
+                }}
+              />
         )}
         {tab==="plan"&&(
           <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : ""}>
