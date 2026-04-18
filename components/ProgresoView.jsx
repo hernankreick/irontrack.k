@@ -49,13 +49,6 @@ var selectBaseStyle = {
   outline: "none",
 };
 
-function medalColor(pos) {
-  if (pos === 1) return "#f59e0b";
-  if (pos === 2) return "#94a3b8";
-  if (pos === 3) return "#b45309";
-  return C.t2;
-}
-
 /** Volumen en kg abreviado tipo SaaS: 12400 → "12.4k kg", 850 → "850 kg" */
 function formatWeeklyVolKgAbbrev(v) {
   var n = Number(v) || 0;
@@ -80,6 +73,21 @@ function formatWeeklyVolKgFull(v) {
   if (n <= 0) return "0 kg";
   return (
     Math.round(n).toLocaleString(undefined, { maximumFractionDigits: 0 }) + " kg"
+  );
+}
+
+/** Texto secundario leaderboard: sesiones completadas vs planificadas (misma ventana que el ranking) */
+function rankingSessionsLine(completed, planned, es) {
+  var c = completed != null ? completed : 0;
+  var p = planned != null ? planned : 0;
+  if (p <= 0) {
+    return es ? "Adherencia al plan" : "Plan adherence";
+  }
+  return (
+    c +
+    "/" +
+    p +
+    (es ? " sesiones completadas" : " sessions completed")
   );
 }
 
@@ -295,6 +303,9 @@ export default function ProgresoView({
       return x.v;
     }).concat([0])
   );
+
+  var rankingTop3 = (model.ranking || []).slice(0, 3);
+  var rankingRest = (model.ranking || []).slice(3);
 
   if (!alumnos.length) {
     return (
@@ -993,113 +1004,301 @@ export default function ProgresoView({
 
           <div
             style={{
-              background: C.card,
+              background: "linear-gradient(165deg, #14141c 0%, " + C.card + " 45%, #101018 100%)",
               border: "1px solid " + C.brd,
-              borderRadius: 12,
-              padding: 16,
+              borderRadius: 14,
+              padding: 18,
               minWidth: 0,
+              boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 40px rgba(0,0,0,0.35)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <Users size={16} color={C.blue} strokeWidth={2} />
-              <span style={{ fontSize: 17, fontWeight: 700, color: C.t, lineHeight: 1.25, letterSpacing: -0.02 }}>
-                {es ? "Ranking de progreso" : "Progress ranking"}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, minWidth: 0 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 11,
+                    background: "linear-gradient(145deg, rgba(59,130,246,0.25) 0%, rgba(59,130,246,0.08) 100%)",
+                    border: "1px solid rgba(59,130,246,0.35)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Users size={20} color={C.blue} strokeWidth={2} />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 17,
+                      fontWeight: 800,
+                      color: C.t,
+                      lineHeight: 1.2,
+                      letterSpacing: -0.03,
+                    }}
+                  >
+                    {es ? "Ranking de progreso" : "Progress ranking"}
+                  </div>
+                  <div style={{ fontSize: 13, color: C.t2, marginTop: 4, lineHeight: 1.4 }}>
+                    {es ? "Bloque actual · 4 semanas" : "Current block · 4 weeks"}
+                  </div>
+                </div>
+              </div>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 0.06,
+                  textTransform: "uppercase",
+                  color: "#93c5fd",
+                  background: "rgba(59,130,246,0.12)",
+                  border: "1px solid rgba(59,130,246,0.35)",
+                  padding: "5px 10px",
+                  borderRadius: 999,
+                  flexShrink: 0,
+                  alignSelf: "flex-start",
+                }}
+              >
+                {es ? "Adherencia" : "Adherence"}
               </span>
             </div>
             {model.ranking.length === 0 ? (
               emptyBox(es, es ? "Sin métricas de adherencia" : "No adherence metrics")
             ) : (
-              model.ranking.map(function (row, idx) {
-                var pos = idx + 1;
-                return (
+              <div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {rankingTop3.map(function (row, idx) {
+                    var medals = ["🥇", "🥈", "🥉"];
+                    var topTint = [
+                      "linear-gradient(135deg, rgba(234,179,8,0.14) 0%, rgba(234,179,8,0.03) 55%, transparent 100%)",
+                      "linear-gradient(135deg, rgba(148,163,184,0.18) 0%, rgba(148,163,184,0.04) 55%, transparent 100%)",
+                      "linear-gradient(135deg, rgba(180,83,9,0.16) 0%, rgba(180,83,9,0.04) 55%, transparent 100%)",
+                    ];
+                    var topBorder = [
+                      "1px solid rgba(234,179,8,0.35)",
+                      "1px solid rgba(148,163,184,0.35)",
+                      "1px solid rgba(180,83,9,0.35)",
+                    ];
+                    return (
+                      <div
+                        key={row.id + "-top"}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "14px 14px",
+                          borderRadius: 12,
+                          background: topTint[idx] || topTint[2],
+                          border: topBorder[idx] || topBorder[2],
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            textAlign: "center",
+                            fontSize: 22,
+                            lineHeight: 1,
+                            flexShrink: 0,
+                          }}
+                          aria-hidden
+                        >
+                          {medals[idx] || String(idx + 1)}
+                        </div>
+                        <div
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: "50%",
+                            background: row.color + "28",
+                            color: row.color,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 13,
+                            fontWeight: 800,
+                            flexShrink: 0,
+                            border: "2px solid " + row.color + "44",
+                            boxShadow: "0 4px 14px " + row.color + "22",
+                          }}
+                        >
+                          {row.initials}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 700,
+                              color: C.t,
+                              lineHeight: 1.25,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {row.n}
+                          </div>
+                          <div style={{ fontSize: 12, color: C.t2, marginTop: 4, lineHeight: 1.35 }}>
+                            {rankingSessionsLine(row.completed, row.planned, es)}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 22,
+                              fontWeight: 900,
+                              color: row.color,
+                              lineHeight: 1.1,
+                              fontVariantNumeric: "tabular-nums",
+                              letterSpacing: -0.02,
+                            }}
+                          >
+                            {row.p}%
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {rankingRest.length > 0 ? (
                   <div
-                    key={row.id}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: "9px 0",
-                      borderBottom: idx < model.ranking.length - 1 ? "1px solid #1e1e2e33" : "none",
+                      marginTop: 14,
+                      paddingTop: 12,
+                      borderTop: "1px solid rgba(30,30,46,0.9)",
                     }}
                   >
                     <div
                       style={{
-                        fontSize: 15,
-                        fontWeight: 800,
-                        width: 20,
-                        color: medalColor(pos),
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {pos}
-                    </div>
-                    <div
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: "50%",
-                        background: row.color + "22",
-                        color: row.color,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
                         fontSize: 10,
                         fontWeight: 700,
-                        flexShrink: 0,
+                        letterSpacing: 0.08,
+                        textTransform: "uppercase",
+                        color: C.t2,
+                        marginBottom: 8,
+                        paddingLeft: 2,
                       }}
                     >
-                      {row.initials}
+                      {es ? "Resto del ranking" : "Rest of leaderboard"}
                     </div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        flex: 1,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        color: C.t,
-                        lineHeight: 1.35,
-                        fontWeight: 500,
-                      }}
-                    >
-                      {row.n}
-                    </div>
-                    <div
-                      style={{
-                        width: 72,
-                        height: 8,
-                        background: C.brd,
-                        borderRadius: 4,
-                        overflow: "hidden",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: row.p + "%",
-                          height: "100%",
-                          background: row.color,
-                          borderRadius: 4,
-                        }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        width: 36,
-                        textAlign: "right",
-                        fontFamily: "ui-monospace, monospace",
-                        color: row.color,
-                        lineHeight: 1.2,
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {row.p}%
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      {rankingRest.map(function (row, j) {
+                        var pos = j + 4;
+                        return (
+                          <div
+                            key={row.id + "-rest"}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              padding: "7px 10px",
+                              borderRadius: 8,
+                              transition: "background 0.15s ease",
+                              cursor: "default",
+                            }}
+                            onMouseEnter={function (e) {
+                              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                            }}
+                            onMouseLeave={function (e) {
+                              e.currentTarget.style.background = "transparent";
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 22,
+                                fontSize: 12,
+                                fontWeight: 800,
+                                color: C.t2,
+                                textAlign: "center",
+                                fontVariantNumeric: "tabular-nums",
+                                flexShrink: 0,
+                              }}
+                            >
+                              {pos}
+                            </div>
+                            <div
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: "50%",
+                                background: row.color + "20",
+                                color: row.color,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 10,
+                                fontWeight: 800,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {row.initials}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                flex: 1,
+                                minWidth: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                color: C.t,
+                              }}
+                            >
+                              {row.n}
+                            </div>
+                            <div
+                              style={{
+                                width: 56,
+                                height: 5,
+                                background: "#252536",
+                                borderRadius: 3,
+                                overflow: "hidden",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: row.p + "%",
+                                  height: "100%",
+                                  background:
+                                    "linear-gradient(90deg, " + row.color + "aa, " + row.color + ")",
+                                  borderRadius: 3,
+                                }}
+                              />
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 800,
+                                width: 34,
+                                textAlign: "right",
+                                fontFamily: "ui-monospace, monospace",
+                                color: row.color,
+                                fontVariantNumeric: "tabular-nums",
+                                flexShrink: 0,
+                              }}
+                            >
+                              {row.p}%
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })
+                ) : null}
+              </div>
             )}
           </div>
         </div>

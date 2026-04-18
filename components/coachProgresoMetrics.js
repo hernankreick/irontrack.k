@@ -217,6 +217,8 @@ export function buildCoachProgresoModel(params) {
         p: ad.pct,
         color: pctColor(ad.pct),
         tienePlan: ad.tienePlan,
+        completed: ad.completed,
+        planned: ad.planned,
       };
     })
     .filter(function (row) {
@@ -533,6 +535,8 @@ export function buildCoachProgresoModel(params) {
       n: row.n,
       p: row.p,
       color: row.color,
+      completed: row.completed,
+      planned: row.planned,
     };
   });
 
