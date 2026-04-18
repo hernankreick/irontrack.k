@@ -1,6 +1,7 @@
 import React from "react";
 import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import {
+  AlertCircle,
   BarChart3,
   Bell,
   CheckCircle2,
