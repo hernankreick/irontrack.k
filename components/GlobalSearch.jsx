@@ -83,6 +83,8 @@ export default function GlobalSearch({
   var wrapRef = useRef(null);
   var inputRef = useRef(null);
   var [focused, setFocused] = useState(false);
+  /** El panel debe seguir abierto al interactuar con chips/resultados aunque el input pierda foco por blur. */
+  var [panelOpen, setPanelOpen] = useState(false);
   var [q, setQ] = useState("");
   var [filter, setFilter] = useState("todo");
   var [hlIdx, setHlIdx] = useState(0);
@@ -189,13 +191,14 @@ export default function GlobalSearch({
     [flatNav.length, hlIdx]
   );
 
-  var showDropdown = focused && (query.length >= 1 || filter !== "todo");
+  var showDropdown = panelOpen && (query.length >= 1 || filter !== "todo");
 
   useEffect(
     function () {
-      if (!showDropdown) return undefined;
+      if (!panelOpen) return undefined;
       function onDoc(e) {
         if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+          setPanelOpen(false);
           setFocused(false);
         }
       }
@@ -204,7 +207,7 @@ export default function GlobalSearch({
         document.removeEventListener("mousedown", onDoc);
       };
     },
-    [showDropdown]
+    [panelOpen]
   );
 
   var runNavigate = useCallback(
@@ -215,6 +218,7 @@ export default function GlobalSearch({
       else if (kind === "ejercicio") onNavigate("ejercicios", row.id);
       else if (kind === "sesion")
         onNavigate("sesiones", row.alumnoId != null ? row.alumnoId : row.id);
+      setPanelOpen(false);
       setFocused(false);
       inputRef.current && inputRef.current.blur();
     },
@@ -223,11 +227,13 @@ export default function GlobalSearch({
 
   var onKeyDown = useCallback(
     function (e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setPanelOpen(false);
+        setFocused(false);
+        return;
+      }
       if (!showDropdown || flatNav.length === 0) {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          setFocused(false);
-        }
         return;
       }
       if (e.key === "ArrowDown") {
@@ -244,9 +250,6 @@ export default function GlobalSearch({
         e.preventDefault();
         var cur = flatNav[hlIdx];
         if (cur) runNavigate(cur.kind, cur.row);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        setFocused(false);
       }
     },
     [showDropdown, flatNav, hlIdx, runNavigate]
@@ -280,12 +283,10 @@ export default function GlobalSearch({
           }}
           onFocus={function () {
             setFocused(true);
+            setPanelOpen(true);
           }}
           onBlur={function () {
-            /* defer para permitir click en resultado */
-            setTimeout(function () {
-              setFocused(false);
-            }, 180);
+            setFocused(false);
           }}
           onKeyDown={onKeyDown}
           style={{
@@ -293,7 +294,7 @@ export default function GlobalSearch({
             height: 44,
             boxSizing: "border-box",
             background: "#111827",
-            border: focused ? "1px solid #2563EB" : "1px solid #1a2535",
+            border: focused || panelOpen ? "1px solid #2563EB" : "1px solid #1a2535",
             borderRadius: 12,
             padding: "0 48px 0 44px",
             color: "#f1f5f9",
@@ -336,7 +337,11 @@ export default function GlobalSearch({
                 <button
                   key={f.id}
                   type="button"
+                  onMouseDown={function (e) {
+                    e.preventDefault();
+                  }}
                   onClick={function () {
+                    setPanelOpen(true);
                     setFilter(f.id);
                     if (inputRef.current) inputRef.current.focus();
                   }}
