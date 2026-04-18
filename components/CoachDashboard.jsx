@@ -164,6 +164,11 @@ function coachFindAlumnoForLabel(alumnos, labelName) {
 export default function CoachDashboard({
   activeNav = "dashboard",
   alumnos = [],
+  sesionesGlobales = [],
+  progresoGlobal = {},
+  rutinasSBEntrenador = [],
+  allEx = [],
+  es = true,
   onEnviarMensaje,
   onCrearRutina,
   onRevisarAlumnos,
@@ -176,7 +181,16 @@ export default function CoachDashboard({
   onGlobalSearchNavigate,
 }) {
   if (activeNav === "progreso") {
-    return <ProgresoView />;
+    return (
+      <ProgresoView
+        alumnos={alumnos}
+        sesionesGlobales={sesionesGlobales}
+        progresoGlobal={progresoGlobal}
+        rutinasSBEntrenador={rutinasSBEntrenador}
+        allEx={allEx}
+        es={es}
+      />
+    );
   }
 
   function runQuick(action) {

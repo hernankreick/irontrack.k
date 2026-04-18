@@ -2405,6 +2405,11 @@ function GymApp() {
               <CoachDashboard
                 activeNav={tab==="progress"?"progreso":"dashboard"}
                 alumnos={alumnos}
+                sesionesGlobales={sesionesGlobales}
+                progresoGlobal={progresoGlobal}
+                rutinasSBEntrenador={rutinasSBEntrenador}
+                allEx={allEx}
+                es={es}
                 onEnviarMensaje={function () {
                   var first = (alumnos || [])[0];
                   if (first) {
