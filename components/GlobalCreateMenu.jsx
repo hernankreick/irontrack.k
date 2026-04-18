@@ -2,11 +2,11 @@ import React from "react";
 import { ChevronDown, ClipboardList, Dumbbell, Plus, UserPlus } from "lucide-react";
 
 const DS = {
-  primary: "#2563EB",
-  card: "#111827",
-  border: "#1a2535",
-  text: "#F3F4F6",
-  muted: "#9CA3AF",
+  primary: "#3b82f6",
+  card: "#12121a",
+  border: "#1e1e2e",
+  text: "#ffffff",
+  muted: "#71717a",
   hoverBg: "rgba(59, 130, 246, 0.12)",
 };
 
@@ -153,9 +153,9 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
     fontWeight: 700,
     background: DS.primary,
     color: "#fff",
-    padding: "12px 18px",
+    padding: "13px 18px",
     fontSize: 13,
-    borderRadius: 8,
+    borderRadius: 14,
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
@@ -228,7 +228,7 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
             padding: "8px 0",
             background: DS.card,
             border: "1px solid " + DS.border,
-            borderRadius: 10,
+            borderRadius: 16,
             boxShadow: "0 16px 40px rgba(0,0,0,0.45)",
             zIndex: 200,
             animation: "globalCreateMenuIn 0.16s ease-out",
@@ -263,7 +263,7 @@ export default function GlobalCreateMenu({ onNuevoAlumno, onNuevaRutina, onNuevo
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
-                  padding: "11px 14px",
+                  padding: "12px 14px",
                   border: "none",
                   background: focusedIdx === idx ? DS.hoverBg : "transparent",
                   color: DS.text,

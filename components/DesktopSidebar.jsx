@@ -9,25 +9,47 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-  User,
   Users,
 } from "lucide-react";
 
 const LS_KEY = "irontrack_desktop_sidebar_collapsed";
 
 const DS = {
-  bg: "#0B0E11",
-  border: "#1a2535",
-  primary: "#2563EB",
-  primaryLight: "#3B82F6",
-  text: "#F3F4F6",
-  muted: "#9CA3AF",
+  bg: "#0a0a0f",
+  card: "#12121a",
+  border: "#1e1e2e",
+  primary: "#3b82f6",
+  primaryLight: "#3b82f6",
+  text: "#ffffff",
+  muted: "#71717a",
   hover: "rgba(59, 130, 246, 0.1)",
-  activeBg: "rgba(37, 99, 235, 0.18)",
+  activeBg: "rgba(59, 130, 246, 0.16)",
+  danger: "#ef4444",
 };
 
-const EXPANDED_W = 220;
+const EXPANDED_W = 240;
 const COLLAPSED_W = 72;
+
+/** Padding horizontal único: nav principal, acciones inferiores y tarjeta comparten la misma columna. */
+const INNER_PAD_X = 12;
+
+function getRowButtonStyle(opts) {
+  var collapsed = !!opts.collapsed;
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: collapsed ? "12px 10px" : "10px 12px",
+    justifyContent: collapsed ? "center" : "flex-start",
+    border: "none",
+    borderRadius: 10,
+    cursor: "pointer",
+    fontFamily: "'DM Sans', system-ui, sans-serif",
+    fontSize: 14,
+    width: "100%",
+    boxSizing: "border-box",
+  };
+}
 
 function useDesktopSidebarFonts() {
   React.useEffect(function () {
@@ -86,20 +108,22 @@ function LogoCompact() {
 
 function LogoFull() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
       <LogoCompact />
-      <div
-        style={{
-          fontFamily: "'Bebas Neue', 'Barlow Condensed', sans-serif",
-          fontSize: 22,
-          letterSpacing: 2,
-          color: "#fff",
-          lineHeight: 0.95,
-        }}
-      >
-        IRON
-        <br />
-        TRACK
+      <div>
+        <div
+          style={{
+            fontFamily: "'Bebas Neue', 'Barlow Condensed', sans-serif",
+            fontSize: 22,
+            letterSpacing: 2,
+            color: "#fff",
+            lineHeight: 0.95,
+          }}
+        >
+          IRON
+          <br />
+          TRACK
+        </div>
       </div>
     </div>
   );
@@ -169,7 +193,7 @@ export default function DesktopSidebar({
         zIndex: 30,
       }}
     >
-      <div style={{ padding: "12px 8px 10px 6px", borderBottom: "1px solid " + DS.border, flexShrink: 0 }}>
+      <div style={{ padding: "12px " + INNER_PAD_X + "px 10px", borderBottom: "1px solid " + DS.border, flexShrink: 0 }}>
         <button
           type="button"
           onClick={function () {
@@ -206,15 +230,26 @@ export default function DesktopSidebar({
         </button>
       </div>
 
-      <div style={{ padding: "10px 8px 16px 6px", flexShrink: 0 }}>{collapsed ? <LogoCompact /> : <LogoFull />}</div>
+      <div style={{ padding: "10px " + INNER_PAD_X + "px 16px", flexShrink: 0 }}>{collapsed ? <LogoCompact /> : <LogoFull />}</div>
 
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          paddingLeft: INNER_PAD_X,
+          paddingRight: INNER_PAD_X,
+          boxSizing: "border-box",
+        }}
+      >
       <nav
         style={{
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
           gap: 4,
-          padding: "2px 6px 12px 4px",
+          padding: "2px 0 12px 0",
           justifyContent: "flex-start",
           alignItems: "stretch",
         }}
@@ -232,26 +267,14 @@ export default function DesktopSidebar({
               onClick={function () {
                 go(item.id);
               }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: collapsed ? "12px 10px" : "10px 10px 10px 6px",
-                justifyContent: collapsed ? "center" : "flex-start",
-                border: "none",
-                borderRadius: 10,
-                cursor: "pointer",
-                fontFamily: "'DM Sans', system-ui, sans-serif",
-                fontSize: 14,
+              style={Object.assign(getRowButtonStyle({ collapsed: collapsed }), {
                 fontWeight: active ? 600 : 500,
                 color: active ? "#fff" : DS.muted,
                 background: active ? DS.activeBg : "transparent",
                 boxShadow: active ? "inset 0 0 0 1px rgba(59,130,246,0.25)" : "none",
                 transition: "background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
                 position: "relative",
-                width: "100%",
-                boxSizing: "border-box",
-              }}
+              })}
               onMouseEnter={function (e) {
                 if (!active) e.currentTarget.style.background = DS.hover;
               }}
@@ -281,11 +304,10 @@ export default function DesktopSidebar({
         })}
       </nav>
 
-      {/* Mismo padding horizontal que <nav> para alinear iconos y textos con Dashboard, Alumnos, etc. */}
       <div
         style={{
           flexShrink: 0,
-          padding: "12px 6px 8px 4px",
+          padding: "8px 0",
           borderTop: "1px solid " + DS.border,
           display: "flex",
           flexDirection: "column",
@@ -299,23 +321,12 @@ export default function DesktopSidebar({
           onClick={function () {
             if (typeof onSettings === "function") onSettings();
           }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: collapsed ? "12px 10px" : "10px 10px 10px 6px",
-            justifyContent: collapsed ? "center" : "flex-start",
-            border: "none",
-            borderRadius: 10,
-            cursor: "pointer",
+          style={Object.assign(getRowButtonStyle({ collapsed: collapsed }), {
             background: "transparent",
             color: DS.muted,
-            fontFamily: "'DM Sans', system-ui, sans-serif",
-            fontSize: 14,
             fontWeight: 500,
-            width: "100%",
             transition: "background 0.18s ease, color 0.18s ease",
-          }}
+          })}
           onMouseEnter={function (e) {
             e.currentTarget.style.background = DS.hover;
             e.currentTarget.style.color = DS.text;
@@ -334,23 +345,12 @@ export default function DesktopSidebar({
           onClick={function () {
             if (typeof onPerfil === "function") onPerfil();
           }}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: collapsed ? "10px 10px" : "10px 10px 10px 6px",
-            justifyContent: collapsed ? "center" : "flex-start",
-            border: "none",
-            borderRadius: 10,
-            cursor: "pointer",
+          style={Object.assign(getRowButtonStyle({ collapsed: collapsed }), {
             background: "transparent",
             color: DS.muted,
-            fontFamily: "'DM Sans', system-ui, sans-serif",
-            fontSize: 14,
             fontWeight: 500,
-            width: "100%",
             transition: "background 0.18s ease, color 0.18s ease",
-          }}
+          })}
           onMouseEnter={function (e) {
             e.currentTarget.style.background = DS.hover;
             e.currentTarget.style.color = DS.text;
@@ -361,19 +361,19 @@ export default function DesktopSidebar({
           }}
         >
           {coachAvatarUrl ? (
-            <img src={coachAvatarUrl} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+            <img src={coachAvatarUrl} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
           ) : (
             <div
               style={{
-                width: 20,
-                height: 20,
+                width: 22,
+                height: 22,
                 borderRadius: "50%",
-                background: "#1e3a5f",
+                background: "linear-gradient(135deg,#1e3a5f,#2563eb)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: 700,
-                fontSize: 9,
+                fontWeight: 800,
+                fontSize: 10,
                 color: "#fff",
                 flexShrink: 0,
               }}
@@ -381,10 +381,7 @@ export default function DesktopSidebar({
               {initials(coachName)}
             </div>
           )}
-          {!collapsed ? (
-            <span style={{ flex: 1, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Perfil</span>
-          ) : null}
-          {!collapsed ? <User size={16} color="#6B7280" style={{ flexShrink: 0 }} /> : null}
+          {!collapsed ? <span>Perfil</span> : null}
         </button>
         {typeof onLogout === "function" ? (
           <button
@@ -393,25 +390,14 @@ export default function DesktopSidebar({
             onClick={function () {
               onLogout();
             }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: collapsed ? "12px 10px" : "10px 10px 10px 6px",
-              justifyContent: collapsed ? "center" : "flex-start",
-              border: "none",
-              borderRadius: 10,
-              cursor: "pointer",
+            style={Object.assign(getRowButtonStyle({ collapsed: collapsed }), {
               background: "transparent",
-              color: "#f87171",
-              fontFamily: "'DM Sans', system-ui, sans-serif",
-              fontSize: 14,
+              color: DS.danger,
               fontWeight: 600,
-              width: "100%",
               transition: "background 0.18s ease, color 0.18s ease",
-            }}
+            })}
             onMouseEnter={function (e) {
-              e.currentTarget.style.background = "rgba(248, 113, 113, 0.12)";
+              e.currentTarget.style.background = "rgba(239, 68, 68, 0.12)";
             }}
             onMouseLeave={function (e) {
               e.currentTarget.style.background = "transparent";
@@ -426,7 +412,7 @@ export default function DesktopSidebar({
       <div style={{ flex: 1, minHeight: 24 }} aria-hidden />
 
       {/* Tarjeta de usuario al pie (mock) */}
-      <div style={{ flexShrink: 0, padding: "0 6px 16px 4px" }}>
+      <div style={{ flexShrink: 0, padding: "0 0 16px 0" }}>
         <button
           type="button"
           title={collapsed ? coachName || "Perfil" : undefined}
@@ -438,11 +424,11 @@ export default function DesktopSidebar({
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: collapsed ? "12px 8px" : "14px 12px 14px 8px",
+            padding: collapsed ? "12px 10px" : "12px 12px",
             justifyContent: collapsed ? "center" : "flex-start",
             borderRadius: 12,
             border: "1px solid " + DS.border,
-            background: "rgba(15, 22, 36, 0.85)",
+            background: DS.card,
             cursor: "pointer",
             boxSizing: "border-box",
             transition: "border-color 0.18s ease, background 0.18s ease",
@@ -453,23 +439,23 @@ export default function DesktopSidebar({
           }}
           onMouseLeave={function (e) {
             e.currentTarget.style.borderColor = DS.border;
-            e.currentTarget.style.background = "rgba(15, 22, 36, 0.85)";
+            e.currentTarget.style.background = DS.card;
           }}
         >
           {coachAvatarUrl ? (
-            <img src={coachAvatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+            <img src={coachAvatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
           ) : (
             <div
               style={{
-                width: 40,
-                height: 40,
+                width: 36,
+                height: 36,
                 borderRadius: "50%",
                 background: "linear-gradient(135deg,#1e3a5f,#2563eb)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: 800,
-                fontSize: 13,
+                fontSize: 12,
                 color: "#fff",
                 flexShrink: 0,
               }}
@@ -491,7 +477,7 @@ export default function DesktopSidebar({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {coachName || "Coach"}
+                  {coachName || "Entrenador"}
                 </div>
                 {coachSubtitle ? (
                   <div style={{ fontSize: 12, color: DS.muted, marginTop: 2, fontWeight: 500 }}>{coachSubtitle}</div>
@@ -501,6 +487,13 @@ export default function DesktopSidebar({
             </>
           ) : null}
         </button>
+        {!collapsed ? (
+          <div style={{ padding: "12px 2px 0 2px", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: DS.text, marginBottom: 4 }}>22°C</div>
+            <div style={{ fontSize: 12, color: DS.muted }}>Parc. nublado</div>
+          </div>
+        ) : null}
+      </div>
       </div>
     </aside>
   );

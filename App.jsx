@@ -1988,6 +1988,7 @@ function GymApp() {
         "@import url(https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap);" +
         "*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased}input,textarea,select{outline:none!important}" +
         "::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:"+(darkMode?"#162234":"#8B9AB2")+";border-radius:2px}" +
+        "@media(min-width:1024px){.plan-main-scroll::-webkit-scrollbar{width:8px}.plan-main-scroll::-webkit-scrollbar-thumb{background:"+(darkMode?"#2a3d5c":"#94a3b8")+";border-radius:4px;border:2px solid transparent;background-clip:padding-box}}" +
         ".hov{transition:all .15s ease;cursor:pointer}.hov:hover{filter:brightness(1.15)}" +
         "@keyframes successPulse{0%{transform:scale(1)}30%{transform:scale(0.94)}60%{transform:scale(1.06)}100%{transform:scale(1)}}" +
         "@keyframes pillBounce{0%{transform:scale(1)}30%{transform:scale(1.25)}50%{transform:scale(0.9)}70%{transform:scale(1.1)}100%{transform:scale(1)}}" +
@@ -2194,13 +2195,14 @@ function GymApp() {
         className={
           "plan-main-scroll relative z-0 overflow-y-auto " +
           (showCoachDesktopShell && !esAlumno ? "overflow-x-hidden " : "") +
-          (tab === "progress" && showAlumnoProgressStack
-            ? "px-5 "
-            : esAlumno && (tab === "plan" || tab === "library")
-              ? "px-7 "
-              : showCoachDesktopShell && !esAlumno && tab === "plan"
-                ? "px-0 "
+          (showCoachDesktopShell && !esAlumno
+            ? "px-0 "
+            : tab === "progress" && showAlumnoProgressStack
+              ? "px-5 "
+              : esAlumno && (tab === "plan" || tab === "library")
+                ? "px-7 "
                 : "px-6 ") +
+          (showCoachDesktopShell && !esAlumno ? "lg:[scrollbar-gutter:stable] " : "") +
           (!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && tab === "plan") ? "mt-6 " : "") +
           (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
           (tab === "progress" && showAlumnoProgressStack
@@ -2211,7 +2213,9 @@ function GymApp() {
                 ? "pt-0 "
               : esAlumno && (tab === "plan" || tab === "library")
                 ? "pt-8 "
-                : "pt-6 ")
+                : showCoachDesktopShell && !esAlumno
+                  ? "pt-6 "
+                  : "pt-6 ")
         }
         ref={function (node) {
           scrollRef.current = node;
@@ -2247,57 +2251,16 @@ function GymApp() {
           background: darkMode ? (esAlumno && tab === "progress" ? "#0d1117" : "#0B1120") : "#F1F5F9",
         }}
       >
+        <div
+          className={
+            showCoachDesktopShell && !esAlumno
+              ? "mx-auto box-border min-h-0 w-full min-w-0 max-w-[min(100%,1400px)] px-4 pb-3 pt-0 sm:px-5 lg:px-6 lg:pb-12 lg:pt-6"
+              : "min-w-0 w-full"
+          }
+        >
         {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
         {tab==="plan"&&!esAlumno&&sessionData?.role==="entrenador"&&(
-              <CoachDashboard
-                embedded={!!showCoachDesktopShell}
-                alumnos={alumnos}
-                coachAvatarUrl={sessionData?.avatarUrl}
-                coachName={sessionData?.name}
-                activeNav="dashboard"
-                setActiveNav={function(nav){
-                  if(nav==="dashboard") setTab("plan");
-                  else if(nav==="routines") setTab("routines");
-                  else if(nav==="exercises") setTab("biblioteca");
-                  else if(nav==="alumnos") setTab("alumnos");
-                  else if(nav==="progress") setTab("progress");
-                }}
-                onRevisar={async function(alumnoId){
-                  var alum=(alumnos||[]).find(function(x){ return String(x.id)===String(alumnoId); });
-                  if(!alum){ return; }
-                  setAlumnoActivo(alum); setTab("alumnos"); setLoadingSB(true);
-                  try{
-                    var r=await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
-                    setRutinasSB(r[0]||[]); setAlumnoProgreso(r[1]||[]); setAlumnoSesiones(r[2]||[]);
-                  }catch(e){ console.error("[CoachDashboard onRevisar]", e); }
-                  setLoadingSB(false);
-                }}
-                onVerPerfil={async function(alumnoId){
-                  var alum=(alumnos||[]).find(function(x){ return String(x.id)===String(alumnoId); });
-                  if(!alum){ return; }
-                  setAlumnoActivo(alum); setTab("alumnos"); setLoadingSB(true);
-                  try{
-                    var r=await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
-                    setRutinasSB(r[0]||[]); setAlumnoProgreso(r[1]||[]); setAlumnoSesiones(r[2]||[]);
-                  }catch(e){ console.error("[CoachDashboard onVerPerfil]", e); }
-                  setLoadingSB(false);
-                }}
-                onEnviarMensaje={function(){
-                  var first=(alumnos||[])[0];
-                  if(first) setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
-                  else toast2(es?"No hay alumnos para contactar":"No athletes to message");
-                }}
-                onCrearRutina={function(){ setTab("routines"); }}
-                onNuevoAlumno={function(){
-                  setTab("alumnos");
-                  setNewAlumnoForm(true);
-                }}
-                onNuevoEjercicio={function(){
-                  setTab("biblioteca");
-                  setBibOpenNewExerciseTick(function (t) { return t + 1; });
-                }}
-                onRevisarAlumnos={function(){ setTab("alumnos"); }}
-              />
+              <CoachDashboard />
         )}
         {tab==="plan"&&(
           <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : ""}>
@@ -4506,6 +4469,7 @@ function GymApp() {
 
       </div>
         </div>
+      </div>
       </div>
       {/* Modal video: fuera del scroll (display:none con sesión ocultaba el overlay) + portal a body */}
       {videoModal &&
