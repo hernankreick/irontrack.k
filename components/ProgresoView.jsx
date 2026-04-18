@@ -37,9 +37,10 @@ var selectBaseStyle = {
   width: "100%",
   maxWidth: "100%",
   boxSizing: "border-box",
-  padding: "8px 10px",
-  fontSize: 12,
+  padding: "10px 12px",
+  fontSize: 14,
   fontWeight: 600,
+  lineHeight: 1.4,
   color: "#ffffff",
   background: "#0d0d15",
   border: "1px solid #1e1e2e",
@@ -395,10 +396,10 @@ export default function ProgresoView({
 
       <div
         style={{
-          padding: 14,
+          padding: 16,
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: 14,
         }}
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
@@ -423,25 +424,34 @@ export default function ProgresoView({
           })}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <div
             style={{
               background: C.card,
               border: "1px solid " + C.brd,
               borderRadius: 12,
-              padding: 16,
+              padding: 20,
               minWidth: 0,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <TrendingUp size={13} color={C.blue} strokeWidth={2} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: C.t }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <TrendingUp size={16} color={C.blue} strokeWidth={2} />
+              <span style={{ fontSize: 17, fontWeight: 700, color: C.t, lineHeight: 1.25, letterSpacing: -0.02 }}>
                 {es ? "Evolución de carga" : "Load progression"}
               </span>
             </div>
 
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ display: "block", fontSize: 10, color: C.t2, marginBottom: 4, fontWeight: 600 }}>
+            <div style={{ marginBottom: 14 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  color: C.t2,
+                  marginBottom: 6,
+                  fontWeight: 600,
+                  lineHeight: 1.35,
+                }}
+              >
                 {es ? "Alumno" : "Athlete"}
               </label>
               <select
@@ -463,7 +473,7 @@ export default function ProgresoView({
             </div>
 
             {!rutinaActiva || diasRutina.length === 0 ? (
-              <div style={{ marginBottom: 10 }}>
+              <div style={{ marginBottom: 14 }}>
                 {emptyBox(
                   es,
                   es
@@ -473,8 +483,17 @@ export default function ProgresoView({
               </div>
             ) : (
               <>
-                <div style={{ marginBottom: 10 }}>
-                  <label style={{ display: "block", fontSize: 10, color: C.t2, marginBottom: 4, fontWeight: 600 }}>
+                <div style={{ marginBottom: 14 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 13,
+                      color: C.t2,
+                      marginBottom: 6,
+                      fontWeight: 600,
+                      lineHeight: 1.35,
+                    }}
+                  >
                     {es ? "Día de entrenamiento" : "Training day"}
                   </label>
                   <select
@@ -499,7 +518,7 @@ export default function ProgresoView({
                 </div>
 
                 {(model.exerciseOptions || []).length === 0 ? (
-                  <div style={{ fontSize: 11, color: C.t2, marginBottom: 10, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 13, color: C.t2, marginBottom: 14, lineHeight: 1.5 }}>
                     {es
                       ? "Este día no tiene ejercicios en la rutina. Podés elegir otro día o revisar la rutina del alumno."
                       : "This day has no exercises in the routine. Pick another day or review the athlete's plan."}
@@ -509,11 +528,20 @@ export default function ProgresoView({
                     {(model.exerciseOptions || []).some(function (o) {
                       return o.section === "warmup";
                     }) ? (
-                      <div style={{ marginBottom: 8 }}>
-                        <div style={{ fontSize: 10, color: C.t2, marginBottom: 6, fontWeight: 600, letterSpacing: 0.3 }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            color: C.t2,
+                            marginBottom: 8,
+                            fontWeight: 600,
+                            letterSpacing: 0.3,
+                            lineHeight: 1.35,
+                          }}
+                        >
                           {es ? "Calentamiento" : "Warm-up"}
                         </div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           {(model.exerciseOptions || [])
                             .filter(function (ex) {
                               return ex.section === "warmup";
@@ -531,13 +559,14 @@ export default function ProgresoView({
                                     border: "1px solid " + (act ? C.blue : C.brd),
                                     background: act ? "#1e3a8a22" : "transparent",
                                     color: act ? alumnoColor : C.t2,
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     fontWeight: 600,
-                                    padding: "5px 10px",
+                                    padding: "7px 12px",
                                     borderRadius: 8,
                                     cursor: "pointer",
                                     fontFamily: "inherit",
                                     maxWidth: "100%",
+                                    lineHeight: 1.35,
                                   }}
                                 >
                                   {ex.name}
@@ -550,11 +579,20 @@ export default function ProgresoView({
                     {(model.exerciseOptions || []).some(function (o) {
                       return o.section === "main";
                     }) ? (
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 10, color: C.t2, marginBottom: 6, fontWeight: 600, letterSpacing: 0.3 }}>
+                      <div style={{ marginBottom: 14 }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            color: C.t2,
+                            marginBottom: 8,
+                            fontWeight: 600,
+                            letterSpacing: 0.3,
+                            lineHeight: 1.35,
+                          }}
+                        >
                           {es ? "Principal" : "Main"}
                         </div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           {(model.exerciseOptions || [])
                             .filter(function (ex) {
                               return ex.section === "main";
@@ -572,13 +610,14 @@ export default function ProgresoView({
                                     border: "1px solid " + (act ? C.blue : C.brd),
                                     background: act ? "#1e3a8a22" : "transparent",
                                     color: act ? alumnoColor : C.t2,
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     fontWeight: 600,
-                                    padding: "5px 10px",
+                                    padding: "7px 12px",
                                     borderRadius: 8,
                                     cursor: "pointer",
                                     fontFamily: "inherit",
                                     maxWidth: "100%",
+                                    lineHeight: 1.35,
                                   }}
                                 >
                                   {ex.name}
@@ -598,12 +637,12 @@ export default function ProgresoView({
                 emptyBox(es, es ? "No hay registros de carga para este ejercicio" : "No load records for this exercise")
               ) : (
                 <>
-                  <p style={{ fontSize: 10, color: C.t2, margin: "0 0 8px 0", lineHeight: 1.35 }}>
+                  <p style={{ fontSize: 13, color: C.t2, margin: "0 0 10px 0", lineHeight: 1.45 }}>
                     {es
                       ? "Bloque actual (4 semanas, lun–dom). Máx. kg registrado por semana."
                       : "Current block (4 weeks, Mon–Sun). Max kg logged per week."}
                   </p>
-                  <svg viewBox="0 0 300 100" width="100%" height={110} style={{ display: "block" }}>
+                  <svg viewBox="0 0 300 100" width="100%" height={124} style={{ display: "block" }}>
                     {(chartComputed.polySegments || []).map(function (seg, si) {
                       return (
                         <polyline
@@ -622,13 +661,13 @@ export default function ProgresoView({
                         <g key={"pt-" + i}>
                           {pt.hasData ? (
                             <>
-                              <circle r={3.5} cx={pt.x} cy={pt.y} fill={alumnoColor} />
-                              <text x={pt.x} y={pt.y - 8} fill={C.t} fontSize={8} fontWeight={700} textAnchor="middle">
+                              <circle r={4} cx={pt.x} cy={pt.y} fill={alumnoColor} />
+                              <text x={pt.x} y={pt.y - 9} fill={C.t} fontSize={12} fontWeight={700} textAnchor="middle">
                                 {pt.v}
                               </text>
                             </>
                           ) : (
-                            <text x={pt.x} y={94} fill={C.t2} fontSize={8} fontWeight={600} textAnchor="middle">
+                            <text x={pt.x} y={93} fill={C.t2} fontSize={11} fontWeight={600} textAnchor="middle">
                               —
                             </text>
                           )}
@@ -640,9 +679,11 @@ export default function ProgresoView({
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
-                      marginTop: 4,
-                      fontSize: 9,
+                      marginTop: 8,
+                      fontSize: 13,
+                      fontWeight: 600,
                       color: C.t2,
+                      lineHeight: 1.35,
                     }}
                   >
                     {(model.chartWeekLabels || []).map(function (s, idx) {
@@ -663,13 +704,13 @@ export default function ProgresoView({
               background: C.card,
               border: "1px solid " + C.brd,
               borderRadius: 12,
-              padding: 16,
+              padding: 20,
               minWidth: 0,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <CheckCircle size={13} color={C.green} strokeWidth={2} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: C.t }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <CheckCircle size={16} color={C.green} strokeWidth={2} />
+              <span style={{ fontSize: 17, fontWeight: 700, color: C.t, lineHeight: 1.25, letterSpacing: -0.02 }}>
                 {es ? "Adherencia al plan" : "Plan adherence"}
               </span>
             </div>
@@ -683,18 +724,20 @@ export default function ProgresoView({
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 10,
-                      marginBottom: 8,
+                      gap: 12,
+                      marginBottom: 10,
                     }}
                   >
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: 14,
+                        fontWeight: 600,
                         color: "#fff",
-                        width: 110,
+                        width: 128,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
+                        lineHeight: 1.4,
                       }}
                     >
                       {row.n}
@@ -702,9 +745,9 @@ export default function ProgresoView({
                     <div
                       style={{
                         flex: 1,
-                        height: 8,
+                        height: 10,
                         background: C.brd,
-                        borderRadius: 4,
+                        borderRadius: 5,
                         overflow: "hidden",
                       }}
                     >
@@ -713,19 +756,21 @@ export default function ProgresoView({
                           width: row.p + "%",
                           height: "100%",
                           background: row.color,
-                          borderRadius: 4,
+                          borderRadius: 5,
                           transition: "width 0.5s ease",
                         }}
                       />
                     </div>
                     <div
                       style={{
-                        fontSize: 11,
+                        fontSize: 14,
                         fontWeight: 700,
-                        width: 32,
+                        width: 40,
                         textAlign: "right",
                         fontFamily: "ui-monospace, monospace",
                         color: row.color,
+                        lineHeight: 1.3,
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
                       {row.p}%
