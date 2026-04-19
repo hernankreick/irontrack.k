@@ -2,6 +2,7 @@ import React from "react";
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowRight,
   ArrowUp,
   Bell,
   CheckCircle,
@@ -48,31 +49,50 @@ const TEAM_MINI = [
   { num: "1", color: C.red, Icon: AlertTriangle, label: "Sin actividad", sub: "<30%" },
 ];
 
+/** Acciones rápidas — metadatos visuales (gradientes, sombras, variables CSS hover). */
 const QUICK = [
   {
     action: "message",
-    bg: "#1e3a8a",
-    border: "#2563eb33",
+    gradient: "linear-gradient(152deg, #2563eb 0%, #3730a3 42%, #0f172a 88%)",
+    border: "rgba(255,255,255,0.1)",
+    shadow: "0 6px 28px rgba(15,23,42,0.55), 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
+    shadowHover:
+      "0 18px 48px rgba(37,99,235,0.35), 0 10px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18)",
+    orbBg: "linear-gradient(165deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.06) 100%)",
+    orbBorder: "rgba(255,255,255,0.28)",
+    orbShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35)",
     Icon: MessageSquare,
-    iconColor: C.blue,
+    iconColor: "#ffffff",
     title: "Enviar mensaje",
     sub: "a tu equipo",
   },
   {
     action: "routine",
-    bg: "#2e1065",
-    border: "#7c3aed33",
+    gradient: "linear-gradient(152deg, #7c3aed 0%, #5b21b6 40%, #0c0a12 88%)",
+    border: "rgba(255,255,255,0.1)",
+    shadow: "0 6px 28px rgba(12,10,18,0.6), 0 2px 8px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.1)",
+    shadowHover:
+      "0 18px 48px rgba(124,58,237,0.38), 0 10px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.16)",
+    orbBg: "linear-gradient(165deg, rgba(255,255,255,0.2) 0%, rgba(167,139,250,0.12) 100%)",
+    orbBorder: "rgba(196,181,253,0.35)",
+    orbShadow: "0 4px 18px rgba(88,28,135,0.45), inset 0 1px 0 rgba(255,255,255,0.3)",
     Icon: FilePlus,
-    iconColor: "#a78bfa",
+    iconColor: "#f5f3ff",
     title: "Crear rutina",
     sub: "personalizada",
   },
   {
     action: "review",
-    bg: "#042f2e",
-    border: "#0d947533",
+    gradient: "linear-gradient(152deg, #059669 0%, #0d9488 38%, #022c22 88%)",
+    border: "rgba(255,255,255,0.1)",
+    shadow: "0 6px 28px rgba(2,44,34,0.55), 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1)",
+    shadowHover:
+      "0 18px 48px rgba(16,185,129,0.32), 0 10px 28px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.15)",
+    orbBg: "linear-gradient(165deg, rgba(255,255,255,0.2) 0%, rgba(52,211,153,0.12) 100%)",
+    orbBorder: "rgba(110,231,183,0.35)",
+    orbShadow: "0 4px 18px rgba(4,120,87,0.4), inset 0 1px 0 rgba(255,255,255,0.28)",
     Icon: Eye,
-    iconColor: "#34d399",
+    iconColor: "#ecfdf5",
     title: "Revisar alumnos",
     sub: "que necesitan atención",
   },
@@ -377,8 +397,25 @@ export default function CoachDashboard({
   return (
     <>
       <style>{`
-        .cd-qcard { transition: transform 0.12s; }
-        .cd-qcard:hover { transform: scale(1.03); }
+        .cd-quick-card {
+          --cd-q-sh: 0 6px 28px rgba(0,0,0,0.4);
+          --cd-q-sh-h: 0 16px 40px rgba(0,0,0,0.45);
+          transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+          transform: translateY(0);
+        }
+        .cd-quick-card:hover {
+          transform: translateY(-5px);
+          box-shadow: var(--cd-q-sh-h) !important;
+          border-color: rgba(255,255,255,0.16) !important;
+        }
+        .cd-quick-card:focus-visible {
+          outline: 2px solid rgba(59,130,246,0.7);
+          outline-offset: 2px;
+        }
+        .cd-quick-card .cd-quick-cta { transition: color 0.2s ease; }
+        .cd-quick-card:hover .cd-quick-cta { color: rgba(255,255,255,0.95) !important; }
+        .cd-quick-card .cd-quick-cta svg { transition: transform 0.2s ease; }
+        .cd-quick-card:hover .cd-quick-cta svg { transform: translateX(3px); }
       `}</style>
       <div
         style={{
@@ -936,46 +973,124 @@ export default function CoachDashboard({
             >
               ACCIONES RÁPIDAS
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 11 }}>
-              {QUICK.map(({ action, bg, border, Icon: Qi, iconColor, title, sub }) => (
-                <div
-                  key={title}
-                  role="button"
-                  tabIndex={0}
-                  className="cd-qcard"
-                  style={{
-                    background: bg,
-                    border: `1px solid ${border}`,
-                    borderRadius: 10,
-                    padding: 15,
-                    cursor: "pointer",
-                  }}
-                  onClick={function () {
-                    runQuick(action);
-                  }}
-                  onKeyDown={function (ev) {
-                    if (ev.key === "Enter" || ev.key === " ") {
-                      ev.preventDefault();
-                      runQuick(action);
-                    }
-                  }}
-                >
-                  <Qi size={22} color={iconColor} strokeWidth={2} />
-                  <p style={{ ...T.bodyLg, color: "#fff", margin: "8px 0 0 0" }}>
-                    {title}
-                  </p>
-                  <small
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: 14,
+              }}
+            >
+              {QUICK.map(function (item) {
+                var Qi = item.Icon;
+                var cta = es ? "Abrir" : "Open";
+                return (
+                  <div
+                    key={item.title}
+                    role="button"
+                    tabIndex={0}
+                    className="cd-quick-card"
                     style={{
-                      ...T.subtitle,
-                      color: "#94a3b8",
-                      display: "block",
-                      marginTop: 4,
+                      ["--cd-q-sh"]: item.shadow,
+                      ["--cd-q-sh-h"]: item.shadowHover,
+                      position: "relative",
+                      overflow: "hidden",
+                      minHeight: 168,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "stretch",
+                      padding: "22px 20px 18px",
+                      borderRadius: 16,
+                      cursor: "pointer",
+                      boxSizing: "border-box",
+                      background: item.gradient,
+                      border: "1px solid " + item.border,
+                      boxShadow: item.shadow,
+                    }}
+                    onClick={function () {
+                      runQuick(item.action);
+                    }}
+                    onKeyDown={function (ev) {
+                      if (ev.key === "Enter" || ev.key === " ") {
+                        ev.preventDefault();
+                        runQuick(item.action);
+                      }
                     }}
                   >
-                    {sub}
-                  </small>
-                </div>
-              ))}
+                    <div
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        top: -40,
+                        right: -30,
+                        width: 140,
+                        height: 140,
+                        borderRadius: "50%",
+                        background: "radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 70%)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: item.orbBg,
+                        border: "1px solid " + item.orbBorder,
+                        boxShadow: item.orbShadow,
+                      }}
+                    >
+                      <Qi size={24} color={item.iconColor} strokeWidth={2.1} />
+                    </div>
+                    <p
+                      style={{
+                        margin: "16px 0 0 0",
+                        fontSize: 17,
+                        fontWeight: 700,
+                        lineHeight: 1.25,
+                        letterSpacing: -0.02,
+                        color: "#fff",
+                      }}
+                    >
+                      {item.title}
+                    </p>
+                    <p
+                      style={{
+                        margin: "8px 0 0 0",
+                        fontSize: 14,
+                        fontWeight: 500,
+                        lineHeight: 1.45,
+                        color: "rgba(255,255,255,0.72)",
+                        maxWidth: "100%",
+                      }}
+                    >
+                      {item.sub}
+                    </p>
+                    <div style={{ flex: 1, minHeight: 8 }} />
+                    <div
+                      className="cd-quick-cta"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginTop: 18,
+                        paddingTop: 14,
+                        borderTop: "1px solid rgba(255,255,255,0.1)",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        letterSpacing: 0.02,
+                        color: "rgba(255,255,255,0.58)",
+                      }}
+                    >
+                      <span>{cta}</span>
+                      <ArrowRight size={18} color="currentColor" strokeWidth={2.25} style={{ flexShrink: 0 }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
