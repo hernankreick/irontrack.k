@@ -304,6 +304,8 @@ export default function DesktopSidebar({
         })}
       </nav>
 
+      <div style={{ flex: 1, minHeight: 24 }} aria-hidden />
+
       <div
         style={{
           flexShrink: 0,
@@ -409,8 +411,6 @@ export default function DesktopSidebar({
         ) : null}
       </div>
 
-      <div style={{ flex: 1, minHeight: 24 }} aria-hidden />
-
       {/* Tarjeta de usuario al pie (mock) */}
       <div style={{ flexShrink: 0, padding: "0 0 16px 0" }}>
         <button
@@ -487,12 +487,6 @@ export default function DesktopSidebar({
             </>
           ) : null}
         </button>
-        {!collapsed ? (
-          <div style={{ padding: "12px 2px 0 2px", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: DS.text, marginBottom: 4 }}>22°C</div>
-            <div style={{ fontSize: 12, color: DS.muted }}>Parc. nublado</div>
-          </div>
-        ) : null}
       </div>
       </div>
     </aside>
