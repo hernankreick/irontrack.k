@@ -1,12 +1,9 @@
 import React from "react";
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowRight,
   ArrowUp,
   Bell,
-  CheckCircle,
-  Clock,
   Eye,
   FilePlus,
   Info,
@@ -41,12 +38,6 @@ const WEEK_BARS = [
   { d: "V", p: 50 },
   { d: "S", p: 0 },
   { d: "D", p: 0 },
-];
-
-const TEAM_MINI = [
-  { num: "5", color: C.green, Icon: CheckCircle, label: "Cumpliendo", sub: ">70% sesiones" },
-  { num: "2", color: C.yel, Icon: Clock, label: "En progreso", sub: "30% – 69%" },
-  { num: "1", color: C.red, Icon: AlertTriangle, label: "Sin actividad", sub: "<30%" },
 ];
 
 /** Acciones rápidas — metadatos visuales (gradientes, sombras, variables CSS hover). */
@@ -534,13 +525,22 @@ export default function CoachDashboard({
             padding: S.pagePadding,
           }}
         >
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 260px)", gap: S.gridGap, alignItems: "start" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) minmax(0, 280px)",
+              gap: S.gridGap,
+              alignItems: "stretch",
+            }}
+          >
             <div
               style={{
                 background: C.card,
                 border: `1px solid ${C.brd}`,
                 borderRadius: 12,
                 padding: S.cardPadding,
+                minWidth: 0,
+                boxSizing: "border-box",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: S.blockGap }}>
@@ -662,78 +662,17 @@ export default function CoachDashboard({
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: S.gridGap, minWidth: 0 }}>
-              <div
-                style={{
-                  background: C.card,
-                  border: `1px solid ${C.brd}`,
-                  borderRadius: 12,
-                  padding: S.cardPadding,
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: S.blockGap,
-                  }}
-                >
-                  <span style={{ ...T.cardTitleSemibold, color: C.t }}>
-                    Equipo de un vistazo
-                  </span>
-                  <button
-                    type="button"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: C.blue,
-                      ...T.link,
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  >
-                    Ver todo →
-                  </button>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                  {TEAM_MINI.map(({ num, color, Icon: Mi, label, sub }) => (
-                    <div
-                      key={label}
-                      style={{
-                        background: C.cardDark,
-                        border: `1px solid ${C.brd}`,
-                        borderRadius: 8,
-                        padding: "10px 8px",
-                        textAlign: "center",
-                      }}
-                    >
-                      <div style={{ ...T.numberStat, color: C.t }}>{num}</div>
-                      <Mi
-                        size={16}
-                        color={color}
-                        strokeWidth={2}
-                        style={{ display: "block", margin: "6px auto 0 auto" }}
-                      />
-                      <div style={{ ...T.bodySemibold, color: C.t2, marginTop: 6 }}>
-                        {label}
-                      </div>
-                      <div style={{ ...T.meta, color: C.t2, marginTop: 4 }}>
-                        {sub}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: C.card,
-                  border: `1px solid ${C.brd}`,
-                  borderRadius: 12,
-                  padding: S.cardPadding,
-                }}
-              >
+            <div
+              style={{
+                background: C.card,
+                border: `1px solid ${C.brd}`,
+                borderRadius: 12,
+                padding: S.cardPadding,
+                minWidth: 0,
+                boxSizing: "border-box",
+                alignSelf: "stretch",
+              }}
+            >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: S.blockGap }}>
                   <Info size={16} color={C.t2} strokeWidth={2} />
                   <span style={{ ...T.cardTitleSemibold, color: C.t }}>
@@ -795,7 +734,6 @@ export default function CoachDashboard({
                     </div>
                   </div>
                 </div>
-              </div>
             </div>
           </div>
 
