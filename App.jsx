@@ -19,8 +19,7 @@ import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.j
 import IronTrackLogo from './components/IronTrackLogo.jsx';
 import StudentProgressSection from './components/student-progress/StudentProgressSection.jsx';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
-import SettingsPage from './components/settings/SettingsPage.jsx';
-import { applyItPrefsToDocument } from './components/settings/SectionPreferencias.jsx';
+import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { Calendar as CalNavIcon, Dumbbell, TrendingUp as TrendNavIcon } from 'lucide-react';
@@ -1862,6 +1861,12 @@ function GymApp() {
   /** Tabs coach desktop sin barra superior global (misma envolvente que plan / progreso). */
   const coachDesktopBleedTab =
     tab === "plan" || tab === "progress" || tab === "settings" || tab === "perfil";
+  /** Coach: ocultar header global (logo + settings + salir) cuando la sidebar ya concentra esa navegación. En desktop, Alumnos/Rutinas/Ejercicios se alinean con Plan (sin barra duplicada). En móvil siguen mostrando el header en esas tabs (sidebar no visible). */
+  const coachSuppressTopNav =
+    showCoachDesktopShell &&
+    !esAlumno &&
+    (coachDesktopBleedTab ||
+      (coachDesktop1024 && (tab === "alumnos" || tab === "routines" || tab === "biblioteca")));
   const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
@@ -2201,28 +2206,30 @@ function GymApp() {
         style={showCoachDesktopShell ? undefined : { display: "contents" }}
       >
         {showCoachDesktopShell ? (
-          <DesktopSidebar
-            activeTab={tab}
-            onNavigate={setTab}
-            onSettings={function () {
-              setTab("settings");
-            }}
-            onPerfil={function () {
-              setTab("perfil");
-            }}
-            onLogout={function () {
-              clearAllIronTrackPrefixedKeys();
-              syncStateWithLocalStorage();
-            }}
-            coachAvatarUrl={sessionData?.avatarUrl}
-            coachName={sessionData?.name}
-          />
+          <div style={{ display: (tab === "settings" || tab === "perfil") ? "none" : "flex" }}>
+            <DesktopSidebar
+              activeTab={tab}
+              onNavigate={setTab}
+              onSettings={function () {
+                setTab("settings");
+              }}
+              onPerfil={function () {
+                setTab("perfil");
+              }}
+              onLogout={function () {
+                clearAllIronTrackPrefixedKeys();
+                syncStateWithLocalStorage();
+              }}
+              coachAvatarUrl={sessionData?.avatarUrl}
+              coachName={sessionData?.name}
+            />
+          </div>
         ) : null}
         <div
           className={showCoachDesktopShell ? "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden" : undefined}
           style={showCoachDesktopShell ? undefined : { display: "contents" }}
         >
-      {!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && coachDesktopBleedTab) && (
+      {!(esAlumno && tab === "progress") && !coachSuppressTopNav && (
       <div
         className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] pb-3 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}
         style={{
@@ -2359,13 +2366,13 @@ function GymApp() {
                 ? "px-7 "
                 : "px-6 ") +
           (showCoachDesktopShell && !esAlumno ? "lg:[scrollbar-gutter:stable] " : "") +
-          (!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && coachDesktopBleedTab) ? "mt-6 " : "") +
+          (!(esAlumno && tab === "progress") && !coachSuppressTopNav ? "mt-6 " : "") +
           (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
           (tab === "progress" && showAlumnoProgressStack
             ? "pt-0 "
             : tab === "progress"
               ? "pt-[max(0.75rem,env(safe-area-inset-top,0px))] "
-              : showCoachDesktopShell && !esAlumno && coachDesktopBleedTab
+              : coachSuppressTopNav
                 ? "pt-0 "
               : esAlumno && (tab === "plan" || tab === "library")
                 ? "pt-8 "
@@ -3078,7 +3085,7 @@ function GymApp() {
           </div>
         )}
         {tab==="library"&&(
-          <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : "min-w-0 max-w-full"}>
+          <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto"}>
             {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal}/>}
             {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>}
           </div>
@@ -3123,7 +3130,7 @@ function GymApp() {
           </div>
         )}
         {tab==="biblioteca"&&!esAlumno&&(
-          <div className="min-w-0 max-w-full">
+          <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto">
             <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
           </div>
         )}
