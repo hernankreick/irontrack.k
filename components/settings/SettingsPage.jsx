@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import SectionPerfil from './SectionPerfil.jsx';
 import SectionPreferencias from './SectionPreferencias.jsx';
 import SectionNegocio from './SectionNegocio.jsx';
@@ -43,8 +43,20 @@ export default function SettingsPage({
   sesionesGlobales,
   sb,
   entrenadorId,
+  /** Sección inicial (p. ej. desde sidebar: settings → preferencias, perfil → perfil). */
+  initialSection = 'perfil',
 }) {
-  const [active, setActive] = useState('perfil');
+  const [active, setActive] = useState(function () {
+    return SECTIONS.some((s) => s.id === initialSection) ? initialSection : 'perfil';
+  });
+
+  useEffect(
+    function () {
+      var next = SECTIONS.some((s) => s.id === initialSection) ? initialSection : 'perfil';
+      setActive(next);
+    },
+    [initialSection]
+  );
 
   const sesionesMesCount = useMemo(() => sesionesEsteMes(sesionesGlobales), [sesionesGlobales]);
 

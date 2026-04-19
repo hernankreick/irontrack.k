@@ -1859,6 +1859,9 @@ function GymApp() {
   const coachDesktop1024 = useDesktopMin1024();
   /** Shell coach (sidebar App + dashboard embebido): todos los anchos; la barra lateral se oculta por CSS por debajo de lg. */
   const showCoachDesktopShell = !esAlumno && sessionData?.role === "entrenador";
+  /** Tabs coach desktop sin barra superior global (misma envolvente que plan / progreso). */
+  const coachDesktopBleedTab =
+    tab === "plan" || tab === "progress" || tab === "settings" || tab === "perfil";
   const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
@@ -1875,7 +1878,7 @@ function GymApp() {
 
   /** En desktop el coach usa sidebar App; en móvil necesita la bottom nav también en Dashboard. */
   const hideGlobalBottomNavCoachDash =
-    !esAlumno && sessionData?.role === "entrenador" && (tab === "plan" || tab === "progress") && coachDesktop1024;
+    !esAlumno && sessionData?.role === "entrenador" && coachDesktopBleedTab && coachDesktop1024;
   const alumnoTopBarFixed = !!(esAlumno && (tab === "plan" || tab === "library"));
   const alumnoTopBarHeight = alumnoTopBarFixed ? 74 : 0;
 
@@ -2202,10 +2205,10 @@ function GymApp() {
             activeTab={tab}
             onNavigate={setTab}
             onSettings={function () {
-              setSettingsOpen(true);
+              setTab("settings");
             }}
             onPerfil={function () {
-              setSettingsOpen(true);
+              setTab("perfil");
             }}
             onLogout={function () {
               clearAllIronTrackPrefixedKeys();
@@ -2219,7 +2222,7 @@ function GymApp() {
           className={showCoachDesktopShell ? "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden" : undefined}
           style={showCoachDesktopShell ? undefined : { display: "contents" }}
         >
-      {!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && (tab === "plan" || tab === "progress")) && (
+      {!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && coachDesktopBleedTab) && (
       <div
         className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] pb-3 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}
         style={{
@@ -2356,13 +2359,13 @@ function GymApp() {
                 ? "px-7 "
                 : "px-6 ") +
           (showCoachDesktopShell && !esAlumno ? "lg:[scrollbar-gutter:stable] " : "") +
-          (!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && (tab === "plan" || tab === "progress")) ? "mt-6 " : "") +
+          (!(esAlumno && tab === "progress") && !(showCoachDesktopShell && !esAlumno && coachDesktopBleedTab) ? "mt-6 " : "") +
           (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
           (tab === "progress" && showAlumnoProgressStack
             ? "pt-0 "
             : tab === "progress"
               ? "pt-[max(0.75rem,env(safe-area-inset-top,0px))] "
-              : showCoachDesktopShell && !esAlumno && (tab === "plan" || tab === "progress")
+              : showCoachDesktopShell && !esAlumno && coachDesktopBleedTab
                 ? "pt-0 "
               : esAlumno && (tab === "plan" || tab === "library")
                 ? "pt-8 "
@@ -2497,6 +2500,29 @@ function GymApp() {
                 globalSearchData={coachGlobalSearchData}
                 onGlobalSearchNavigate={coachGlobalSearchNavigate}
               />
+        )}
+        {(tab === "settings" || tab === "perfil") && showCoachDesktopShell && !esAlumno && sessionData?.role === "entrenador" && sessionData && (
+          <SettingsPage
+            key={tab}
+            coach={sessionData}
+            onClose={function () {
+              setTab("plan");
+            }}
+            initialSection={tab === "perfil" ? "perfil" : "preferencias"}
+            toast2={toast2}
+            setSessionData={setSessionData}
+            syncStateWithLocalStorage={syncStateWithLocalStorage}
+            lang={lang}
+            setLang={setLang}
+            darkMode={darkMode}
+            setDarkMode={setDarkMode}
+            es={es}
+            alumnosCount={alumnos.length}
+            rutinasActivasCount={rutinasSBEntrenador.length}
+            sesionesGlobales={sesionesGlobales}
+            sb={sb}
+            entrenadorId={sessionData.entrenadorId || "entrenador_principal"}
+          />
         )}
         {tab==="plan"&&(
           <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : ""}>
@@ -3907,7 +3933,7 @@ function GymApp() {
           </div>
         </div>
       )}
-      {settingsOpen && !esAlumno && sessionData && (
+      {settingsOpen && !esAlumno && sessionData && tab !== "settings" && tab !== "perfil" && (
         <SettingsPage
           coach={sessionData}
           onClose={()=>setSettingsOpen(false)}

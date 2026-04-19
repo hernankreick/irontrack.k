@@ -1,7 +1,6 @@
 import React from "react";
 import {
   BarChart3,
-  ChevronRight,
   ClipboardList,
   Dumbbell,
   LayoutDashboard,
@@ -149,7 +148,7 @@ export default function DesktopSidebar({
   onLogout,
   coachAvatarUrl,
   coachName,
-  coachSubtitle = "Preparador físico",
+  coachSubtitle: _coachSubtitle = "Preparador físico",
 }) {
   useDesktopSidebarFonts();
   const [collapsed, setCollapsed] = React.useState(readCollapsed);
@@ -309,7 +308,7 @@ export default function DesktopSidebar({
       <div
         style={{
           flexShrink: 0,
-          padding: "8px 0",
+          padding: "8px 0 16px 0",
           borderTop: "1px solid " + DS.border,
           display: "flex",
           flexDirection: "column",
@@ -324,21 +323,44 @@ export default function DesktopSidebar({
             if (typeof onSettings === "function") onSettings();
           }}
           style={Object.assign(getRowButtonStyle({ collapsed: collapsed }), {
-            background: "transparent",
-            color: DS.muted,
-            fontWeight: 500,
-            transition: "background 0.18s ease, color 0.18s ease",
+            background: activeTab === "settings" ? DS.activeBg : "transparent",
+            color: activeTab === "settings" ? DS.text : DS.muted,
+            fontWeight: activeTab === "settings" ? 600 : 500,
+            boxShadow: activeTab === "settings" ? "inset 0 0 0 1px rgba(59,130,246,0.25)" : "none",
+            transition: "background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
+            position: "relative",
           })}
           onMouseEnter={function (e) {
-            e.currentTarget.style.background = DS.hover;
-            e.currentTarget.style.color = DS.text;
+            if (activeTab !== "settings") {
+              e.currentTarget.style.background = DS.hover;
+              e.currentTarget.style.color = DS.text;
+            }
           }}
           onMouseLeave={function (e) {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.color = DS.muted;
+            if (activeTab !== "settings") {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = DS.muted;
+            } else {
+              e.currentTarget.style.background = DS.activeBg;
+              e.currentTarget.style.color = DS.text;
+            }
           }}
         >
-          <Settings size={20} strokeWidth={2} style={{ flexShrink: 0 }} />
+          {activeTab === "settings" ? (
+            <span
+              style={{
+                position: "absolute",
+                left: 0,
+                top: "50%",
+                width: 3,
+                height: 22,
+                marginTop: -11,
+                borderRadius: "0 4px 4px 0",
+                background: DS.primary,
+              }}
+            />
+          ) : null}
+          <Settings size={20} strokeWidth={2} style={{ flexShrink: 0 }} color={activeTab === "settings" ? DS.primaryLight : undefined} />
           {!collapsed ? <span>Settings</span> : null}
         </button>
         <button
@@ -348,20 +370,43 @@ export default function DesktopSidebar({
             if (typeof onPerfil === "function") onPerfil();
           }}
           style={Object.assign(getRowButtonStyle({ collapsed: collapsed }), {
-            background: "transparent",
-            color: DS.muted,
-            fontWeight: 500,
-            transition: "background 0.18s ease, color 0.18s ease",
+            background: activeTab === "perfil" ? DS.activeBg : "transparent",
+            color: activeTab === "perfil" ? DS.text : DS.muted,
+            fontWeight: activeTab === "perfil" ? 600 : 500,
+            boxShadow: activeTab === "perfil" ? "inset 0 0 0 1px rgba(59,130,246,0.25)" : "none",
+            transition: "background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
+            position: "relative",
           })}
           onMouseEnter={function (e) {
-            e.currentTarget.style.background = DS.hover;
-            e.currentTarget.style.color = DS.text;
+            if (activeTab !== "perfil") {
+              e.currentTarget.style.background = DS.hover;
+              e.currentTarget.style.color = DS.text;
+            }
           }}
           onMouseLeave={function (e) {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.color = DS.muted;
+            if (activeTab !== "perfil") {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = DS.muted;
+            } else {
+              e.currentTarget.style.background = DS.activeBg;
+              e.currentTarget.style.color = DS.text;
+            }
           }}
         >
+          {activeTab === "perfil" ? (
+            <span
+              style={{
+                position: "absolute",
+                left: 0,
+                top: "50%",
+                width: 3,
+                height: 22,
+                marginTop: -11,
+                borderRadius: "0 4px 4px 0",
+                background: DS.primary,
+              }}
+            />
+          ) : null}
           {coachAvatarUrl ? (
             <img src={coachAvatarUrl} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
           ) : (
@@ -409,84 +454,6 @@ export default function DesktopSidebar({
             {!collapsed ? <span>Salir</span> : null}
           </button>
         ) : null}
-      </div>
-
-      {/* Tarjeta de usuario al pie (mock) */}
-      <div style={{ flexShrink: 0, padding: "0 0 16px 0" }}>
-        <button
-          type="button"
-          title={collapsed ? coachName || "Perfil" : undefined}
-          onClick={function () {
-            if (typeof onPerfil === "function") onPerfil();
-          }}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: collapsed ? "12px 10px" : "12px 12px",
-            justifyContent: collapsed ? "center" : "flex-start",
-            borderRadius: 12,
-            border: "1px solid " + DS.border,
-            background: DS.card,
-            cursor: "pointer",
-            boxSizing: "border-box",
-            transition: "border-color 0.18s ease, background 0.18s ease",
-          }}
-          onMouseEnter={function (e) {
-            e.currentTarget.style.borderColor = "rgba(59,130,246,0.35)";
-            e.currentTarget.style.background = "rgba(37, 99, 235, 0.08)";
-          }}
-          onMouseLeave={function (e) {
-            e.currentTarget.style.borderColor = DS.border;
-            e.currentTarget.style.background = DS.card;
-          }}
-        >
-          {coachAvatarUrl ? (
-            <img src={coachAvatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-          ) : (
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg,#1e3a5f,#2563eb)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 800,
-                fontSize: 12,
-                color: "#fff",
-                flexShrink: 0,
-              }}
-            >
-              {initials(coachName)}
-            </div>
-          )}
-          {!collapsed ? (
-            <>
-              <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-                <div
-                  style={{
-                    fontFamily: "'DM Sans', system-ui, sans-serif",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: DS.text,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {coachName || "Entrenador"}
-                </div>
-                {coachSubtitle ? (
-                  <div style={{ fontSize: 12, color: DS.muted, marginTop: 2, fontWeight: 500 }}>{coachSubtitle}</div>
-                ) : null}
-              </div>
-              <ChevronRight size={18} color="#6B7280" style={{ flexShrink: 0 }} aria-hidden />
-            </>
-          ) : null}
-        </button>
       </div>
       </div>
     </aside>
