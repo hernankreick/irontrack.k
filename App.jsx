@@ -2504,6 +2504,22 @@ function GymApp() {
                     return t + 1;
                   });
                 }}
+                onIrProgreso={function () {
+                  setTab("progress");
+                }}
+                onAbrirChatAlumno={function (alumnoId) {
+                  var alum = (alumnos || []).find(function (x) {
+                    return String(x.id) === String(alumnoId);
+                  });
+                  if (!alum) {
+                    toast2(es ? "Alumno no encontrado" : "Athlete not found");
+                    return;
+                  }
+                  setChatModal({
+                    alumnoId: alum.id,
+                    alumnoNombre: alum.nombre || alum.email || "Alumno",
+                  });
+                }}
                 globalSearchData={coachGlobalSearchData}
                 onGlobalSearchNavigate={coachGlobalSearchNavigate}
                 getAlumnoCategoria={coachAlumnoCategoria}

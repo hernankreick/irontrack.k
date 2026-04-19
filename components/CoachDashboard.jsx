@@ -3,7 +3,6 @@ import {
   AlertCircle,
   ArrowRight,
   ArrowUp,
-  Bell,
   Eye,
   FilePlus,
   Info,
@@ -12,6 +11,7 @@ import {
 } from "lucide-react";
 import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import GlobalSearch from "./GlobalSearch.jsx";
+import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
 import { coachType as T, coachSpace as S } from "./coachUiScale.js";
 
@@ -339,6 +339,10 @@ export default function CoachDashboard({
   onNuevoEjercicio,
   globalSearchData = { alumnos: [], rutinas: [], ejercicios: [], sesiones: [] },
   onGlobalSearchNavigate,
+  /** Navegar a la pestaña Progreso (notificaciones tipo logro / resumen). */
+  onIrProgreso,
+  /** Abrir modal de chat con un alumno por id (notificaciones tipo mensaje). */
+  onAbrirChatAlumno,
   /** (a) => "sin_rutina" | "activo" | "inactivo" — preferentemente coachAlumnoCategoria desde App.jsx */
   getAlumnoCategoria,
 }) {
@@ -455,37 +459,15 @@ export default function CoachDashboard({
                 placeholder="Buscar alumno, rutina, ejercicio..."
               />
             </div>
-            <button
-              type="button"
-              style={{
-                width: 36,
-                height: 36,
-                background: C.card,
-                border: `1px solid ${C.brd}`,
-                borderRadius: 7,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 0,
-                position: "relative",
-              }}
-            >
-              <Bell size={17} color="#94a3b8" strokeWidth={2} />
-              <span
-                style={{
-                  position: "absolute",
-                  top: 5,
-                  right: 6,
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: C.red,
-                  border: "1px solid #0d0d15",
-                  boxSizing: "border-box",
-                }}
-              />
-            </button>
+            <CoachNotificationCenter
+              es={es}
+              alertRows={coachAlertsReal}
+              alumnos={alumnos}
+              onRevisarAlumno={onRevisar}
+              onIrAlumnos={onRevisarAlumnos}
+              onIrProgreso={onIrProgreso}
+              onAbrirChatAlumno={onAbrirChatAlumno}
+            />
             <GlobalCreateMenu
               onNuevoAlumno={onNuevoAlumno}
               onNuevaRutina={onNuevaRutina}
