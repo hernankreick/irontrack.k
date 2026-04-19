@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { coachType as T, coachSpace as S } from '../../../coachUiScale.js';
 
 const C_TEXT = '#ffffff';
 const C_SECONDARY = '#e2e8f0';
@@ -15,7 +16,7 @@ function ProblemaVisual({ problema, color }) {
 
   if (SIN_SESIONES_RX.test(problema)) {
     return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 2 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: S.gridTight, marginTop: 2 }}>
         <span style={badgeStyle} title={problema}>
           <span aria-hidden style={{ marginRight: 6, opacity: 0.9 }}>○</span>
           Sin registro
@@ -35,22 +36,20 @@ const badgeStyle = {
   alignItems: 'center',
   background: PLACEHOLDER_BG,
   color: PLACEHOLDER_TEXT,
-  fontSize: 10,
-  fontWeight: 700,
+  ...T.tableHeader,
+  letterSpacing: '0.02em',
   padding: '5px 10px',
   borderRadius: 6,
-  letterSpacing: '0.02em',
-  textTransform: 'uppercase',
 };
 
 export default function ListaRevisar({ alumnos = [], onSeleccionar }) {
   if (alumnos.length === 0) return null;
 
   return (
-    <div style={{ marginBottom: 28 }}>
+    <div style={{ marginBottom: S.pageGap }}>
       <p style={s.label}>A REVISAR</p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: S.gridTight }}>
         {alumnos.map((a, i) => (
           <FilaRevisar
             key={a.id ?? i}
@@ -96,7 +95,7 @@ function FilaRevisar({ alumno, onSeleccionar }) {
         transform: active ? 'translateY(-1px)' : 'translateY(0)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: S.gridGapTight }}>
         <span style={{ ...s.dot, background: color, marginTop: 6 }} />
         <div style={s.textoCol}>
           <span
@@ -116,17 +115,14 @@ function FilaRevisar({ alumno, onSeleccionar }) {
 
 const s = {
   label: {
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: '0.1em',
+    ...T.tableHeader,
     color: C_SECONDARY,
-    textTransform: 'uppercase',
-    margin: '0 0 10px',
+    margin: `0 0 ${S.blockGap}px`,
   },
   card: {
     background: CARD_BG,
     borderRadius: CARD_RADIUS,
-    padding: '12px 14px',
+    padding: S.cardPadding,
     border: '1px solid #2d3748',
   },
   dot: {
@@ -144,13 +140,13 @@ const s = {
     gap: 2,
   },
   nombre: {
-    fontSize: 14,
+    ...T.bodySemibold,
+    fontWeight: 700,
     lineHeight: 1.35,
     color: C_TEXT,
-    fontWeight: 700,
   },
   problema: {
-    fontSize: 12,
+    ...T.meta,
     fontWeight: 600,
   },
 };

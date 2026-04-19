@@ -1,3 +1,5 @@
+import { coachType as T, coachSpace as S } from '../../../coachUiScale.js';
+
 const C_TEXT = '#ffffff';
 const C_SECONDARY = '#e2e8f0';
 
@@ -49,18 +51,15 @@ function FilaAlumno({ alumno, ultimo, onSeleccionar }) {
 
 const s = {
   label: {
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: '0.1em',
+    ...T.tableHeader,
     color: C_SECONDARY,
-    textTransform: 'uppercase',
-    margin: '0 0 10px',
+    margin: `0 0 ${S.blockGap}px`,
   },
   fila: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    padding: '9px 0',
+    gap: S.gridGapTight,
+    padding: `${S.gridTight}px 0`,
     cursor: 'pointer',
   },
   avatar: {
@@ -69,7 +68,7 @@ const s = {
     borderRadius: 6,
     background: '#1e2228',
     color: C_SECONDARY,
-    fontSize: 10,
+    ...T.meta,
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
@@ -78,14 +77,14 @@ const s = {
     letterSpacing: '0.02em',
   },
   nombre: {
-    fontSize: 13,
-    color: C_TEXT,
+    ...T.bodySemibold,
     fontWeight: 700,
+    color: C_TEXT,
     flex: 1,
     minWidth: 0,
   },
   estado: {
-    fontSize: 11,
+    ...T.meta,
     fontWeight: 600,
     flexShrink: 0,
   },

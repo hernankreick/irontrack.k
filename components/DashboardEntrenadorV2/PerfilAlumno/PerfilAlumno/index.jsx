@@ -2,6 +2,7 @@ import HeaderResumen from "./HeaderResumen";
 import AtencionAhora from "./AtencionAhora";
 import ListaRevisar  from "./lista-revisar.jsx";
 import ListaAlumnos  from "./ListaAlumnos";
+import { coachSpace as S } from "../../../coachUiScale.js";
 
 // ─── Lógica de priorización ───────────────────────────────────────────────────
 // Calcula días sin entrenar y deriva prioridad sin depender de priorizarAlumnos.js
@@ -85,7 +86,7 @@ export default function DashboardEntrenadorV2({
   const handleMensaje = (a) => onChatAlumno?.(a._raw);
 
   return (
-    <div style={{ paddingBottom: 32 }}>
+    <div style={{ paddingBottom: S.pageGap + 8 }}>
       <HeaderResumen
         nombre={nombre}
         sesiones={totalSesiones}

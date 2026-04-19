@@ -1,3 +1,5 @@
+import { coachType as T, coachSpace as S } from '../../../coachUiScale.js';
+
 const C_TEXT = '#ffffff';
 const C_SECONDARY = '#e2e8f0';
 
@@ -14,7 +16,7 @@ export default function HeaderResumen({ nombre, sesiones, sinEntrenar, pagos }) 
   const saludoRompeEmail = typeof nombre === "string" && nombre.includes("@");
 
   return (
-    <div style={{ marginBottom: 28 }}>
+    <div style={{ marginBottom: S.pageGap }}>
       <p style={{ ...s.saludo, ...(saludoRompeEmail ? { wordBreak: "break-all" } : {}) }}>{saludo}, {nombre}</p>
       {metricas && <p style={s.metricas}>{metricas}</p>}
     </div>
@@ -23,13 +25,12 @@ export default function HeaderResumen({ nombre, sesiones, sinEntrenar, pagos }) 
 
 const s = {
   saludo: {
-    fontSize: 20,
-    fontWeight: 700,
+    ...T.screenTitle,
     color: C_TEXT,
     margin: "0 0 6px",
   },
   metricas: {
-    fontSize: 12,
+    ...T.meta,
     color: C_SECONDARY,
     fontWeight: 600,
     margin: 0,

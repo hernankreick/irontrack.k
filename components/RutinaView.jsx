@@ -5,6 +5,7 @@ import { DaySection } from './DaySection.jsx';
 import { EditExerciseModal } from './EditExerciseModal.jsx';
 import { emptyDays } from '../lib/routineTemplates.js';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from '../lib/exerciseResolve.js';
+import { coachType as T, coachSpace as S } from './coachUiScale.js';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -87,10 +88,10 @@ function RutinaCard({
   });
 
   return (
-    <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ ...card, padding: 0, overflow: 'hidden', marginBottom: S.blockGap }}>
 
       {/* ── Header de la rutina ── */}
-      <div style={{ background: bgHeader, padding: '16px 16px 12px' }}>
+      <div style={{ background: bgHeader, padding: `${S.gridGapTight}px ${S.cardPadding}px ${S.blockGap}px` }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {editandoNombre ? (
@@ -101,17 +102,17 @@ function RutinaCard({
                 onBlur={guardarNombreRutina}
                 onKeyDown={e => e.key === 'Enter' && guardarNombreRutina()}
                 style={{
-                  fontSize: 22, fontWeight: 900, color: textMain,
+                  ...T.numberStat,
+                  color: textMain,
                   background: 'transparent', border: 'none',
                   borderBottom: '1px solid #3b82f6',
                   outline: 'none', padding: '2px 0',
                   fontFamily: 'inherit', width: '100%',
-                  lineHeight: 1.2,
                 }}
               />
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: textMain, lineHeight: 1.1, wordBreak: 'break-word' }}>
+                <div style={{ ...T.numberStat, color: textMain, lineHeight: 1.1, wordBreak: 'break-word' }}>
                   {nombreLocal}
                 </div>
                 <button
@@ -127,15 +128,17 @@ function RutinaCard({
                 </button>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 12, color: textMuted, fontWeight: 600 }}>
+            <div style={{ display: 'flex', gap: S.gridTight, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ ...T.meta, color: textMuted, fontWeight: 600 }}>
                 {r.days.length} {es ? 'días' : 'days'} · {totalEx} {es ? 'ejercicios' : 'exercises'}
               </span>
               {r.scanned && (
                 <span style={{
                   background: '#2563EB22', color: '#2563EB',
                   border: '1px solid #60a5fa33', borderRadius: 6,
-                  padding: '2px 8px', fontSize: 10, fontWeight: 700,
+                  padding: '2px 8px',
+                  ...T.tableHeader,
+                  letterSpacing: '0.04em',
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}>
                   <Ic name="image" size={11} color="#2563EB" />
@@ -146,8 +149,8 @@ function RutinaCard({
                 <span style={{
                   background: '#22C55E15', color: '#22C55E',
                   borderRadius: 6, padding: '2px 8px',
-                  fontSize: 10, fontWeight: 700,
-                  textTransform: 'uppercase', letterSpacing: '.5px',
+                  ...T.tableHeader,
+                  letterSpacing: '0.04em',
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}>
                   <Ic name="check" size={11} color="#22C55E" />
@@ -205,8 +208,11 @@ function RutinaCard({
                 border: 'none', borderRadius: 8,
                 padding: '7px 10px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 4,
-                fontSize: 12, fontWeight: 700, color: textMuted,
-                textTransform: 'uppercase', letterSpacing: '.5px',
+                ...T.label,
+                fontWeight: 700,
+                color: textMuted,
+                textTransform: 'uppercase',
+                letterSpacing: '.5px',
                 minHeight: 36,
               }}
             >
@@ -224,7 +230,7 @@ function RutinaCard({
         </div>
 
         {/* Asignar alumno + GUARDAR */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <div style={{ display: 'flex', gap: S.gridTight, marginTop: S.blockGap }}>
           <select
             value={r.alumno_id || ''}
             onChange={e => {
@@ -241,7 +247,7 @@ function RutinaCard({
               border: `1px solid ${border}`,
               borderRadius: 10,
               padding: '8px 12px',
-              fontSize: 14,
+              ...T.control,
               fontFamily: 'inherit',
             }}
           >
@@ -260,7 +266,7 @@ function RutinaCard({
               border: 'none',
               borderRadius: 10,
               padding: '8px 16px',
-              fontSize: 13,
+              ...T.periodTab,
               fontWeight: 700,
               cursor: saving ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
@@ -296,7 +302,7 @@ function RutinaCard({
         </div>
 
         {lastSaved && (
-          <div style={{ fontSize: 11, color: textMuted, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ ...T.meta, color: textMuted, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Ic name="check-circle" size={11} color="#22C55E" />
             {es ? 'Guardado a las' : 'Saved at'}{' '}
             {lastSaved.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
@@ -306,7 +312,7 @@ function RutinaCard({
 
       {/* ── Días (DaySection) ── */}
       {!collapsed && (
-        <div style={{ padding: '12px 16px 16px' }}>
+        <div style={{ padding: `${S.gridGapTight}px ${S.cardPadding}px ${S.gridGap}px` }}>
           {r.days.map((d, di) => {
             // Enrich exercises with display name (lookup in allEx by id)
             const enrichList = (list) => (list || []).map(ex => {
@@ -414,6 +420,7 @@ export function RutinaView(props) {
     setFiltroRut, btn, card, setNewR, routines, setRoutines, allEx, PATS,
     setEditEx, toast2, setAddExModal, setAddExSearch, setAddExPat, setAddExMuscle,
     setAddExSelectedIds, setDupDayModal, alumnos, sb, setAssignRoutineId,
+    desktopCoachStableLayout = false,
   } = props;
 
   const [hasUnsaved, setHasUnsaved]           = useState(false);
@@ -501,19 +508,32 @@ export function RutinaView(props) {
     closeEditModal();
   };
 
+  var scrollPadBottom = desktopCoachStableLayout
+    ? hasUnsaved
+      ? "calc(96px + env(safe-area-inset-bottom, 0px))"
+      : "calc(20px + env(safe-area-inset-bottom, 0px))"
+    : hasUnsaved
+      ? "calc(140px + env(safe-area-inset-bottom, 0px))"
+      : "calc(5.5rem + env(safe-area-inset-bottom, 0px))";
+
   return (
-    <>
+    <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col">
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      <div ref={contentRef} className="min-w-0 max-w-full" style={{ paddingBottom: 140 }}>
+      <div
+        ref={contentRef}
+        className="min-h-0 min-w-0 max-w-full flex-1 overflow-y-auto overflow-x-hidden"
+        style={{ paddingBottom: scrollPadBottom, WebkitOverflowScrolling: "touch" }}
+      >
 
         {/* ── Botón escanear ── */}
         <button className="hov" onClick={() => setTab('scanner')} style={{
-          width: '100%', marginBottom: 10, padding: '10px 16px',
+          width: '100%', marginBottom: S.gridTight, padding: '10px 16px',
           background: 'transparent', border: `1px solid ${border}`,
-          borderRadius: 12, color: textMuted, fontSize: 14, fontWeight: 700,
+          borderRadius: 12, color: textMuted,
+          ...T.control,
           cursor: 'pointer', fontFamily: 'inherit',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: S.gridTight,
           textTransform: 'uppercase', letterSpacing: '.5px',
           minHeight: 44,
         }}>
@@ -523,11 +543,13 @@ export function RutinaView(props) {
 
         {/* ── Botón nueva rutina ── */}
         <button className="hov" style={{
-          width: '100%', marginBottom: 16, padding: '14px',
+          width: '100%', marginBottom: S.gridGap, padding: '14px',
           background: '#3b82f6', border: 'none',
-          borderRadius: 12, color: '#fff', fontSize: 17, fontWeight: 800,
+          borderRadius: 12, color: '#fff',
+          ...T.cardTitle,
+          fontWeight: 800,
           cursor: 'pointer', fontFamily: 'inherit',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: S.gridTight,
           minHeight: 52,
         }} onClick={() => setNewR({
           templateId: 'blank', name: '', numDays: 3,
@@ -540,14 +562,14 @@ export function RutinaView(props) {
         {/* ── Lista de rutinas ── */}
         {routines.length === 0 ? (
           <div style={{
-            textAlign: 'center', padding: '40px 20px',
-            color: textMuted, fontSize: 14, lineHeight: 1.6,
+            textAlign: 'center', padding: `${S.pageGap * 2}px ${S.pagePadding}px`,
+            color: textMuted, ...T.body, lineHeight: 1.6,
           }}>
             <DumbbellIcon color={textMuted} />
-            <div style={{ marginTop: 12, fontWeight: 700, fontSize: 16 }}>
+            <div style={{ marginTop: S.blockGap, ...T.cardTitle, color: textMuted }}>
               {es ? 'Sin rutinas todavía' : 'No routines yet'}
             </div>
-            <div style={{ marginTop: 4 }}>
+            <div style={{ marginTop: 4, ...T.subtitle, color: textMuted }}>
               {es ? 'Creá tu primera rutina con el botón de arriba.' : 'Create your first routine above.'}
             </div>
           </div>
@@ -590,8 +612,8 @@ export function RutinaView(props) {
             ? { left: saveBarBox.left, width: saveBarBox.width }
             : { left: 0, right: 0 }),
           boxSizing: 'border-box',
-          padding: '12px 16px',
-          paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+          padding: `${S.gridGapTight}px ${S.gridGapTight}px`,
+          paddingBottom: `calc(${S.gridGapTight}px + env(safe-area-inset-bottom, 0px))`,
           background: 'rgba(15,23,42,0.95)',
           backdropFilter: 'blur(12px)',
           borderTop: `1px solid ${border}`,
@@ -606,9 +628,9 @@ export function RutinaView(props) {
           style={{
             maxWidth: 500,
             width: '100%',
-            padding: '13px',
+            padding: `${S.cardPaddingTight - 5}px`,
             borderRadius: 12,
-            fontSize: 14,
+            ...T.control,
             fontWeight: 700,
             fontFamily: 'inherit',
             cursor: hasUnsaved ? 'pointer' : 'default',
@@ -639,6 +661,6 @@ export function RutinaView(props) {
           }
         </button>
       </div>
-    </>
+    </div>
   );
 }

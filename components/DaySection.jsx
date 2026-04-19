@@ -7,6 +7,7 @@ import {
 } from '@dnd-kit/sortable';
 import { Copy, Trash2, Plus, Pencil } from 'lucide-react';
 import { ExerciseCard } from './ExerciseCard.jsx';
+import { coachType as T, coachSpace as S } from './coachUiScale.js';
 
 const BLOCK_ACCENT = {
   warmup:    '#f59e0b',
@@ -38,34 +39,31 @@ function SortableBlock({
       background: '#0f172a',
       border: `1px solid ${accent}22`,
       borderRadius: 12,
-      padding: '10px 12px',
-      marginBottom: 10,
+      padding: `${S.blockGap - 2}px ${S.gridGapTight}px`,
+      marginBottom: S.gridTight,
     }}>
       {/* Block header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: count > 0 ? 10 : 6,
+        marginBottom: count > 0 ? S.gridTight : 6,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: S.gridTight }}>
           <span style={{
             width: 3, height: 14, borderRadius: 2,
             background: accent, display: 'inline-block', flexShrink: 0,
           }} />
           <span style={{
-            fontSize: 11,
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: '1px',
+            ...T.tableHeader,
+            letterSpacing: '0.08em',
             color: accent,
           }}>
             {label}
           </span>
         </div>
         <span style={{
-          fontSize: 13,
-          fontWeight: 600,
+          ...T.subtitle,
           color: '#475569',
         }}>
           {count}
@@ -120,7 +118,7 @@ function SortableBlock({
           border: `1px dashed ${accent}55`,
           borderRadius: 8,
           color: accent,
-          fontSize: 12,
+          ...T.label,
           fontWeight: 700,
           cursor: 'pointer',
           display: 'flex',
@@ -165,13 +163,13 @@ export function DaySection({
   };
 
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: S.gridGap }}>
       {/* Day header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 10,
+        marginBottom: S.gridTight,
       }}>
         {editandoNombre ? (
           <input
@@ -182,7 +180,9 @@ export function DaySection({
             onKeyDown={e => e.key === 'Enter' && guardarNombre()}
             style={{
               flex: 1, minWidth: 0,
-              fontSize: 15, fontWeight: 700, color: '#f1f5f9',
+              ...T.bodyLg,
+              fontWeight: 700,
+              color: '#f1f5f9',
               background: 'transparent', border: 'none',
               borderBottom: '1px solid #3b82f6',
               outline: 'none', padding: '2px 0',
@@ -191,7 +191,7 @@ export function DaySection({
           />
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9' }}>
+            <span style={{ ...T.bodyLg, fontWeight: 700, color: '#f1f5f9' }}>
               {nombre}
             </span>
             <button

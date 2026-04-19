@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { pickVideoUrl } from '../lib/exerciseResolve.js';
+import { coachType as T, coachSpace as S } from './coachUiScale.js';
 
 const BLOCK_COLORS = {
   warmup: '#f59e0b',
@@ -40,10 +41,10 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
         background: '#1e293b',
         borderRadius: 10,
         borderLeft: `3px solid ${color}`,
-        marginBottom: 6,
+        marginBottom: S.chipGridGap - 4,
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: S.gridTight,
         padding: '8px 10px',
       }}
     >
@@ -66,7 +67,7 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
       {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 14,
+          ...T.bodySemibold,
           fontWeight: 700,
           wordBreak: 'break-word',
           color: '#f1f5f9',
@@ -76,7 +77,7 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
           {exercise.name}
         </div>
         {summary && (
-          <div style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>
+          <div style={{ ...T.meta, color: '#64748b' }}>
             {summary}
           </div>
         )}
@@ -93,7 +94,8 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
             width: 44, height: 44, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#94a3b8', textDecoration: 'none',
-            fontSize: 14, borderRadius: 8,
+            ...T.control,
+            borderRadius: 8,
           }}
         >
           ▶

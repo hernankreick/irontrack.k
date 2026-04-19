@@ -1,5 +1,6 @@
 /**
- * Escala tipográfica y spacing compartida — vistas entrenador (CoachDashboard, ProgresoView).
+ * Escala tipográfica y spacing compartida — vistas entrenador
+ * (CoachDashboard, ProgresoView, Alumnos / Rutinas).
  * Los colores se definen en cada vista (C.t, C.t2, etc.).
  */
 
@@ -72,5 +73,7 @@ export const coachSpace = {
   /** Grillas */
   gridGap: 16,
   gridGapTight: 12,
+  /** Filas compactas (listas, filas de alumno) */
+  gridTight: 10,
   chipGridGap: 10,
 };

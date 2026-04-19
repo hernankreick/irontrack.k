@@ -1,3 +1,5 @@
+import { coachType as T, coachSpace as S } from '../../../coachUiScale.js';
+
 const C_TEXT = '#ffffff';
 const C_SECONDARY = '#e2e8f0';
 
@@ -17,14 +19,14 @@ export default function AtencionAhora({ alumno, onVer, onMensaje }) {
   const heavy = isRedAlert(color);
 
   return (
-    <div style={{ marginBottom: 28 }}>
+    <div style={{ marginBottom: S.pageGap }}>
       <p style={s.label}>ATENCIÓN AHORA</p>
 
       <div
         style={{
           background: CARD_BG,
           borderRadius: CARD_RADIUS,
-          padding: heavy ? '16px 16px 14px' : '14px 16px',
+          padding: S.cardPadding,
           border: heavy ? '1px solid #7f1d1d' : CARD_BORDER,
           boxShadow: heavy ? '0 4px 24px rgba(0,0,0,0.35)' : '0 2px 12px rgba(0,0,0,0.2)',
         }}
@@ -32,7 +34,7 @@ export default function AtencionAhora({ alumno, onVer, onMensaje }) {
         <p
           style={{
             ...s.nombre,
-            fontSize: heavy ? 18 : 16,
+            ...(heavy ? s.nombreHeavy : s.nombreNormal),
             margin: '0 0 10px',
             ...(nombreEsEmail ? { wordBreak: 'break-all' } : {}),
           }}
@@ -45,12 +47,12 @@ export default function AtencionAhora({ alumno, onVer, onMensaje }) {
             style={{
               background: '#4c1d1d',
               borderRadius: 8,
-              padding: '12px 14px',
-              marginBottom: 14,
+              padding: `${S.blockGap}px 14px`,
+              marginBottom: S.blockGapLoose,
               border: '1px solid #7f1d1d',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: S.gridGapTight }}>
               <span
                 style={{
                   width: 11,
@@ -68,7 +70,7 @@ export default function AtencionAhora({ alumno, onVer, onMensaje }) {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: S.gridTight, marginBottom: S.gridTight }}>
               <span style={{ ...s.dot, background: color }} />
               {problema && (
                 <p style={{ ...s.problema, color, margin: 0 }}>{problema}</p>
@@ -77,7 +79,7 @@ export default function AtencionAhora({ alumno, onVer, onMensaje }) {
           </>
         )}
 
-        <div style={{ display: 'flex', gap: 12, marginTop: heavy ? 0 : 4 }}>
+        <div style={{ display: 'flex', gap: S.gridGapTight, marginTop: heavy ? 0 : 4 }}>
           <button type="button" onClick={() => onVer?.(alumno)} style={s.btnVer}>
             VER
           </button>
@@ -92,12 +94,9 @@ export default function AtencionAhora({ alumno, onVer, onMensaje }) {
 
 const s = {
   label: {
-    fontSize: 10,
-    fontWeight: 700,
-    letterSpacing: '0.1em',
+    ...T.tableHeader,
     color: C_SECONDARY,
-    textTransform: 'uppercase',
-    margin: '0 0 10px',
+    margin: `0 0 ${S.blockGap}px`,
   },
   dot: {
     width: 7,
@@ -112,14 +111,21 @@ const s = {
     minWidth: 0,
     lineHeight: 1.25,
   },
+  nombreNormal: {
+    ...T.numberStatSm,
+  },
+  nombreHeavy: {
+    ...T.cardTitle,
+    fontSize: 18,
+  },
   problema: {
-    fontSize: 12,
+    ...T.meta,
     fontWeight: 600,
     flex: 1,
     minWidth: 0,
   },
   problemaHeavy: {
-    fontSize: 13,
+    ...T.labelMd,
     fontWeight: 700,
     margin: 0,
     lineHeight: 1.35,
@@ -127,13 +133,12 @@ const s = {
     minWidth: 0,
   },
   btnVer: {
+    ...T.control,
     background: '#1d4ed8',
     color: C_TEXT,
     border: 'none',
     borderRadius: 8,
     padding: '8px 18px',
-    fontSize: 10,
-    fontWeight: 700,
     letterSpacing: '0.06em',
     cursor: 'pointer',
     textTransform: 'uppercase',
@@ -141,13 +146,12 @@ const s = {
     boxShadow: '0 2px 8px rgba(29,78,216,0.45)',
   },
   btnMensaje: {
+    ...T.control,
     background: 'transparent',
     color: '#93c5fd',
     border: '2px solid #3b82f6',
     borderRadius: 8,
     padding: '6px 16px',
-    fontSize: 10,
-    fontWeight: 700,
     letterSpacing: '0.06em',
     cursor: 'pointer',
     textTransform: 'uppercase',
