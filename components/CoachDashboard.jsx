@@ -48,33 +48,6 @@ const TEAM_MINI = [
   { num: "1", color: C.red, Icon: AlertTriangle, label: "Sin actividad", sub: "<30%" },
 ];
 
-const ALERTAS = [
-  {
-    i: "AT",
-    n: "Agustín Torres",
-    b: "1 de 3 sesiones",
-    bc: C.yel,
-    bd: C.yelDim,
-    d: "Bajo cumplimiento esta semana",
-  },
-  {
-    i: "SG",
-    n: "Sofía Gómez",
-    b: "Sin actividad",
-    bc: C.red,
-    bd: C.redDim,
-    d: "No tiene tiempo para completar el día",
-  },
-  {
-    i: "LD",
-    n: "Lucas Díaz",
-    b: "Necesita atención",
-    bc: C.yel,
-    bd: C.yelDim,
-    d: "Necesita seguimiento de la semana",
-  },
-];
-
 const QUICK = [
   {
     action: "message",
@@ -105,14 +78,6 @@ const QUICK = [
   },
 ];
 
-const TABLA = [
-  { i: "JL", n: "Julieta Laroze", p: 82, s: "Hoy" },
-  { i: "AG", n: "Agustín", p: 45, s: "Hace 2 días" },
-  { i: "HK", n: "Hernán", p: 0, s: "Sin actividad" },
-  { i: "MC", n: "María Clara", p: 61, s: "Ayer" },
-  { i: "PG", n: "Pablo García", p: 88, s: "Hace 1 día" },
-];
-
 function pctColor(p) {
   if (p >= 70) return C.green;
   if (p >= 30) return C.yel;
@@ -121,39 +86,222 @@ function pctColor(p) {
 
 function sesionColor(s) {
   if (s === "Hoy") return C.green;
-  if (s === "Sin actividad") return C.red;
+  if (s === "Sin actividad" || s === "Sin rutina") return C.red;
   return C.t2;
 }
 
-/**
- * Resuelve un alumno real a partir del nombre mostrado en una tarjeta (coincidencia exacta o parcial).
- */
-function coachFindAlumnoForLabel(alumnos, labelName) {
-  if (!labelName || !Array.isArray(alumnos) || alumnos.length === 0) return null;
-  var target = String(labelName)
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-  var exact = alumnos.find(function (a) {
-    var n = String(a.nombre || "")
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "");
-    return n === target;
+function parseDateMs(raw) {
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "string" && raw.indexOf("/") >= 0) {
+    var p = raw.split("/");
+    if (p.length >= 3) {
+      var d = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+      return isNaN(d.getTime()) ? null : d.getTime();
+    }
+  }
+  var d2 = new Date(typeof raw === "string" ? raw.slice(0, 19) : raw);
+  return isNaN(d2.getTime()) ? null : d2.getTime();
+}
+
+function coachDisplayName(a) {
+  var n = (a && (a.nombre || "")).trim();
+  if (n) return n;
+  return (a && a.email) || "";
+}
+
+function coachInitials(a) {
+  var base = coachDisplayName(a) || "?";
+  return base
+    .split(/\s+/)
+    .map(function (p) {
+      return p.charAt(0);
+    })
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+/** Espejo de coachAlumnoCategoria en App.jsx (fallback si no se pasa getAlumnoCategoria). */
+function defaultCoachAlumnoCategoria(a, rutinasSBEntrenador, sesionesGlobales, progresoGlobal) {
+  if (!rutinasSBEntrenador.some(function (r) { return r.alumno_id === a.id; })) return "sin_rutina";
+  var cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000;
+  var ses = sesionesGlobales || [];
+  for (var i = 0; i < ses.length; i++) {
+    if (ses[i].alumno_id !== a.id) continue;
+    var raw = ses[i].created_at || "";
+    if (!raw) continue;
+    var d = new Date(raw.slice(0, 10));
+    if (!isNaN(d.getTime()) && d.getTime() >= cutoff) return "activo";
+  }
+  var plist = progresoGlobal[a.id];
+  if (plist && plist.length) {
+    for (var j = 0; j < plist.length; j++) {
+      var fecha = plist[j].fecha || "";
+      if (!fecha) continue;
+      var d2;
+      if (fecha.indexOf("/") >= 0) {
+        var p = fecha.split("/");
+        d2 = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
+      } else {
+        d2 = new Date(fecha.slice(0, 10));
+      }
+      if (!isNaN(d2.getTime()) && d2.getTime() >= cutoff) return "activo";
+    }
+  }
+  return "inactivo";
+}
+
+function getLastActivityMs(a, sesionesGlobales, progresoGlobal) {
+  var best = null;
+  (sesionesGlobales || []).forEach(function (s) {
+    if (s.alumno_id !== a.id) return;
+    var t = parseDateMs(s.created_at || s.fecha);
+    if (t != null && (best == null || t > best)) best = t;
   });
-  if (exact) return exact;
-  return (
-    alumnos.find(function (a) {
-      var n = String(a.nombre || "")
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-      return n && (n.includes(target) || target.includes(n));
-    }) || null
-  );
+  (progresoGlobal[a.id] || []).forEach(function (r) {
+    var t = parseDateMs(r.fecha);
+    if (t != null && (best == null || t > best)) best = t;
+  });
+  return best;
+}
+
+function countSesionesSince(a, sesionesGlobales, sinceMs) {
+  return (sesionesGlobales || []).filter(function (s) {
+    if (s.alumno_id !== a.id) return false;
+    var t = parseDateMs(s.created_at || s.fecha);
+    return t != null && t >= sinceMs;
+  }).length;
+}
+
+function countProgresoSince(a, progresoGlobal, sinceMs) {
+  return (progresoGlobal[a.id] || []).filter(function (r) {
+    var t = parseDateMs(r.fecha);
+    return t != null && t >= sinceMs;
+  }).length;
+}
+
+function formatUltimaSesion(lastMs, es, sinRutina) {
+  if (sinRutina) return es ? "Sin rutina" : "No routine";
+  if (lastMs == null) return es ? "Sin actividad" : "No activity";
+  var days = Math.floor((Date.now() - lastMs) / 86400000);
+  if (days <= 0) return es ? "Hoy" : "Today";
+  if (days === 1) return es ? "Ayer" : "Yesterday";
+  if (days < 14) return es ? "Hace " + days + " días" : days + "d ago";
+  if (days < 45) return es ? "Hace " + Math.floor(days / 7) + " sem." : Math.floor(days / 7) + "w ago";
+  return es ? "Sin actividad" : "No activity";
+}
+
+function computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal) {
+  if (cat === "sin_rutina") return 0;
+  var now = Date.now();
+  var d7 = now - 7 * 86400000;
+  var ses = sesionesGlobales || [];
+  var n7 = countSesionesSince(a, ses, d7);
+  var p7 = countProgresoSince(a, progresoGlobal, d7);
+  if (cat === "inactivo") {
+    var last = getLastActivityMs(a, ses, progresoGlobal);
+    if (last == null) return 5;
+    var days = Math.floor((now - last) / 86400000);
+    return Math.max(5, Math.min(42, 40 - Math.min(35, days)));
+  }
+  var score = Math.round(52 + n7 * 14 + Math.min(24, p7 * 3));
+  return Math.max(71, Math.min(100, score));
+}
+
+/**
+ * Alertas derivadas solo de datos reales (sin inventar alumnos).
+ * Prioridad: sin rutina > inactivo > poca actividad en la semana (con rutina).
+ */
+function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, es) {
+  if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
+  var ses = sesionesGlobales || [];
+  var out = [];
+  var now = Date.now();
+  alumnos.forEach(function (a) {
+    var cat = catFn(a);
+    var name = coachDisplayName(a);
+    if (!name) return;
+    var initials = coachInitials(a);
+    if (cat === "sin_rutina") {
+      out.push({
+        key: "sr-" + a.id,
+        alumnoId: a.id,
+        initials: initials,
+        name: name,
+        badge: es ? "Sin rutina" : "No routine",
+        bc: C.yel,
+        bd: C.yelDim,
+        desc: es ? "No tiene rutina asignada en el sistema." : "No routine assigned.",
+        severity: 0,
+      });
+      return;
+    }
+    if (cat === "inactivo") {
+      out.push({
+        key: "in-" + a.id,
+        alumnoId: a.id,
+        initials: initials,
+        name: name,
+        badge: es ? "Sin actividad reciente" : "Inactive",
+        bc: C.red,
+        bd: C.redDim,
+        desc: es
+          ? "Sin sesiones ni registros en las últimas 3 semanas."
+          : "No sessions or logs in the last 3 weeks.",
+        severity: 1,
+      });
+      return;
+    }
+    var since7 = now - 7 * 86400000;
+    var n7 = countSesionesSince(a, ses, since7);
+    var p7 = countProgresoSince(a, progresoGlobal, since7);
+    if (cat === "activo" && n7 === 0 && p7 === 0) {
+      out.push({
+        key: "wk-" + a.id,
+        alumnoId: a.id,
+        initials: initials,
+        name: name,
+        badge: es ? "Poca actividad" : "Low activity",
+        bc: C.yel,
+        bd: C.yelDim,
+        desc: es
+          ? "Sin sesiones ni registros en la última semana."
+          : "No sessions or logs in the last week.",
+        severity: 2,
+      });
+    }
+  });
+  out.sort(function (x, y) {
+    if (x.severity !== y.severity) return x.severity - y.severity;
+    return String(x.name).localeCompare(String(y.name), es ? "es" : "en");
+  });
+  return out.slice(0, 12);
+}
+
+function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, es) {
+  if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
+  return alumnos
+    .map(function (a) {
+      var cat = catFn(a);
+      var pct = computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal);
+      var lastMs = getLastActivityMs(a, sesionesGlobales, progresoGlobal);
+      var ult = formatUltimaSesion(lastMs, es, cat === "sin_rutina");
+      return {
+        id: a.id,
+        initials: coachInitials(a),
+        name: coachDisplayName(a) || (es ? "Alumno" : "Athlete"),
+        pct: pct,
+        ult: ult,
+        cat: cat,
+      };
+    })
+    .filter(function (row) {
+      return !!row.name;
+    })
+    .sort(function (a, b) {
+      if (a.pct !== b.pct) return a.pct - b.pct;
+      return String(a.name).localeCompare(String(b.name), es ? "es" : "en");
+    });
 }
 
 /**
@@ -180,7 +328,33 @@ export default function CoachDashboard({
   onNuevoEjercicio,
   globalSearchData = { alumnos: [], rutinas: [], ejercicios: [], sesiones: [] },
   onGlobalSearchNavigate,
+  /** (a) => "sin_rutina" | "activo" | "inactivo" — preferentemente coachAlumnoCategoria desde App.jsx */
+  getAlumnoCategoria,
 }) {
+  var catFn = React.useMemo(
+    function () {
+      if (typeof getAlumnoCategoria === "function") return getAlumnoCategoria;
+      return function (a) {
+        return defaultCoachAlumnoCategoria(a, rutinasSBEntrenador, sesionesGlobales, progresoGlobal);
+      };
+    },
+    [getAlumnoCategoria, rutinasSBEntrenador, sesionesGlobales, progresoGlobal]
+  );
+
+  var coachAlertsReal = React.useMemo(
+    function () {
+      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, es);
+    },
+    [alumnos, catFn, sesionesGlobales, progresoGlobal, es]
+  );
+
+  var coachActiveRows = React.useMemo(
+    function () {
+      return buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, es);
+    },
+    [alumnos, catFn, sesionesGlobales, progresoGlobal, es]
+  );
+
   if (activeNav === "progreso") {
     return (
       <ProgresoView
@@ -627,110 +801,129 @@ export default function CoachDashboard({
                 Ver todas →
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 11 }}>
-              {ALERTAS.map((a) => {
-                var alumAlert = coachFindAlumnoForLabel(alumnos, a.n);
-                var alumId = alumAlert && alumAlert.id != null ? alumAlert.id : null;
-                return (
-                <div
-                  key={a.i}
-                  style={{
-                    background: C.cardDark,
-                    border: `1px solid ${C.brd}`,
-                    borderRadius: 9,
-                    padding: 13,
-                  }}
-                >
-                  <div style={{ display: "flex", gap: 9, marginBottom: 6, alignItems: "flex-start" }}>
+            {coachAlertsReal.length === 0 ? (
+              <div
+                style={{
+                  padding: "22px 16px",
+                  textAlign: "center",
+                  borderRadius: 9,
+                  background: C.cardDark,
+                  border: `1px dashed ${C.brd}`,
+                  ...T.body,
+                  color: C.t2,
+                }}
+              >
+                {es
+                  ? "No hay alertas por ahora. Cuando un alumno necesite atención (sin rutina, inactividad o poca actividad semanal), aparecerá acá."
+                  : "No alerts right now. When an athlete needs attention, it will show here."}
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                  gap: 11,
+                }}
+              >
+                {coachAlertsReal.map(function (a) {
+                  var alumId = a.alumnoId;
+                  return (
                     <div
+                      key={a.key}
                       style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: "50%",
-                        background: a.bd,
-                        color: a.bc,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {a.i}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ ...T.bodyLg, color: "#fff" }}>
-                        {a.n}
-                      </div>
-                      <div
-                        style={{
-                          display: "inline-block",
-                          marginTop: 6,
-                          background: a.bd,
-                          color: a.bc,
-                          fontSize: 13,
-                          padding: "3px 9px",
-                          borderRadius: 99,
-                        }}
-                      >
-                        {a.b}
-                      </div>
-                    </div>
-                  </div>
-                  <p style={{ ...T.body, color: C.t2, margin: "6px 0 0 0" }}>
-                    {a.d}
-                  </p>
-                  <div style={{ display: "flex", gap: 7, marginTop: 9 }}>
-                    <button
-                      type="button"
-                      style={{
-                        background: a.bc,
-                        color: "#000",
-                        borderRadius: 5,
-                        padding: "6px 11px",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        border: "none",
-                        cursor: alumId ? "pointer" : "not-allowed",
-                        opacity: alumId ? 1 : 0.45,
-                      }}
-                      disabled={!alumId}
-                      onClick={function () {
-                        if (!alumId || typeof onRevisar !== "function") return;
-                        onRevisar(alumId);
-                      }}
-                    >
-                      REVISAR
-                    </button>
-                    <button
-                      type="button"
-                      style={{
-                        background: "transparent",
+                        background: C.cardDark,
                         border: `1px solid ${C.brd}`,
-                        color: C.t2,
-                        borderRadius: 5,
-                        padding: "6px 11px",
-                        fontSize: 13,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        cursor: alumId ? "pointer" : "not-allowed",
-                        opacity: alumId ? 1 : 0.45,
-                      }}
-                      disabled={!alumId}
-                      onClick={function () {
-                        if (!alumId || typeof onVerPerfil !== "function") return;
-                        onVerPerfil(alumId);
+                        borderRadius: 9,
+                        padding: 13,
                       }}
                     >
-                      VER PERFIL
-                    </button>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
+                      <div style={{ display: "flex", gap: 9, marginBottom: 6, alignItems: "flex-start" }}>
+                        <div
+                          style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: "50%",
+                            background: a.bd,
+                            color: a.bc,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {a.initials}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ ...T.bodyLg, color: "#fff" }}>{a.name}</div>
+                          <div
+                            style={{
+                              display: "inline-block",
+                              marginTop: 6,
+                              background: a.bd,
+                              color: a.bc,
+                              fontSize: 13,
+                              padding: "3px 9px",
+                              borderRadius: 99,
+                            }}
+                          >
+                            {a.badge}
+                          </div>
+                        </div>
+                      </div>
+                      <p style={{ ...T.body, color: C.t2, margin: "6px 0 0 0" }}>{a.desc}</p>
+                      <div style={{ display: "flex", gap: 7, marginTop: 9 }}>
+                        <button
+                          type="button"
+                          style={{
+                            background: a.bc,
+                            color: a.bc === C.yel ? "#0a0a0f" : "#fff",
+                            borderRadius: 5,
+                            padding: "6px 11px",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            border: "none",
+                            cursor: alumId ? "pointer" : "not-allowed",
+                            opacity: alumId ? 1 : 0.45,
+                          }}
+                          disabled={!alumId}
+                          onClick={function () {
+                            if (!alumId || typeof onRevisar !== "function") return;
+                            onRevisar(alumId);
+                          }}
+                        >
+                          REVISAR
+                        </button>
+                        <button
+                          type="button"
+                          style={{
+                            background: "transparent",
+                            border: `1px solid ${C.brd}`,
+                            color: C.t2,
+                            borderRadius: 5,
+                            padding: "6px 11px",
+                            fontSize: 13,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            cursor: alumId ? "pointer" : "not-allowed",
+                            opacity: alumId ? 1 : 0.45,
+                          }}
+                          disabled={!alumId}
+                          onClick={function () {
+                            if (!alumId || typeof onVerPerfil !== "function") return;
+                            onVerPerfil(alumId);
+                          }}
+                        >
+                          VER PERFIL
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div>
@@ -815,105 +1008,133 @@ export default function CoachDashboard({
                   cursor: "pointer",
                   padding: 0,
                 }}
+                onClick={function () {
+                  if (typeof onRevisarAlumnos === "function") onRevisarAlumnos();
+                }}
               >
                 Ver todos →
               </button>
             </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 165px 132px",
-                gap: 10,
-                paddingBottom: 8,
-                borderBottom: `1px solid #1e1e2e33`,
-              }}
-            >
-              {["ALUMNO", "CUMPLIMIENTO", "ÚLTIMA SESIÓN"].map((h) => (
+            {coachActiveRows.length === 0 ? (
+              <div
+                style={{
+                  padding: "22px 12px",
+                  textAlign: "center",
+                  ...T.body,
+                  color: C.t2,
+                  borderRadius: 8,
+                  background: C.cardDark,
+                  border: `1px dashed ${C.brd}`,
+                }}
+              >
+                {es
+                  ? "Todavía no tenés alumnos cargados. Agregá alumnos desde Alumnos o con «Crear»."
+                  : "No athletes yet. Add them from Athletes or «Create»."}
+              </div>
+            ) : (
+              <div style={{ maxHeight: 440, overflowY: "auto" }}>
                 <div
-                  key={h}
-                  style={{
-                    ...T.tableHeader,
-                    color: C.t2,
-                    letterSpacing: 0.08,
-                  }}
-                >
-                  {h}
-                </div>
-              ))}
-            </div>
-            {TABLA.map((row, idx) => {
-              const col = pctColor(row.p);
-              return (
-                <div
-                  key={row.i + row.n}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "1fr 165px 132px",
                     gap: 10,
-                    alignItems: "center",
-                    padding: "9px 0",
-                    borderBottom: idx < TABLA.length - 1 ? "1px solid #1e1e2e33" : "none",
+                    paddingBottom: 8,
+                    borderBottom: `1px solid #1e1e2e33`,
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  {["ALUMNO", "CUMPLIMIENTO", "ÚLTIMA SESIÓN"].map((h) => (
                     <div
+                      key={h}
                       style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "50%",
-                        background: col + "22",
-                        color: col,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        flexShrink: 0,
+                        ...T.tableHeader,
+                        color: C.t2,
+                        letterSpacing: 0.08,
                       }}
                     >
-                      {row.i}
+                      {h}
                     </div>
-                    <span
-                      style={{
-                        ...T.body,
-                        color: C.t,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {row.n}
-                    </span>
-                  </div>
-                  <div>
-                    <div style={{ ...T.bodySemibold, color: col, fontWeight: 700 }}>
-                      {row.p}%
-                    </div>
-                    <div
-                      style={{
-                        height: 7,
-                        background: C.brd,
-                        borderRadius: 3,
-                        marginTop: 5,
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: row.p + "%",
-                          height: "100%",
-                          background: col,
-                          borderRadius: 3,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div style={{ ...T.subtitle, color: sesionColor(row.s) }}>
-                    {row.s}
-                  </div>
+                  ))}
                 </div>
-              );
-            })}
+                {coachActiveRows.map(function (row, idx) {
+                  var col = pctColor(row.pct);
+                  return (
+                    <div
+                      key={String(row.id)}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 165px 132px",
+                        gap: 10,
+                        alignItems: "center",
+                        padding: "9px 0",
+                        borderBottom: idx < coachActiveRows.length - 1 ? "1px solid #1e1e2e33" : "none",
+                        cursor: typeof onVerPerfil === "function" ? "pointer" : "default",
+                      }}
+                      onClick={function () {
+                        if (typeof onVerPerfil === "function") onVerPerfil(row.id);
+                      }}
+                      role={typeof onVerPerfil === "function" ? "button" : undefined}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: "50%",
+                            background: col + "22",
+                            color: col,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {row.initials}
+                        </div>
+                        <span
+                          style={{
+                            ...T.body,
+                            color: C.t,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {row.name}
+                        </span>
+                      </div>
+                      <div>
+                        <div style={{ ...T.bodySemibold, color: col, fontWeight: 700 }}>
+                          {row.pct}%
+                        </div>
+                        <div
+                          style={{
+                            height: 7,
+                            background: C.brd,
+                            borderRadius: 3,
+                            marginTop: 5,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: row.pct + "%",
+                              height: "100%",
+                              background: col,
+                              borderRadius: 3,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ ...T.subtitle, color: sesionColor(row.ult) }}>
+                        {row.ult}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

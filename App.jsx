@@ -2499,6 +2499,7 @@ function GymApp() {
                 }}
                 globalSearchData={coachGlobalSearchData}
                 onGlobalSearchNavigate={coachGlobalSearchNavigate}
+                getAlumnoCategoria={coachAlumnoCategoria}
               />
         )}
         {(tab === "settings" || tab === "perfil") && showCoachDesktopShell && !esAlumno && sessionData?.role === "entrenador" && sessionData && (
