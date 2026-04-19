@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 
+/**
+ * Campo de texto controlado. Misma API: label, value, onChange, type, placeholder, suffix, helpText, className
+ */
 export default function Field({
   label,
   value,
@@ -7,6 +10,8 @@ export default function Field({
   type = 'text',
   placeholder,
   suffix,
+  helpText,
+  className = '',
 }) {
   const [show, setShow] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -14,24 +19,18 @@ export default function Field({
   const inputType = isPwd && show ? 'text' : type;
 
   return (
-    <div className="w-full space-y-2">
+    <div className={`flex min-w-0 flex-col gap-2 ${className}`.trim()}>
       {label ? (
-        <div
-          className="text-[9px] font-medium uppercase tracking-[0.1em] text-[#64748b]"
-          style={{ fontFamily: 'inherit' }}
-        >
-          {label}
-        </div>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</span>
       ) : null}
       <div
-        className={`flex min-h-[36px] w-full items-stretch overflow-hidden rounded-lg border bg-white/5 transition-[border-color,box-shadow] duration-150 ${
-          focused ? 'border-[#2563EB]' : 'border-white/10'
+        className={`flex min-h-[44px] w-full min-w-0 items-stretch rounded-xl border bg-white/[0.03] transition-colors duration-150 ${
+          focused ? 'border-blue-500/80 ring-2 ring-blue-500/20' : 'border-white/[0.09]'
         }`}
-        style={focused ? { boxShadow: '0 0 0 3px rgba(37,99,235,0.14)' } : undefined}
       >
         <input
-          className="min-h-[36px] min-w-0 flex-1 border-0 bg-transparent px-[11px] py-[9px] text-xs leading-snug text-white outline-none placeholder:text-white/40 disabled:opacity-50"
-          style={{ fontFamily: 'inherit', fontSize: '12px' }}
+          className="min-h-[44px] min-w-0 flex-1 border-0 bg-transparent px-3.5 py-2.5 text-[13px] leading-snug text-white outline-none placeholder:text-white/35 disabled:opacity-50"
+          style={{ fontFamily: 'inherit' }}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           type={inputType}
@@ -42,7 +41,7 @@ export default function Field({
         {isPwd ? (
           <button
             type="button"
-            className="flex min-h-[36px] min-w-[36px] shrink-0 items-center justify-center border-0 bg-transparent px-1 text-white/50 transition-colors hover:text-white"
+            className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center border-0 bg-transparent text-white/45 transition-colors hover:text-white"
             onClick={() => setShow((v) => !v)}
             aria-label={show ? 'Ocultar contraseña' : 'Mostrar contraseña'}
           >
@@ -60,9 +59,10 @@ export default function Field({
           </button>
         ) : null}
         {suffix && !isPwd ? (
-          <span className="flex items-center pr-3 text-[11px] text-white/50">{suffix}</span>
+          <span className="flex items-center pr-3.5 text-[11px] text-white/45">{suffix}</span>
         ) : null}
       </div>
+      {helpText ? <p className="text-xs leading-relaxed text-white/40">{helpText}</p> : null}
     </div>
   );
 }

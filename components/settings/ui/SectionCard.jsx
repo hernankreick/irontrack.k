@@ -1,26 +1,35 @@
 import React from 'react';
 
+/**
+ * Panel de sección (Settings v2). Solo presentación: título, subtítulo, cuerpo.
+ * Props estables: title, subtitle, children, titleDanger, dangerTone
+ */
 export default function SectionCard({ title, subtitle, children, titleDanger, dangerTone }) {
-  const shell = dangerTone
-    ? 'border border-red-500/30 bg-red-500/5'
-    : 'border border-white/[0.07] bg-[#0d1424]';
-  const headBorder = dangerTone ? 'border-red-500/20' : 'border-white/[0.07]';
+  const frame = dangerTone
+    ? 'border border-red-500/30 bg-gradient-to-b from-red-950/40 to-[#0a0f18]'
+    : 'border border-white/[0.07] bg-[#0b111c]/90';
+
   return (
     <section
-      className={`group w-full overflow-hidden rounded-2xl p-4 transition-shadow duration-300 ${shell} md:hover:-translate-y-0.5 md:hover:shadow-[0_12px_32px_rgba(0,0,0,0.35)]`}
+      className={`relative w-full min-w-0 overflow-hidden rounded-2xl ${frame} shadow-[0_0_0_1px_rgba(255,255,255,0.03)_inset,0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-md`}
     >
-      {title ? (
-        <div className={`mb-4 space-y-2 border-b ${headBorder} pb-4 lg:mb-5 lg:pb-5`}>
-          <h3
-            className={`text-xs font-semibold tracking-tight ${titleDanger ? 'text-red-400' : 'text-white'}`}
-            style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '12px' }}
-          >
-            {title}
-          </h3>
-          {subtitle ? <p className="text-sm text-white/60">{subtitle}</p> : null}
-        </div>
-      ) : null}
-      <div className="space-y-5 lg:space-y-6">{children}</div>
+      <div className="px-6 py-7 sm:px-8 sm:py-8 lg:px-10 lg:py-9">
+        {title ? (
+          <header className="mb-8 border-b border-white/[0.06] pb-7">
+            {titleDanger || dangerTone ? (
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-400/90">Acción sensible</p>
+            ) : null}
+            <h2
+              className={`${titleDanger || dangerTone ? 'mt-2' : ''} text-lg font-semibold tracking-tight sm:text-xl ${titleDanger || dangerTone ? 'text-red-100' : 'text-white'}`}
+              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+            >
+              {title}
+            </h2>
+            {subtitle ? <p className="mt-3 text-sm leading-relaxed text-white/50">{subtitle}</p> : null}
+          </header>
+        ) : null}
+        <div className="flex min-w-0 flex-col gap-8 lg:gap-10">{children}</div>
+      </div>
     </section>
   );
 }

@@ -145,110 +145,120 @@ export default function SectionPreferencias({ lang, setLang, darkMode, setDarkMo
     },
   ];
 
+  const rowShell = 'rounded-2xl border border-white/[0.07] bg-white/[0.02] px-5 py-5 sm:px-6 sm:py-6';
+
   return (
-    <div className="flex flex-col space-y-8">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-6 xl:gap-8">
-        <SectionCard title="Idioma" subtitle="Seleccioná el idioma de la interfaz.">
-          <div className="space-y-4">
-            <h3 className="mb-6 block text-lg font-semibold text-white">Idioma de la interfaz</h3>
-            <div className="flex flex-wrap gap-3">
-            {langCards.map((c) => {
-              const selected = locale === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => {
-                    setLocale(c.id);
-                    const p = { ...readPrefs(), lang: c.id, theme, tz };
-                    if (!readPrefs()) Object.assign(p, { theme, tz });
-                    persist({ lang: c.id, theme, tz });
-                  }}
-                  className={`flex h-11 min-h-[44px] min-w-[100px] flex-1 flex-col items-center justify-center gap-3 rounded-lg border px-5 py-3 text-center text-sm font-medium transition-all sm:flex-initial ${
-                    selected
-                      ? 'border-blue-500 bg-blue-500/20 text-blue-400'
-                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
-                  }`}
-                >
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-xs font-bold text-white/90">
-                    {c.abbr}
-                  </span>
-                  <span className="font-semibold text-white">{c.label}</span>
-                </button>
-              );
-            })}
+    <div className="flex min-w-0 flex-col gap-8 pb-4 lg:pb-0">
+      <SectionCard title="Apariencia" subtitle="Idioma de la interfaz y modo visual.">
+        <div className={`${rowShell}`}>
+          <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-12 lg:items-center lg:gap-8">
+            <div className="lg:col-span-4">
+              <p className="text-sm font-semibold text-white">Idioma</p>
+              <p className="mt-1 text-sm text-white/45">Afecta textos de la app donde aplique.</p>
+            </div>
+            <div className="flex min-w-0 flex-wrap gap-2 lg:col-span-8 lg:justify-end">
+              {langCards.map((c) => {
+                const selected = locale === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setLocale(c.id);
+                      const p = { ...readPrefs(), lang: c.id, theme, tz };
+                      if (!readPrefs()) Object.assign(p, { theme, tz });
+                      persist({ lang: c.id, theme, tz });
+                    }}
+                    className={`inline-flex min-h-[44px] min-w-[5.5rem] flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-all sm:flex-none ${
+                      selected
+                        ? 'border-blue-500/70 bg-blue-500/15 text-blue-100'
+                        : 'border-white/[0.08] bg-transparent text-white/70 hover:border-white/[0.14] hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-white/80">{c.abbr}</span>
+                    {c.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </SectionCard>
+        </div>
 
-        <SectionCard title="Tema" subtitle="Apariencia clara u oscura.">
-          <div className="space-y-4">
-            <h3 className="mb-6 block text-lg font-semibold text-white">Apariencia</h3>
-            <div className="flex flex-wrap gap-3">
-            {themeCards.map((c) => {
-              const selected = theme === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => {
-                    setTheme(c.id);
-                    persist({ lang: locale, theme: c.id, tz });
-                  }}
-                  className={`flex h-11 min-h-[44px] min-w-[100px] flex-1 items-center justify-center gap-3 rounded-lg border px-5 py-3 text-sm font-medium transition-all sm:flex-initial ${
-                    selected
-                      ? 'border-blue-500 bg-blue-500/20 text-blue-400'
-                      : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
-                  }`}
-                >
-                  <span className="flex size-12 shrink-0 items-center justify-center text-white/90">{c.icon}</span>
-                  <span className="font-semibold">{c.label}</span>
-                </button>
-              );
-            })}
+        <div className={`${rowShell}`}>
+          <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-12 lg:items-center lg:gap-8">
+            <div className="lg:col-span-4">
+              <p className="text-sm font-semibold text-white">Tema</p>
+              <p className="mt-1 text-sm text-white/45">Claro, oscuro o siguiendo al sistema.</p>
+            </div>
+            <div className="flex min-w-0 flex-wrap gap-2 lg:col-span-8 lg:justify-end">
+              {themeCards.map((c) => {
+                const selected = theme === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setTheme(c.id);
+                      persist({ lang: locale, theme: c.id, tz });
+                    }}
+                    className={`inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-all sm:flex-none sm:px-5 ${
+                      selected
+                        ? 'border-blue-500/70 bg-blue-500/15 text-blue-100'
+                        : 'border-white/[0.08] bg-transparent text-white/70 hover:border-white/[0.14] hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <span className="text-white/80">{c.icon}</span>
+                    {c.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </SectionCard>
-      </div>
+        </div>
+      </SectionCard>
 
-      <SectionCard title="Zona horaria" subtitle="Referencia para recordatorios y vistas de calendario.">
-        <div className="space-y-4">
-          <h3 className="mb-6 block text-lg font-semibold text-white">Referencia horaria</h3>
-          <div className="space-y-2">
-          <label className="block text-sm font-medium text-white/80" htmlFor="it-settings-tz">
-            Zona horaria
-          </label>
-          <select
-            id="it-settings-tz"
-            className="h-11 min-h-[44px] w-full rounded-lg border border-white/10 bg-white/5 px-4 text-[15px] text-white outline-none transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            style={{
-              fontFamily: 'inherit',
-            }}
-            value={tz}
-            onChange={(e) => {
-              const v = e.target.value;
-              setTz(v);
-              writePrefs({ lang: locale, theme, tz: v });
-            }}
-          >
-            {TZ_OPTIONS.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+      <SectionCard title="Comportamiento" subtitle="Preferencias que impactan cómo se interpreta el tiempo en la app.">
+        <div className={rowShell}>
+          <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-12 lg:items-end lg:gap-8">
+            <div className="lg:col-span-4">
+              <label className="text-sm font-semibold text-white" htmlFor="it-settings-tz">
+                Zona horaria
+              </label>
+              <p className="mt-1 text-sm text-white/45">Referencia para calendarios y recordatorios.</p>
+            </div>
+            <div className="min-w-0 lg:col-span-8">
+              <select
+                id="it-settings-tz"
+                className="h-12 w-full min-w-0 rounded-xl border border-white/[0.09] bg-[#070b14] px-4 text-[15px] text-white outline-none transition-colors focus:border-blue-500/80 focus:ring-2 focus:ring-blue-500/20"
+                style={{ fontFamily: 'inherit' }}
+                value={tz}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setTz(v);
+                  writePrefs({ lang: locale, theme, tz: v });
+                }}
+              >
+                {TZ_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </SectionCard>
 
       <StickyActionBar>
-        <Btn className="w-full" onClick={onSave}>
+        <Btn className="h-12 w-full text-[12px]" onClick={onSave}>
           GUARDAR PREFERENCIAS
         </Btn>
       </StickyActionBar>
 
-      <div className="mt-8 hidden sm:flex">
-        <Btn onClick={onSave}>GUARDAR PREFERENCIAS</Btn>
+      <div className="hidden border-t border-white/[0.08] pt-8 lg:flex lg:justify-end">
+        <Btn className="h-12 px-8 text-[12px]" onClick={onSave}>
+          GUARDAR PREFERENCIAS
+        </Btn>
       </div>
     </div>
   );
