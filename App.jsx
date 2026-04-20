@@ -2912,6 +2912,7 @@ function GymApp() {
         {(tab === "settings" || tab === "perfil") && showCoachDesktopShell && !esAlumno && sessionData?.role === "entrenador" && sessionData && (
           <SettingsPage
             key={tab}
+            embedInMainColumn
             coach={sessionData}
             onClose={function () {
               setTab("plan");
@@ -3614,7 +3615,7 @@ function GymApp() {
           </div>
         )}
         {tab==="alumnos"&&sessionData?.role==="entrenador"&&(
-          <div className="min-w-0 max-w-full" style={{background:"#0a0f1a",marginLeft:showCoachDesktopShell?0:-4,marginRight:showCoachDesktopShell?0:-4,padding:"8px 4px 20px",borderRadius:12}}>
+          <div className="min-w-0 max-w-full" style={{background:"#0a0f1a",marginLeft:showCoachDesktopShell?0:-4,marginRight:showCoachDesktopShell?0:-4,padding:"8px 0 20px",borderRadius:12}}>
             <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
               <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:"#fff",minWidth:0,flex:"1 1 12rem"}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",flexShrink:0}}>

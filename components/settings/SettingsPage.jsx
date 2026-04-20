@@ -557,6 +557,8 @@ export default function SettingsPage({
   lang, setLang, darkMode, setDarkMode, es,
   alumnosCount, rutinasActivasCount, sesionesGlobales,
   sb, entrenadorId, initialSection = 'perfil',
+  /** Coach (tab settings/perfil): flujo en columna con el mismo gutter que Dashboard/Alumnos (px-4 sm:px-5 lg:px-6). Si false, overlay pantalla completa. */
+  embedInMainColumn = false,
 }) {
   const [active, setActive] = useState(
     SECTIONS.some(s => s.id === initialSection) ? initialSection : 'perfil'
@@ -578,17 +580,35 @@ export default function SettingsPage({
   const TABS = { perfil: TabPerfil, preferencias: TabPreferencias, negocio: TabNegocio, suscripcion: TabSuscripcion, notificaciones: TabNotificaciones, riesgo: TabRiesgo };
   const ActiveTab = TABS[active] || TabPerfil;
 
+  const embed = embedInMainColumn;
+
   return (
-    <div style={{
+    <div style={embed ? {
+      position: 'relative',
+      flex: 1,
+      minHeight: 0,
+      display: 'flex',
+      flexDirection: 'column',
+      width: '100%',
+      overflow: 'hidden',
+      background: C.bg,
+      color: C.text,
+      fontFamily: "'DM Sans', sans-serif",
+      borderRadius: 12,
+      boxSizing: 'border-box',
+    } : {
       position: 'fixed', inset: 0, zIndex: 220,
       display: 'flex', flexDirection: 'column',
       background: C.bg, color: C.text,
       fontFamily: "'DM Sans', sans-serif",
     }}>
-      {/* HEADER */}
+      {/* HEADER — en embed el padding horizontal lo aplica el contenedor padre (misma columna que Alumnos/Rutinas) */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: 52, flexShrink: 0,
+        padding: embed ? '12px 0' : '0 24px',
+        minHeight: 52,
+        height: embed ? undefined : 52,
+        flexShrink: 0,
         borderBottom: `1px solid ${C.border}`, background: '#0D1117',
       }}>
         <div>
@@ -611,9 +631,10 @@ export default function SettingsPage({
           borderRight: `1px solid ${C.border}`,
           background: '#0D1117',
           display: 'flex', flexDirection: 'column',
-          overflowY: 'auto', padding: '16px 10px',
+          overflowY: 'auto',
+          padding: embed ? '16px 8px 16px 0' : '16px 10px',
         }}>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', color: C.muted, padding: '4px 8px 10px' }}>Navegación</div>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', color: C.muted, padding: embed ? '4px 0 10px' : '4px 8px 10px' }}>Navegación</div>
           {SECTIONS.map((s, i) => {
             const isActive = active === s.id;
             return (
@@ -640,8 +661,11 @@ export default function SettingsPage({
 
         {/* CONTENT */}
         <main style={{
-          flex: 1, overflowY: 'auto', padding: '24px 28px',
+          flex: 1,
+          overflowY: 'auto',
+          padding: embed ? '24px 0 24px 20px' : '24px 28px',
           background: C.bg,
+          boxSizing: 'border-box',
         }}>
           <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 22, fontFamily: 'Bebas Neue, sans-serif', letterSpacing: 2 }}>

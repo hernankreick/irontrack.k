@@ -37,9 +37,12 @@ function getRowButtonStyle(opts) {
   return {
     display: "flex",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     padding: collapsed ? "12px 10px" : "10px 12px",
-    justifyContent: collapsed ? "center" : "flex-start",
+    /** Con padding horizontal INNER_PAD_X en <nav> / sección inferior, no duplicar margen izquierdo. */
+    paddingLeft: 0,
+    /** Siempre alinear contenido a la izquierda; el centrado hacía que ítems y logo parecieran “flotando”. */
+    justifyContent: "flex-start",
     border: "none",
     borderRadius: 10,
     cursor: "pointer",
@@ -97,7 +100,7 @@ function useDesktopMin1024() {
 /** Logo compacto: solo barras (estado colapsado) */
 function LogoCompact() {
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 3, height: 24 }}>
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-start", gap: 3, height: 24 }}>
       <div style={{ width: 3, height: 18, background: DS.primaryLight, borderRadius: 2 }} />
       <div style={{ width: 3, height: 24, background: DS.primary, borderRadius: 2 }} />
       <div style={{ width: 3, height: 14, background: "#1D4ED8", borderRadius: 2 }} />
@@ -237,20 +240,23 @@ export default function DesktopSidebar({
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
-          paddingLeft: INNER_PAD_X,
-          paddingRight: INNER_PAD_X,
+          paddingLeft: 0,
+          paddingRight: 0,
           boxSizing: "border-box",
         }}
       >
       <nav
         style={{
           flexShrink: 0,
+          width: "100%",
+          alignSelf: "stretch",
           display: "flex",
           flexDirection: "column",
           gap: 4,
-          padding: "2px 0 12px 0",
+          padding: "2px " + INNER_PAD_X + "px 12px " + INNER_PAD_X + "px",
           justifyContent: "flex-start",
           alignItems: "stretch",
+          boxSizing: "border-box",
         }}
         aria-label="Navegación principal"
       >
@@ -286,7 +292,7 @@ export default function DesktopSidebar({
                 <span
                   style={{
                     position: "absolute",
-                    left: 0,
+                    left: -12,
                     top: "50%",
                     width: 3,
                     height: 22,
@@ -308,10 +314,13 @@ export default function DesktopSidebar({
       <div
         style={{
           flexShrink: 0,
-          padding: "8px 0 16px 0",
+          width: "100%",
+          alignSelf: "stretch",
+          padding: "8px " + INNER_PAD_X + "px 16px " + INNER_PAD_X + "px",
           borderTop: "1px solid " + DS.border,
           display: "flex",
           flexDirection: "column",
+          alignItems: "stretch",
           gap: 4,
           boxSizing: "border-box",
         }}
@@ -350,7 +359,7 @@ export default function DesktopSidebar({
             <span
               style={{
                 position: "absolute",
-                left: 0,
+                left: -12,
                 top: "50%",
                 width: 3,
                 height: 22,
@@ -397,7 +406,7 @@ export default function DesktopSidebar({
             <span
               style={{
                 position: "absolute",
-                left: 0,
+                left: -12,
                 top: "50%",
                 width: 3,
                 height: 22,

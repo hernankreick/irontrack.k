@@ -30,6 +30,26 @@ const C = {
   redDim: "#450a0a",
 };
 
+/** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
+export const NAV_ITEM_PAD = "10px 12px";
+
+/** Estilo unificado para filas tipo nav (icono + texto) dentro del dashboard */
+export function navItemStyle(isActive) {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: NAV_ITEM_PAD,
+    borderRadius: 8,
+    cursor: "pointer",
+    backgroundColor: isActive ? "#1E3A5F" : "transparent",
+    color: isActive ? "#3B82F6" : "#94A3B8",
+    fontFamily: "DM Sans, system-ui, sans-serif",
+    fontSize: 14,
+    fontWeight: isActive ? 600 : 400,
+  };
+}
+
 const WEEK_BARS = [
   { d: "L", p: 100 },
   { d: "M", p: 100 },
@@ -525,7 +545,7 @@ export default function CoachDashboard({
                 boxSizing: "border-box",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: S.blockGap }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
                 <Info size={16} color={C.t2} strokeWidth={2} />
                 <span style={{ ...T.cardTitleSemibold, color: C.t }}>
                   Cumplimiento semanal
@@ -655,7 +675,7 @@ export default function CoachDashboard({
                 alignSelf: "stretch",
               }}
             >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: S.blockGap }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
                   <Info size={16} color={C.t2} strokeWidth={2} />
                   <span style={{ ...T.cardTitleSemibold, color: C.t }}>
                     Tu rendimiento
@@ -735,7 +755,7 @@ export default function CoachDashboard({
                 marginBottom: S.blockGap,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <AlertCircle size={17} color={C.yel} strokeWidth={2} />
                 <span style={{ ...T.cardTitleSemibold, color: C.t }}>
                   Alertas inteligentes
@@ -761,7 +781,7 @@ export default function CoachDashboard({
             {coachAlertsReal.length === 0 ? (
               <div
                 style={{
-                  padding: "22px 16px",
+                  padding: "22px 12px",
                   textAlign: "center",
                   borderRadius: 9,
                   background: C.cardDark,
@@ -1073,7 +1093,8 @@ export default function CoachDashboard({
                     display: "grid",
                     gridTemplateColumns: "1fr 165px 132px",
                     gap: 10,
-                    paddingBottom: 8,
+                    padding: "10px 12px 8px",
+                    boxSizing: "border-box",
                     borderBottom: `1px solid #1e1e2e33`,
                   }}
                 >
@@ -1100,7 +1121,8 @@ export default function CoachDashboard({
                         gridTemplateColumns: "1fr 165px 132px",
                         gap: 10,
                         alignItems: "center",
-                        padding: "9px 0",
+                        padding: NAV_ITEM_PAD,
+                        boxSizing: "border-box",
                         borderBottom: idx < coachActiveRows.length - 1 ? "1px solid #1e1e2e33" : "none",
                         cursor: typeof onVerPerfil === "function" ? "pointer" : "default",
                       }}
