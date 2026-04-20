@@ -958,6 +958,7 @@ function GymApp() {
   const [resumenSesion, setResumenSesion] = useState(null);
   const [chatOpenId, setChatOpenId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileEdit, setProfileEdit] = useState({nombre:"",apellido:"",email:"",phone:"",avatarDataUrl:null});
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -992,6 +993,7 @@ function GymApp() {
   const [aliasForm, setAliasForm] = useState({alias:"",cbu:"",monto:"",banco:"",nota:""});
   const [timer, setTimer] = useState(null);
   const timerRef = useRef(null);
+  const mobileDrawerRef = useRef(null);
 
   var ALUMNO_HEADER_MINI_PX = 56;
   /** Colapso visual únicamente: NO quitar nodos ni height:0. La caja real la fija studentHeaderShellRef (altura monótona). */
@@ -1867,6 +1869,61 @@ function GymApp() {
     !esAlumno &&
     (coachDesktopBleedTab ||
       (coachDesktop1024 && (tab === "alumnos" || tab === "routines" || tab === "biblioteca")));
+  useEffect(() => {
+    if (coachDesktop1024) return; // solo mobile
+    const appEl = document.getElementById("app-root") || document.body;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let dragging = false;
+    let axisLocked = false;
+
+    function onTouchStart(e) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      dragging = false;
+      axisLocked = false;
+      const fromLeft = touchStartX;
+      // abrir: swipe desde borde izquierdo (≤40px); cerrar: drawer abierto
+      if (!mobileDrawerOpen && fromLeft > 40) return;
+      dragging = true;
+    }
+
+    function onTouchMove(e) {
+      if (!dragging) return;
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+      if (!axisLocked) {
+        if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+        axisLocked = true;
+        if (Math.abs(dy) > Math.abs(dx)) {
+          dragging = false;
+          return;
+        }
+      }
+      e.preventDefault();
+    }
+
+    function onTouchEnd(e) {
+      if (!dragging) return;
+      dragging = false;
+      axisLocked = false;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (mobileDrawerOpen) {
+        if (dx < -50) setMobileDrawerOpen(false);
+      } else {
+        if (dx > 50) setMobileDrawerOpen(true);
+      }
+    }
+
+    appEl.addEventListener("touchstart", onTouchStart, { passive: true });
+    appEl.addEventListener("touchmove", onTouchMove, { passive: false });
+    appEl.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      appEl.removeEventListener("touchstart", onTouchStart);
+      appEl.removeEventListener("touchmove", onTouchMove);
+      appEl.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [coachDesktop1024, mobileDrawerOpen]);
   const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
@@ -2245,7 +2302,44 @@ function GymApp() {
           boxShadow: alumnoTopBarFixed ? "0 8px 24px rgba(0,0,0,.18)" : undefined,
         }}
       >
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {showCoachDesktopShell && !coachDesktop1024 && (
+            <button
+              onClick={() => setMobileDrawerOpen(true)}
+              style={{
+                width: 34,
+                height: 34,
+                background: "#111827",
+                border: "1px solid #1A2535",
+                borderRadius: 9,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+                position: "relative",
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="3" y1="7" x2="21" y2="7" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="17" x2="21" y2="17" />
+              </svg>
+              {/* dot rojo si hay notificaciones pendientes */}
+              <span
+                style={{
+                  position: "absolute",
+                  top: 5,
+                  right: 5,
+                  width: 7,
+                  height: 7,
+                  background: "#ef4444",
+                  borderRadius: "50%",
+                  border: "1.5px solid #0B0E11",
+                }}
+              />
+            </button>
+          )}
           <IronTrackLogo
             size={22}
             color="#2563EB"
@@ -2524,6 +2618,296 @@ function GymApp() {
                 onGlobalSearchNavigate={coachGlobalSearchNavigate}
                 getAlumnoCategoria={coachAlumnoCategoria}
               />
+        )}
+        {/* ── MOBILE DRAWER (solo entrenador, solo mobile) ── */}
+        {showCoachDesktopShell && !coachDesktop1024 && (
+          <>
+            {/* Overlay */}
+            <div
+              onClick={() => setMobileDrawerOpen(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 200,
+                background: "rgba(0,0,0,0.65)",
+                backdropFilter: "blur(2px)",
+                WebkitBackdropFilter: "blur(2px)",
+                opacity: mobileDrawerOpen ? 1 : 0,
+                pointerEvents: mobileDrawerOpen ? "all" : "none",
+                transition: "opacity .28s ease",
+              }}
+            />
+
+            {/* Drawer */}
+            <div
+              ref={mobileDrawerRef}
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                bottom: 0,
+                width: 260,
+                zIndex: 201,
+                background: "#111827",
+                borderRight: "1px solid #1A2535",
+                display: "flex",
+                flexDirection: "column",
+                transform: mobileDrawerOpen ? "translateX(0)" : "translateX(-100%)",
+                transition: "transform .3s cubic-bezier(.32,.72,0,1)",
+                overflowY: "auto",
+                overflowX: "hidden",
+              }}
+            >
+              {/* Header del drawer */}
+              <div style={{ padding: "20px 16px 14px", borderBottom: "1px solid #1A2535", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
+                  <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: "-.3px" }}>
+                    <span style={{ color: "#2563EB" }}>IRON</span>
+                    <span style={{ color: "#fff" }}>TRACK</span>
+                  </span>
+                  <span
+                    style={{
+                      background: "rgba(37,99,235,.15)",
+                      border: "1px solid rgba(59,130,246,.3)",
+                      color: "#3B82F6",
+                      fontSize: 8,
+                      fontWeight: 700,
+                      borderRadius: 99,
+                      padding: "2px 7px",
+                      letterSpacing: ".5px",
+                    }}
+                  >
+                    PRO
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg,#1d4ed8,#2563EB)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: "#fff",
+                      border: "2px solid rgba(59,130,246,.4)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {(sessionData?.name || "E").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{sessionData?.name || "Entrenador"}</div>
+                    <div style={{ color: "#64748b", fontSize: 10, marginTop: 2 }}>Entrenador personal</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body scrollable */}
+              <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+                {/* PRINCIPAL */}
+                <div
+                  style={{
+                    color: "#374151",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "1.2px",
+                    textTransform: "uppercase",
+                    padding: "10px 16px 4px",
+                  }}
+                >
+                  PRINCIPAL
+                </div>
+
+                {[
+                  { k: "plan", icon: "calendar", label: es ? "Dashboard" : "Dashboard", sub: null },
+                  { k: "alumnos", icon: "users", label: es ? "Alumnos" : "Athletes", sub: es ? "Gestionar equipo" : "Manage team" },
+                  { k: "routines", icon: "file-text", label: es ? "Rutinas" : "Routines", sub: null },
+                  { k: "biblioteca", icon: "activity", label: es ? "Ejercicios" : "Exercises", sub: null },
+                ].map((item) => (
+                  <div
+                    key={item.k}
+                    onClick={() => {
+                      setTab(item.k);
+                      setMobileDrawerOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 16px",
+                      cursor: "pointer",
+                      background: tab === item.k ? "rgba(37,99,235,.1)" : "transparent",
+                      borderLeft: tab === item.k ? "3px solid #2563EB" : "3px solid transparent",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 8,
+                        background: tab === item.k ? "rgba(37,99,235,.15)" : "rgba(148,163,184,.06)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Ic name={item.icon} size={14} color={tab === item.k ? "#3B82F6" : "#94a3b8"} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: tab === item.k ? "#3B82F6" : "#e2e8f0", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
+                      {item.sub && <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{item.sub}</div>}
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ height: 1, background: "#1A2535", margin: "6px 16px" }} />
+
+                {/* PERFIL */}
+                <div
+                  style={{
+                    color: "#374151",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "1.2px",
+                    textTransform: "uppercase",
+                    padding: "10px 16px 4px",
+                  }}
+                >
+                  PERFIL
+                </div>
+
+                {[
+                  { k: "perfil", icon: "user", label: es ? "Mi perfil" : "My profile", sub: es ? "Foto, bio, datos" : "Photo, bio, data" },
+                  { k: "settings", icon: "settings", label: es ? "Configuración" : "Settings", sub: es ? "Preferencias" : "Preferences" },
+                ].map((item) => (
+                  <div
+                    key={item.k}
+                    onClick={() => {
+                      setTab(item.k);
+                      setMobileDrawerOpen(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 16px",
+                      cursor: "pointer",
+                      background: tab === item.k ? "rgba(37,99,235,.1)" : "transparent",
+                      borderLeft: tab === item.k ? "3px solid #2563EB" : "3px solid transparent",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 8,
+                        background: "rgba(37,99,235,.1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Ic name={item.icon} size={14} color="#3B82F6" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
+                      <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{item.sub}</div>
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ height: 1, background: "#1A2535", margin: "6px 16px" }} />
+
+                {/* PAGOS */}
+                <div
+                  style={{
+                    color: "#374151",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: "1.2px",
+                    textTransform: "uppercase",
+                    padding: "10px 16px 4px",
+                  }}
+                >
+                  PAGOS
+                </div>
+
+                {[
+                  { icon: "credit-card", label: es ? "Facturación" : "Billing", sub: "Plan Pro · $29/mes" },
+                  { icon: "dollar-sign", label: es ? "Cobros" : "Payments", sub: es ? "Gestionar cobros" : "Manage payments" },
+                ].map((item, i) => (
+                  <div
+                    key={i}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", cursor: "pointer", opacity: 0.6 }}
+                  >
+                    <div
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 8,
+                        background: "rgba(34,197,94,.1)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Ic name={item.icon} size={14} color="#22c55e" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
+                      <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{item.sub}</div>
+                    </div>
+                    <span
+                      style={{
+                        background: "#1A2535",
+                        color: "#64748b",
+                        fontSize: 8,
+                        borderRadius: 99,
+                        padding: "2px 6px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      PRONTO
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer: cerrar sesión */}
+              <div style={{ borderTop: "1px solid #1A2535", flexShrink: 0 }}>
+                <div
+                  onClick={() => {
+                    clearAllIronTrackPrefixedKeys();
+                    syncStateWithLocalStorage();
+                  }}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", cursor: "pointer" }}
+                >
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 8,
+                      background: "rgba(239,68,68,.1)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Ic name="log-out" size={14} color="#ef4444" />
+                  </div>
+                  <div style={{ color: "#ef4444", fontSize: 12, fontWeight: 600 }}>{es ? "Cerrar sesión" : "Log out"}</div>
+                </div>
+              </div>
+            </div>
+          </>
         )}
         {(tab === "settings" || tab === "perfil") && showCoachDesktopShell && !esAlumno && sessionData?.role === "entrenador" && sessionData && (
           <SettingsPage
