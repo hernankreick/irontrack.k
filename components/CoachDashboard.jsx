@@ -520,8 +520,9 @@ export default function CoachDashboard({
               display: "flex",
               alignItems: "center",
               gap: 8,
+              width: "100%",
               minWidth: 0,
-              ...(isMobile ? { flex: "1 1 100%", width: "100%", maxWidth: "100%" } : { flexShrink: 0 }),
+              ...(isMobile ? { flex: "1 1 100%", maxWidth: "100%" } : { flexShrink: 0 }),
             }}
           >
             {isMobile && (
@@ -555,9 +556,9 @@ export default function CoachDashboard({
             )}
             <div
               style={{
-                position: "relative",
                 flex: 1,
                 minWidth: 0,
+                width: "100%",
                 ...(isMobile ? {} : { maxWidth: 440 }),
               }}
             >
@@ -568,19 +569,19 @@ export default function CoachDashboard({
                 sesiones={globalSearchData.sesiones}
                 onNavigate={onGlobalSearchNavigate}
                 placeholder="Buscar alumno, rutina, ejercicio..."
+                compactInputEnd
               />
             </div>
-            <div style={{ flexShrink: 0 }}>
-              <CoachNotificationCenter
-                es={es}
-                alertRows={coachAlertsReal}
-                alumnos={alumnos}
-                onRevisarAlumno={onRevisar}
-                onIrAlumnos={onRevisarAlumnos}
-                onIrProgreso={onIrProgreso}
-                onAbrirChatAlumno={onAbrirChatAlumno}
-              />
-            </div>
+            <CoachNotificationCenter
+              es={es}
+              alertRows={coachAlertsReal}
+              alumnos={alumnos}
+              onRevisarAlumno={onRevisar}
+              onIrAlumnos={onRevisarAlumnos}
+              onIrProgreso={onIrProgreso}
+              onAbrirChatAlumno={onAbrirChatAlumno}
+              useFixedMobilePanel={isMobile}
+            />
             <GlobalCreateMenu
               onNuevoAlumno={onNuevoAlumno}
               onNuevaRutina={onNuevaRutina}
