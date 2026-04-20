@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Bell, Check, MessageSquare, Target, Trophy, Zap } from "lucide-react";
 
 const LS_READ = "it_coach_notif_read_v1";
@@ -175,11 +176,14 @@ export default function CoachNotificationCenter({
   onIrProgreso,
   /** Opcional: abrir chat con un alumno (p. ej. mensajes entrantes). */
   onAbrirChatAlumno,
+  /** Coach mobile: panel anclado a viewport para que no se corte a la izquierda. */
+  useFixedMobilePanel = false,
 }) {
   var [open, setOpen] = React.useState(false);
   var [filter, setFilter] = React.useState("all");
   var [readIds, setReadIds] = React.useState(loadReadIds);
   var wrapRef = React.useRef(null);
+  var panelRef = React.useRef(null);
 
   var allItems = React.useMemo(
     function () {
@@ -228,7 +232,10 @@ export default function CoachNotificationCenter({
     function () {
       if (!open) return undefined;
       function onDoc(e) {
-        if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+        var t = e.target;
+        var inWrap = wrapRef.current && wrapRef.current.contains(t);
+        var inPanel = panelRef.current && panelRef.current.contains(t);
+        if (!inWrap && !inPanel) setOpen(false);
       }
       function onKey(e) {
         if (e.key === "Escape") setOpen(false);
@@ -281,7 +288,201 @@ export default function CoachNotificationCenter({
     }
   }
 
+  var absolutePanelStyle = {
+    position: "absolute",
+    right: 0,
+    top: "calc(100% + 8px)",
+    width: "min(100vw - 24px, 380px)",
+    maxHeight: "min(70vh, 520px)",
+    background: C.card,
+    border: "1px solid " + C.brd,
+    borderRadius: 12,
+    boxShadow: "0 18px 48px rgba(0,0,0,0.55)",
+    zIndex: 300,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+  };
+
+  /** Viewport real: `fixed` dentro de un ancestro con transform recorta el panel; el portal evita eso. */
+  var fixedMobilePanelStyle = {
+    position: "fixed",
+    top: "calc(8px + env(safe-area-inset-top, 0px) + 120px)",
+    left: "max(12px, env(safe-area-inset-left, 0px))",
+    right: "max(12px, env(safe-area-inset-right, 0px))",
+    width: "auto",
+    maxWidth: "min(100vw - 24px, 480px)",
+    marginLeft: "auto",
+    marginRight: "auto",
+    boxSizing: "border-box",
+    maxHeight: "70vh",
+    background: "#111827",
+    border: "1px solid #1A2535",
+    borderRadius: 14,
+    zIndex: 10050,
+    boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    WebkitOverflowScrolling: "touch",
+  };
+
+  var panelInner = (
+    <>
+      <div
+        style={{
+          padding: "12px 14px",
+          borderBottom: "1px solid " + C.brd,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.t }}>{es ? "Notificaciones" : "Notifications"}</div>
+        {unreadCount > 0 ? (
+          <button
+            type="button"
+            onClick={markAllRead}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: C.blue,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <Check size={14} strokeWidth={2.5} />
+            {es ? "Marcar leídas" : "Mark read"}
+          </button>
+        ) : null}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, padding: "8px 10px 10px", borderBottom: "1px solid " + C.brd, flexShrink: 0 }}>
+        {[
+          { id: "all", label: es ? "Todas" : "All" },
+          { id: "important", label: es ? "Importantes" : "Important" },
+          { id: "unread", label: es ? "No leídas" : "Unread" },
+        ].map(function (t) {
+          var active = filter === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={function () {
+                setFilter(t.id);
+              }}
+              style={{
+                flex: 1,
+                padding: "6px 8px",
+                borderRadius: 8,
+                border: "1px solid " + (active ? C.blue : C.brd),
+                background: active ? "rgba(59,130,246,0.18)" : "transparent",
+                color: active ? "#fff" : C.t2,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        style={{
+          overflowY: "auto",
+          flex: 1,
+          minHeight: 0,
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        {filtered.length === 0 ? (
+          <div style={{ padding: "36px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.35 }}>📭</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.t, marginBottom: 6 }}>{es ? "Sin notificaciones" : "No notifications"}</div>
+            <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.45 }}>
+              {es ? "Cuando haya alertas o mensajes relevantes, aparecerán acá." : "When there are relevant alerts or messages, they will show up here."}
+            </div>
+          </div>
+        ) : (
+          filtered.map(function (item) {
+            var unread = readIds.indexOf(item.id) < 0;
+            var meta = categoryMeta(item.category, es);
+            var Icon = meta.Icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={function () {
+                  runAction(item);
+                }}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  display: "flex",
+                  gap: 10,
+                  padding: "12px 14px",
+                  border: "none",
+                  borderBottom: "1px solid " + C.brd,
+                  background: unread ? "rgba(59,130,246,0.06)" : "transparent",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 9,
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid " + C.brd,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <Icon size={18} color={meta.color} strokeWidth={2} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: meta.color, letterSpacing: 0.3 }}>{meta.label}</span>
+                    {!unread ? (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: C.t2, textTransform: "uppercase" }}>{es ? "Leída" : "Read"}</span>
+                    ) : (
+                      <span style={{ fontSize: 10, fontWeight: 800, color: C.blue, textTransform: "uppercase" }}>{es ? "Nueva" : "New"}</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.t, marginBottom: 2 }}>{item.alumnoName}</div>
+                  <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.35, marginBottom: 4 }}>{item.preview}</div>
+                  <div style={{ fontSize: 11, color: C.t2 }}>{formatRelative(item.atMs, es)}</div>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      <div style={{ padding: "8px 12px", borderTop: "1px solid " + C.brd, fontSize: 11, color: C.t2, flexShrink: 0, lineHeight: 1.35 }}>
+        {es
+          ? "Las alertas de adherencia usan datos reales del equipo. Mensajes y otros eventos son demo hasta conectar backend."
+          : "Adherence alerts use real team data. Messages and other events are demo until backend is wired."}
+      </div>
+    </>
+  );
+
   return (
+    <>
     <div ref={wrapRef} style={{ position: "relative", flexShrink: 0 }}>
       <button
         type="button"
@@ -334,170 +535,30 @@ export default function CoachNotificationCenter({
         ) : null}
       </button>
 
-      {open ? (
+      {open && !useFixedMobilePanel ? (
         <div
+          ref={panelRef}
           role="dialog"
           aria-label={es ? "Centro de notificaciones" : "Notification center"}
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "calc(100% + 8px)",
-            width: "min(100vw - 24px, 380px)",
-            maxHeight: "min(70vh, 520px)",
-            background: C.card,
-            border: "1px solid " + C.brd,
-            borderRadius: 12,
-            boxShadow: "0 18px 48px rgba(0,0,0,0.55)",
-            zIndex: 300,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
+          style={absolutePanelStyle}
         >
-          <div
-            style={{
-              padding: "12px 14px",
-              borderBottom: "1px solid " + C.brd,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ fontSize: 15, fontWeight: 800, color: C.t }}>{es ? "Notificaciones" : "Notifications"}</div>
-            {unreadCount > 0 ? (
-              <button
-                type="button"
-                onClick={markAllRead}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: C.blue,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <Check size={14} strokeWidth={2.5} />
-                {es ? "Marcar leídas" : "Mark read"}
-              </button>
-            ) : null}
-          </div>
-
-          <div style={{ display: "flex", gap: 6, padding: "8px 10px 10px", borderBottom: "1px solid " + C.brd, flexShrink: 0 }}>
-            {[
-              { id: "all", label: es ? "Todas" : "All" },
-              { id: "important", label: es ? "Importantes" : "Important" },
-              { id: "unread", label: es ? "No leídas" : "Unread" },
-            ].map(function (t) {
-              var active = filter === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={function () {
-                    setFilter(t.id);
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: "6px 8px",
-                    borderRadius: 8,
-                    border: "1px solid " + (active ? C.blue : C.brd),
-                    background: active ? "rgba(59,130,246,0.18)" : "transparent",
-                    color: active ? "#fff" : C.t2,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding: "36px 20px", textAlign: "center" }}>
-                <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.35 }}>📭</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.t, marginBottom: 6 }}>{es ? "Sin notificaciones" : "No notifications"}</div>
-                <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.45 }}>
-                  {es ? "Cuando haya alertas o mensajes relevantes, aparecerán acá." : "When there are relevant alerts or messages, they will show up here."}
-                </div>
-              </div>
-            ) : (
-              filtered.map(function (item) {
-                var unread = readIds.indexOf(item.id) < 0;
-                var meta = categoryMeta(item.category, es);
-                var Icon = meta.Icon;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={function () {
-                      runAction(item);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      display: "flex",
-                      gap: 10,
-                      padding: "12px 14px",
-                      border: "none",
-                      borderBottom: "1px solid " + C.brd,
-                      background: unread ? "rgba(59,130,246,0.06)" : "transparent",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      boxSizing: "border-box",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 9,
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid " + C.brd,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Icon size={18} color={meta.color} strokeWidth={2} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: meta.color, letterSpacing: 0.3 }}>{meta.label}</span>
-                        {!unread ? (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: C.t2, textTransform: "uppercase" }}>{es ? "Leída" : "Read"}</span>
-                        ) : (
-                          <span style={{ fontSize: 10, fontWeight: 800, color: C.blue, textTransform: "uppercase" }}>{es ? "Nueva" : "New"}</span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: C.t, marginBottom: 2 }}>{item.alumnoName}</div>
-                      <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.35, marginBottom: 4 }}>{item.preview}</div>
-                      <div style={{ fontSize: 11, color: C.t2 }}>{formatRelative(item.atMs, es)}</div>
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-
-          <div style={{ padding: "8px 12px", borderTop: "1px solid " + C.brd, fontSize: 11, color: C.t2, flexShrink: 0, lineHeight: 1.35 }}>
-            {es
-              ? "Las alertas de adherencia usan datos reales del equipo. Mensajes y otros eventos son demo hasta conectar backend."
-              : "Adherence alerts use real team data. Messages and other events are demo until backend is wired."}
-          </div>
+          {panelInner}
         </div>
       ) : null}
     </div>
+    {open && useFixedMobilePanel && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-label={es ? "Centro de notificaciones" : "Notification center"}
+            style={fixedMobilePanelStyle}
+          >
+            {panelInner}
+          </div>,
+          document.body
+        )
+      : null}
+    </>
   );
 }

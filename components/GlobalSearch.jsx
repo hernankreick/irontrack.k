@@ -79,6 +79,8 @@ export default function GlobalSearch({
   sesiones = [],
   onNavigate,
   placeholder = "Buscar alumno, rutina, ejercicio...",
+  /** Coach dashboard: sin control extra a la derecha del input (menos padding). */
+  compactInputEnd = false,
 }) {
   var wrapRef = useRef(null);
   var inputRef = useRef(null);
@@ -296,7 +298,7 @@ export default function GlobalSearch({
             background: "#111827",
             border: focused || panelOpen ? "1px solid #2563EB" : "1px solid #1a2535",
             borderRadius: 12,
-            padding: "0 48px 0 44px",
+            padding: compactInputEnd ? "0 16px 0 44px" : "0 48px 0 44px",
             color: "#f1f5f9",
             fontSize: 15,
             fontFamily: "'DM Sans', system-ui, sans-serif",

@@ -122,12 +122,6 @@ function pctBracketColor(p) {
   return "#22C55E";
 }
 
-function coachMenuInitialsFromName(name) {
-  var n = (name || "E").trim().split(/\s+/).filter(Boolean);
-  if (n.length >= 2) return (n[0].charAt(0) + n[1].charAt(0)).toUpperCase();
-  return (name || "E").slice(0, 2).toUpperCase();
-}
-
 function estadoTextColor(row) {
   if (row.cat === "sin_rutina") return "#EF4444";
   if (row.cat === "inactivo") return "#F59E0B";
@@ -384,11 +378,6 @@ export default function CoachDashboard({
   onAbrirChatAlumno,
   /** (a) => "sin_rutina" | "activo" | "inactivo" — preferentemente coachAlumnoCategoria desde App.jsx */
   getAlumnoCategoria,
-  /** Mobile menú coach — nombre visible y acciones (App.jsx pasa session + tabs + logout). */
-  nombreEntrenador = "Entrenador",
-  onOpenCoachPerfil,
-  onOpenCoachConfig,
-  onCoachLogout,
 }) {
   var catFn = React.useMemo(
     function () {
@@ -439,10 +428,6 @@ export default function CoachDashboard({
       else mq.removeListener(update);
     };
   }, []);
-
-  var _coachMenu = React.useState(false);
-  var showCoachMenu = _coachMenu[0];
-  var setShowCoachMenu = _coachMenu[1];
 
   if (activeNav === "progreso") {
     return (
@@ -525,35 +510,6 @@ export default function CoachDashboard({
               ...(isMobile ? { flex: "1 1 100%", maxWidth: "100%" } : { flexShrink: 0 }),
             }}
           >
-            {isMobile && (
-              <button
-                type="button"
-                aria-label={es ? "Menú de cuenta" : "Account menu"}
-                onClick={function () {
-                  setShowCoachMenu(true);
-                }}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: "50%",
-                  border: "none",
-                  flexShrink: 0,
-                  background: "linear-gradient(135deg,#1E3A5F,#2563EB)",
-                  color: "#fff",
-                  fontSize: 13,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontFamily: "DM Sans, system-ui, sans-serif",
-                  padding: 0,
-                  boxSizing: "border-box",
-                }}
-              >
-                {coachMenuInitialsFromName(nombreEntrenador)}
-              </button>
-            )}
             <div
               style={{
                 flex: 1,
@@ -1503,153 +1459,6 @@ export default function CoachDashboard({
         </div>
       </div>
 
-      {isMobile && showCoachMenu && (
-        <div
-          role="presentation"
-          style={{
-            position: "fixed",
-            top: 70,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 999,
-            background: "rgba(0,0,0,0.6)",
-            backdropFilter: "blur(4px)",
-            WebkitBackdropFilter: "blur(4px)",
-          }}
-          onClick={function () {
-            setShowCoachMenu(false);
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              background: "#111827",
-              borderBottom: "1px solid #1A2535",
-              padding: "8px 0",
-            }}
-            onClick={function (e) {
-              e.stopPropagation();
-            }}
-          >
-            <div style={{ padding: "12px 20px 16px", borderBottom: "1px solid #1A2535" }}>
-              <div
-                style={{
-                  color: "#F9FAFB",
-                  fontFamily: "DM Sans, system-ui, sans-serif",
-                  fontWeight: 700,
-                  fontSize: 16,
-                }}
-              >
-                {nombreEntrenador}
-              </div>
-              <div
-                style={{
-                  color: "#6B7280",
-                  fontFamily: "DM Sans, system-ui, sans-serif",
-                  fontSize: 13,
-                }}
-              >
-                {es ? "Entrenador" : "Coach"}
-              </div>
-            </div>
-            {[
-              {
-                label: es ? "Mi perfil" : "My profile",
-                danger: false,
-                icon: "profile",
-                action: function () {
-                  setShowCoachMenu(false);
-                  if (typeof onOpenCoachPerfil === "function") onOpenCoachPerfil();
-                },
-              },
-              {
-                label: es ? "Configuración" : "Settings",
-                danger: false,
-                icon: "settings",
-                action: function () {
-                  setShowCoachMenu(false);
-                  if (typeof onOpenCoachConfig === "function") onOpenCoachConfig();
-                },
-              },
-              {
-                label: es ? "Cerrar sesión" : "Log out",
-                danger: true,
-                icon: "logout",
-                action: function () {
-                  setShowCoachMenu(false);
-                  if (typeof onCoachLogout === "function") onCoachLogout();
-                },
-              },
-            ].map(function (item) {
-              return (
-                <div
-                  key={item.label}
-                  onClick={item.action}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: "14px 20px",
-                    cursor: "pointer",
-                    color: item.danger ? "#EF4444" : "#F9FAFB",
-                    fontFamily: "DM Sans, system-ui, sans-serif",
-                    fontSize: 15,
-                    fontWeight: 500,
-                    borderBottom: "1px solid #1A2535",
-                  }}
-                >
-                  {item.icon === "profile" ? (
-                    <svg
-                      width={18}
-                      height={18}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      aria-hidden
-                    >
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  ) : item.icon === "settings" ? (
-                    <svg
-                      width={18}
-                      height={18}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      aria-hidden
-                    >
-                      <circle cx="12" cy="12" r="3" />
-                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
-                    </svg>
-                  ) : (
-                    <svg
-                      width={18}
-                      height={18}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      aria-hidden
-                    >
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                      <polyline points="16 17 21 12 16 7" />
-                      <line x1="21" y1="12" x2="9" y2="12" />
-                    </svg>
-                  )}
-                  <span>{item.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </>
   );
 }
