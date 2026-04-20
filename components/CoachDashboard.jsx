@@ -390,6 +390,32 @@ export default function CoachDashboard({
     [alumnos, catFn, sesionesGlobales, progresoGlobal, es]
   );
 
+  /** Resumen stats (mock alineado al dashboard) — solo layout mobile vs desktop. */
+  var sesionesCompletadas = 16;
+  var sesionesTotales = 24;
+  var pctSemana =
+    sesionesTotales > 0 ? Math.round((sesionesCompletadas / sesionesTotales) * 100) : 0;
+  var rendimientoScore = 72;
+  var rendimientoDeltaPts = 8;
+
+  var _mobile = React.useState(false);
+  var isMobile = _mobile[0];
+  var setIsMobile = _mobile[1];
+  React.useEffect(function () {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    var mq = window.matchMedia("(max-width: 768px)");
+    function update() {
+      setIsMobile(mq.matches);
+    }
+    update();
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else mq.addListener(update);
+    return function () {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+    };
+  }, []);
+
   if (activeNav === "progreso") {
     return (
       <ProgresoView
@@ -461,13 +487,21 @@ export default function CoachDashboard({
               Acá tenés el resumen de tu equipo
             </p>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              minWidth: 0,
+              ...(isMobile ? { flex: "1 1 100%", width: "100%", maxWidth: "100%" } : { flexShrink: 0 }),
+            }}
+          >
             <div
               style={{
                 position: "relative",
                 flex: 1,
                 minWidth: 0,
-                maxWidth: 440,
+                ...(isMobile ? {} : { maxWidth: 440 }),
               }}
             >
               <GlobalSearch
@@ -479,15 +513,17 @@ export default function CoachDashboard({
                 placeholder="Buscar alumno, rutina, ejercicio..."
               />
             </div>
-            <CoachNotificationCenter
-              es={es}
-              alertRows={coachAlertsReal}
-              alumnos={alumnos}
-              onRevisarAlumno={onRevisar}
-              onIrAlumnos={onRevisarAlumnos}
-              onIrProgreso={onIrProgreso}
-              onAbrirChatAlumno={onAbrirChatAlumno}
-            />
+            <div style={{ flexShrink: 0 }}>
+              <CoachNotificationCenter
+                es={es}
+                alertRows={coachAlertsReal}
+                alumnos={alumnos}
+                onRevisarAlumno={onRevisar}
+                onIrAlumnos={onRevisarAlumnos}
+                onIrProgreso={onIrProgreso}
+                onAbrirChatAlumno={onAbrirChatAlumno}
+              />
+            </div>
             <GlobalCreateMenu
               onNuevoAlumno={onNuevoAlumno}
               onNuevaRutina={onNuevaRutina}
@@ -514,6 +550,8 @@ export default function CoachDashboard({
                 fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
                 outline: "none",
                 boxSizing: "border-box",
+                flexShrink: 0,
+                whiteSpace: "nowrap",
               }}
             />
           </div>
@@ -527,154 +565,264 @@ export default function CoachDashboard({
             padding: S.pagePadding,
           }}
         >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) minmax(0, 280px)",
-              gap: S.gridGap,
-              alignItems: "stretch",
-            }}
-          >
+          {isMobile ? (
             <div
               style={{
-                background: C.card,
-                border: `1px solid ${C.brd}`,
-                borderRadius: 12,
-                padding: S.cardPadding,
-                minWidth: 0,
-                boxSizing: "border-box",
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: S.gridGapTight,
+                alignItems: "stretch",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
-                <Info size={16} color={C.t2} strokeWidth={2} />
-                <span style={{ ...T.cardTitleSemibold, color: C.t }}>
-                  Cumplimiento semanal
-                </span>
-              </div>
-              <div style={{ ...T.numberHero, color: C.t }}>
-                16 / 24
-              </div>
-              <div style={{ ...T.subtitle, color: C.t2, marginTop: 6 }}>
-                sesiones completadas
-              </div>
               <div
                 style={{
-                  marginTop: S.blockGap,
-                  display: "inline-block",
-                  background: C.greenDim,
-                  color: C.green,
-                  borderRadius: 99,
-                  padding: "5px 12px",
-                  ...T.bodySemibold,
-                }}
-              >
-                Quedan 2 días para completar
-              </div>
-              <div
-                style={{
+                  background: C.card,
+                  border: `1px solid ${C.brd}`,
+                  borderRadius: 12,
+                  padding: S.cardPaddingTight,
+                  minWidth: 0,
+                  boxSizing: "border-box",
+                  borderLeft: "3px solid #2563EB",
                   display: "flex",
-                  gap: 14,
-                  alignItems: "flex-start",
-                  marginTop: 10,
+                  flexDirection: "column",
                 }}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {WEEK_BARS.map((row) => (
-                    <div
-                      key={row.d}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginBottom: 6,
-                      }}
-                    >
-                      <span
-                        style={{
-                          ...T.labelMd,
-                          color: C.t2,
-                          width: 15,
-                          fontFamily: "ui-monospace, monospace",
-                        }}
-                      >
-                        {row.d}
-                      </span>
-                      <div
-                        style={{
-                          flex: 1,
-                          height: 7,
-                          background: C.brd,
-                          borderRadius: 3,
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: row.p + "%",
-                            height: "100%",
-                            background: row.p > 0 ? C.blue : C.brd,
-                            borderRadius: 3,
-                          }}
-                        />
-                      </div>
-                      <span
-                        style={{
-                          ...T.labelMd,
-                          color: C.t2,
-                          width: 34,
-                          textAlign: "right",
-                        }}
-                      >
-                        {row.p}%
-                      </span>
-                    </div>
-                  ))}
+                <span style={{ ...T.labelMd, color: C.t2 }}>Esta semana</span>
+                <div
+                  style={{
+                    ...T.numberStat,
+                    color: C.t,
+                    marginTop: 6,
+                    letterSpacing: -0.02,
+                  }}
+                >
+                  {sesionesCompletadas}/{sesionesTotales}
                 </div>
-                <div style={{ position: "relative", width: 88, height: 88, flexShrink: 0 }}>
-                  <svg width={88} height={88} viewBox="0 0 80 80" style={{ display: "block" }}>
-                    <circle r={30} cx={40} cy={40} stroke={C.brd} strokeWidth={8} fill="none" />
-                    <circle
-                      r={30}
-                      cx={40}
-                      cy={40}
-                      stroke={C.blue}
-                      strokeWidth={8}
-                      fill="none"
-                      strokeDasharray="188.5"
-                      strokeDashoffset={60.32}
-                      strokeLinecap="round"
-                      transform="rotate(-90 40 40)"
-                    />
-                  </svg>
+                <div style={{ ...T.subtitle, color: C.t2, marginTop: 4 }}>
+                  sesiones completadas
+                </div>
+                <div style={{ flex: 1, minHeight: S.blockGap }} />
+                <div
+                  style={{
+                    height: 7,
+                    background: C.brd,
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    marginTop: S.blockGap,
+                  }}
+                >
                   <div
                     style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      ...T.numberGauge,
-                      color: C.t,
-                      pointerEvents: "none",
+                      width: pctSemana + "%",
+                      height: "100%",
+                      background: "#2563EB",
+                      borderRadius: 3,
                     }}
-                  >
-                    67%
-                  </div>
+                  />
+                </div>
+              </div>
+              <div
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.brd}`,
+                  borderRadius: 12,
+                  padding: S.cardPaddingTight,
+                  minWidth: 0,
+                  boxSizing: "border-box",
+                  borderLeft: "3px solid #22C55E",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <span style={{ ...T.labelMd, color: C.t2 }}>Rendimiento</span>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                  <span style={{ ...T.numberStat, color: C.t }}>{rendimientoScore}</span>
+                  <span style={{ ...T.cardTitleSemibold, color: C.t2, fontSize: 15 }}>/100</span>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginTop: 6,
+                    ...T.meta,
+                    color: "#22C55E",
+                    fontWeight: 600,
+                  }}
+                >
+                  <ArrowUp size={13} strokeWidth={2.5} />
+                  +{rendimientoDeltaPts} pts vs sem. ant.
+                </div>
+                <div style={{ flex: 1, minHeight: S.blockGap }} />
+                <div
+                  style={{
+                    height: 7,
+                    background: C.brd,
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    marginTop: S.blockGap,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: rendimientoScore + "%",
+                      height: "100%",
+                      background: "#22C55E",
+                      borderRadius: 3,
+                    }}
+                  />
                 </div>
               </div>
             </div>
-
+          ) : (
             <div
               style={{
-                background: C.card,
-                border: `1px solid ${C.brd}`,
-                borderRadius: 12,
-                padding: S.cardPadding,
-                minWidth: 0,
-                boxSizing: "border-box",
-                alignSelf: "stretch",
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 280px)",
+                gap: S.gridGap,
+                alignItems: "stretch",
               }}
             >
+              <div
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.brd}`,
+                  borderRadius: 12,
+                  padding: S.cardPadding,
+                  minWidth: 0,
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
+                  <Info size={16} color={C.t2} strokeWidth={2} />
+                  <span style={{ ...T.cardTitleSemibold, color: C.t }}>
+                    Cumplimiento semanal
+                  </span>
+                </div>
+                <div style={{ ...T.numberHero, color: C.t }}>
+                  16 / 24
+                </div>
+                <div style={{ ...T.subtitle, color: C.t2, marginTop: 6 }}>
+                  sesiones completadas
+                </div>
+                <div
+                  style={{
+                    marginTop: S.blockGap,
+                    display: "inline-block",
+                    background: C.greenDim,
+                    color: C.green,
+                    borderRadius: 99,
+                    padding: "5px 12px",
+                    ...T.bodySemibold,
+                  }}
+                >
+                  Quedan 2 días para completar
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 14,
+                    alignItems: "flex-start",
+                    marginTop: 10,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {WEEK_BARS.map((row) => (
+                      <div
+                        key={row.d}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span
+                          style={{
+                            ...T.labelMd,
+                            color: C.t2,
+                            width: 15,
+                            fontFamily: "ui-monospace, monospace",
+                          }}
+                        >
+                          {row.d}
+                        </span>
+                        <div
+                          style={{
+                            flex: 1,
+                            height: 7,
+                            background: C.brd,
+                            borderRadius: 3,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: row.p + "%",
+                              height: "100%",
+                              background: row.p > 0 ? C.blue : C.brd,
+                              borderRadius: 3,
+                            }}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            ...T.labelMd,
+                            color: C.t2,
+                            width: 34,
+                            textAlign: "right",
+                          }}
+                        >
+                          {row.p}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ position: "relative", width: 88, height: 88, flexShrink: 0 }}>
+                    <svg width={88} height={88} viewBox="0 0 80 80" style={{ display: "block" }}>
+                      <circle r={30} cx={40} cy={40} stroke={C.brd} strokeWidth={8} fill="none" />
+                      <circle
+                        r={30}
+                        cx={40}
+                        cy={40}
+                        stroke={C.blue}
+                        strokeWidth={8}
+                        fill="none"
+                        strokeDasharray="188.5"
+                        strokeDashoffset={60.32}
+                        strokeLinecap="round"
+                        transform="rotate(-90 40 40)"
+                      />
+                    </svg>
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        ...T.numberGauge,
+                        color: C.t,
+                        pointerEvents: "none",
+                      }}
+                    >
+                      67%
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.brd}`,
+                  borderRadius: 12,
+                  padding: S.cardPadding,
+                  minWidth: 0,
+                  boxSizing: "border-box",
+                  alignSelf: "stretch",
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
                   <Info size={16} color={C.t2} strokeWidth={2} />
                   <span style={{ ...T.cardTitleSemibold, color: C.t }}>
@@ -736,8 +884,9 @@ export default function CoachDashboard({
                     </div>
                   </div>
                 </div>
+              </div>
             </div>
-          </div>
+          )}
 
           <div
             style={{
