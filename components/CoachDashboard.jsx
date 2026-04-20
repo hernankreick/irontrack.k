@@ -115,6 +115,25 @@ function pctColor(p) {
   return C.red;
 }
 
+/** Color del % en lista mobile: menor a 30 rojo, 30–79 ámbar, 80+ verde */
+function pctBracketColor(p) {
+  if (p < 30) return "#EF4444";
+  if (p < 80) return "#F59E0B";
+  return "#22C55E";
+}
+
+function coachMenuInitialsFromName(name) {
+  var n = (name || "E").trim().split(/\s+/).filter(Boolean);
+  if (n.length >= 2) return (n[0].charAt(0) + n[1].charAt(0)).toUpperCase();
+  return (name || "E").slice(0, 2).toUpperCase();
+}
+
+function estadoTextColor(row) {
+  if (row.cat === "sin_rutina") return "#EF4444";
+  if (row.cat === "inactivo") return "#F59E0B";
+  return sesionColor(row.ult);
+}
+
 function sesionColor(s) {
   if (s === "Hoy") return C.green;
   if (s === "Sin actividad" || s === "Sin rutina") return C.red;
@@ -365,6 +384,11 @@ export default function CoachDashboard({
   onAbrirChatAlumno,
   /** (a) => "sin_rutina" | "activo" | "inactivo" — preferentemente coachAlumnoCategoria desde App.jsx */
   getAlumnoCategoria,
+  /** Mobile menú coach — nombre visible y acciones (App.jsx pasa session + tabs + logout). */
+  nombreEntrenador = "Entrenador",
+  onOpenCoachPerfil,
+  onOpenCoachConfig,
+  onCoachLogout,
 }) {
   var catFn = React.useMemo(
     function () {
@@ -415,6 +439,10 @@ export default function CoachDashboard({
       else mq.removeListener(update);
     };
   }, []);
+
+  var _coachMenu = React.useState(false);
+  var showCoachMenu = _coachMenu[0];
+  var setShowCoachMenu = _coachMenu[1];
 
   if (activeNav === "progreso") {
     return (
@@ -496,6 +524,35 @@ export default function CoachDashboard({
               ...(isMobile ? { flex: "1 1 100%", width: "100%", maxWidth: "100%" } : { flexShrink: 0 }),
             }}
           >
+            {isMobile && (
+              <button
+                type="button"
+                aria-label={es ? "Menú de cuenta" : "Account menu"}
+                onClick={function () {
+                  setShowCoachMenu(true);
+                }}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  border: "none",
+                  flexShrink: 0,
+                  background: "linear-gradient(135deg,#1E3A5F,#2563EB)",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "DM Sans, system-ui, sans-serif",
+                  padding: 0,
+                  boxSizing: "border-box",
+                }}
+              >
+                {coachMenuInitialsFromName(nombreEntrenador)}
+              </button>
+            )}
             <div
               style={{
                 position: "relative",
@@ -569,17 +626,17 @@ export default function CoachDashboard({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: S.gridGapTight,
+                gridTemplateColumns: "1fr 1fr",
+                gap: 10,
                 alignItems: "stretch",
               }}
             >
               <div
                 style={{
-                  background: C.card,
-                  border: `1px solid ${C.brd}`,
-                  borderRadius: 12,
-                  padding: S.cardPaddingTight,
+                  background: "#111827",
+                  border: "1px solid #1A2535",
+                  borderRadius: 14,
+                  padding: 14,
                   minWidth: 0,
                   boxSizing: "border-box",
                   borderLeft: "3px solid #2563EB",
@@ -587,25 +644,25 @@ export default function CoachDashboard({
                   flexDirection: "column",
                 }}
               >
-                <span style={{ ...T.labelMd, color: C.t2 }}>Esta semana</span>
+                <span style={{ ...T.labelMd, color: "#9CA3AF" }}>Esta semana</span>
                 <div
                   style={{
                     ...T.numberStat,
-                    color: C.t,
+                    color: "#F9FAFB",
                     marginTop: 6,
                     letterSpacing: -0.02,
                   }}
                 >
                   {sesionesCompletadas}/{sesionesTotales}
                 </div>
-                <div style={{ ...T.subtitle, color: C.t2, marginTop: 4 }}>
+                <div style={{ ...T.subtitle, color: "#9CA3AF", marginTop: 4 }}>
                   sesiones completadas
                 </div>
                 <div style={{ flex: 1, minHeight: S.blockGap }} />
                 <div
                   style={{
-                    height: 7,
-                    background: C.brd,
+                    height: 6,
+                    background: "#1A2535",
                     borderRadius: 3,
                     overflow: "hidden",
                     marginTop: S.blockGap,
@@ -623,10 +680,10 @@ export default function CoachDashboard({
               </div>
               <div
                 style={{
-                  background: C.card,
-                  border: `1px solid ${C.brd}`,
-                  borderRadius: 12,
-                  padding: S.cardPaddingTight,
+                  background: "#111827",
+                  border: "1px solid #1A2535",
+                  borderRadius: 14,
+                  padding: 14,
                   minWidth: 0,
                   boxSizing: "border-box",
                   borderLeft: "3px solid #22C55E",
@@ -634,10 +691,10 @@ export default function CoachDashboard({
                   flexDirection: "column",
                 }}
               >
-                <span style={{ ...T.labelMd, color: C.t2 }}>Rendimiento</span>
+                <span style={{ ...T.labelMd, color: "#9CA3AF" }}>Rendimiento</span>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
-                  <span style={{ ...T.numberStat, color: C.t }}>{rendimientoScore}</span>
-                  <span style={{ ...T.cardTitleSemibold, color: C.t2, fontSize: 15 }}>/100</span>
+                  <span style={{ ...T.numberStat, color: "#F9FAFB" }}>{rendimientoScore}</span>
+                  <span style={{ ...T.cardTitleSemibold, color: "#9CA3AF", fontSize: 15 }}>/100</span>
                 </div>
                 <div
                   style={{
@@ -656,8 +713,8 @@ export default function CoachDashboard({
                 <div style={{ flex: 1, minHeight: S.blockGap }} />
                 <div
                   style={{
-                    height: 7,
-                    background: C.brd,
+                    height: 6,
+                    background: "#1A2535",
                     borderRadius: 3,
                     overflow: "hidden",
                     marginTop: S.blockGap,
@@ -1235,6 +1292,106 @@ export default function CoachDashboard({
                   ? "Todavía no tenés alumnos cargados. Agregá alumnos desde Alumnos o con «Crear»."
                   : "No athletes yet. Add them from Athletes or «Create»."}
               </div>
+            ) : isMobile ? (
+              <div style={{ maxHeight: 440, overflowY: "auto" }}>
+                {coachActiveRows.map(function (row, idx) {
+                  var br = pctBracketColor(row.pct);
+                  var estadoCol = estadoTextColor(row);
+                  return (
+                    <div
+                      key={String(row.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "12px 14px",
+                        boxSizing: "border-box",
+                        borderBottom: idx < coachActiveRows.length - 1 ? "1px solid #1e1e2e33" : "none",
+                        cursor: typeof onVerPerfil === "function" ? "pointer" : "default",
+                      }}
+                      onClick={function () {
+                        if (typeof onVerPerfil === "function") onVerPerfil(row.id);
+                      }}
+                      role={typeof onVerPerfil === "function" ? "button" : undefined}
+                    >
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          background: br + "33",
+                          color: "#F9FAFB",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          flexShrink: 0,
+                          fontFamily: "DM Sans, system-ui, sans-serif",
+                        }}
+                      >
+                        {row.initials}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            ...T.body,
+                            color: C.t,
+                            fontWeight: 600,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {row.name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: estadoCol,
+                            marginTop: 2,
+                            fontFamily: "DM Sans, system-ui, sans-serif",
+                          }}
+                        >
+                          {row.ult}
+                        </div>
+                        <div
+                          style={{
+                            height: 3,
+                            borderRadius: 2,
+                            marginTop: 4,
+                            background: C.brd,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: row.pct + "%",
+                              height: "100%",
+                              background: br,
+                              borderRadius: 2,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          minWidth: 44,
+                          textAlign: "right",
+                          fontFamily: "DM Mono, ui-monospace, monospace",
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: br,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {row.pct}%
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <div style={{ maxHeight: 440, overflowY: "auto" }}>
                 <div
@@ -1344,6 +1501,154 @@ export default function CoachDashboard({
           </div>
         </div>
       </div>
+
+      {isMobile && showCoachMenu && (
+        <div
+          role="presentation"
+          style={{
+            position: "fixed",
+            top: 70,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 999,
+            background: "rgba(0,0,0,0.6)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+          }}
+          onClick={function () {
+            setShowCoachMenu(false);
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              background: "#111827",
+              borderBottom: "1px solid #1A2535",
+              padding: "8px 0",
+            }}
+            onClick={function (e) {
+              e.stopPropagation();
+            }}
+          >
+            <div style={{ padding: "12px 20px 16px", borderBottom: "1px solid #1A2535" }}>
+              <div
+                style={{
+                  color: "#F9FAFB",
+                  fontFamily: "DM Sans, system-ui, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 16,
+                }}
+              >
+                {nombreEntrenador}
+              </div>
+              <div
+                style={{
+                  color: "#6B7280",
+                  fontFamily: "DM Sans, system-ui, sans-serif",
+                  fontSize: 13,
+                }}
+              >
+                {es ? "Entrenador" : "Coach"}
+              </div>
+            </div>
+            {[
+              {
+                label: es ? "Mi perfil" : "My profile",
+                danger: false,
+                icon: "profile",
+                action: function () {
+                  setShowCoachMenu(false);
+                  if (typeof onOpenCoachPerfil === "function") onOpenCoachPerfil();
+                },
+              },
+              {
+                label: es ? "Configuración" : "Settings",
+                danger: false,
+                icon: "settings",
+                action: function () {
+                  setShowCoachMenu(false);
+                  if (typeof onOpenCoachConfig === "function") onOpenCoachConfig();
+                },
+              },
+              {
+                label: es ? "Cerrar sesión" : "Log out",
+                danger: true,
+                icon: "logout",
+                action: function () {
+                  setShowCoachMenu(false);
+                  if (typeof onCoachLogout === "function") onCoachLogout();
+                },
+              },
+            ].map(function (item) {
+              return (
+                <div
+                  key={item.label}
+                  onClick={item.action}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "14px 20px",
+                    cursor: "pointer",
+                    color: item.danger ? "#EF4444" : "#F9FAFB",
+                    fontFamily: "DM Sans, system-ui, sans-serif",
+                    fontSize: 15,
+                    fontWeight: 500,
+                    borderBottom: "1px solid #1A2535",
+                  }}
+                >
+                  {item.icon === "profile" ? (
+                    <svg
+                      width={18}
+                      height={18}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden
+                    >
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  ) : item.icon === "settings" ? (
+                    <svg
+                      width={18}
+                      height={18}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width={18}
+                      height={18}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden
+                    >
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                  )}
+                  <span>{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </>
   );
 }
