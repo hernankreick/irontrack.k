@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardList, Dumbbell, FileText, Search, Users } from "lucide-react";
+import { globalSearchTheme } from "./coachThemePalette.js";
 
 const FILTERS = [
   { id: "todo", label: "Todo" },
@@ -14,7 +15,7 @@ function escapeRegExp(s) {
 }
 
 /** Resalta coincidencias del query en el texto. */
-export function HighlightMatch({ text, query }) {
+export function HighlightMatch({ text, query, highlightColor = "#60a5fa" }) {
   var q = (query || "").trim();
   if (!q || !text) return <>{text}</>;
   try {
@@ -24,7 +25,7 @@ export function HighlightMatch({ text, query }) {
         {parts.map(function (part, i) {
           if (part.toLowerCase() === q.toLowerCase()) {
             return (
-              <span key={i} style={{ color: "#60a5fa", fontWeight: 600 }}>
+              <span key={i} style={{ color: highlightColor, fontWeight: 600 }}>
                 {part}
               </span>
             );
@@ -81,7 +82,14 @@ export default function GlobalSearch({
   placeholder = "Buscar alumno, rutina, ejercicio...",
   /** Coach dashboard: sin control extra a la derecha del input (menos padding). */
   compactInputEnd = false,
+  darkMode = true,
 }) {
+  var th = useMemo(
+    function () {
+      return globalSearchTheme(darkMode);
+    },
+    [darkMode]
+  );
   var wrapRef = useRef(null);
   var inputRef = useRef(null);
   var [focused, setFocused] = useState(false);
@@ -269,7 +277,7 @@ export default function GlobalSearch({
             left: 14,
             top: "50%",
             transform: "translateY(-50%)",
-            color: "#64748b",
+            color: th.chipColor,
             pointerEvents: "none",
           }}
         />
@@ -295,11 +303,11 @@ export default function GlobalSearch({
             width: "100%",
             height: 44,
             boxSizing: "border-box",
-            background: "#111827",
-            border: focused || panelOpen ? "1px solid #2563EB" : "1px solid #1a2535",
+            background: th.inputBg,
+            border: focused || panelOpen ? "1px solid #2563EB" : "1px solid " + th.inputBorder,
             borderRadius: 12,
             padding: compactInputEnd ? "0 16px 0 44px" : "0 48px 0 44px",
-            color: "#f1f5f9",
+            color: th.inputText,
             fontSize: 15,
             fontFamily: "'DM Sans', system-ui, sans-serif",
             outline: "none",
@@ -315,13 +323,13 @@ export default function GlobalSearch({
             left: 0,
             right: 0,
             marginTop: 6,
-            background: "#111827",
-            border: "1px solid #1a2535",
+            background: th.panelBg,
+            border: "1px solid " + th.panelBorder,
             borderRadius: 14,
             zIndex: 50,
             maxHeight: "min(70vh, 420px)",
             overflowY: "auto",
-            boxShadow: "0 16px 48px rgba(0,0,0,0.45)",
+            boxShadow: th.panelShadow,
           }}
         >
           <div
@@ -330,7 +338,7 @@ export default function GlobalSearch({
               flexWrap: "wrap",
               gap: 8,
               padding: "10px 12px 8px",
-              borderBottom: "1px solid #1a2535",
+              borderBottom: "1px solid " + th.panelBorder,
             }}
           >
             {FILTERS.map(function (f) {
@@ -348,9 +356,9 @@ export default function GlobalSearch({
                     if (inputRef.current) inputRef.current.focus();
                   }}
                   style={{
-                    border: sel ? "1px solid #2563EB" : "1px solid #1a2535",
-                    background: sel ? "#1e3a8a22" : "transparent",
-                    color: sel ? "#60a5fa" : "#94a3b8",
+                    border: sel ? "1px solid #2563EB" : "1px solid " + th.chipBorder,
+                    background: sel ? th.chipSelBg : "transparent",
+                    color: sel ? th.chipSelColor : th.chipColor,
                     borderRadius: 999,
                     padding: "6px 12px",
                     fontSize: 12,
@@ -366,7 +374,7 @@ export default function GlobalSearch({
           </div>
 
           {filteredSections.length === 0 ? (
-            <div style={{ padding: "20px 16px", color: "#64748b", fontSize: 14, fontFamily: "'DM Sans',sans-serif" }}>
+            <div style={{ padding: "20px 16px", color: th.chipColor, fontSize: 14, fontFamily: "'DM Sans',sans-serif" }}>
               Sin resultados
             </div>
           ) : (
@@ -380,7 +388,7 @@ export default function GlobalSearch({
                   <div
                     style={{
                       fontSize: 10,
-                      color: "#475569",
+                      color: th.sectionLabel,
                       textTransform: "uppercase",
                       letterSpacing: "1.5px",
                       padding: "10px 16px 6px",
@@ -411,7 +419,7 @@ export default function GlobalSearch({
                           gap: 12,
                           padding: "10px 16px",
                           border: "none",
-                          background: active ? "#1a2535" : "transparent",
+                          background: active ? th.rowHover : "transparent",
                           cursor: "pointer",
                           textAlign: "left",
                           boxSizing: "border-box",
@@ -424,8 +432,8 @@ export default function GlobalSearch({
                                 width: 34,
                                 height: 34,
                                 borderRadius: "50%",
-                                background: "#1e293b",
-                                color: "#94a3b8",
+                                background: th.avatarBg,
+                                color: th.avatarColor,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -442,13 +450,13 @@ export default function GlobalSearch({
                                 style={{
                                   fontSize: 14,
                                   fontWeight: 600,
-                                  color: "#f1f5f9",
+                                  color: th.rowText,
                                   fontFamily: "'DM Sans',sans-serif",
                                 }}
                               >
-                                <HighlightMatch text={row.nombre} query={query} />
+                                <HighlightMatch text={row.nombre} query={query} highlightColor={th.highlight} />
                               </div>
-                              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                              <div style={{ fontSize: 12, color: th.rowMuted, marginTop: 2 }}>
                                 {row.pctSemanal}% semanal · {row.sesionesCompletadas} sesiones
                               </div>
                             </div>
@@ -480,20 +488,20 @@ export default function GlobalSearch({
                                 width: 34,
                                 height: 34,
                                 borderRadius: 9,
-                                background: "#1e293b",
+                                background: th.avatarBg,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 flexShrink: 0,
                               }}
                             >
-                              <ClipboardList size={18} color="#3b82f6" strokeWidth={2} />
+                              <ClipboardList size={18} color={th.highlight} strokeWidth={2} />
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>
-                                <HighlightMatch text={row.nombre} query={query} />
+                              <div style={{ fontSize: 14, fontWeight: 600, color: th.rowText }}>
+                                <HighlightMatch text={row.nombre} query={query} highlightColor={th.highlight} />
                               </div>
-                              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                              <div style={{ fontSize: 12, color: th.rowMuted, marginTop: 2 }}>
                                 {row.ejerciciosCount} ej. · Sem. {row.semanaActual} · {row.alumnosAsignados}
                               </div>
                             </div>
@@ -519,20 +527,20 @@ export default function GlobalSearch({
                                 width: 34,
                                 height: 34,
                                 borderRadius: 9,
-                                background: "#1e293b",
+                                background: th.avatarBg,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 flexShrink: 0,
                               }}
                             >
-                              <Dumbbell size={18} color="#3b82f6" strokeWidth={2} />
+                              <Dumbbell size={18} color={th.highlight} strokeWidth={2} />
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>
-                                <HighlightMatch text={row.nombre} query={query} />
+                              <div style={{ fontSize: 14, fontWeight: 600, color: th.rowText }}>
+                                <HighlightMatch text={row.nombre} query={query} highlightColor={th.highlight} />
                               </div>
-                              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                              <div style={{ fontSize: 12, color: th.rowMuted, marginTop: 2 }}>
                                 {row.grupoMuscular}
                               </div>
                             </div>
@@ -558,20 +566,20 @@ export default function GlobalSearch({
                                 width: 34,
                                 height: 34,
                                 borderRadius: 9,
-                                background: "#1e293b",
+                                background: th.avatarBg,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 flexShrink: 0,
                               }}
                             >
-                              <FileText size={18} color="#3b82f6" strokeWidth={2} />
+                              <FileText size={18} color={th.highlight} strokeWidth={2} />
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>
-                                <HighlightMatch text={row.alumnoNombre + " · " + row.tipoSesion} query={query} />
+                              <div style={{ fontSize: 14, fontWeight: 600, color: th.rowText }}>
+                                <HighlightMatch text={row.alumnoNombre + " · " + row.tipoSesion} query={query} highlightColor={th.highlight} />
                               </div>
-                              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{row.fechaLabel}</div>
+                              <div style={{ fontSize: 12, color: th.rowMuted, marginTop: 2 }}>{row.fechaLabel}</div>
                             </div>
                             <span
                               style={{
@@ -604,16 +612,16 @@ export default function GlobalSearch({
               justifyContent: "center",
               gap: 8,
               padding: "8px 12px",
-              borderTop: "1px solid #1a2535",
+              borderTop: "1px solid " + th.footerBorder,
               fontSize: 11,
-              color: "#475569",
+              color: th.sectionLabel,
               fontFamily: "'DM Sans',sans-serif",
             }}
           >
             <kbd
               style={{
-                background: "#0f172a",
-                border: "1px solid #334155",
+                background: th.kbdBg,
+                border: "1px solid " + th.kbdBorder,
                 borderRadius: 4,
                 padding: "2px 6px",
                 fontSize: 10,
@@ -624,8 +632,8 @@ export default function GlobalSearch({
             </kbd>
             <kbd
               style={{
-                background: "#0f172a",
-                border: "1px solid #334155",
+                background: th.kbdBg,
+                border: "1px solid " + th.kbdBorder,
                 borderRadius: 4,
                 padding: "2px 6px",
                 fontSize: 10,
@@ -636,8 +644,8 @@ export default function GlobalSearch({
             </kbd>
             <kbd
               style={{
-                background: "#0f172a",
-                border: "1px solid #334155",
+                background: th.kbdBg,
+                border: "1px solid " + th.kbdBorder,
                 borderRadius: 4,
                 padding: "2px 6px",
                 fontSize: 10,

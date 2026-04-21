@@ -1765,6 +1765,15 @@ function GymApp() {
   const green=darkMode?"#22C55E":"#16A34A";
   const greenSoft=darkMode?"rgba(34,197,94,0.12)":"rgba(22,163,74,0.1)";
   const greenBorder=darkMode?"rgba(34,197,94,0.25)":"rgba(22,163,74,0.25)";
+  /** Coach — pestaña Alumnos: en modo día, superficies claras que contrasten con el scroll blanco. */
+  const coachAluShell = darkMode ? "#0a0f1a" : "#f1f5f9";
+  const coachAluSurface = darkMode ? "#111827" : "#ffffff";
+  const coachAluSubtle = darkMode ? "#0f172a" : "#f8fafc";
+  const coachAluBorderSoft = darkMode ? "rgba(59,130,246,0.22)" : "#e2e8f0";
+  const coachAluTrack = darkMode ? "#1e293b" : "#e2e8f0";
+  const coachAluDropdown = darkMode ? "#111827" : "#ffffff";
+  const coachAluDropdownShadow = darkMode ? "0 12px 32px rgba(0,0,0,0.55)" : "0 12px 28px rgba(15,23,42,0.12)";
+  const coachAluGhostBtn = darkMode ? "#162234" : "#f1f5f9";
   const card={background:bgCard,borderRadius:16,padding:"22px 24px",marginBottom:12,border:"1px solid "+border,boxShadow:darkMode?"0 4px 16px rgba(0,0,0,0.5)":"0 2px 8px rgba(0,0,0,0.08)"};
   const inp={background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"8px 12px",fontSize:15,fontFamily:"Inter,sans-serif",width:"100%",boxSizing:"border-box"};
   const lbl={fontSize:13,fontWeight:600,letterSpacing:0.3,color:textMuted,marginBottom:4,display:"block"};
@@ -2351,6 +2360,7 @@ function GymApp() {
               }}
               coachAvatarUrl={sessionData?.avatarUrl}
               coachName={sessionData?.name}
+              darkMode={darkMode}
             />
           </div>
         ) : null}
@@ -2360,7 +2370,10 @@ function GymApp() {
         >
       {!(esAlumno && tab === "progress") && !coachSuppressTopNav && (
       <div
-        className={"relative z-50 flex items-center justify-between border-b border-[#2D4057] pb-3 pt-4 " + (darkMode ? "bg-[#0F1923]" : "bg-[#F0F4F8]")}
+        className={
+          "relative z-50 flex items-center justify-between pb-3 pt-4 " +
+          (darkMode ? "border-b border-[#2D4057] bg-[#0F1923]" : showCoachDesktopShell && !esAlumno ? "border-b border-slate-200 bg-white" : "border-b border-[#2D4057] bg-[#F0F4F8]")
+        }
         style={{
           position: alumnoTopBarFixed ? "fixed" : "relative",
           top: alumnoTopBarFixed ? 0 : undefined,
@@ -2381,8 +2394,8 @@ function GymApp() {
               style={{
                 width: 34,
                 height: 34,
-                background: "#111827",
-                border: "1px solid #1A2535",
+                background: darkMode ? "#111827" : "#ffffff",
+                border: darkMode ? "1px solid #1A2535" : "1px solid #e2e8f0",
                 borderRadius: 9,
                 display: "flex",
                 alignItems: "center",
@@ -2392,7 +2405,7 @@ function GymApp() {
                 position: "relative",
               }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={darkMode ? "#94a3b8" : "#64748b"} strokeWidth="2.5" strokeLinecap="round">
                 <line x1="3" y1="7" x2="21" y2="7" />
                 <line x1="3" y1="12" x2="21" y2="12" />
                 <line x1="3" y1="17" x2="21" y2="17" />
@@ -2407,7 +2420,7 @@ function GymApp() {
                   height: 7,
                   background: "#ef4444",
                   borderRadius: "50%",
-                  border: "1.5px solid #0B0E11",
+                  border: darkMode ? "1.5px solid #0B0E11" : "1.5px solid #ffffff",
                 }}
               />
             </button>
@@ -2645,7 +2658,13 @@ function GymApp() {
           scrollBehavior: "auto",
           overflowAnchor: "none",
           overscrollBehavior: "contain",
-          background: darkMode ? (esAlumno && tab === "progress" ? "#0d1117" : "#0B1120") : "#F1F5F9",
+          background: darkMode
+            ? esAlumno && tab === "progress"
+              ? "#0d1117"
+              : "#0B1120"
+            : showCoachDesktopShell && !esAlumno
+              ? "#ffffff"
+              : "#F1F5F9",
         }}
       >
         <div
@@ -2665,6 +2684,7 @@ function GymApp() {
                 rutinasSBEntrenador={rutinasSBEntrenador}
                 allEx={allEx}
                 lang={lang}
+                darkMode={darkMode}
                 onEnviarMensaje={function () {
                   var first = (alumnos || [])[0];
                   if (first) {
@@ -3750,12 +3770,12 @@ function GymApp() {
           </div>
         )}
         {tab==="alumnos"&&sessionData?.role==="entrenador"&&(
-          <div className="min-w-0 max-w-full" style={{background:"#0a0f1a",marginLeft:showCoachDesktopShell?0:-4,marginRight:showCoachDesktopShell?0:-4,padding:"8px 0 20px",borderRadius:12}}>
+          <div className="min-w-0 max-w-full" style={{background:coachAluShell,marginLeft:showCoachDesktopShell?0:-4,marginRight:showCoachDesktopShell?0:-4,padding:"8px 0 20px",borderRadius:12}}>
             <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
-              <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:"#fff",minWidth:0,flex:"1 1 12rem"}}><Ic name="users" size={18}/> {msg("MIS ALUMNOS", "MY ATHLETES")}</div>
+              <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:textMain,minWidth:0,flex:"1 1 12rem"}}><Ic name="users" size={18} color={textMain}/> {msg("MIS ALUMNOS", "MY ATHLETES")}</div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",flexShrink:0}}>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={msg("Datos de pago", "Payment info")}><Ic name="share" size={16}/></button>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={msg("Actualizar", "Refresh")}><Ic name="refresh-cw" size={16}/></button>
+                <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={msg("Datos de pago", "Payment info")}><Ic name="share" size={16}/></button>
+                <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={msg("Actualizar", "Refresh")}><Ic name="refresh-cw" size={16}/></button>
                 <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {msg("Nuevo", "New")}</button>
               </div>
             </div>
@@ -3780,14 +3800,14 @@ function GymApp() {
             )}
 
             <div style={{marginBottom:12}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,background:"#111827",border:"1px solid rgba(59,130,246,0.22)",borderRadius:12,padding:"10px 12px"}}>
-                <Ic name="search" size={18} color="#64748b"/>
+              <div style={{display:"flex",alignItems:"center",gap:10,background:coachAluSurface,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"10px 12px",boxShadow:darkMode ? "none" : "0 1px 2px rgba(15,23,42,0.06)"}}>
+                <Ic name="search" size={18} color={textMuted}/>
                 <input
                   type="search"
                   value={coachAlumnosSearch}
                   onChange={function (e) { setCoachAlumnosSearch(e.target.value); }}
                   placeholder={msg("Buscar alumno...", "Search athlete...")}
-                  style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#fff",fontSize:15,fontFamily:"inherit",minWidth:0}}
+                  style={{flex:1,background:"transparent",border:"none",outline:"none",color:textMain,fontSize:15,fontFamily:"inherit",minWidth:0}}
                 />
               </div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
@@ -3811,9 +3831,9 @@ function GymApp() {
                         fontWeight: 700,
                         cursor: "pointer",
                         fontFamily: "inherit",
-                        border: sel ? "1px solid #3b82f6" : "1px solid rgba(59,130,246,0.2)",
-                        background: sel ? "rgba(59,130,246,0.2)" : "#111827",
-                        color: sel ? "#3b82f6" : "#94a3b8",
+                        border: sel ? "1px solid #2563eb" : "1px solid "+coachAluBorderSoft,
+                        background: sel ? (darkMode ? "rgba(59,130,246,0.2)" : "rgba(37,99,235,0.1)") : coachAluSurface,
+                        color: sel ? "#2563eb" : textMuted,
                       }}
                     >
                       {es ? chip.es : chip.en} ({chip.n})
@@ -3894,35 +3914,35 @@ function GymApp() {
               </div>
             )}
             {alumnos.length===0&&!loadingSB&&(
-              <div style={{textAlign:"center",padding:"30px 0",color:"#94a3b8"}}>
+              <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
                 <div style={{fontSize:36,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <Ic name="users" size={34} color="#64748b"/>
+                  <Ic name="users" size={34} color={textMuted}/>
                 </div>
-                <div style={{fontSize:15,fontWeight:700}}>{msg("Sin alumnos aún", "No athletes yet")}</div>
+                <div style={{fontSize:15,fontWeight:700,color:textMain}}>{msg("Sin alumnos aún", "No athletes yet")}</div>
               </div>
             )}
             {alumnos.length>0 && coachAlumnosListaFiltrada.length===0 && !loadingSB && (
-              <div style={{textAlign:"center",padding:"24px 12px",color:"#94a3b8",fontSize:15,fontWeight:600}}>
+              <div style={{textAlign:"center",padding:"24px 12px",color:textMuted,fontSize:15,fontWeight:600}}>
                 {msg("No hay alumnos que coincidan con la búsqueda o el filtro.", "No athletes match your search or filter.")}
               </div>
             )}
 
             {coachAlumnosListaFiltrada.map(a=>(
-              <div key={a.id} style={{position:"relative",background:"#111827",borderRadius:12,padding:"14px 14px 12px",marginBottom:10,border:alumnoActivo?.id===a.id?"1px solid #3b82f6":"1px solid rgba(59,130,246,0.22)"}}>
+              <div key={a.id} style={{position:"relative",background:coachAluSurface,borderRadius:12,padding:"14px 14px 12px",marginBottom:10,border:alumnoActivo?.id===a.id?"1px solid #2563eb":"1px solid "+coachAluBorderSoft,boxShadow:darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.08)"}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
-                  <div style={{width:48,height:48,borderRadius:"50%",background:"#3b82f6",color:"#fff",fontSize:20,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}>
+                  <div style={{width:48,height:48,borderRadius:"50%",background:"#2563eb",color:"#fff",fontSize:20,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}>
                     {(a.nombre||a.email||"?").trim().charAt(0).toUpperCase()}
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-                      <span style={{fontSize:17,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
+                      <span style={{fontSize:17,fontWeight:800,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
                       {(() => {
                         var cat = coachAlumnoCategoria(a);
-                        var cfg = cat === "activo" ? { bg: "#14532d", color: "#4ade80", t: msg("Activo", "Active") } : cat === "inactivo" ? { bg: "#422006", color: "#fbbf24", t: msg("Inactivo", "Inactive") } : { bg: "#1e293b", color: "#94a3b8", t: msg("Sin rutina", "No routine") };
+                        var cfg = cat === "activo" ? { bg: darkMode ? "#14532d" : "#dcfce7", color: darkMode ? "#4ade80" : "#15803d", t: msg("Activo", "Active") } : cat === "inactivo" ? { bg: darkMode ? "#422006" : "#fef3c7", color: darkMode ? "#fbbf24" : "#b45309", t: msg("Inactivo", "Inactive") } : { bg: darkMode ? "#1e293b" : "#f1f5f9", color: darkMode ? "#94a3b8" : "#475569", t: msg("Sin rutina", "No routine") };
                         return <span style={{fontSize:11,fontWeight:800,padding:"2px 8px",borderRadius:6,background:cfg.bg,color:cfg.color}}>{cfg.t}</span>;
                       })()}
                     </div>
-                    <div style={{fontSize:13,color:"#94a3b8",lineHeight:1.4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
+                    <div style={{fontSize:13,color:textMuted,lineHeight:1.4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
                     {(() => {
                       var rA = rutinasSBEntrenador.find(function (r) { return r.alumno_id === a.id; });
                       var nD = rA ? (rA.datos?.days || []).length : 0;
@@ -3931,8 +3951,8 @@ function GymApp() {
                       var pct = Math.min(100, Math.round((done / nD) * 100));
                       return (
                         <div style={{marginTop:10}}>
-                          <div style={{fontSize:12,fontWeight:700,color:"#94a3b8",marginBottom:4}}>{done}/{nD} {msg("días esta semana", "days this week")}</div>
-                          <div style={{height:6,background:"#1e293b",borderRadius:4,overflow:"hidden"}}>
+                          <div style={{fontSize:12,fontWeight:700,color:textMuted,marginBottom:4}}>{done}/{nD} {msg("días esta semana", "days this week")}</div>
+                          <div style={{height:6,background:coachAluTrack,borderRadius:4,overflow:"hidden"}}>
                             <div style={{width: pct + "%", height: "100%", background: "#22c55e", borderRadius: 4, transition: "width .2s ease"}}/>
                           </div>
                         </div>
@@ -3958,31 +3978,31 @@ function GymApp() {
                         type="button"
                         className="hov"
                         aria-label={msg("Más opciones", "More options")}
-                        style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",color:"#94a3b8",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,cursor:"pointer"}}
+                        style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:10,cursor:"pointer"}}
                         onClick={function (e) { e.stopPropagation(); setCoachCardMenuId(coachCardMenuId === a.id ? null : a.id); }}
                       >
                         <Ic name="more-vertical" size={18} color="currentColor"/>
                       </button>
                       {coachCardMenuId === a.id && (
                         <div
-                          style={{position:"absolute",right:0,top:"100%",marginTop:6,background:"#111827",border:"1px solid rgba(59,130,246,0.35)",borderRadius:12,padding:6,zIndex:30,minWidth:176,boxShadow:"0 12px 32px rgba(0,0,0,0.55)"}}
+                          style={{position:"absolute",right:0,top:"100%",marginTop:6,background:coachAluDropdown,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:6,zIndex:30,minWidth:176,boxShadow:coachAluDropdownShadow}}
                           onClick={function (e) { e.stopPropagation(); }}
                         >
                           <button
                             type="button"
                             className="hov"
-                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#e2e8f0",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
+                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:textMain,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
                             onClick={function () { setCoachCardMenuId(null); if (!confirm(msg("¿Editar alumno?", "Edit athlete?"))) return; setEditAlumnoModal(a); setEditAlumnoEmail(a.email); setEditAlumnoPass(""); }}
                           >
-                            <Ic name="edit-2" size={16} color="#94a3b8"/> {msg("Editar", "Edit")}
+                            <Ic name="edit-2" size={16} color={textMuted}/> {msg("Editar", "Edit")}
                           </button>
                           <button
                             type="button"
                             className="hov"
-                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#e2e8f0",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
+                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:textMain,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
                             onClick={function () { setCoachCardMenuId(null); setChatModal({ alumnoId: a.id, alumnoNombre: a.nombre || a.email || "Alumno" }); }}
                           >
-                            <Ic name="message-circle" size={16} color="#3b82f6"/> {msg("Mensaje", "Message")}
+                            <Ic name="message-circle" size={16} color="#2563eb"/> {msg("Mensaje", "Message")}
                           </button>
                           <button
                             type="button"
@@ -4005,7 +4025,7 @@ function GymApp() {
                   <div>
                     {(()=>{
                       const rutinaActiva=rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
-                      if(!rutinaActiva) return <div style={{background:"#111827",borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid rgba(59,130,246,0.22)"}}><div style={{fontSize:13,color:"#94a3b8"}}>{msg("Sin rutina asignada", "No routine assigned")}</div></div>;
+                      if(!rutinaActiva) return <div style={{background:coachAluSurface,borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid "+coachAluBorderSoft}}><div style={{fontSize:13,color:textMuted}}>{msg("Sin rutina asignada", "No routine assigned")}</div></div>;
                       const dias=rutinaActiva.datos?.days||[];
                       const semanaCiclo = currentWeek + 1;
                       const rId = rutinaActiva.id;
@@ -4028,22 +4048,22 @@ function GymApp() {
                       })();
                       return(
                         <div style={{marginBottom:8}}>
-                          <div style={{background:"#111827",border:"1px solid rgba(59,130,246,0.22)",borderRadius:12,padding:"16px",position:"relative"}}>
+                          <div style={{background:coachAluSurface,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"16px",position:"relative",boxShadow:darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.06)"}}>
                             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:14}}>
                               <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:24,fontWeight:900,color:"#fff",lineHeight:1.15}}>{rutinaActiva.nombre}</div>
+                                <div style={{fontSize:24,fontWeight:900,color:textMain,lineHeight:1.15}}>{rutinaActiva.nombre}</div>
                                 <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:10,alignItems:"center"}}>
-                                  <span style={{fontSize:14,color:"#94a3b8",fontWeight:600}}>{dias.length} {msg("días", "days")}</span>
-                                  <span style={{padding:"4px 10px",borderRadius:8,background:"rgba(59,130,246,0.15)",border:"1px solid rgba(59,130,246,0.35)",color:"#3b82f6",fontSize:12,fontWeight:800}}>{msg("Semana", "Week")} {semanaCiclo} {msg("de", "of")} 4</span>
-                                  <span style={{fontSize:13,color:"#94a3b8",fontWeight:600}}>{semCalLabel}</span>
+                                  <span style={{fontSize:14,color:textMuted,fontWeight:600}}>{dias.length} {msg("días", "days")}</span>
+                                  <span style={{padding:"4px 10px",borderRadius:8,background:darkMode?"rgba(59,130,246,0.15)":"rgba(37,99,235,0.1)",border:"1px solid "+(darkMode?"rgba(59,130,246,0.35)":"rgba(37,99,235,0.35)"),color:"#2563eb",fontSize:12,fontWeight:800}}>{msg("Semana", "Week")} {semanaCiclo} {msg("de", "of")} 4</span>
+                                  <span style={{fontSize:13,color:textMuted,fontWeight:600}}>{semCalLabel}</span>
                                 </div>
                               </div>
                               <div style={{position:"relative",flexShrink:0}}>
-                                <button type="button" className="hov" aria-label={msg("Opciones de rutina", "Routine options")} style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,cursor:"pointer"}} onClick={function(){setCoachRutinaMenuOpen(function(o){return !o;});}}>
-                                  <Ic name="more-vertical" size={18} color="#94a3b8"/>
+                                <button type="button" className="hov" aria-label={msg("Opciones de rutina", "Routine options")} style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:10,cursor:"pointer"}} onClick={function(){setCoachRutinaMenuOpen(function(o){return !o;});}}>
+                                  <Ic name="more-vertical" size={18} color={textMuted}/>
                                 </button>
                                 {coachRutinaMenuOpen && (
-                                  <div style={{position:"absolute",right:0,top:"100%",marginTop:6,background:"#0f172a",border:"1px solid rgba(59,130,246,0.35)",borderRadius:12,padding:6,zIndex:40,minWidth:200,boxShadow:"0 12px 32px rgba(0,0,0,0.55)"}} onClick={function(e){e.stopPropagation();}}>
+                                  <div style={{position:"absolute",right:0,top:"100%",marginTop:6,background:coachAluDropdown,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:6,zIndex:40,minWidth:200,boxShadow:coachAluDropdownShadow}} onClick={function(e){e.stopPropagation();}}>
                                     <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#fbbf24",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
                                       if(!confirm(es?"¿Reiniciar semana actual? El alumno volverá a Día 1 de la semana "+semanaCiclo+".":"Reset current week? Athlete will restart at Day 1 of week "+semanaCiclo+".")) return;
                                       setCompletedDays(function(prev){return prev.filter(function(k){return !k.endsWith("-w"+(semanaCiclo-1))});});
@@ -4066,16 +4086,16 @@ function GymApp() {
                             </div>
                             <div style={{marginBottom:12}}>
                               <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
-                                <span style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{diasCompletados} {msg("de", "of")} {dias.length} {msg("días completados", "days completed")}</span>
+                                <span style={{fontSize:14,fontWeight:700,color:textMain}}>{diasCompletados} {msg("de", "of")} {dias.length} {msg("días completados", "days completed")}</span>
                                 <span style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>{pctBar}%</span>
                               </div>
-                              <div style={{height:12,background:"#1e293b",borderRadius:8,overflow:"hidden"}}>
+                              <div style={{height:12,background:coachAluTrack,borderRadius:8,overflow:"hidden"}}>
                                 <div style={{width:pctBar+"%",height:"100%",background:"linear-gradient(90deg,#22c55e,#16a34a)",borderRadius:8,transition:"width .25s ease"}}/>
                               </div>
                             </div>
-                            <div style={{marginBottom:14,padding:"10px 12px",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10}}>
-                              <span style={{fontSize:13,color:"#cbd5e1",fontWeight:600}}>{msg("Próxima sesión:", "Next session:")} </span>
-                              <span style={{fontSize:13,color:"#fff",fontWeight:700}}>{proxTxt}</span>
+                            <div style={{marginBottom:14,padding:"10px 12px",background:darkMode?"rgba(59,130,246,0.06)":"rgba(37,99,235,0.06)",border:"1px solid "+(darkMode?"rgba(59,130,246,0.2)":"rgba(37,99,235,0.2)"),borderRadius:10}}>
+                              <span style={{fontSize:13,color:textMuted,fontWeight:600}}>{msg("Próxima sesión:", "Next session:")} </span>
+                              <span style={{fontSize:13,color:textMain,fontWeight:700}}>{proxTxt}</span>
                             </div>
                             {dias.length > 0 && (
                               <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:14,paddingBottom:4,WebkitOverflowScrolling:"touch"}}>
@@ -4092,9 +4112,9 @@ function GymApp() {
                                         flexShrink:0,
                                         padding:"10px 14px",
                                         borderRadius:10,
-                                        border:active?"2px solid #3b82f6":"1px solid rgba(59,130,246,0.25)",
-                                        background:active?"rgba(59,130,246,0.18)":"#0f172a",
-                                        color:active?"#fff":"#94a3b8",
+                                        border:active?"2px solid #2563eb":"1px solid "+coachAluBorderSoft,
+                                        background:active?(darkMode?"rgba(59,130,246,0.18)":"rgba(37,99,235,0.12)"):coachAluSubtle,
+                                        color:active?textMain:textMuted,
                                         fontSize:13,
                                         fontWeight:800,
                                         cursor:"pointer",
@@ -4112,8 +4132,8 @@ function GymApp() {
                               </div>
                             )}
                             {dias.length > 0 && (
-                              <div style={{background:"#0f172a",borderRadius:12,border:"1px solid rgba(59,130,246,0.15)",padding:"12px"}}>
-                                <div style={{fontSize:12,fontWeight:800,color:"#94a3b8",marginBottom:10}}>{dSel.label || ((msg("Día ", "Day "))+(diSel+1))} · {((dSel.warmup||[]).length+(dSel.exercises||[]).length)} {msg("ej.", "ex.")}</div>
+                              <div style={{background:coachAluSubtle,borderRadius:12,border:"1px solid "+coachAluBorderSoft,padding:"12px"}}>
+                                <div style={{fontSize:12,fontWeight:800,color:textMuted,marginBottom:10}}>{dSel.label || ((msg("Día ", "Day "))+(diSel+1))} · {((dSel.warmup||[]).length+(dSel.exercises||[]).length)} {msg("ej.", "ex.")}</div>
                                 <div style={{marginBottom:12}}>
                                     <button type="button" className="hov" onClick={function(){ setCoachDiaSecsOpen(function(o){ return {...o, warmup:!o.warmup}; }); }} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"transparent",border:"none",padding:"6px 0",cursor:"pointer",marginBottom:8}}>
                                       <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{msg("ENTRADA EN CALOR", "WARM-UP")}</span>
@@ -4124,9 +4144,9 @@ function GymApp() {
                                         {(dSel.warmup||[]).map((ex,ei)=>{
                                           const exInfo=allEx.find(e=>e.id===ex.id);
                                           const nombre=resolveExerciseTitle(exInfo||null,ex,es);
-                                          return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.warmup||[]).length-1?"1px solid rgba(59,130,246,0.12)":"none"}}>
-                                            <div style={{flex:1,fontSize:14,fontWeight:600,color:"#fff"}}>{nombre}</div>
-                                            <div style={{fontSize:12,color:"#94a3b8",marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
+                                          return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.warmup||[]).length-1?"1px solid "+coachAluBorderSoft:"none"}}>
+                                            <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{nombre}</div>
+                                            <div style={{fontSize:12,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
                                             <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
                                           </div>;
                                         })}
@@ -4143,9 +4163,9 @@ function GymApp() {
                                     {(dSel.exercises||[]).map((ex,ei)=>{
                                       const exInfo=allEx.find(e=>e.id===ex.id);
                                       const nombre=resolveExerciseTitle(exInfo||null,ex,es);
-                                      return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.exercises||[]).length-1?"1px solid rgba(59,130,246,0.12)":"none"}}>
-                                        <div style={{flex:1,fontSize:15,fontWeight:700,color:"#fff"}}>{nombre}</div>
-                                        <div style={{fontSize:12,color:"#94a3b8",marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
+                                      return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.exercises||[]).length-1?"1px solid "+coachAluBorderSoft:"none"}}>
+                                        <div style={{flex:1,fontSize:15,fontWeight:700,color:textMain}}>{nombre}</div>
+                                        <div style={{fontSize:12,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
                                         <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
                                       </div>;
                                     })}
@@ -4155,14 +4175,14 @@ function GymApp() {
                               </div>
                             )}
                             <div style={{display:"flex",gap:8,marginTop:14}}>
-                              <button className="hov" style={{flex:2,padding:"10px",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:12,fontSize:14,fontWeight:800,color:"#e2e8f0",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(msg("¿Editar esta rutina?", "Edit this routine?"))) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(msg("Abierta en RUTINAS", "Opened in ROUTINES"));}}><Ic name="edit-2" size={16} color="#94a3b8"/>{msg("Editar rutina", "Edit routine")}</button>
-                              <button className="hov" style={{padding:"10px 16px",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:12,fontSize:14,fontWeight:800,color:"#94a3b8",cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(msg("¿Quitar rutina?", "Remove?"))) return;await sb.deleteRutina(rutinaActiva.id);setRutinasSB(prev=>prev.filter(x=>x.id!==rutinaActiva.id));toast2(msg("Quitada", "Removed"));}}><Ic name="trash-2" size={15}/></button>
+                              <button className="hov" style={{flex:2,padding:"10px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMain,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(msg("¿Editar esta rutina?", "Edit this routine?"))) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(msg("Abierta en RUTINAS", "Opened in ROUTINES"));}}><Ic name="edit-2" size={16} color={textMuted}/>{msg("Editar rutina", "Edit routine")}</button>
+                              <button className="hov" style={{padding:"10px 16px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(msg("¿Quitar rutina?", "Remove?"))) return;await sb.deleteRutina(rutinaActiva.id);setRutinasSB(prev=>prev.filter(x=>x.id!==rutinaActiva.id));toast2(msg("Quitada", "Removed"));}}><Ic name="trash-2" size={15}/></button>
                             </div>
                           </div>
                         </div>
                       );
                     })()}
-                    <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={async()=>{
+                    <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={async()=>{
                       const rutinaLocal=routineForAssign;if(!rutinaLocal){toast2(msg("Creá una rutina en RUTINAS", "Create a routine in ROUTINES"));return;}
                       const ex=rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
                       const rutinaNombre=rutinaLocal.name||"Rutina";

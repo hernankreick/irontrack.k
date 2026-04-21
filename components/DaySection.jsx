@@ -27,7 +27,10 @@ function SortableBlock({
   onDeleteExercise,
   onReorderBlock,
   blockKey,
+  darkMode = true,
 }) {
+  var blockBg = darkMode ? '#0f172a' : '#f8fafc';
+  var blockBorder = darkMode ? `1px solid ${accent}22` : `1px solid ${accent}28`;
   const [activeId, setActiveId] = useState(null);
 
   const sensors = useSensors(
@@ -38,11 +41,12 @@ function SortableBlock({
 
   return (
     <div style={{
-      background: '#0f172a',
-      border: `1px solid ${accent}22`,
+      background: blockBg,
+      border: blockBorder,
       borderRadius: 12,
       padding: `${S.blockGap - 2}px ${S.gridGapTight}px`,
       marginBottom: S.gridTight,
+      boxShadow: darkMode ? 'none' : '0 1px 2px rgba(15,23,42,0.04)',
     }}>
       {/* Block header */}
       <div style={{
@@ -66,7 +70,7 @@ function SortableBlock({
         </div>
         <span style={{
           ...T.subtitle,
-          color: '#475569',
+          color: darkMode ? '#475569' : '#64748b',
         }}>
           {count}
         </span>
@@ -153,7 +157,12 @@ export function DaySection({
   onReorderExercises,
   onRenameDay,
   lang = 'es',
+  darkMode = true,
+  textMain = '#0f172a',
+  textMuted = '#64748b',
 }) {
+  var dayTitleColor = darkMode ? '#f1f5f9' : textMain;
+  var dayInputColor = darkMode ? '#f1f5f9' : textMain;
   const warmup    = day.warmup    || [];
   const exercises = day.exercises || [];
 
@@ -192,7 +201,7 @@ export function DaySection({
               flex: 1, minWidth: 0,
               ...T.bodyLg,
               fontWeight: 700,
-              color: '#f1f5f9',
+              color: dayInputColor,
               background: 'transparent', border: 'none',
               borderBottom: '1px solid #3b82f6',
               outline: 'none', padding: '2px 0',
@@ -201,14 +210,14 @@ export function DaySection({
           />
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-            <span style={{ ...T.bodyLg, fontWeight: 700, color: '#f1f5f9' }}>
+            <span style={{ ...T.bodyLg, fontWeight: 700, color: dayTitleColor }}>
               {nombre}
             </span>
             <button
               onClick={() => setEditandoNombre(true)}
               style={{
                 width: 44, height: 44, background: 'transparent', border: 'none',
-                cursor: 'pointer', color: '#64748b',
+                cursor: 'pointer', color: textMuted,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 borderRadius: 8, flexShrink: 0,
               }}
@@ -257,6 +266,7 @@ export function DaySection({
         onEditExercise={onEditExercise}
         onDeleteExercise={onDeleteExercise}
         onReorderBlock={onReorderWarmup}
+        darkMode={darkMode}
       />
 
       {/* BLOQUE PRINCIPAL */}
@@ -271,6 +281,7 @@ export function DaySection({
         onEditExercise={onEditExercise}
         onDeleteExercise={onDeleteExercise}
         onReorderBlock={onReorderExercises}
+        darkMode={darkMode}
       />
     </div>
   );

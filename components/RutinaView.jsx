@@ -345,6 +345,9 @@ function RutinaCard({
               <DaySection
                 key={di}
                 lang={lang}
+                darkMode={darkMode}
+                textMain={textMain}
+                textMuted={textMuted}
                 day={{
                   id:        di,
                   name:      routineDayDisplayName(d, di, lang),

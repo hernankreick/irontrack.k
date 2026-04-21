@@ -15,27 +15,14 @@ import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
 import { coachType as T, coachSpace as S } from "./coachUiScale.js";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
-
-const C = {
-  card: "#12121a",
-  cardDark: "#0d0d15",
-  brd: "#1e1e2e",
-  t: "#ffffff",
-  t2: "#71717a",
-  blue: "#3b82f6",
-  green: "#22c55e",
-  greenDim: "#052e16",
-  yel: "#eab308",
-  yelDim: "#422006",
-  red: "#ef4444",
-  redDim: "#450a0a",
-};
+import { coachThemePalette } from "./coachThemePalette.js";
 
 /** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
 export const NAV_ITEM_PAD = "10px 12px";
 
 /** Estilo unificado para filas tipo nav (icono + texto) dentro del dashboard */
-export function navItemStyle(isActive) {
+export function navItemStyle(isActive, palette) {
+  var P = palette || coachThemePalette(true);
   return {
     display: "flex",
     alignItems: "center",
@@ -43,8 +30,8 @@ export function navItemStyle(isActive) {
     padding: NAV_ITEM_PAD,
     borderRadius: 8,
     cursor: "pointer",
-    backgroundColor: isActive ? "#1E3A5F" : "transparent",
-    color: isActive ? "#3B82F6" : "#94A3B8",
+    backgroundColor: isActive ? P.blueDim : "transparent",
+    color: isActive ? P.blue : P.t2,
     fontFamily: "DM Sans, system-ui, sans-serif",
     fontSize: 14,
     fontWeight: isActive ? 600 : 400,
@@ -66,7 +53,7 @@ function weekBarsForLang(lang) {
 }
 
 /** Metadatos visuales compartidos por acción rápida (gradientes, sombras). */
-const QUICK_VISUAL = {
+const QUICK_VISUAL_DARK = {
   message: {
     gradient: "linear-gradient(152deg, #2563eb 0%, #3730a3 42%, #0f172a 88%)",
     border: "rgba(255,255,255,0.1)",
@@ -78,6 +65,10 @@ const QUICK_VISUAL = {
     orbShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35)",
     Icon: MessageSquare,
     iconColor: "#ffffff",
+    titleColor: "#ffffff",
+    subColor: "rgba(255,255,255,0.72)",
+    ctaColor: "rgba(255,255,255,0.58)",
+    ctaBorder: "rgba(255,255,255,0.1)",
   },
   routine: {
     gradient: "linear-gradient(152deg, #7c3aed 0%, #5b21b6 40%, #0c0a12 88%)",
@@ -90,6 +81,10 @@ const QUICK_VISUAL = {
     orbShadow: "0 4px 18px rgba(88,28,135,0.45), inset 0 1px 0 rgba(255,255,255,0.3)",
     Icon: FilePlus,
     iconColor: "#f5f3ff",
+    titleColor: "#ffffff",
+    subColor: "rgba(255,255,255,0.72)",
+    ctaColor: "rgba(255,255,255,0.58)",
+    ctaBorder: "rgba(255,255,255,0.1)",
   },
   review: {
     gradient: "linear-gradient(152deg, #059669 0%, #0d9488 38%, #022c22 88%)",
@@ -102,11 +97,63 @@ const QUICK_VISUAL = {
     orbShadow: "0 4px 18px rgba(4,120,87,0.4), inset 0 1px 0 rgba(255,255,255,0.28)",
     Icon: Eye,
     iconColor: "#ecfdf5",
+    titleColor: "#ffffff",
+    subColor: "rgba(255,255,255,0.72)",
+    ctaColor: "rgba(255,255,255,0.58)",
+    ctaBorder: "rgba(255,255,255,0.1)",
   },
 };
 
-function buildQuickActions(lang) {
-  var v = QUICK_VISUAL;
+const QUICK_VISUAL_LIGHT = {
+  message: {
+    gradient: "linear-gradient(152deg, #eff6ff 0%, #dbeafe 42%, #ffffff 92%)",
+    border: "rgba(37,99,235,0.2)",
+    shadow: "0 6px 24px rgba(15,23,42,0.07), 0 2px 8px rgba(15,23,42,0.04)",
+    shadowHover: "0 14px 36px rgba(37,99,235,0.14), 0 8px 20px rgba(15,23,42,0.07)",
+    orbBg: "linear-gradient(165deg, rgba(37,99,235,0.12) 0%, #ffffff 100%)",
+    orbBorder: "rgba(37,99,235,0.28)",
+    orbShadow: "0 2px 12px rgba(37,99,235,0.12)",
+    Icon: MessageSquare,
+    iconColor: "#2563eb",
+    titleColor: "#0f172a",
+    subColor: "rgba(15,23,42,0.58)",
+    ctaColor: "rgba(37,99,235,0.85)",
+    ctaBorder: "rgba(15,23,42,0.08)",
+  },
+  routine: {
+    gradient: "linear-gradient(152deg, #f5f3ff 0%, #ede9fe 45%, #ffffff 92%)",
+    border: "rgba(124,58,237,0.22)",
+    shadow: "0 6px 24px rgba(15,23,42,0.07), 0 2px 8px rgba(15,23,42,0.04)",
+    shadowHover: "0 14px 36px rgba(124,58,237,0.14), 0 8px 20px rgba(15,23,42,0.07)",
+    orbBg: "linear-gradient(165deg, rgba(124,58,237,0.12) 0%, #ffffff 100%)",
+    orbBorder: "rgba(124,58,237,0.3)",
+    orbShadow: "0 2px 12px rgba(124,58,237,0.12)",
+    Icon: FilePlus,
+    iconColor: "#7c3aed",
+    titleColor: "#0f172a",
+    subColor: "rgba(15,23,42,0.58)",
+    ctaColor: "rgba(124,58,237,0.88)",
+    ctaBorder: "rgba(15,23,42,0.08)",
+  },
+  review: {
+    gradient: "linear-gradient(152deg, #ecfdf5 0%, #d1fae5 42%, #ffffff 92%)",
+    border: "rgba(5,150,105,0.22)",
+    shadow: "0 6px 24px rgba(15,23,42,0.07), 0 2px 8px rgba(15,23,42,0.04)",
+    shadowHover: "0 14px 36px rgba(5,150,105,0.14), 0 8px 20px rgba(15,23,42,0.07)",
+    orbBg: "linear-gradient(165deg, rgba(16,185,129,0.12) 0%, #ffffff 100%)",
+    orbBorder: "rgba(16,185,129,0.3)",
+    orbShadow: "0 2px 12px rgba(16,185,129,0.12)",
+    Icon: Eye,
+    iconColor: "#059669",
+    titleColor: "#0f172a",
+    subColor: "rgba(15,23,42,0.58)",
+    ctaColor: "rgba(5,150,105,0.9)",
+    ctaBorder: "rgba(15,23,42,0.08)",
+  },
+};
+
+function buildQuickActions(lang, darkMode) {
+  var v = darkMode !== false ? QUICK_VISUAL_DARK : QUICK_VISUAL_LIGHT;
   return [
     {
       action: "message",
@@ -130,9 +177,9 @@ function buildQuickActions(lang) {
 }
 
 function pctColor(p) {
-  if (p >= 70) return C.green;
-  if (p >= 30) return C.yel;
-  return C.red;
+  if (p >= 70) return "#22c55e";
+  if (p >= 30) return "#eab308";
+  return "#ef4444";
 }
 
 /** Color del % en lista mobile: menor a 30 rojo, 30–79 ámbar, 80+ verde */
@@ -142,20 +189,21 @@ function pctBracketColor(p) {
   return "#22C55E";
 }
 
-function estadoTextColor(row, lang) {
+function estadoTextColor(row, lang, muted) {
   if (row.cat === "sin_rutina") return "#EF4444";
   if (row.cat === "inactivo") return "#F59E0B";
-  return sesionColor(row.ult, lang);
+  return sesionColor(row.ult, lang, muted);
 }
 
-function sesionColor(s, lang) {
-  if (s == null || s === "") return C.t2;
+function sesionColor(s, lang, muted) {
+  var m = muted || "#71717a";
+  if (s == null || s === "") return m;
   var today = M(lang, "Hoy", "Today", "Hoje");
   var noAct = M(lang, "Sin actividad", "No activity", "Sem atividade");
   var noRut = M(lang, "Sin rutina", "No routine", "Sem rotina");
-  if (s === today) return C.green;
-  if (s === noAct || s === noRut) return C.red;
-  return C.t2;
+  if (s === today) return "#22c55e";
+  if (s === noAct || s === noRut) return "#ef4444";
+  return m;
 }
 
 function parseDateMs(raw) {
@@ -280,11 +328,12 @@ function computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal) {
  * Alertas derivadas solo de datos reales (sin inventar alumnos).
  * Prioridad: sin rutina > inactivo > poca actividad en la semana (con rutina).
  */
-function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang) {
+function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang, P) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
   var ses = sesionesGlobales || [];
   var out = [];
   var now = Date.now();
+  var pal = P || coachThemePalette(true);
   alumnos.forEach(function (a) {
     var cat = catFn(a);
     var name = coachDisplayName(a);
@@ -297,8 +346,8 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang
         initials: initials,
         name: name,
         badge: M(lang, "Sin rutina", "No routine", "Sem rotina"),
-        bc: C.yel,
-        bd: C.yelDim,
+        bc: pal.yel,
+        bd: pal.yelDim,
         desc: M(lang, "No tiene rutina asignada en el sistema.", "No routine assigned.", "Sem rotina atribuída no sistema."),
         severity: 0,
       });
@@ -311,8 +360,8 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang
         initials: initials,
         name: name,
         badge: M(lang, "Sin actividad reciente", "Inactive", "Inativo recentemente"),
-        bc: C.red,
-        bd: C.redDim,
+        bc: pal.red,
+        bd: pal.redDim,
         desc: M(
           lang,
           "Sin sesiones ni registros en las últimas 3 semanas.",
@@ -333,8 +382,8 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang
         initials: initials,
         name: name,
         badge: M(lang, "Poca actividad", "Low activity", "Pouca atividade"),
-        bc: C.yel,
-        bd: C.yelDim,
+        bc: pal.yel,
+        bd: pal.yelDim,
         desc: M(
           lang,
           "Sin sesiones ni registros en la última semana.",
@@ -408,7 +457,16 @@ export default function CoachDashboard({
   onAbrirChatAlumno,
   /** (a) => "sin_rutina" | "activo" | "inactivo" — preferentemente coachAlumnoCategoria desde App.jsx */
   getAlumnoCategoria,
+  /** Alineado con `darkMode` de App (config Tema día/noche). */
+  darkMode = true,
 }) {
+  var C = React.useMemo(
+    function () {
+      return coachThemePalette(darkMode);
+    },
+    [darkMode]
+  );
+
   var catFn = React.useMemo(
     function () {
       if (typeof getAlumnoCategoria === "function") return getAlumnoCategoria;
@@ -421,9 +479,9 @@ export default function CoachDashboard({
 
   var coachAlertsReal = React.useMemo(
     function () {
-      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang);
+      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang, C);
     },
-    [alumnos, catFn, sesionesGlobales, progresoGlobal, lang]
+    [alumnos, catFn, sesionesGlobales, progresoGlobal, lang, C]
   );
 
   var coachActiveRows = React.useMemo(
@@ -442,9 +500,9 @@ export default function CoachDashboard({
 
   var quickActions = React.useMemo(
     function () {
-      return buildQuickActions(lang);
+      return buildQuickActions(lang, darkMode);
     },
-    [lang]
+    [lang, darkMode]
   );
 
   var greetingLine = React.useMemo(
@@ -491,6 +549,7 @@ export default function CoachDashboard({
         progresoGlobal={progresoGlobal}
         rutinasSBEntrenador={rutinasSBEntrenador}
         allEx={allEx}
+        darkMode={darkMode}
       />
     );
   }
@@ -513,14 +572,14 @@ export default function CoachDashboard({
         .cd-quick-card:hover {
           transform: translateY(-5px);
           box-shadow: var(--cd-q-sh-h) !important;
-          border-color: rgba(255,255,255,0.16) !important;
+          border-color: ${darkMode ? "rgba(255,255,255,0.16)" : "rgba(37,99,235,0.28)"} !important;
         }
         .cd-quick-card:focus-visible {
           outline: 2px solid rgba(59,130,246,0.7);
           outline-offset: 2px;
         }
         .cd-quick-card .cd-quick-cta { transition: color 0.2s ease; }
-        .cd-quick-card:hover .cd-quick-cta { color: rgba(255,255,255,0.95) !important; }
+        .cd-quick-card:hover .cd-quick-cta { color: ${darkMode ? "rgba(255,255,255,0.95)" : "rgba(37,99,235,0.95)"} !important; }
         .cd-quick-card .cd-quick-cta svg { transition: transform 0.2s ease; }
         .cd-quick-card:hover .cd-quick-cta svg { transform: translateX(3px); }
       `}</style>
@@ -580,6 +639,7 @@ export default function CoachDashboard({
                 onNavigate={onGlobalSearchNavigate}
                 placeholder={M(lang, "Buscar alumno, rutina, ejercicio...", "Search athlete, routine, exercise...", "Buscar aluno, rotina, exercício...")}
                 compactInputEnd
+                darkMode={darkMode}
               />
             </div>
             <CoachNotificationCenter
@@ -591,6 +651,7 @@ export default function CoachDashboard({
               onIrProgreso={onIrProgreso}
               onAbrirChatAlumno={onAbrirChatAlumno}
               useFixedMobilePanel={isMobile}
+              darkMode={darkMode}
             />
             <GlobalCreateMenu
               lang={lang}
@@ -645,8 +706,8 @@ export default function CoachDashboard({
             >
               <div
                 style={{
-                  background: "#111827",
-                  border: "1px solid #1A2535",
+                  background: C.mobileStatBg,
+                  border: "1px solid " + C.mobileStatBorder,
                   borderRadius: 14,
                   padding: 14,
                   minWidth: 0,
@@ -656,25 +717,25 @@ export default function CoachDashboard({
                   flexDirection: "column",
                 }}
               >
-                <span style={{ ...T.labelMd, color: "#9CA3AF" }}>{M(lang, "Esta semana", "This week", "Esta semana")}</span>
+                <span style={{ ...T.labelMd, color: C.mobileStatMuted }}>{M(lang, "Esta semana", "This week", "Esta semana")}</span>
                 <div
                   style={{
                     ...T.numberStat,
-                    color: "#F9FAFB",
+                    color: C.mobileStatText,
                     marginTop: 6,
                     letterSpacing: -0.02,
                   }}
                 >
                   {sesionesCompletadas}/{sesionesTotales}
                 </div>
-                <div style={{ ...T.subtitle, color: "#9CA3AF", marginTop: 4 }}>
+                <div style={{ ...T.subtitle, color: C.mobileStatMuted, marginTop: 4 }}>
                   {M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
                 </div>
                 <div style={{ flex: 1, minHeight: S.blockGap }} />
                 <div
                   style={{
                     height: 6,
-                    background: "#1A2535",
+                    background: C.mobileTrack,
                     borderRadius: 3,
                     overflow: "hidden",
                     marginTop: S.blockGap,
@@ -692,8 +753,8 @@ export default function CoachDashboard({
               </div>
               <div
                 style={{
-                  background: "#111827",
-                  border: "1px solid #1A2535",
+                  background: C.mobileStatBg,
+                  border: "1px solid " + C.mobileStatBorder,
                   borderRadius: 14,
                   padding: 14,
                   minWidth: 0,
@@ -703,10 +764,10 @@ export default function CoachDashboard({
                   flexDirection: "column",
                 }}
               >
-                <span style={{ ...T.labelMd, color: "#9CA3AF" }}>{M(lang, "Rendimiento", "Performance", "Desempenho")}</span>
+                <span style={{ ...T.labelMd, color: C.mobileStatMuted }}>{M(lang, "Rendimiento", "Performance", "Desempenho")}</span>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
-                  <span style={{ ...T.numberStat, color: "#F9FAFB" }}>{rendimientoScore}</span>
-                  <span style={{ ...T.cardTitleSemibold, color: "#9CA3AF", fontSize: 15 }}>/100</span>
+                  <span style={{ ...T.numberStat, color: C.mobileStatText }}>{rendimientoScore}</span>
+                  <span style={{ ...T.cardTitleSemibold, color: C.mobileStatMuted, fontSize: 15 }}>/100</span>
                 </div>
                 <div
                   style={{
@@ -726,7 +787,7 @@ export default function CoachDashboard({
                 <div
                   style={{
                     height: 6,
-                    background: "#1A2535",
+                    background: C.mobileTrack,
                     borderRadius: 3,
                     overflow: "hidden",
                     marginTop: S.blockGap,
@@ -1054,7 +1115,7 @@ export default function CoachDashboard({
                           {a.initials}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ ...T.bodyLg, color: "#fff" }}>{a.name}</div>
+                          <div style={{ ...T.bodyLg, color: C.t }}>{a.name}</div>
                           <div
                             style={{
                               display: "inline-block",
@@ -1076,7 +1137,7 @@ export default function CoachDashboard({
                           type="button"
                           style={{
                             background: a.bc,
-                            color: a.bc === C.yel ? "#0a0a0f" : "#fff",
+                            color: a.bc === C.yel ? (darkMode ? "#0a0a0f" : "#0f172a") : "#fff",
                             borderRadius: 5,
                             padding: "6px 11px",
                             fontSize: 13,
@@ -1213,7 +1274,7 @@ export default function CoachDashboard({
                         fontWeight: 700,
                         lineHeight: 1.25,
                         letterSpacing: -0.02,
-                        color: "#fff",
+                        color: item.titleColor,
                       }}
                     >
                       {item.title}
@@ -1224,7 +1285,7 @@ export default function CoachDashboard({
                         fontSize: 14,
                         fontWeight: 500,
                         lineHeight: 1.45,
-                        color: "rgba(255,255,255,0.72)",
+                        color: item.subColor,
                         maxWidth: "100%",
                       }}
                     >
@@ -1239,11 +1300,11 @@ export default function CoachDashboard({
                         justifyContent: "space-between",
                         marginTop: 18,
                         paddingTop: 14,
-                        borderTop: "1px solid rgba(255,255,255,0.1)",
+                        borderTop: item.ctaBorder || "1px solid rgba(255,255,255,0.1)",
                         fontSize: 13,
                         fontWeight: 600,
                         letterSpacing: 0.02,
-                        color: "rgba(255,255,255,0.58)",
+                        color: item.ctaColor,
                       }}
                     >
                       <span>{cta}</span>
@@ -1314,7 +1375,7 @@ export default function CoachDashboard({
               <div style={{ maxHeight: 440, overflowY: "auto" }}>
                 {coachActiveRows.map(function (row, idx) {
                   var br = pctBracketColor(row.pct);
-                  var estadoCol = estadoTextColor(row, lang);
+                  var estadoCol = estadoTextColor(row, lang, C.t2);
                   return (
                     <div
                       key={String(row.id)}
@@ -1324,7 +1385,7 @@ export default function CoachDashboard({
                         gap: 12,
                         padding: "12px 14px",
                         boxSizing: "border-box",
-                        borderBottom: idx < coachActiveRows.length - 1 ? "1px solid #1e1e2e33" : "none",
+                        borderBottom: idx < coachActiveRows.length - 1 ? "1px solid " + C.rowDivider : "none",
                         cursor: typeof onVerPerfil === "function" ? "pointer" : "default",
                       }}
                       onClick={function () {
@@ -1338,7 +1399,7 @@ export default function CoachDashboard({
                           height: 36,
                           borderRadius: "50%",
                           background: br + "33",
-                          color: "#F9FAFB",
+                          color: C.t,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -1419,7 +1480,7 @@ export default function CoachDashboard({
                     gap: 10,
                     padding: "10px 12px 8px",
                     boxSizing: "border-box",
-                    borderBottom: `1px solid #1e1e2e33`,
+                    borderBottom: "1px solid " + C.rowDivider,
                   }}
                 >
                   {[M(lang, "ALUMNO", "ATHLETE", "ALUNO"), M(lang, "CUMPLIMIENTO", "COMPLIANCE", "CUMPRIMENTO"), M(lang, "ÚLTIMA SESIÓN", "LAST SESSION", "ÚLTIMA SESSÃO")].map((h) => (
@@ -1447,7 +1508,7 @@ export default function CoachDashboard({
                         alignItems: "center",
                         padding: NAV_ITEM_PAD,
                         boxSizing: "border-box",
-                        borderBottom: idx < coachActiveRows.length - 1 ? "1px solid #1e1e2e33" : "none",
+                        borderBottom: idx < coachActiveRows.length - 1 ? "1px solid " + C.rowDivider : "none",
                         cursor: typeof onVerPerfil === "function" ? "pointer" : "default",
                       }}
                       onClick={function () {
@@ -1508,7 +1569,7 @@ export default function CoachDashboard({
                           />
                         </div>
                       </div>
-                      <div style={{ ...T.subtitle, color: sesionColor(row.ult, lang) }}>
+                      <div style={{ ...T.subtitle, color: sesionColor(row.ult, lang, C.t2) }}>
                         {row.ult}
                       </div>
                     </div>

@@ -2,19 +2,9 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { Bell, Check, MessageSquare, Target, Trophy, Zap } from "lucide-react";
 import { irontrackMsg as M } from "../lib/irontrackMsg.js";
+import { coachThemePalette } from "./coachThemePalette.js";
 
 const LS_READ = "it_coach_notif_read_v1";
-
-const C = {
-  card: "#12121a",
-  brd: "#1e1e2e",
-  t: "#ffffff",
-  t2: "#71717a",
-  blue: "#3b82f6",
-  green: "#22c55e",
-  yel: "#eab308",
-  red: "#ef4444",
-};
 
 /** @typedef {{ key: string, alumnoId?: string, name: string, badge: string, desc: string, severity: number }} CoachAlertRow */
 
@@ -133,34 +123,35 @@ function mapAlertsToNotifications(alertRows) {
   });
 }
 
-function categoryMeta(cat, lang) {
+function categoryMeta(cat, lang, P) {
+  var pal = P || coachThemePalette(true);
   switch (cat) {
     case "mensaje":
       return {
         label: M(lang, "Mensaje", "Message", "Mensagem"),
         Icon: MessageSquare,
-        color: C.blue,
+        color: pal.blue,
       };
     case "adherencia":
       return {
         label: M(lang, "Adherencia", "Adherence", "Aderência"),
         Icon: Target,
-        color: C.yel,
+        color: pal.yel,
       };
     case "seguimiento":
       return {
         label: M(lang, "Seguimiento", "Follow-up", "Acompanhamento"),
         Icon: Zap,
-        color: C.red,
+        color: pal.red,
       };
     case "logro":
       return {
         label: M(lang, "Logro", "Win", "Conquista"),
         Icon: Trophy,
-        color: C.green,
+        color: pal.green,
       };
     default:
-      return { label: cat, Icon: Bell, color: C.t2 };
+      return { label: cat, Icon: Bell, color: pal.t2 };
   }
 }
 
@@ -179,7 +170,15 @@ export default function CoachNotificationCenter({
   onAbrirChatAlumno,
   /** Coach mobile: panel anclado a viewport para que no se corte a la izquierda. */
   useFixedMobilePanel = false,
+  darkMode = true,
 }) {
+  var C = React.useMemo(
+    function () {
+      return coachThemePalette(darkMode);
+    },
+    [darkMode]
+  );
+
   var [open, setOpen] = React.useState(false);
   var [filter, setFilter] = React.useState("all");
   var [readIds, setReadIds] = React.useState(loadReadIds);
@@ -298,7 +297,7 @@ export default function CoachNotificationCenter({
     background: C.card,
     border: "1px solid " + C.brd,
     borderRadius: 12,
-    boxShadow: "0 18px 48px rgba(0,0,0,0.55)",
+    boxShadow: darkMode ? "0 18px 48px rgba(0,0,0,0.55)" : "0 12px 40px rgba(15,23,42,0.12)",
     zIndex: 300,
     display: "flex",
     flexDirection: "column",
@@ -317,11 +316,11 @@ export default function CoachNotificationCenter({
     marginRight: "auto",
     boxSizing: "border-box",
     maxHeight: "70vh",
-    background: "#111827",
-    border: "1px solid #1A2535",
+    background: C.card,
+    border: "1px solid " + C.brd,
     borderRadius: 14,
     zIndex: 10050,
-    boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+    boxShadow: darkMode ? "0 8px 32px rgba(0,0,0,0.6)" : "0 8px 28px rgba(15,23,42,0.1)",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
@@ -385,7 +384,7 @@ export default function CoachNotificationCenter({
                 borderRadius: 8,
                 border: "1px solid " + (active ? C.blue : C.brd),
                 background: active ? "rgba(59,130,246,0.18)" : "transparent",
-                color: active ? "#fff" : C.t2,
+                color: active ? C.blue : C.t2,
                 fontSize: 12,
                 fontWeight: 700,
                 cursor: "pointer",
@@ -417,7 +416,7 @@ export default function CoachNotificationCenter({
         ) : (
           filtered.map(function (item) {
             var unread = readIds.indexOf(item.id) < 0;
-            var meta = categoryMeta(item.category, lang);
+            var meta = categoryMeta(item.category, lang, C);
             var Icon = meta.Icon;
             return (
               <button
@@ -512,7 +511,7 @@ export default function CoachNotificationCenter({
           position: "relative",
         }}
       >
-        <Bell size={17} color="#94a3b8" strokeWidth={2} />
+        <Bell size={17} color={C.t2} strokeWidth={2} />
         {unreadCount > 0 ? (
           <span
             style={{
@@ -530,7 +529,7 @@ export default function CoachNotificationCenter({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              border: "2px solid #0d0d15",
+              border: "2px solid " + C.bg,
               boxSizing: "border-box",
             }}
           >

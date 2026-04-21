@@ -12,21 +12,9 @@ import {
   Settings,
   Users,
 } from "lucide-react";
+import { desktopSidebarTheme } from "./coachThemePalette.js";
 
 const LS_KEY = "irontrack_desktop_sidebar_collapsed";
-
-const DS = {
-  bg: "#0a0a0f",
-  card: "#12121a",
-  border: "#1e1e2e",
-  primary: "#3b82f6",
-  primaryLight: "#3b82f6",
-  text: "#ffffff",
-  muted: "#71717a",
-  hover: "rgba(59, 130, 246, 0.1)",
-  activeBg: "rgba(59, 130, 246, 0.16)",
-  danger: "#ef4444",
-};
 
 const EXPANDED_W = 240;
 const COLLAPSED_W = 72;
@@ -100,27 +88,29 @@ function useDesktopMin1024() {
 }
 
 /** Logo compacto: solo barras (estado colapsado) */
-function LogoCompact() {
+function LogoCompact(props) {
+  var DS = props.theme;
   return (
     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-start", gap: 3, height: 24 }}>
       <div style={{ width: 3, height: 18, background: DS.primaryLight, borderRadius: 2 }} />
       <div style={{ width: 3, height: 24, background: DS.primary, borderRadius: 2 }} />
-      <div style={{ width: 3, height: 14, background: "#1D4ED8", borderRadius: 2 }} />
+      <div style={{ width: 3, height: 14, background: DS.logoBarMid, borderRadius: 2 }} />
     </div>
   );
 }
 
-function LogoFull() {
+function LogoFull(props) {
+  var DS = props.theme;
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-      <LogoCompact />
+      <LogoCompact theme={DS} />
       <div>
         <div
           style={{
             fontFamily: "'Bebas Neue', 'Barlow Condensed', sans-serif",
             fontSize: 22,
             letterSpacing: 2,
-            color: "#fff",
+            color: DS.text,
             lineHeight: 0.95,
           }}
         >
@@ -146,7 +136,15 @@ export default function DesktopSidebar({
   coachAvatarUrl,
   coachName,
   coachSubtitle: _coachSubtitle = "Preparador físico",
+  darkMode = true,
 }) {
+  const DS = React.useMemo(
+    function () {
+      return desktopSidebarTheme(darkMode);
+    },
+    [darkMode]
+  );
+
   const { lang } = useIronTrackI18n();
   const NAV_MAIN = React.useMemo(
     function () {
@@ -250,7 +248,9 @@ export default function DesktopSidebar({
         </button>
       </div>
 
-      <div style={{ padding: "10px " + INNER_PAD_X + "px 16px", flexShrink: 0 }}>{collapsed ? <LogoCompact /> : <LogoFull />}</div>
+      <div style={{ padding: "10px " + INNER_PAD_X + "px 16px", flexShrink: 0 }}>
+        {collapsed ? <LogoCompact theme={DS} /> : <LogoFull theme={DS} />}
+      </div>
 
       <div
         style={{
@@ -292,7 +292,7 @@ export default function DesktopSidebar({
               }}
               style={Object.assign(getRowButtonStyle({ collapsed: collapsed }), {
                 fontWeight: active ? 600 : 500,
-                color: active ? "#fff" : DS.muted,
+                color: active ? DS.activeLabel : DS.muted,
                 background: active ? DS.activeBg : "transparent",
                 boxShadow: active ? "inset 0 0 0 1px rgba(59,130,246,0.25)" : "none",
                 transition: "background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
@@ -320,7 +320,7 @@ export default function DesktopSidebar({
                   }}
                 />
               ) : null}
-              <Icon size={20} color={active ? DS.primaryLight : "#6B7280"} strokeWidth={2} style={{ flexShrink: 0 }} />
+              <Icon size={20} color={active ? DS.primaryLight : DS.iconInactive} strokeWidth={2} style={{ flexShrink: 0 }} />
               {!collapsed ? <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span> : null}
             </button>
           );

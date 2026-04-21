@@ -12,37 +12,7 @@ import { buildCoachProgresoModel, getRoutineForAlumno } from "./coachProgresoMet
 import { coachType as T, coachSpace as S } from "./coachUiScale.js";
 import { useIronTrackI18n } from "../contexts/IronTrackI18nContext.jsx";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
-
-const C = {
-  bg: "#0a0a0f",
-  card: "#12121a",
-  cardDark: "#0d0d15",
-  brd: "#1e1e2e",
-  t: "#ffffff",
-  t2: "#71717a",
-  blue: "#3b82f6",
-  blueDim: "#1e3a8a",
-  green: "#22c55e",
-  greenDim: "#052e16",
-  yel: "#eab308",
-  yelDim: "#422006",
-  red: "#ef4444",
-  redDim: "#450a0a",
-};
-
-var selectBaseStyle = Object.assign({}, T.control, {
-  width: "100%",
-  maxWidth: "100%",
-  boxSizing: "border-box",
-  padding: "10px 12px",
-  color: "#ffffff",
-  background: "#0d0d15",
-  border: "1px solid #1e1e2e",
-  borderRadius: 8,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  outline: "none",
-});
+import { coachThemePalette } from "./coachThemePalette.js";
 
 /** Volumen en kg abreviado tipo SaaS: 12400 → "12.4k kg", 850 → "850 kg" */
 function formatWeeklyVolKgAbbrev(v) {
@@ -86,16 +56,17 @@ function rankingSessionsLine(completed, planned, lang) {
   );
 }
 
-function emptyBox(lang, title) {
+function emptyBox(lang, title, palette) {
+  var P = palette || coachThemePalette(true);
   return (
     <div
       style={{
         padding: "28px 16px",
         textAlign: "center",
-        color: C.t2,
-        border: "1px dashed " + C.brd,
+        color: P.t2,
+        border: "1px dashed " + P.brd,
         borderRadius: 10,
-        background: C.cardDark,
+        background: P.cardDark,
         ...T.body,
       }}
     >
@@ -113,6 +84,7 @@ function emptyBox(lang, title) {
  *  rutinasSBEntrenador?: array,
  *  allEx?: array,
  *  es?: boolean,
+ *  darkMode?: boolean,
  * }} props
  */
 export default function ProgresoView({
@@ -121,9 +93,72 @@ export default function ProgresoView({
   progresoGlobal = {},
   rutinasSBEntrenador = [],
   allEx = [],
+  darkMode = true,
 }) {
   const { lang } = useIronTrackI18n();
   const [periodo, setPeriodo] = useState("semanas4");
+
+  var C = useMemo(
+    function () {
+      return coachThemePalette(darkMode);
+    },
+    [darkMode]
+  );
+
+  var selectBaseStyle = useMemo(
+    function () {
+      return Object.assign({}, T.control, {
+        width: "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        padding: "10px 12px",
+        color: C.t,
+        background: C.cardDark,
+        border: "1px solid " + C.brd,
+        borderRadius: 8,
+        fontFamily: "inherit",
+        cursor: "pointer",
+        outline: "none",
+      });
+    },
+    [C]
+  );
+
+  /** Tarjeta «Ranking de progreso»: modo día = superficie clara, sin gradiente nocturno. */
+  var rankingCardUi = useMemo(
+    function () {
+      var dm = darkMode !== false;
+      if (dm) {
+        return {
+          wrapBg:
+            "linear-gradient(165deg, #14141c 0%, " + C.card + " 45%, #101018 100%)",
+          wrapShadow:
+            "0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 40px rgba(0,0,0,0.35)",
+          topRowShadow: "0 8px 24px rgba(0,0,0,0.25)",
+          restBorderTop: "1px solid rgba(30,30,46,0.9)",
+          miniBarTrack: "#252536",
+          restRowHover: "rgba(255,255,255,0.04)",
+          adherBadgeColor: "#93c5fd",
+          adherBadgeBg: "rgba(59,130,246,0.12)",
+          adherBadgeBorder: "1px solid rgba(59,130,246,0.35)",
+        };
+      }
+      return {
+        wrapBg:
+          "linear-gradient(165deg, #ffffff 0%, " + C.cardDark + " 42%, #f1f5f9 100%)",
+        wrapShadow:
+          "0 1px 2px rgba(15,23,42,0.06), 0 10px 36px rgba(15,23,42,0.07)",
+        topRowShadow: "0 2px 14px rgba(15,23,42,0.07)",
+        restBorderTop: "1px solid " + C.brd,
+        miniBarTrack: "#e2e8f0",
+        restRowHover: "rgba(15,23,42,0.06)",
+        adherBadgeColor: "#1d4ed8",
+        adherBadgeBg: "rgba(37,99,235,0.08)",
+        adherBadgeBorder: "1px solid rgba(37,99,235,0.28)",
+      };
+    },
+    [darkMode, C]
+  );
 
   var periodOpts = useMemo(
     function () {
@@ -333,7 +368,7 @@ export default function ProgresoView({
         >
           <h2 style={{ ...T.screenTitle, color: C.t, margin: 0 }}>{M(lang, "Progreso", "Progress", "Progresso")}</h2>
         </header>
-        <div style={{ padding: S.pagePadding }}>{emptyBox(lang, M(lang, "No tenés alumnos cargados", "No athletes yet", "Não há alunos carregados"))}</div>
+        <div style={{ padding: S.pagePadding }}>{emptyBox(lang, M(lang, "No tenés alumnos cargados", "No athletes yet", "Não há alunos carregados"), C)}</div>
       </div>
     );
   }
@@ -487,7 +522,8 @@ export default function ProgresoView({
                     "Este alumno no tiene una rutina con días cargados",
                     "This athlete has no routine with training days",
                     "Este aluno não tem rotina com dias de treino carregados"
-                  )
+                  ),
+                  C
                 )}
               </div>
             ) : (
@@ -636,7 +672,7 @@ export default function ProgresoView({
 
             {rutinaActiva && diasRutina.length > 0 && (model.exerciseOptions || []).length > 0 ? (
               !model.hasChartData || chartComputed.empty ? (
-                emptyBox(lang, M(lang, "No hay registros de carga para este ejercicio", "No load records for this exercise", "Sem registros de carga para este exercício"))
+                emptyBox(lang, M(lang, "No hay registros de carga para este ejercicio", "No load records for this exercise", "Sem registros de carga para este exercício"), C)
               ) : (
                 <>
                   <p style={{ ...T.subtitle, color: C.t2, margin: "0 0 10px 0" }}>
@@ -718,7 +754,7 @@ export default function ProgresoView({
               </span>
             </div>
             {model.adherenciaRows.length === 0 ? (
-              emptyBox(lang, M(lang, "Ningún alumno tiene rutina asignada", "No athletes with an assigned plan", "Nenhum aluno tem rotina atribuída"))
+              emptyBox(lang, M(lang, "Ningún alumno tiene rutina asignada", "No athletes with an assigned plan", "Nenhum aluno tem rotina atribuída"), C)
             ) : (
               model.adherenciaRows.map(function (row) {
                 return (
@@ -799,7 +835,7 @@ export default function ProgresoView({
               </span>
             </div>
             {model.prsRecientes.length === 0 ? (
-              emptyBox(lang, M(lang, "Todavía no hay PRs registrados", "No PRs logged yet", "Ainda não há PRs registrados"))
+              emptyBox(lang, M(lang, "Todavía no hay PRs registrados", "No PRs logged yet", "Ainda não há PRs registrados"), C)
             ) : (
               model.prsRecientes.slice(0, 4).map(function (row, idx) {
                 var list = model.prsRecientes.slice(0, 4);
@@ -1049,12 +1085,12 @@ export default function ProgresoView({
 
           <div
             style={{
-              background: "linear-gradient(165deg, #14141c 0%, " + C.card + " 45%, #101018 100%)",
+              background: rankingCardUi.wrapBg,
               border: "1px solid " + C.brd,
               borderRadius: 14,
             padding: S.cardPaddingTight,
             minWidth: 0,
-            boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 40px rgba(0,0,0,0.35)",
+            boxShadow: rankingCardUi.wrapShadow,
           }}
         >
             <div
@@ -1098,9 +1134,9 @@ export default function ProgresoView({
                   fontWeight: 700,
                   letterSpacing: 0.06,
                   textTransform: "uppercase",
-                  color: "#93c5fd",
-                  background: "rgba(59,130,246,0.12)",
-                  border: "1px solid rgba(59,130,246,0.35)",
+                  color: rankingCardUi.adherBadgeColor,
+                  background: rankingCardUi.adherBadgeBg,
+                  border: rankingCardUi.adherBadgeBorder,
                   padding: "5px 10px",
                   borderRadius: 999,
                   flexShrink: 0,
@@ -1111,7 +1147,7 @@ export default function ProgresoView({
               </span>
             </div>
             {model.ranking.length === 0 ? (
-              emptyBox(lang, M(lang, "Sin métricas de adherencia", "No adherence metrics", "Sem métricas de aderência"))
+              emptyBox(lang, M(lang, "Sin métricas de adherencia", "No adherence metrics", "Sem métricas de aderência"), C)
             ) : (
               <div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1138,7 +1174,7 @@ export default function ProgresoView({
                           borderRadius: 12,
                           background: topTint[idx] || topTint[2],
                           border: topBorder[idx] || topBorder[2],
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+                          boxShadow: rankingCardUi.topRowShadow,
                         }}
                       >
                         <div
@@ -1213,7 +1249,7 @@ export default function ProgresoView({
                     style={{
                       marginTop: 14,
                       paddingTop: 12,
-                      borderTop: "1px solid rgba(30,30,46,0.9)",
+                      borderTop: rankingCardUi.restBorderTop,
                     }}
                   >
                     <div
@@ -1245,7 +1281,7 @@ export default function ProgresoView({
                               cursor: "default",
                             }}
                             onMouseEnter={function (e) {
-                              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                              e.currentTarget.style.background = rankingCardUi.restRowHover;
                             }}
                             onMouseLeave={function (e) {
                               e.currentTarget.style.background = "transparent";
@@ -1299,7 +1335,7 @@ export default function ProgresoView({
                               style={{
                                 width: 56,
                                 height: 5,
-                                background: "#252536",
+                                background: rankingCardUi.miniBarTrack,
                                 borderRadius: 3,
                                 overflow: "hidden",
                                 flexShrink: 0,
