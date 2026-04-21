@@ -617,11 +617,21 @@ const guardar = async () => {
   localStorage.setItem("it_notif_hora", notifHora);
   localStorage.setItem("it_notif_on", "true");
   setNotifActivo(true);
-  // Pedir permiso de notificaciones
-  if("Notification" in window && Notification.permission==="default"){
-    await Notification.requestPermission();
+  var perm = typeof Notification !== "undefined" ? Notification.permission : "denied";
+  if ("Notification" in window && perm === "default") {
+    perm = await Notification.requestPermission();
   }
-  toast2(msg("Recordatorios activados ✓", "Reminders set ✓"));
+  if ("Notification" in window && perm === "granted") {
+    toast2(msg("Recordatorios activados ✓", "Reminders set ✓"));
+    checkTrainingReminderTick();
+  } else if ("Notification" in window) {
+    toast2(msg(
+      "Preferencias guardadas, pero el navegador bloqueó las notificaciones. Permití notificaciones para este sitio en la configuración del navegador.",
+      "Preferences saved, but the browser blocked notifications. Allow notifications for this site in your browser settings."
+    ));
+  } else {
+    toast2(msg("Recordatorios guardados (este navegador no soporta notificaciones de escritorio).", "Reminders saved (this browser does not support desktop notifications)."));
+  }
 };
 const apagar = () => {
   localStorage.setItem("it_notif_on","false");
@@ -682,9 +692,44 @@ return(
 );
 }
 
-
-
-
+/**
+ * Dispara notificación local de entrenamiento si coincide día/hora y está activo.
+ * Depende de permiso granted y de que la app esté abierta (o pestaña con timers razonables).
+ */
+function checkTrainingReminderTick() {
+  if (typeof window === "undefined") return;
+  try {
+    if (localStorage.getItem("it_notif_on") !== "true") return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    var diasRaw = localStorage.getItem("it_notif_dias") || "[]";
+    var dias = JSON.parse(diasRaw);
+    if (!Array.isArray(dias) || dias.length === 0) return;
+    dias = dias.map(function (d) { return typeof d === "string" ? parseInt(d, 10) : d; }).filter(function (x) { return x === 0 || x > 0; });
+    if (dias.length === 0) return;
+    var hora = (localStorage.getItem("it_notif_hora") || "08:00").trim();
+    var now = new Date();
+    var jsD = now.getDay();
+    var uiIdx = jsD === 0 ? 6 : jsD - 1;
+    if (dias.indexOf(uiIdx) === -1) return;
+    var pad = function (n) { return String(n).padStart(2, "0"); };
+    var hhmm = pad(now.getHours()) + ":" + pad(now.getMinutes());
+    if (hhmm !== hora) return;
+    var stamp = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + "_" + hhmm;
+    if (localStorage.getItem("it_notif_last_fired") === stamp) return;
+    localStorage.setItem("it_notif_last_fired", stamp);
+    var lang = localStorage.getItem("it_lang") || "es";
+    var title = "IronTrack — ¡Hora de entrenar!";
+    var body = "Tocá para abrir la app y registrar tu sesión.";
+    if (lang === "en") {
+      title = "IronTrack — Time to train!";
+      body = "Open the app to log your workout.";
+    } else if (lang === "pt") {
+      title = "IronTrack — Hora de treinar!";
+      body = "Abra o app para registrar a sessão.";
+    }
+    new Notification(title, { body: body, tag: "irontrack-training-" + stamp, silent: false });
+  } catch (e) { /* ignore */ }
+}
 
 const IconPlan = ({size=20, color="currentColor"}) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1551,6 +1596,23 @@ function GymApp() {
   const toast2 = useCallback((msg, type) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2200);
+  }, []);
+
+  /** Recordatorios de entrenamiento (alumno): comprobar hora mientras la app está abierta. */
+  React.useEffect(function () {
+    if (typeof window === "undefined") return;
+    function onVisible() {
+      if (document.visibilityState === "visible") checkTrainingReminderTick();
+    }
+    checkTrainingReminderTick();
+    var id = setInterval(checkTrainingReminderTick, 30000);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", checkTrainingReminderTick);
+    return function () {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", checkTrainingReminderTick);
+    };
   }, []);
 
   const coachAlumnoCategoria = React.useCallback(function (a) {
