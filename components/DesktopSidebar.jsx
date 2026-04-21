@@ -1,4 +1,6 @@
 import React from "react";
+import { useIronTrackI18n } from "../contexts/IronTrackI18nContext.jsx";
+import { irontrackMsg as M } from "../lib/irontrackMsg.js";
 import {
   BarChart3,
   ClipboardList,
@@ -131,14 +133,6 @@ function LogoFull() {
   );
 }
 
-const NAV_MAIN = [
-  { id: "plan", label: "Dashboard", icon: LayoutDashboard },
-  { id: "alumnos", label: "Alumnos", icon: Users },
-  { id: "routines", label: "Rutinas", icon: ClipboardList },
-  { id: "biblioteca", label: "Ejercicios", icon: Dumbbell },
-  { id: "progress", label: "Progreso", icon: BarChart3 },
-];
-
 /**
  * Sidebar fijo izquierdo (coach, viewport ≥1024px).
  * Colapsado/expandido persistido en localStorage.
@@ -153,6 +147,30 @@ export default function DesktopSidebar({
   coachName,
   coachSubtitle: _coachSubtitle = "Preparador físico",
 }) {
+  const { lang } = useIronTrackI18n();
+  const NAV_MAIN = React.useMemo(
+    function () {
+      return [
+        { id: "plan", label: M(lang, "Dashboard", "Dashboard", "Painel"), icon: LayoutDashboard },
+        { id: "alumnos", label: M(lang, "Alumnos", "Athletes", "Alunos"), icon: Users },
+        { id: "routines", label: M(lang, "Rutinas", "Routines", "Rotinas"), icon: ClipboardList },
+        { id: "biblioteca", label: M(lang, "Ejercicios", "Exercises", "Exercícios"), icon: Dumbbell },
+        { id: "progress", label: M(lang, "Progreso", "Progress", "Progresso"), icon: BarChart3 },
+      ];
+    },
+    [lang]
+  );
+  /** Pie de sidebar (config / perfil / salir): mismo criterio trilingüe que el nav. */
+  const footerLabels = React.useMemo(
+    function () {
+      return {
+        settings: M(lang, "Configuración", "Settings", "Configurações"),
+        perfil: M(lang, "Perfil", "Profile", "Perfil"),
+        salir: M(lang, "Salir", "Log out", "Sair"),
+      };
+    },
+    [lang]
+  );
   useDesktopSidebarFonts();
   const [collapsed, setCollapsed] = React.useState(readCollapsed);
 
@@ -327,7 +345,7 @@ export default function DesktopSidebar({
       >
         <button
           type="button"
-          title={collapsed ? "Settings" : undefined}
+          title={collapsed ? footerLabels.settings : undefined}
           onClick={function () {
             if (typeof onSettings === "function") onSettings();
           }}
@@ -370,11 +388,11 @@ export default function DesktopSidebar({
             />
           ) : null}
           <Settings size={20} strokeWidth={2} style={{ flexShrink: 0 }} color={activeTab === "settings" ? DS.primaryLight : undefined} />
-          {!collapsed ? <span>Settings</span> : null}
+          {!collapsed ? <span>{footerLabels.settings}</span> : null}
         </button>
         <button
           type="button"
-          title={collapsed ? "Perfil" : undefined}
+          title={collapsed ? footerLabels.perfil : undefined}
           onClick={function () {
             if (typeof onPerfil === "function") onPerfil();
           }}
@@ -437,12 +455,12 @@ export default function DesktopSidebar({
               {initials(coachName)}
             </div>
           )}
-          {!collapsed ? <span>Perfil</span> : null}
+          {!collapsed ? <span>{footerLabels.perfil}</span> : null}
         </button>
         {typeof onLogout === "function" ? (
           <button
             type="button"
-            title={collapsed ? "Salir" : undefined}
+            title={collapsed ? footerLabels.salir : undefined}
             onClick={function () {
               onLogout();
             }}
@@ -460,7 +478,7 @@ export default function DesktopSidebar({
             }}
           >
             <LogOut size={20} strokeWidth={2} style={{ flexShrink: 0 }} />
-            {!collapsed ? <span>Salir</span> : null}
+            {!collapsed ? <span>{footerLabels.salir}</span> : null}
           </button>
         ) : null}
       </div>

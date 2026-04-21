@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Ic } from './Ic.jsx';
+import { useIronTrackI18n } from '../contexts/IronTrackI18nContext.jsx';
+import { irontrackMsg as M, pickExerciseName, pickPatLabel } from '../lib/irontrackMsg.js';
 
-export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onClose, darkMode, PATS}) {
+export function LogForm({ex, btn, inp, lbl, tag, fmtP, progress, onLog, onClose, darkMode, PATS}) {
+  const { lang } = useIronTrackI18n();
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#1E2D40":"#FFFFFF";
@@ -24,7 +27,7 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
   const lastSet=progress[ex.id]?.sets?.[0];
   const isPR = parseFloat(kg)>0 && parseFloat(kg)>(progress[ex.id]?.max||0);
   const rpeColors={6:"#22C55E",7:"#22C55E",8:"#60A5FA",9:"#8B9AB2",10:"#2563EB"};
-  const rpeLabels={6:es?"Muy facil":"Easy",7:es?"Controlado":"Moderate",8:es?"Exigente":"Hard",9:es?"Muy duro":"Very Hard",10:es?"Al limite":"Max"};
+  const rpeLabels={6:M(lang,"Muy facil","Easy","Muito fácil"),7:M(lang,"Controlado","Moderate","Controlado"),8:M(lang,"Exigente","Hard","Exigente"),9:M(lang,"Muy duro","Very Hard","Muito pesado"),10:M(lang,"Al limite","Max","No limite")};
   const kgNum = parseFloat(kg)||0;
   const adjustKg = (delta) => setKg(v=>String(Math.max(0,(parseFloat(v)||0)+delta)));
   const holdTimer = useRef(null);
@@ -74,14 +77,14 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
           {pat.icon}
         </div>
         <div style={{flex:1}}>
-          <div style={{fontSize:22,fontWeight:900,color:textMain,lineHeight:1.1}}>{es?ex.name:ex.nameEn||ex.name}</div>
-          <div style={{fontSize:13,color:pat.color,fontWeight:700,marginTop:4}}>{es?pat.label:pat.labelEn} · {ex.sets}×{ex.reps}</div>
+          <div style={{fontSize:22,fontWeight:900,color:textMain,lineHeight:1.1}}>{pickExerciseName(ex, lang)}</div>
+          <div style={{fontSize:13,color:pat.color,fontWeight:700,marginTop:4}}>{pickPatLabel(pat, lang)} · {ex.sets}×{ex.reps}</div>
         </div>
         <button className="hov" style={{background:"transparent",border:"none",color:textMuted,fontSize:22,padding:"4px 8px",cursor:"pointer"}} onClick={onClose}><Ic name="x" size={16}/></button>
       </div>
       {lastSet&&(
         <div style={{background:bgSub,borderRadius:12,padding:"8px 12px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <span style={{fontSize:13,color:textMuted}}>{es?"Última vez":"Last time"}</span>
+          <span style={{fontSize:13,color:textMuted}}>{M(lang,"Última vez","Last time","Última vez")}</span>
           <span style={{fontSize:15,fontWeight:800,color:textMain}}>{lastSet.kg}kg × {lastSet.reps} reps</span>
         </div>
       )}
@@ -89,8 +92,8 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
         <div style={{background:"#60A5FA22",border:"1px solid #f59e0b55",borderRadius:12,padding:"8px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:28}}><Ic name="award" size={28} color="#fbbf24"/></span>
           <div>
-            <div style={{fontSize:15,fontWeight:900,color:"#60A5FA"}}>{es?"¡NUEVO RÉCORD PERSONAL!":"NEW PERSONAL RECORD!"}</div>
-            <div style={{fontSize:13,color:"#f59e0b88"}}>{kgNum}kg {es?"supera tu máximo anterior":"beats your previous max"}</div>
+            <div style={{fontSize:15,fontWeight:900,color:"#60A5FA"}}>{M(lang,"¡NUEVO RÉCORD PERSONAL!","NEW PERSONAL RECORD!","NOVO RECORDE PESSOAL!")}</div>
+            <div style={{fontSize:13,color:"#f59e0b88"}}>{kgNum}kg {M(lang,"supera tu máximo anterior","beats your previous max","supera seu máximo anterior")}</div>
           </div>
         </div>
       )}
@@ -99,7 +102,7 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
         <div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
             <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>PESO {isPR?"🏆":""}</span>
-            {lastSet&&<span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{es?"Último":"Last"}: {lastSet.kg}kg</span>}
+            {lastSet&&<span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{M(lang,"Último","Last","Último")}: {lastSet.kg}kg</span>}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <button type="button" className="hov"
@@ -111,7 +114,7 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
               onPointerUp={stopKgHold}
               onPointerLeave={stopKgHold}
               onPointerCancel={stopKgHold}
-              aria-label={es?"Menos 1 kg":"Decrease 1 kg"}
+              aria-label={M(lang,"Menos 1 kg","Decrease 1 kg","Menos 1 kg")}
             >−</button>
             <div style={{flex:1,position:"relative"}}>
               <input
@@ -131,10 +134,10 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
               onPointerUp={stopKgHold}
               onPointerLeave={stopKgHold}
               onPointerCancel={stopKgHold}
-              aria-label={es?"Más 1 kg":"Increase 1 kg"}
+              aria-label={M(lang,"Más 1 kg","Increase 1 kg","Mais 1 kg")}
             >+</button>
           </div>
-          <div style={{fontSize:9,color:"#374151",marginTop:3}}>{es?"Tocá ±1 kg · mantené ±5 kg":"Tap ±1 kg · hold ±5 kg"}</div>
+          <div style={{fontSize:9,color:"#374151",marginTop:3}}>{M(lang,"Tocá ±1 kg · mantené ±5 kg","Tap ±1 kg · hold ±5 kg","Toque ±1 kg · segure ±5 kg")}</div>
         </div>
         {/* REPS pills */}
         <div>
@@ -168,7 +171,7 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
               </div>
             );
           })()}
-          <div style={{fontSize:9,color:"#374151",textAlign:"center",marginTop:3}}>{es?"← deslizá para cambiar reps →":"← swipe to change reps →"}</div>
+          <div style={{fontSize:9,color:"#374151",textAlign:"center",marginTop:3}}>{M(lang,"← deslizá para cambiar reps →","← swipe to change reps →","← deslize para mudar as reps →")}</div>
         </div>
       </div>
       <button className="hov"
@@ -182,18 +185,18 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
           onLog(parseFloat(kg),parseInt(reps),note,pause,rpe);
         }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        {es?"REGISTRAR SET":"LOG SET"}
+        {M(lang,"REGISTRAR SET","LOG SET","REGISTRAR SÉRIE")}
       </button>
       <button onClick={()=>setShowAdvanced(v=>!v)}
         style={{width:"100%",background:"transparent",border:"none",color:textMuted,fontSize:13,fontWeight:700,cursor:"pointer",padding:"4px",fontFamily:"inherit",marginBottom:showAdvanced?10:0}}>
-        {showAdvanced?"▲ ":(es?"▼ Pausa · Nota · RPE":"▼ Rest · Note · RPE")}
+        {showAdvanced?"▲ ":M(lang,"▼ Pausa · Nota · RPE","▼ Rest · Note · RPE","▼ Pausa · Nota · RPE")}
       </button>
 
       {showAdvanced&&(
         <div>
           <div style={{marginBottom:8}}>
             <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>
-              {es?"PAUSA":"REST"}: {fmtP(pause)}
+              {M(lang,"PAUSA","REST","PAUSA")}: {fmtP(pause)}
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {[0,60,90,120,180,240].map(p=>(
@@ -202,14 +205,14 @@ export function LogForm({ex, es, btn, inp, lbl, tag, fmtP, progress, onLog, onCl
                     background:pause===p?pat?.color+"22":"transparent",color:pause===p?pat?.color:textMuted,
                     fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
                   onClick={()=>setPause(p)}>
-                  {p===0?(es?"No":"Off"):fmtP(p)}
+                  {p===0?M(lang,"No","Off","Não"):fmtP(p)}
                 </button>
               ))}
             </div>
           </div>
           <div style={{marginBottom:8}}>
-            <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{es?"NOTA":"NOTE"}</div>
-            <input style={{...inp,width:"100%"}} value={note} onChange={e=>setNote(e.target.value)} placeholder={es?"Sensaciones, técnica...":"How did it feel?"}/>
+            <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{M(lang,"NOTA","NOTE","NOTA")}</div>
+            <input style={{...inp,width:"100%"}} value={note} onChange={e=>setNote(e.target.value)} placeholder={M(lang,"Sensaciones, técnica...","How did it feel?","Sensações, técnica...")}/>
           </div>
           <div>
             <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>

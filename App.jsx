@@ -22,6 +22,8 @@ import { WelcomeModal } from './components/WelcomeModal.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
+import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
+import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { Calendar as CalNavIcon, Dumbbell, TrendingUp as TrendNavIcon } from 'lucide-react';
 
 
@@ -220,21 +222,21 @@ function parseBibMuscleJson(raw) {
   return null;
 }
 
-function formatBibMuscleDisplay(raw, es) {
+function formatBibMuscleDisplay(raw, lang) {
   var arr = parseBibMuscleJson(raw);
   if (arr) {
     if (arr.length === 0) return "";
     var ordered = BIB_MUSCLE_ORDER.filter(function (k) { return arr.indexOf(k) >= 0; });
     return ordered.map(function (k) {
       var o = BIB_MUSCLE_OPTIONS.find(function (x) { return x.k === k; });
-      return o ? (es ? o.selEs : o.selEn) : k;
+      return o ? irontrackMsg(lang, o.selEs, o.selEn, o.selPt) : k;
     }).join(", ");
   }
   return raw ? String(raw) : "";
 }
 
 function bibMuscleFilterHaystack(raw) {
-  var base = formatBibMuscleDisplay(raw, true) + " " + formatBibMuscleDisplay(raw, false) + " " + String(raw || "");
+  var base = formatBibMuscleDisplay(raw, "es") + " " + formatBibMuscleDisplay(raw, "en") + " " + String(raw || "");
   var arr = parseBibMuscleJson(raw);
   if (arr && arr.length) base += " " + arr.join(" ");
   return base.toLowerCase();
@@ -435,7 +437,7 @@ function PagoAlumno({aliasData, es, toast2, darkMode}) {
   const handleCopy = () => {
     navigator.clipboard.writeText(aliasData.alias);
     setCopied(true);
-    toast2(es ? "Alias copiado ✓" : "Alias copied ✓");
+    toast2(msg("Alias copiado ✓", "Alias copied ✓"));
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -464,7 +466,7 @@ function PagoAlumno({aliasData, es, toast2, darkMode}) {
             <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
           </svg>
           <span style={{ fontSize: 13, fontWeight: 700, color: "#22C55E" }}>
-            {es ? "Datos de pago" : "Payment info"}
+            {msg("Datos de pago", "Payment info")}
           </span>
         </div>
         <button
@@ -517,8 +519,8 @@ function PagoAlumno({aliasData, es, toast2, darkMode}) {
           }}
         >
           {copied
-            ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> {es ? "¡Copiado!" : "Copied!"}</>
-            : <><Ic name="copy" size={14}/> {es ? "Copiar alias" : "Copy alias"}</>
+            ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> {msg("¡Copiado!", "Copied!")}</>
+            : <><Ic name="copy" size={14}/> {msg("Copiar alias", "Copy alias")}</>
           }
         </button>
       </div>
@@ -542,9 +544,9 @@ return(
   <div style={{marginBottom:12}}>
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
       <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,textTransform:"uppercase"}}>
-        {fotos.length} fotos · {es?"comparador":"before/after"}
+        {fotos.length} fotos · {msg("comparador", "before/after")}
       </div>
-      <div style={{fontSize:11,color:textMuted}}>← {es?"arrastrá":"drag"} →</div>
+      <div style={{fontSize:11,color:textMuted}}>← {msg("arrastrá", "drag")} →</div>
     </div>
     <div ref={sliderRef}
       style={{position:"relative",width:"100%",aspectRatio:"3/4",borderRadius:12,overflow:"hidden",
@@ -568,10 +570,10 @@ return(
           boxShadow:"0 2px 12px rgba(0,0,0,.4)",fontSize:15,color:"#2563EB",fontWeight:700}}>⇔</div>
       </div>
       <div style={{position:"absolute",bottom:8,left:8,background:"rgba(0,0,0,.7)",color:"#fff",fontSize:11,fontWeight:600,padding:"4px 8px",borderRadius:6}}>
-        {es?"ANTES":"BEFORE"} · {fotoAntes.fecha}
+        {msg("ANTES", "BEFORE")} · {fotoAntes.fecha}
       </div>
       <div style={{position:"absolute",bottom:8,right:8,background:"rgba(37,99,235,.85)",color:"#fff",fontSize:11,fontWeight:600,padding:"4px 8px",borderRadius:6}}>
-        {es?"AHORA":"NOW"} · {fotoDespues.fecha}
+        {msg("AHORA", "NOW")} · {fotoDespues.fecha}
       </div>
     </div>
   </div>
@@ -619,17 +621,17 @@ const guardar = async () => {
   if("Notification" in window && Notification.permission==="default"){
     await Notification.requestPermission();
   }
-  toast2(es?"Recordatorios activados ✓":"Reminders set ✓");
+  toast2(msg("Recordatorios activados ✓", "Reminders set ✓"));
 };
 const apagar = () => {
   localStorage.setItem("it_notif_on","false");
   setNotifActivo(false);
-  toast2(es?"Recordatorios desactivados":"Reminders off");
+  toast2(msg("Recordatorios desactivados", "Reminders off"));
 };
 return(
   <div style={{marginBottom:24}}>
     <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:2,marginBottom:12,textTransform:"uppercase"}}>
-      🔔 {es?"Recordatorios de entrenamiento":"Training reminders"}
+      🔔 {msg("Recordatorios de entrenamiento", "Training reminders")}
     </div>
     <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
       {DIAS.map((d,i)=>(
@@ -645,7 +647,7 @@ return(
     </div>
     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
       <div style={{fontSize:13,color:textMuted,fontWeight:500,flex:1}}>
-        {es?"Hora del recordatorio":"Reminder time"}
+        {msg("Hora del recordatorio", "Reminder time")}
       </div>
       <input type="time" value={notifHora}
         onChange={e=>{setNotifHora(e.target.value);localStorage.setItem("it_notif_hora",e.target.value);}}
@@ -661,7 +663,7 @@ return(
         <button onClick={apagar}
           style={{padding:"8px 16px",background:"#EF444422",color:"#EF4444",border:"1px solid #EF444433",
             borderRadius:12,fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-          {es?"Apagar":"Off"}
+          {msg("Apagar", "Off")}
         </button>
       </div>
     ):(
@@ -672,8 +674,8 @@ return(
           border:"none",borderRadius:12,fontSize:15,fontWeight:700,
           cursor:notifDias.length>0?"pointer":"not-allowed",fontFamily:"inherit"}}>
         {notifDias.length===0
-          ?(es?"Seleccioná al menos un día":"Select at least one day")
-          :(es?"Activar recordatorios":"Activate reminders")}
+          ?(msg("Seleccioná al menos un día", "Select at least one day"))
+          :(msg("Activar recordatorios", "Activate reminders"))}
       </button>
     )}
   </div>
@@ -891,6 +893,9 @@ function GymApp() {
   }, [sessionData]);
 
   const es = lang==="es";
+  const msg = useCallback(function (esStr, enStr, ptStr) {
+    return irontrackMsg(lang, esStr, enStr, ptStr);
+  }, [lang]);
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
   const [progress, setProgress] = useState(() => { try{return JSON.parse(localStorage.getItem("it_pg")||"{}")}catch(e){return {}} });
   const [user, setUser] = useState(() => { try{return JSON.parse(localStorage.getItem("it_u")||"null")}catch(e){return null} });
@@ -1191,7 +1196,7 @@ function GymApp() {
       if(!raw) return;
       var p = JSON.parse(raw);
       applyItPrefsToDocument(p);
-      if(p.lang === "es" || p.lang === "en") { setLang(p.lang); localStorage.setItem("it_lang", p.lang); }
+      if(p.lang === "es" || p.lang === "en" || p.lang === "pt") { setLang(p.lang); localStorage.setItem("it_lang", p.lang); }
       if(p.theme === "night") { setDarkMode(true); localStorage.setItem("it_dark", "true"); }
       else if(p.theme === "day") { setDarkMode(false); localStorage.setItem("it_dark", "false"); }
       else if(p.theme === "system") {
@@ -1417,7 +1422,7 @@ function GymApp() {
         if(rem <= 0) {
           if(timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
           setTimer(null);
-          toast2(es?"¡Pausa lista! 💪":"Rest done! 💪");
+          toast2(msg("¡Pausa lista! 💪", "Rest done! 💪"));
         }
       }
     };
@@ -1442,7 +1447,7 @@ function GymApp() {
           timerRef.current = null;
         }
         setTimer(null);
-        toast2(es ? "¡Pausa lista! 💪" : "Rest done! 💪");
+        toast2(msg("¡Pausa lista! 💪", "Rest done! 💪"));
       }
     }, 500);
     return () => {
@@ -1927,15 +1932,15 @@ function GymApp() {
   const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
   const tabs2 = esAlumno
     ? [
-        {k:"plan",    icon:(c)=><CalNavIcon size={20} color={c} strokeWidth={2}/>,      lbl:es?"PLAN":"PLAN"},
-        {k:"library", icon:(c)=><Dumbbell size={20} color={c} strokeWidth={2}/>, lbl:es?"EJERCICIOS":"EXERCISES"},
-        {k:"progress",icon:(c)=><TrendNavIcon size={20} color={c} strokeWidth={2}/>,  lbl:es?"PROGRESO":"PROGRESS"}
+        {k:"plan",    icon:(c)=><CalNavIcon size={20} color={c} strokeWidth={2}/>,      lbl:msg("PLAN", "PLAN")},
+        {k:"library", icon:(c)=><Dumbbell size={20} color={c} strokeWidth={2}/>, lbl:msg("EJERCICIOS", "EXERCISES")},
+        {k:"progress",icon:(c)=><TrendNavIcon size={20} color={c} strokeWidth={2}/>,  lbl:msg("PROGRESO", "PROGRESS")}
       ]
     : [
-        {k:"plan",      icon:(c)=><Ic name="bar-chart-2" size={20} color={c}/>, lbl:es?"DASHBOARD":"DASHBOARD"},
-        {k:"routines",  icon:(c)=><Ic name="file-text" size={20} color={c}/>,  lbl:es?"RUTINAS":"ROUTINES"},
-        {k:"biblioteca",icon:(c)=><Ic name="activity" size={20} color={c}/>, lbl:es?"EJERCICIOS":"EXERCISES"},
-        {k:"alumnos",   icon:(c)=><Ic name="users" size={20} color={c}/>,  lbl:es?"ALUMNOS":"ATHLETES"}
+        {k:"plan",      icon:(c)=><Ic name="bar-chart-2" size={20} color={c}/>, lbl:msg("DASHBOARD", "DASHBOARD")},
+        {k:"routines",  icon:(c)=><Ic name="file-text" size={20} color={c}/>,  lbl:msg("RUTINAS", "ROUTINES")},
+        {k:"biblioteca",icon:(c)=><Ic name="activity" size={20} color={c}/>, lbl:msg("EJERCICIOS", "EXERCISES")},
+        {k:"alumnos",   icon:(c)=><Ic name="users" size={20} color={c}/>,  lbl:msg("ALUMNOS", "ATHLETES")}
       ];
 
   /** En desktop el coach usa sidebar App; en móvil necesita la bottom nav también en Dashboard. */
@@ -2064,7 +2069,7 @@ function GymApp() {
   if (!sharedParam && authLoading) return (
     <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
       <IronTrackLogo size={40} color="#2563EB" showBar={false}/>
-      <div style={{marginTop:20,fontSize:14,fontWeight:600,color:textMuted,letterSpacing:0.5}}>{es?"Cargando…":"Loading…"}</div>
+      <div style={{marginTop:20,fontSize:14,fontWeight:600,color:textMuted,letterSpacing:0.5}}>{msg("Cargando…", "Loading…")}</div>
     </div>
   );
 
@@ -2080,7 +2085,7 @@ function GymApp() {
       <div style={{marginBottom:40,textAlign:"center"}}>
         <IronTrackLogo size={32} color="#2563EB" showBar={false}/>
         <div style={{fontSize:13,color:textMuted,marginTop:8,letterSpacing:1.5,fontWeight:500}}>
-          {es?"ENTRENAMIENTO INTELIGENTE":"INTELLIGENT TRAINING"}
+          {msg("ENTRENAMIENTO INTELIGENTE", "INTELLIGENT TRAINING")}
         </div>
       </div>
       <div style={{width:"100%",background:bgCard,borderRadius:16,padding:"24px",border:"1px solid "+border}}>
@@ -2162,10 +2167,10 @@ function GymApp() {
                     }, 500);
                   }
                 }
-              } catch(e){ toast2(es?"Error de biometría":"Biometric error"); }
+              } catch(e){ toast2(msg("Error de biometría", "Biometric error")); }
             }}>
             <Ic name="lock" size={36} color="#2563EB"/>
-            <span>{es?"Ingresar con huella / Face ID":"Sign in with biometrics"}</span>
+            <span>{msg("Ingresar con huella / Face ID", "Sign in with biometrics")}</span>
           </button>
         )}
         {loginEmail.trim().toLowerCase()==="entrenador@irontrack.app"&&<div style={{fontSize:11,color:textMuted,textAlign:"center",marginTop:12}}>Contraseña por defecto: irontrack2024</div>}
@@ -2179,6 +2184,7 @@ function GymApp() {
   const coachDesktopNavHidden = !!(showCoachDesktopShell && coachDesktop1024);
 
   return (
+    <IronTrackI18nProvider lang={lang}>
     <div style={{
       minHeight:"100dvh",
       height: alumnoFullScreenShell ? "100svh" : undefined,
@@ -2250,7 +2256,7 @@ function GymApp() {
           animation:"slideUpFade .3s ease"
         }}>
           <div style={{width:7,height:7,borderRadius:"50%",background:"#F59E0B",flexShrink:0}}/>
-          <span>{es?"Sin conexión — sets guardados localmente":"Offline — sets saved locally"}</span>
+          <span>{msg("Sin conexión — sets guardados localmente", "Offline — sets saved locally")}</span>
           {pendingSync.length>0&&(
             <span style={{marginLeft:"auto",background:"#F59E0B22",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>
               {pendingSync.length} pendiente{pendingSync.length>1?"s":""}
@@ -2344,7 +2350,7 @@ function GymApp() {
             size={22}
             color="#2563EB"
             showBar={true}
-            mode={(readOnly||esAlumno)?(es?"MODO ALUMNO":"ATHLETE MODE"):(!esAlumno&&sessionData?(es?"MODO ENTRENADOR":"COACH MODE"):null)}
+            mode={(readOnly||esAlumno)?(msg("MODO ALUMNO", "ATHLETE MODE")):(!esAlumno&&sessionData?(msg("MODO ENTRENADOR", "COACH MODE")):null)}
             modeColor={(readOnly||esAlumno)?"#22C55E":"#2563EB"}
           />
         </div>
@@ -2405,7 +2411,7 @@ function GymApp() {
                   setProfileModalOpen(true);
                 }}
               >
-                <Ic name="user" size={17} color="#3b82f6" /> {es ? "Mi perfil" : "My profile"}
+                <Ic name="user" size={17} color="#3b82f6" /> {msg("Mi perfil", "My profile")}
               </div>
               <div
                 className="hov"
@@ -2415,7 +2421,7 @@ function GymApp() {
                   setSettingsOpen(true);
                 }}
               >
-                <Ic name="settings" size={17} color="#94a3b8" /> {es ? "Configuración" : "Settings"}
+                <Ic name="settings" size={17} color="#94a3b8" /> {msg("Configuración", "Settings")}
               </div>
             </div>
             <div style={{ borderTop: "1px solid rgba(239,68,68,.2)", padding: "4px 0" }}>
@@ -2424,13 +2430,13 @@ function GymApp() {
                 style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, fontWeight: 700, color: "#f87171" }}
                 onClick={() => {
                   setUserMenuOpen(false);
-                  if (confirm(es ? "¿Cerrar sesión?" : "Log out?")) {
+                  if (confirm(msg("¿Cerrar sesión?", "Log out?"))) {
                     clearAllIronTrackPrefixedKeys();
                     syncStateWithLocalStorage();
                   }
                 }}
               >
-                <Ic name="log-out" size={17} color="#f87171" /> {es ? "Cerrar sesión" : "Log out"}
+                <Ic name="log-out" size={17} color="#f87171" /> {msg("Cerrar sesión", "Log out")}
               </div>
             </div>
           </div>
@@ -2530,13 +2536,13 @@ function GymApp() {
                 progresoGlobal={progresoGlobal}
                 rutinasSBEntrenador={rutinasSBEntrenador}
                 allEx={allEx}
-                es={es}
+                lang={lang}
                 onEnviarMensaje={function () {
                   var first = (alumnos || [])[0];
                   if (first) {
                     setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
                   } else {
-                    toast2(es ? "No hay alumnos para contactar" : "No athletes to message");
+                    toast2(msg("No hay alumnos para contactar", "No athletes to message"));
                   }
                 }}
                 onCrearRutina={function () {
@@ -2606,7 +2612,7 @@ function GymApp() {
                     return String(x.id) === String(alumnoId);
                   });
                   if (!alum) {
-                    toast2(es ? "Alumno no encontrado" : "Athlete not found");
+                    toast2(msg("Alumno no encontrado", "Athlete not found"));
                     return;
                   }
                   setChatModal({
@@ -2723,10 +2729,10 @@ function GymApp() {
                 </div>
 
                 {[
-                  { k: "plan", icon: "calendar", label: es ? "Dashboard" : "Dashboard", sub: null },
-                  { k: "alumnos", icon: "users", label: es ? "Alumnos" : "Athletes", sub: es ? "Gestionar equipo" : "Manage team" },
-                  { k: "routines", icon: "file-text", label: es ? "Rutinas" : "Routines", sub: null },
-                  { k: "biblioteca", icon: "activity", label: es ? "Ejercicios" : "Exercises", sub: null },
+                  { k: "plan", icon: "calendar", label: msg("Dashboard", "Dashboard"), sub: null },
+                  { k: "alumnos", icon: "users", label: msg("Alumnos", "Athletes"), sub: msg("Gestionar equipo", "Manage team") },
+                  { k: "routines", icon: "file-text", label: msg("Rutinas", "Routines"), sub: null },
+                  { k: "biblioteca", icon: "activity", label: msg("Ejercicios", "Exercises"), sub: null },
                 ].map((item) => (
                   <div
                     key={item.k}
@@ -2782,8 +2788,8 @@ function GymApp() {
                 </div>
 
                 {[
-                  { k: "perfil", icon: "user", label: es ? "Mi perfil" : "My profile", sub: es ? "Foto, bio, datos" : "Photo, bio, data" },
-                  { k: "settings", icon: "settings", label: es ? "Configuración" : "Settings", sub: es ? "Preferencias" : "Preferences" },
+                  { k: "perfil", icon: "user", label: msg("Mi perfil", "My profile"), sub: msg("Foto, bio, datos", "Photo, bio, data") },
+                  { k: "settings", icon: "settings", label: msg("Configuración", "Settings"), sub: msg("Preferencias", "Preferences") },
                 ].map((item) => (
                   <div
                     key={item.k}
@@ -2839,8 +2845,8 @@ function GymApp() {
                 </div>
 
                 {[
-                  { icon: "credit-card", label: es ? "Facturación" : "Billing", sub: "Plan Pro · $29/mes" },
-                  { icon: "dollar-sign", label: es ? "Cobros" : "Payments", sub: es ? "Gestionar cobros" : "Manage payments" },
+                  { icon: "credit-card", label: msg("Facturación", "Billing"), sub: "Plan Pro · $29/mes" },
+                  { icon: "dollar-sign", label: msg("Cobros", "Payments"), sub: msg("Gestionar cobros", "Manage payments") },
                 ].map((item, i) => (
                   <div
                     key={i}
@@ -2903,7 +2909,7 @@ function GymApp() {
                   >
                     <Ic name="log-out" size={14} color="#ef4444" />
                   </div>
-                  <div style={{ color: "#ef4444", fontSize: 12, fontWeight: 600 }}>{es ? "Cerrar sesión" : "Log out"}</div>
+                  <div style={{ color: "#ef4444", fontSize: 12, fontWeight: 600 }}>{msg("Cerrar sesión", "Log out")}</div>
                 </div>
               </div>
             </div>
@@ -2996,7 +3002,7 @@ function GymApp() {
                   >
                   <div style={{marginBottom:12}}>
                     <div style={{fontSize:13,color:textMuted,fontWeight:500,letterSpacing:0.3}}>
-                      {new Date().getHours()<12?(es?"BUENOS DÍAS":"GOOD MORNING"):new Date().getHours()<18?(es?"BUENAS TARDES":"GOOD AFTERNOON"):(es?"BUENAS NOCHES":"GOOD EVENING")}
+                      {new Date().getHours()<12?(msg("BUENOS DÍAS", "GOOD MORNING", "BOM DIA")):new Date().getHours()<18?(msg("BUENAS TARDES", "GOOD AFTERNOON", "BOA TARDE")):(msg("BUENAS NOCHES", "GOOD EVENING", "BOA NOITE"))}
                     </div>
                     <div style={{fontSize:28,fontWeight:900,color:textMain}}>{sessionData?.name?.split(" ")[0]||"Atleta"}</div>
                     {rachaActual>=2&&(
@@ -3008,7 +3014,7 @@ function GymApp() {
                         }}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                           <span style={{fontSize:11,fontWeight:700,color:"#fbbf24"}}>
-                            {rachaActual} {es?"semanas seguidas":"weeks straight"}
+                            {rachaActual} {msg("semanas seguidas", "weeks straight")}
                           </span>
                         </div>
                       </div>
@@ -3022,7 +3028,7 @@ function GymApp() {
                       <div style={{flex:1}}>
                         <div style={{fontSize:11,fontWeight:600,color:"#2563EB",letterSpacing:1,
                           marginBottom:4,textTransform:"uppercase"}}>
-                          {es?"Nota de tu entrenador":"Coach note"}
+                          {msg("Nota de tu entrenador", "Coach note")}
                         </div>
                         <div style={{fontSize:15,color:textMain,lineHeight:1.5,fontWeight:400}}>{notaDia}</div>
                       </div>
@@ -3031,10 +3037,10 @@ function GymApp() {
                   {/* ESTA SEMANA */}
                   <div style={{background:bgCard,borderRadius:14,padding:"20px 22px",marginBottom:12,border:"1px solid "+border}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
-                      <span style={{fontSize:11,fontWeight:700,color:textMuted,letterSpacing:1,textTransform:"uppercase"}}>{es?"Esta semana":"This week"}</span>
+                      <span style={{fontSize:11,fontWeight:700,color:textMuted,letterSpacing:1,textTransform:"uppercase"}}>{msg("Esta semana", "This week")}</span>
                       <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:12,fontWeight:700,color:"#2563EB"}}>{es?"Semana":"Week"} {currentWeek+1} {es?"de":"of"} 4</div>
-                        <div style={{fontSize:11,color:textMuted}}>{daysCompletedThisWeek}/{totalDays} {es?"días":"days"}</div>
+                        <div style={{fontSize:12,fontWeight:700,color:"#2563EB"}}>{msg("Semana", "Week")} {currentWeek+1} {msg("de", "of")} 4</div>
+                        <div style={{fontSize:11,color:textMuted}}>{daysCompletedThisWeek}/{totalDays} {msg("días", "days")}</div>
                       </div>
                     </div>
                     <div style={{display:"flex",gap:10}}>
@@ -3083,12 +3089,12 @@ function GymApp() {
                       <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:"#2563EB",borderRadius:"3px 0 0 3px",pointerEvents:"none",zIndex:0}}/>
                       <div className="plan-hoy-cta-head" style={{ position: "relative", zIndex: 1 }}>
                         <div style={{minWidth:0,flex:1}}>
-                          <div className="plan-hoy-cta-kicker" style={{ color: "#2563EB" }}>{es?"HOY":"TODAY"}</div>
+                          <div className="plan-hoy-cta-kicker" style={{ color: "#2563EB" }}>{msg("HOY", "TODAY")}</div>
                           <div className="plan-hoy-cta-title" style={{ color: textMain }}>
                             {todayDay.label||("Día "+(nextDayIdx+1))}
                           </div>
                           <div className="plan-hoy-cta-sub" style={{ color: textMuted }}>
-                            {((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {es?"ejercicios":"exercises"} · {r0?.name}
+                            {((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {msg("ejercicios", "exercises")} · {r0?.name}
                           </div>
                         </div>
                         <div
@@ -3099,7 +3105,7 @@ function GymApp() {
                             color:"#2563EB",
                           }}
                         >
-                          {es?"Sem":"Wk"} {currentWeek+1}
+                          {msg("Sem", "Wk")} {currentWeek+1}
                         </div>
                       </div>
                       <button
@@ -3134,7 +3140,7 @@ function GymApp() {
                         }}
                       >
                         <Ic name="zap" size={16} color="#fff"/>
-                        {es?"EMPEZAR AHORA":"START NOW"}
+                        {msg("EMPEZAR AHORA", "START NOW")}
                       </button>
                     </div>
                   )}
@@ -3151,8 +3157,8 @@ function GymApp() {
                         <path d="M8 14l4.5 4.5L20 9" stroke="#22C55E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                       <div>
-                        <div style={{fontSize:14,fontWeight:800,color:"#22C55E"}}>{es?"¡Entrenamiento completado!":"Workout done!"}</div>
-                        <div style={{fontSize:12,color:textMuted}}>{es?"Buen trabajo, descansá.":"Great work, rest up."}</div>
+                        <div style={{fontSize:14,fontWeight:800,color:"#22C55E"}}>{msg("¡Entrenamiento completado!", "Workout done!")}</div>
+                        <div style={{fontSize:12,color:textMuted}}>{msg("Buen trabajo, descansá.", "Great work, rest up.")}</div>
                       </div>
                     </div>
                   )}
@@ -3197,10 +3203,10 @@ function GymApp() {
                             setPreSessionPRs({...snap});
                             setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                           }}>
-                          ⚡ {es?"Entrenar":"Train"}
+                          ⚡ {msg("Entrenar", "Train")}
                         </button>
                       )}
-                      {yaEntrenoHoy&&<span style={{fontSize:13,color:"#22C55E",fontWeight:600}}>✅ {es?"Listo hoy":"Done today"}</span>}
+                      {yaEntrenoHoy&&<span style={{fontSize:13,color:"#22C55E",fontWeight:600}}>✅ {msg("Listo hoy", "Done today")}</span>}
                     </div>
                   </div>
                 </div>
@@ -3210,8 +3216,8 @@ function GymApp() {
             {esAlumno&&routines.length===0&&(
               <div style={{textAlign:"center",padding:"60px 0",color:textMuted}}>
                 <div style={{fontSize:48,marginBottom:12}}>📋</div>
-                <div style={{fontSize:22,fontWeight:700,letterSpacing:1,marginBottom:8}}>{es?"Sin rutinas aun":"No routines yet"}</div>
-                <div style={{fontSize:15}}>{es?"Crea tu primera rutina en RUTINAS":"Create your first routine in ROUTINES"}</div>
+                <div style={{fontSize:22,fontWeight:700,letterSpacing:1,marginBottom:8}}>{msg("Sin rutinas aun", "No routines yet")}</div>
+                <div style={{fontSize:15}}>{msg("Crea tu primera rutina en RUTINAS", "Create your first routine in ROUTINES")}</div>
               </div>
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
@@ -3241,7 +3247,7 @@ function GymApp() {
                       WebkitBoxOrient:"vertical",
                       overflow:"hidden",
                       paddingTop:2,
-                    }}>{r.created} · {r.days.length} {es?"dias":"days"}{r.note?" · "+r.note:""}</div>
+                    }}>{r.created} · {r.days.length} {msg("dias", "days")}{r.note?" · "+r.note:""}</div>
                   </div>
                   )}
                   {planScrollDiag.dayList&&r.days.map((d,di)=>{
@@ -3266,13 +3272,13 @@ function GymApp() {
                             {isDayDone?"✓":(di+1)}
                           </div>
                           <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:15,fontWeight:700,color:textMain}}>{d.label||((es?"Día ":"Day ")+(di+1))}</div>
+                            <div style={{fontSize:15,fontWeight:700,color:textMain}}>{d.label||((msg("Día ", "Day "))+(di+1))}</div>
                             <div style={{fontSize:12,color:textMuted,marginTop:1}}>
-                              {totalEj} {es?"ejercicios":"exercises"}{!isOpen&&exNames?" · "+exNames:""}
+                              {totalEj} {msg("ejercicios", "exercises")}{!isOpen&&exNames?" · "+exNames:""}
                             </div>
                           </div>
-                          {isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#22C55E",flexShrink:0}}>{es?"Listo":"Done"}</span>}
-                          {isNextDay&&!isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#2563EB",flexShrink:0}}>{es?"Siguiente":"Next"}</span>}
+                          {isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#22C55E",flexShrink:0}}>{msg("Listo", "Done")}</span>}
+                          {isNextDay&&!isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#2563EB",flexShrink:0}}>{msg("Siguiente", "Next")}</span>}
                           <span style={{fontSize:13,color:textMuted,flexShrink:0}}>{isOpen?"▲":"▼"}</span>
                         </div>
 
@@ -3283,7 +3289,7 @@ function GymApp() {
                               <div style={{marginTop:12,marginBottom:12}}>
                                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
                                   <span style={{width:3,height:12,borderRadius:2,background:"#F59E0B"}}/>
-                                  <span style={{fontSize:11,fontWeight:700,color:"#F59E0B",letterSpacing:1}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</span>
+                                  <span style={{fontSize:11,fontWeight:700,color:"#F59E0B",letterSpacing:1}}>{msg("ENTRADA EN CALOR", "WARM-UP")}</span>
                                 </div>
                                 {(d.warmup||[]).map(function(ex,ei){
                                   var inf=allEx.find(function(e){return e.id===ex.id});
@@ -3303,7 +3309,7 @@ function GymApp() {
                             <div style={{marginBottom:12}}>
                               <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
                                 <span style={{width:3,height:12,borderRadius:2,background:"#2563EB"}}/>
-                                <span style={{fontSize:11,fontWeight:700,color:"#2563EB",letterSpacing:1}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
+                                <span style={{fontSize:11,fontWeight:700,color:"#2563EB",letterSpacing:1}}>{msg("BLOQUE PRINCIPAL", "MAIN BLOCK")}</span>
                               </div>
                               {d.exercises.map(function(ex,ei){
                                 var inf=allEx.find(function(e){return e.id===ex.id});
@@ -3330,7 +3336,7 @@ function GymApp() {
                             {/* Botón iniciar/estado del día */}
                             {isDayDone&&(
                               <div style={{textAlign:"center",padding:"8px",color:"#22C55E",fontSize:13,fontWeight:700}}>
-                                ✅ {es?"Día completado esta semana":"Day completed this week"}
+                                ✅ {msg("Día completado esta semana", "Day completed this week")}
                               </div>
                             )}
                             {isNextDay&&!isDayDone&&(
@@ -3339,7 +3345,7 @@ function GymApp() {
                                 [].concat(d.warmup||[],d.exercises||[]).forEach(function(ex){snap[ex.id]=progress[ex.id]?.max||0});
                                 setPreSessionPRs(snap);
                                 setSessionPRList([]);setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
-                              }}>{es?"INICIAR ENTRENAMIENTO":"START WORKOUT"}</button>
+                              }}>{msg("INICIAR ENTRENAMIENTO", "START WORKOUT")}</button>
                             )}
                             {isFuture&&(
                               <div style={{textAlign:"center",padding:"8px",color:textMuted,fontSize:12,fontWeight:700,background:bgSub,borderRadius:8,marginTop:4}}>
@@ -3378,7 +3384,7 @@ function GymApp() {
                       }}
                     >
                       <Ic name="download" size={20} color="#fff"/>
-                      {es?"Descargar Rutina en PDF":"Download routine as PDF"}
+                      {msg("Descargar Rutina en PDF", "Download routine as PDF")}
                     </button>
                   )}
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -3393,9 +3399,9 @@ function GymApp() {
                         display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>‹</button>
                     <div style={{flex:1,textAlign:"center",padding:"0 8px"}}>
                       <div style={{fontSize:15,fontWeight:700,color:textMain,marginBottom:8}}>
-                        {es?"Semana":"Week"} <span style={{color:"#2563EB",fontWeight:800}}>{currentWeek+1}</span>
+                        {msg("Semana", "Week")} <span style={{color:"#2563EB",fontWeight:800}}>{currentWeek+1}</span>
                         <span style={{fontSize:11,color:textMuted,fontWeight:400,marginLeft:8}}>
-                          {completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length}/{r.days.length} {es?"días":"days"}
+                          {completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length}/{r.days.length} {msg("días", "days")}
                         </span>
                       </div>
                       <div style={{display:"flex",gap:4,justifyContent:"center"}}>
@@ -3464,7 +3470,7 @@ function GymApp() {
                       background:_dm?"#162234":"#EEF2F7"
                     }}>
                       <span style={{fontSize:9,color:textMuted,fontWeight:600,whiteSpace:"nowrap"}}>
-                        {es?"30d carga":"30d load"}
+                        {msg("30d carga", "30d load")}
                       </span>
                       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{flex:1}}>
                         <path d={areaD} fill={fill}/>
@@ -3488,7 +3494,7 @@ function GymApp() {
         {tab==="library"&&(
           <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto"}>
             {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal}/>}
-            {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>}
+            {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>}
           </div>
         )}
         {tab==="routines"&&!esAlumno&&(
@@ -3501,6 +3507,7 @@ function GymApp() {
             textMain={textMain}
             darkMode={darkMode}
             bgSub={bgSub}
+            lang={lang}
             es={es}
             setFiltroRut={setFiltroRut}
             btn={btn}
@@ -3532,7 +3539,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto">
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} es={es} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
+            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
           </div>
         )}
         {tab==="progress"&&showAlumnoProgressStack&&(
@@ -3583,7 +3590,7 @@ function GymApp() {
             })}
             {/* ── Rutinas asignadas (Supabase) ── */}
             {rutinasSBEntrenador.length>0&&(<div style={{marginTop:16}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#22C55E",letterSpacing:2,marginBottom:8,textTransform:"uppercase",borderLeft:"3px solid #22C55E",paddingLeft:8}}>{es?"RUTINAS ASIGNADAS":"ASSIGNED ROUTINES"} ({rutinasSBEntrenador.length})</div>
+              <div style={{fontSize:11,fontWeight:800,color:"#22C55E",letterSpacing:2,marginBottom:8,textTransform:"uppercase",borderLeft:"3px solid #22C55E",paddingLeft:8}}>{msg("RUTINAS ASIGNADAS", "ASSIGNED ROUTINES")} ({rutinasSBEntrenador.length})</div>
               {rutinasSBEntrenador.map(function(rSB,ri){
                 var alumnoInfo=alumnos.find(function(al){return al.id===rSB.alumno_id});
                 var diasSB=rSB.datos?.days||[];
@@ -3595,11 +3602,11 @@ function GymApp() {
                         <span style={{background:"#22C55E22",color:"#22C55E",borderRadius:6,padding:"1px 7px",fontSize:10,fontWeight:700}}>☁️</span>
                       </div>
                       {alumnoInfo&&<div style={{fontSize:13,fontWeight:700,color:textMuted,marginTop:2}}>👤 {alumnoInfo.nombre||alumnoInfo.email}</div>}
-                      <div style={{fontSize:13,color:textMuted}}>{diasSB.length} {es?"días":"days"}</div>
+                      <div style={{fontSize:13,color:textMuted}}>{diasSB.length} {msg("días", "days")}</div>
                     </div>
                     <div style={{display:"flex",gap:8}}>
-                      <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var rutLocal={id:rSB.id,...(rSB.datos||{}),name:rSB.nombre,saved:true,alumno_id:rSB.alumno_id,alumno:alumnoInfo?.nombre||""};setRoutines(function(p){var ex=p.find(function(x){return x.id===rSB.id});return ex?p:[rutLocal,...p]});toast2(es?"Abierta para editar":"Opened for editing");}}>{es?"Editar":"Edit"}</button>
-                      <button className="hov" style={{background:"#22C55E22",color:"#22C55E",border:"none",borderRadius:8,padding:"8px 10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var newId=uid();var copia={id:newId,name:rSB.nombre+" (copia)",days:(rSB.datos?.days||[]).map(function(d){return{...d,warmup:(d.warmup||[]).map(function(e){return{...e}}),exercises:(d.exercises||[]).map(function(e){return{...e}})}}),collapsed:false,saved:false};setRoutines(function(p){return[...p,copia]});setAssignRoutineId(newId);toast2(es?"Duplicada":"Duplicated");}}><Ic name="copy" size={14}/></button>
+                      <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var rutLocal={id:rSB.id,...(rSB.datos||{}),name:rSB.nombre,saved:true,alumno_id:rSB.alumno_id,alumno:alumnoInfo?.nombre||""};setRoutines(function(p){var ex=p.find(function(x){return x.id===rSB.id});return ex?p:[rutLocal,...p]});toast2(msg("Abierta para editar", "Opened for editing"));}}>{msg("Editar", "Edit")}</button>
+                      <button className="hov" style={{background:"#22C55E22",color:"#22C55E",border:"none",borderRadius:8,padding:"8px 10px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){var newId=uid();var copia={id:newId,name:rSB.nombre+" (copia)",days:(rSB.datos?.days||[]).map(function(d){return{...d,warmup:(d.warmup||[]).map(function(e){return{...e}}),exercises:(d.exercises||[]).map(function(e){return{...e}})}}),collapsed:false,saved:false};setRoutines(function(p){return[...p,copia]});setAssignRoutineId(newId);toast2(msg("Duplicada", "Duplicated"));}}><Ic name="copy" size={14}/></button>
                     </div>
                   </div>
                   <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>{diasSB.map(function(d,di){return(<span key={(rSB.id||"rut")+"-dchip-"+di} style={{background:bgSub,borderRadius:6,padding:"2px 8px",fontSize:11,color:textMuted,fontWeight:600}}>{d.label||("Día "+(di+1))} · {((d.warmup||[]).length+(d.exercises||[]).length)} ej.</span>)})}</div>
@@ -3609,7 +3616,7 @@ function GymApp() {
             {Object.keys(progress).length===0&&(
               <div style={{textAlign:"center",padding:"60px 0",color:textMuted}}>
                 <div style={{fontSize:48,marginBottom:12}}>📊</div>
-                <div style={{fontSize:22,fontWeight:700,letterSpacing:1}}>{es?"Sin registros aun":"No records yet"}</div>
+                <div style={{fontSize:22,fontWeight:700,letterSpacing:1}}>{msg("Sin registros aun", "No records yet")}</div>
               </div>
             )}
           </div>
@@ -3617,17 +3624,17 @@ function GymApp() {
         {tab==="alumnos"&&sessionData?.role==="entrenador"&&(
           <div className="min-w-0 max-w-full" style={{background:"#0a0f1a",marginLeft:showCoachDesktopShell?0:-4,marginRight:showCoachDesktopShell?0:-4,padding:"8px 0 20px",borderRadius:12}}>
             <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
-              <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:"#fff",minWidth:0,flex:"1 1 12rem"}}><Ic name="users" size={18}/> {es?"MIS ALUMNOS":"MY ATHLETES"}</div>
+              <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:"#fff",minWidth:0,flex:"1 1 12rem"}}><Ic name="users" size={18}/> {msg("MIS ALUMNOS", "MY ATHLETES")}</div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",flexShrink:0}}>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={es?"Datos de pago":"Payment info"}><Ic name="share" size={16}/></button>
-                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={es?"Actualizar":"Refresh"}><Ic name="refresh-cw" size={16}/></button>
-                <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {es?"Nuevo":"New"}</button>
+                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={msg("Datos de pago", "Payment info")}><Ic name="share" size={16}/></button>
+                <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={msg("Actualizar", "Refresh")}><Ic name="refresh-cw" size={16}/></button>
+                <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {msg("Nuevo", "New")}</button>
               </div>
             </div>
 
             {routines.length>0&&(
               <div style={{marginBottom:12,padding:"12px 14px",background:bgSub,borderRadius:12,border:"1px solid "+border}}>
-                <div style={{fontSize:11,fontWeight:800,letterSpacing:0.8,color:"#2563EB",marginBottom:8}}>{es?"RUTINA QUE SE ASIGNA AL TOCAR «ASIGNAR»":"ROUTINE USED WHEN YOU TAP «ASSIGN»"}</div>
+                <div style={{fontSize:11,fontWeight:800,letterSpacing:0.8,color:"#2563EB",marginBottom:8}}>{msg("RUTINA QUE SE ASIGNA AL TOCAR «ASIGNAR»", "ROUTINE USED WHEN YOU TAP «ASSIGN»")}</div>
                 {routines.length===1 ? (
                   <div style={{fontSize:16,fontWeight:700,color:textMain}}>{routines[0].name}</div>
                 ) : (
@@ -3636,11 +3643,11 @@ function GymApp() {
                     value={routineForAssign?.id||""}
                     onChange={function(e){setAssignRoutineId(e.target.value);}}>
                     {routines.map(function(r){
-                      return <option key={r.id} value={r.id}>{r.name||"—"} · {(r.days||[]).length} {es?"días":"days"}</option>;
+                      return <option key={r.id} value={r.id}>{r.name||"—"} · {(r.days||[]).length} {msg("días", "days")}</option>;
                     })}
                   </select>
                 )}
-                <div style={{fontSize:12,color:textMuted,marginTop:6}}>{es?"Creá o editá rutinas en RUTINAS. Con varias listas, elegí cuál mandar acá.":"Create or edit routines under ROUTINES. If you have several, pick which one to send."}</div>
+                <div style={{fontSize:12,color:textMuted,marginTop:6}}>{msg("Creá o editá rutinas en RUTINAS. Con varias listas, elegí cuál mandar acá.", "Create or edit routines under ROUTINES. If you have several, pick which one to send.")}</div>
               </div>
             )}
 
@@ -3651,7 +3658,7 @@ function GymApp() {
                   type="search"
                   value={coachAlumnosSearch}
                   onChange={function (e) { setCoachAlumnosSearch(e.target.value); }}
-                  placeholder={es ? "Buscar alumno..." : "Search athlete..."}
+                  placeholder={msg("Buscar alumno...", "Search athlete...")}
                   style={{flex:1,background:"transparent",border:"none",outline:"none",color:"#fff",fontSize:15,fontFamily:"inherit",minWidth:0}}
                 />
               </div>
@@ -3691,9 +3698,9 @@ function GymApp() {
             {newAlumnoForm&&(
               <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>{setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}}>
                 <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxWidth:480,paddingBottom:32}} onClick={e=>e.stopPropagation()}>
-                  <div style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:16,color:textMain}}>{es?"NUEVO ALUMNO":"NEW ATHLETE"}</div>
+                  <div style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:16,color:textMain}}>{msg("NUEVO ALUMNO", "NEW ATHLETE")}</div>
                   <div style={{marginBottom:8}}>
-                    <span style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4,display:"block"}}>{es?"NOMBRE":"NAME"}</span>
+                    <span style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4,display:"block"}}>{msg("NOMBRE", "NAME")}</span>
                     <input
                       style={{background:bgSub,color:textMain,
                         border:"1px solid "+(newAlumnoErrors.nombre?"#EF4444":newAlumnoData.nombre.trim().length>1?"#22C55E":border),
@@ -3702,8 +3709,8 @@ function GymApp() {
                       value={newAlumnoData.nombre}
                       onChange={e=>{setNewAlumnoData(p=>({...p,nombre:e.target.value}));if(e.target.value.trim().length>1)setNewAlumnoErrors(p=>({...p,nombre:false}));}}
                       onBlur={e=>{if(!e.target.value.trim())setNewAlumnoErrors(p=>({...p,nombre:true}));}}
-                      placeholder={es?"Nombre completo":"Full name"}/>
-                    {newAlumnoErrors.nombre&&<div style={{fontSize:11,color:"#EF4444",marginTop:4,fontWeight:700}}><Ic name="alert-triangle" size={14} color="#F59E0B"/> {es?"El nombre es obligatorio":"Name is required"}</div>}
+                      placeholder={msg("Nombre completo", "Full name")}/>
+                    {newAlumnoErrors.nombre&&<div style={{fontSize:11,color:"#EF4444",marginTop:4,fontWeight:700}}><Ic name="alert-triangle" size={14} color="#F59E0B"/> {msg("El nombre es obligatorio", "Name is required")}</div>}
                   </div>
                   <div style={{marginBottom:8}}>
                     <span style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4,display:"block"}}>EMAIL</span>
@@ -3716,21 +3723,21 @@ function GymApp() {
                       onChange={e=>{setNewAlumnoData(p=>({...p,email:e.target.value}));if(/^[^@]+@[^@]+\.[^@]+$/.test(e.target.value))setNewAlumnoErrors(p=>({...p,email:false}));}}
                       onBlur={e=>{if(!/^[^@]+@[^@]+\.[^@]+$/.test(e.target.value))setNewAlumnoErrors(p=>({...p,email:true}));}}
                       placeholder="email@ejemplo.com"/>
-                    {newAlumnoErrors.email&&<div style={{fontSize:11,color:"#EF4444",marginTop:4,fontWeight:700}}><Ic name="alert-triangle" size={14} color="#F59E0B"/> {es?"Email inválido (ej: nombre@mail.com)":"Invalid email (e.g. name@mail.com)"}</div>}
+                    {newAlumnoErrors.email&&<div style={{fontSize:11,color:"#EF4444",marginTop:4,fontWeight:700}}><Ic name="alert-triangle" size={14} color="#F59E0B"/> {msg("Email inválido (ej: nombre@mail.com)", "Invalid email (e.g. name@mail.com)")}</div>}
                   </div>
                   <div style={{marginBottom:16}}>
-                    <span style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4,display:"block"}}>{es?"CONTRASEÑA":"PASSWORD"}</span>
+                    <span style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4,display:"block"}}>{msg("CONTRASEÑA", "PASSWORD")}</span>
                     <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",width:"100%",fontSize:15}} value={newAlumnoData.pass} onChange={e=>setNewAlumnoData(p=>({...p,pass:e.target.value}))} placeholder="Contraseña" type="password"/>
                   </div>
                   <div style={{display:"flex",gap:8}}>
-                    <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"12px 16px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}}>{es?"Cancelar":"Cancel"}</button>
+                    <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"12px 16px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}}>{msg("Cancelar", "Cancel")}</button>
                     <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:12,padding:"12px 16px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",flex:1}} onClick={async()=>{
                       const errNom = !newAlumnoData.nombre.trim();
                       const errEm = !/^[^@]+@[^@]+\.[^@]+$/.test(newAlumnoData.email);
                       if(errNom||errEm){setNewAlumnoErrors({nombre:errNom,email:errEm});return;}
                       setLoadingSB(true);
                       const res = await sb.createAlumno({nombre:newAlumnoData.nombre.trim(),email:newAlumnoData.email.trim(),password:newAlumnoData.pass.trim()||"irontrack2024",entrenador_id:ENTRENADOR_ID});
-                      if(res&&res[0]){setAlumnos(prev=>[...prev,res[0]]);toast2(es?"Alumno creado ✓":"Athlete created ✓");setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}
+                      if(res&&res[0]){setAlumnos(prev=>[...prev,res[0]]);toast2(msg("Alumno creado ✓", "Athlete created ✓"));setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}
                       else{toast2("Error al crear alumno");}
                       setLoadingSB(false);
                     }}>GUARDAR</button>
@@ -3763,12 +3770,12 @@ function GymApp() {
                 <div style={{fontSize:36,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
                   <Ic name="users" size={34} color="#64748b"/>
                 </div>
-                <div style={{fontSize:15,fontWeight:700}}>{es?"Sin alumnos aún":"No athletes yet"}</div>
+                <div style={{fontSize:15,fontWeight:700}}>{msg("Sin alumnos aún", "No athletes yet")}</div>
               </div>
             )}
             {alumnos.length>0 && coachAlumnosListaFiltrada.length===0 && !loadingSB && (
               <div style={{textAlign:"center",padding:"24px 12px",color:"#94a3b8",fontSize:15,fontWeight:600}}>
-                {es?"No hay alumnos que coincidan con la búsqueda o el filtro.":"No athletes match your search or filter."}
+                {msg("No hay alumnos que coincidan con la búsqueda o el filtro.", "No athletes match your search or filter.")}
               </div>
             )}
 
@@ -3783,7 +3790,7 @@ function GymApp() {
                       <span style={{fontSize:17,fontWeight:800,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
                       {(() => {
                         var cat = coachAlumnoCategoria(a);
-                        var cfg = cat === "activo" ? { bg: "#14532d", color: "#4ade80", t: es ? "Activo" : "Active" } : cat === "inactivo" ? { bg: "#422006", color: "#fbbf24", t: es ? "Inactivo" : "Inactive" } : { bg: "#1e293b", color: "#94a3b8", t: es ? "Sin rutina" : "No routine" };
+                        var cfg = cat === "activo" ? { bg: "#14532d", color: "#4ade80", t: msg("Activo", "Active") } : cat === "inactivo" ? { bg: "#422006", color: "#fbbf24", t: msg("Inactivo", "Inactive") } : { bg: "#1e293b", color: "#94a3b8", t: msg("Sin rutina", "No routine") };
                         return <span style={{fontSize:11,fontWeight:800,padding:"2px 8px",borderRadius:6,background:cfg.bg,color:cfg.color}}>{cfg.t}</span>;
                       })()}
                     </div>
@@ -3796,7 +3803,7 @@ function GymApp() {
                       var pct = Math.min(100, Math.round((done / nD) * 100));
                       return (
                         <div style={{marginTop:10}}>
-                          <div style={{fontSize:12,fontWeight:700,color:"#94a3b8",marginBottom:4}}>{done}/{nD} {es ? "días esta semana" : "days this week"}</div>
+                          <div style={{fontSize:12,fontWeight:700,color:"#94a3b8",marginBottom:4}}>{done}/{nD} {msg("días esta semana", "days this week")}</div>
                           <div style={{height:6,background:"#1e293b",borderRadius:4,overflow:"hidden"}}>
                             <div style={{width: pct + "%", height: "100%", background: "#22c55e", borderRadius: 4, transition: "width .2s ease"}}/>
                           </div>
@@ -3817,12 +3824,12 @@ function GymApp() {
                         const ses = await sb.getSesiones(a.id); setAlumnoSesiones(ses || []);
                         setLoadingSB(false);
                       }}
-                    >{alumnoActivo?.id === a.id ? (es ? "CERRAR" : "CLOSE") : "VER"}</button>
+                    >{alumnoActivo?.id === a.id ? (msg("CERRAR", "CLOSE", "FECHAR")) : msg("VER", "VIEW", "VER")}</button>
                     <div style={{position:"relative"}}>
                       <button
                         type="button"
                         className="hov"
-                        aria-label={es ? "Más opciones" : "More options"}
+                        aria-label={msg("Más opciones", "More options")}
                         style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",color:"#94a3b8",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,cursor:"pointer"}}
                         onClick={function (e) { e.stopPropagation(); setCoachCardMenuId(coachCardMenuId === a.id ? null : a.id); }}
                       >
@@ -3837,9 +3844,9 @@ function GymApp() {
                             type="button"
                             className="hov"
                             style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#e2e8f0",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
-                            onClick={function () { setCoachCardMenuId(null); if (!confirm(es ? "¿Editar alumno?" : "Edit athlete?")) return; setEditAlumnoModal(a); setEditAlumnoEmail(a.email); setEditAlumnoPass(""); }}
+                            onClick={function () { setCoachCardMenuId(null); if (!confirm(msg("¿Editar alumno?", "Edit athlete?"))) return; setEditAlumnoModal(a); setEditAlumnoEmail(a.email); setEditAlumnoPass(""); }}
                           >
-                            <Ic name="edit-2" size={16} color="#94a3b8"/> {es ? "Editar" : "Edit"}
+                            <Ic name="edit-2" size={16} color="#94a3b8"/> {msg("Editar", "Edit")}
                           </button>
                           <button
                             type="button"
@@ -3847,7 +3854,7 @@ function GymApp() {
                             style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#e2e8f0",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
                             onClick={function () { setCoachCardMenuId(null); setChatModal({ alumnoId: a.id, alumnoNombre: a.nombre || a.email || "Alumno" }); }}
                           >
-                            <Ic name="message-circle" size={16} color="#3b82f6"/> {es ? "Mensaje" : "Message"}
+                            <Ic name="message-circle" size={16} color="#3b82f6"/> {msg("Mensaje", "Message")}
                           </button>
                           <button
                             type="button"
@@ -3855,11 +3862,11 @@ function GymApp() {
                             style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
                             onClick={async function () {
                               setCoachCardMenuId(null);
-                              if (!confirm((es ? "Eliminar a " : "Delete ") + a.nombre + "?")) return;
-                              await sb.deleteAlumno?.(a.id); setAlumnos(function (prev) { return prev.filter(function (x) { return x.id !== a.id; }); }); toast2(es ? "Alumno eliminado" : "Athlete removed");
+                              if (!confirm((msg("Eliminar a ", "Delete ")) + a.nombre + "?")) return;
+                              await sb.deleteAlumno?.(a.id); setAlumnos(function (prev) { return prev.filter(function (x) { return x.id !== a.id; }); }); toast2(msg("Alumno eliminado", "Athlete removed"));
                             }}
                           >
-                            <Ic name="trash-2" size={16} color="#f87171"/> {es ? "Eliminar" : "Delete"}
+                            <Ic name="trash-2" size={16} color="#f87171"/> {msg("Eliminar", "Delete")}
                           </button>
                         </div>
                       )}
@@ -3870,7 +3877,7 @@ function GymApp() {
                   <div>
                     {(()=>{
                       const rutinaActiva=rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
-                      if(!rutinaActiva) return <div style={{background:"#111827",borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid rgba(59,130,246,0.22)"}}><div style={{fontSize:13,color:"#94a3b8"}}>{es?"Sin rutina asignada":"No routine assigned"}</div></div>;
+                      if(!rutinaActiva) return <div style={{background:"#111827",borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid rgba(59,130,246,0.22)"}}><div style={{fontSize:13,color:"#94a3b8"}}>{msg("Sin rutina asignada", "No routine assigned")}</div></div>;
                       const dias=rutinaActiva.datos?.days||[];
                       const semanaCiclo = currentWeek + 1;
                       const rId = rutinaActiva.id;
@@ -3889,7 +3896,7 @@ function GymApp() {
                         if(diasCompletados >= dias.length) { proxDia = 1; proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1; }
                         else { proxDia = diasCompletados + 1; proxSemana = semanaCiclo; }
                         var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
-                        return proxLabel + " · " + (es?"Semana ":"Week ") + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (es?" (nuevo ciclo)":" (new cycle)") : "");
+                        return proxLabel + " · " + (msg("Semana ", "Week ")) + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (msg(" (nuevo ciclo)", " (new cycle)")) : "");
                       })();
                       return(
                         <div style={{marginBottom:8}}>
@@ -3898,13 +3905,13 @@ function GymApp() {
                               <div style={{flex:1,minWidth:0}}>
                                 <div style={{fontSize:24,fontWeight:900,color:"#fff",lineHeight:1.15}}>{rutinaActiva.nombre}</div>
                                 <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:10,alignItems:"center"}}>
-                                  <span style={{fontSize:14,color:"#94a3b8",fontWeight:600}}>{dias.length} {es?"días":"days"}</span>
-                                  <span style={{padding:"4px 10px",borderRadius:8,background:"rgba(59,130,246,0.15)",border:"1px solid rgba(59,130,246,0.35)",color:"#3b82f6",fontSize:12,fontWeight:800}}>{es?"Semana":"Week"} {semanaCiclo} {es?"de":"of"} 4</span>
+                                  <span style={{fontSize:14,color:"#94a3b8",fontWeight:600}}>{dias.length} {msg("días", "days")}</span>
+                                  <span style={{padding:"4px 10px",borderRadius:8,background:"rgba(59,130,246,0.15)",border:"1px solid rgba(59,130,246,0.35)",color:"#3b82f6",fontSize:12,fontWeight:800}}>{msg("Semana", "Week")} {semanaCiclo} {msg("de", "of")} 4</span>
                                   <span style={{fontSize:13,color:"#94a3b8",fontWeight:600}}>{semCalLabel}</span>
                                 </div>
                               </div>
                               <div style={{position:"relative",flexShrink:0}}>
-                                <button type="button" className="hov" aria-label={es?"Opciones de rutina":"Routine options"} style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,cursor:"pointer"}} onClick={function(){setCoachRutinaMenuOpen(function(o){return !o;});}}>
+                                <button type="button" className="hov" aria-label={msg("Opciones de rutina", "Routine options")} style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:10,cursor:"pointer"}} onClick={function(){setCoachRutinaMenuOpen(function(o){return !o;});}}>
                                   <Ic name="more-vertical" size={18} color="#94a3b8"/>
                                 </button>
                                 {coachRutinaMenuOpen && (
@@ -3913,17 +3920,17 @@ function GymApp() {
                                       if(!confirm(es?"¿Reiniciar semana actual? El alumno volverá a Día 1 de la semana "+semanaCiclo+".":"Reset current week? Athlete will restart at Day 1 of week "+semanaCiclo+".")) return;
                                       setCompletedDays(function(prev){return prev.filter(function(k){return !k.endsWith("-w"+(semanaCiclo-1))});});
                                       setCoachRutinaMenuOpen(false);
-                                      toast2(es?"Semana reiniciada ✓":"Week reset ✓");
+                                      toast2(msg("Semana reiniciada ✓", "Week reset ✓"));
                                     }}>
-                                      <Ic name="refresh-cw" size={15} color="#fbbf24"/> {es?"Reiniciar semana":"Reset week"}
+                                      <Ic name="refresh-cw" size={15} color="#fbbf24"/> {msg("Reiniciar semana", "Reset week")}
                                     </button>
                                     <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
-                                      if(!confirm(es?"¿Reiniciar rutina completa? Volverá a Semana 1, Día 1. El historial de progreso se mantiene.":"Reset entire routine? Will go back to Week 1, Day 1. Progress history is kept.")) return;
+                                      if(!confirm(msg("¿Reiniciar rutina completa? Volverá a Semana 1, Día 1. El historial de progreso se mantiene.", "Reset entire routine? Will go back to Week 1, Day 1. Progress history is kept."))) return;
                                       setCompletedDays([]); setCurrentWeek(0); localStorage.removeItem("it_last_week_advance_date");
                                       setCoachRutinaMenuOpen(false);
-                                      toast2(es?"Rutina reiniciada ✓":"Routine reset ✓");
+                                      toast2(msg("Rutina reiniciada ✓", "Routine reset ✓"));
                                     }}>
-                                      <Ic name="refresh-cw" size={15} color="#f87171"/> {es?"Reiniciar rutina":"Reset routine"}
+                                      <Ic name="refresh-cw" size={15} color="#f87171"/> {msg("Reiniciar rutina", "Reset routine")}
                                     </button>
                                   </div>
                                 )}
@@ -3931,7 +3938,7 @@ function GymApp() {
                             </div>
                             <div style={{marginBottom:12}}>
                               <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
-                                <span style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{diasCompletados} {es?"de":"of"} {dias.length} {es?"días completados":"days completed"}</span>
+                                <span style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{diasCompletados} {msg("de", "of")} {dias.length} {msg("días completados", "days completed")}</span>
                                 <span style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>{pctBar}%</span>
                               </div>
                               <div style={{height:12,background:"#1e293b",borderRadius:8,overflow:"hidden"}}>
@@ -3939,7 +3946,7 @@ function GymApp() {
                               </div>
                             </div>
                             <div style={{marginBottom:14,padding:"10px 12px",background:"rgba(59,130,246,0.06)",border:"1px solid rgba(59,130,246,0.2)",borderRadius:10}}>
-                              <span style={{fontSize:13,color:"#cbd5e1",fontWeight:600}}>{es?"Próxima sesión:":"Next session:"} </span>
+                              <span style={{fontSize:13,color:"#cbd5e1",fontWeight:600}}>{msg("Próxima sesión:", "Next session:")} </span>
                               <span style={{fontSize:13,color:"#fff",fontWeight:700}}>{proxTxt}</span>
                             </div>
                             {dias.length > 0 && (
@@ -3969,7 +3976,7 @@ function GymApp() {
                                         gap:6,
                                       }}
                                     >
-                                      {es?"Día ":"Day "}{di+1}
+                                      {msg("Día ", "Day ")}{di+1}
                                       {dayDone ? <Ic name="check-sm" size={14} color="#22c55e"/> : null}
                                     </button>
                                   );
@@ -3978,10 +3985,10 @@ function GymApp() {
                             )}
                             {dias.length > 0 && (
                               <div style={{background:"#0f172a",borderRadius:12,border:"1px solid rgba(59,130,246,0.15)",padding:"12px"}}>
-                                <div style={{fontSize:12,fontWeight:800,color:"#94a3b8",marginBottom:10}}>{dSel.label || ((es?"Día ":"Day ")+(diSel+1))} · {((dSel.warmup||[]).length+(dSel.exercises||[]).length)} {es?"ej.":"ex."}</div>
+                                <div style={{fontSize:12,fontWeight:800,color:"#94a3b8",marginBottom:10}}>{dSel.label || ((msg("Día ", "Day "))+(diSel+1))} · {((dSel.warmup||[]).length+(dSel.exercises||[]).length)} {msg("ej.", "ex.")}</div>
                                 <div style={{marginBottom:12}}>
                                     <button type="button" className="hov" onClick={function(){ setCoachDiaSecsOpen(function(o){ return {...o, warmup:!o.warmup}; }); }} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"transparent",border:"none",padding:"6px 0",cursor:"pointer",marginBottom:8}}>
-                                      <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{es?"ENTRADA EN CALOR":"WARM-UP"}</span>
+                                      <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{msg("ENTRADA EN CALOR", "WARM-UP")}</span>
                                       <Ic name="chevron-right" size={16} color="#f59e0b" style={{transform:coachDiaSecsOpen.warmup?"rotate(90deg)":"none",transition:"transform .2s"}}/>
                                     </button>
                                     {coachDiaSecsOpen.warmup && (
@@ -3995,12 +4002,12 @@ function GymApp() {
                                             <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
                                           </div>;
                                         })}
-                                        <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:6,padding:"8px",background:"transparent",border:"1px dashed rgba(245,158,11,0.45)",borderRadius:8,fontSize:12,fontWeight:700,color:"#f59e0b",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#f59e0b"/>{es?"+ Añadir ejercicio":"+ Add exercise"}</button>
+                                        <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:6,padding:"8px",background:"transparent",border:"1px dashed rgba(245,158,11,0.45)",borderRadius:8,fontSize:12,fontWeight:700,color:"#f59e0b",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#f59e0b"/>{msg("+ Añadir ejercicio", "+ Add exercise")}</button>
                                       </div>
                                     )}
                                 </div>
                                 <button type="button" className="hov" onClick={function(){ setCoachDiaSecsOpen(function(o){ return {...o, main:!o.main}; }); }} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"transparent",border:"none",padding:"6px 0",cursor:"pointer",marginBottom:8}}>
-                                  <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{es?"BLOQUE PRINCIPAL":"MAIN BLOCK"}</span>
+                                  <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{msg("BLOQUE PRINCIPAL", "MAIN BLOCK")}</span>
                                   <Ic name="chevron-right" size={16} color="#f59e0b" style={{transform:coachDiaSecsOpen.main?"rotate(90deg)":"none",transition:"transform .2s"}}/>
                                 </button>
                                 {coachDiaSecsOpen.main && (
@@ -4014,21 +4021,21 @@ function GymApp() {
                                         <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
                                       </div>;
                                     })}
-                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed rgba(59,130,246,0.4)",borderRadius:8,fontSize:13,fontWeight:700,color:"#3b82f6",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#3b82f6"/>{es?"+ Añadir ejercicio":"+ Add exercise"}</button>
+                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed rgba(59,130,246,0.4)",borderRadius:8,fontSize:13,fontWeight:700,color:"#3b82f6",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#3b82f6"/>{msg("+ Añadir ejercicio", "+ Add exercise")}</button>
                                   </div>
                                 )}
                               </div>
                             )}
                             <div style={{display:"flex",gap:8,marginTop:14}}>
-                              <button className="hov" style={{flex:2,padding:"10px",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:12,fontSize:14,fontWeight:800,color:"#e2e8f0",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(es?"¿Editar esta rutina?":"Edit this routine?")) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(es?"Abierta en RUTINAS":"Opened in ROUTINES");}}><Ic name="edit-2" size={16} color="#94a3b8"/>{es?"Editar rutina":"Edit routine"}</button>
-                              <button className="hov" style={{padding:"10px 16px",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:12,fontSize:14,fontWeight:800,color:"#94a3b8",cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(es?"¿Quitar rutina?":"Remove?")) return;await sb.deleteRutina(rutinaActiva.id);setRutinasSB(prev=>prev.filter(x=>x.id!==rutinaActiva.id));toast2(es?"Quitada":"Removed");}}><Ic name="trash-2" size={15}/></button>
+                              <button className="hov" style={{flex:2,padding:"10px",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:12,fontSize:14,fontWeight:800,color:"#e2e8f0",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(msg("¿Editar esta rutina?", "Edit this routine?"))) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(msg("Abierta en RUTINAS", "Opened in ROUTINES"));}}><Ic name="edit-2" size={16} color="#94a3b8"/>{msg("Editar rutina", "Edit routine")}</button>
+                              <button className="hov" style={{padding:"10px 16px",background:"#0f172a",border:"1px solid rgba(59,130,246,0.25)",borderRadius:12,fontSize:14,fontWeight:800,color:"#94a3b8",cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(msg("¿Quitar rutina?", "Remove?"))) return;await sb.deleteRutina(rutinaActiva.id);setRutinasSB(prev=>prev.filter(x=>x.id!==rutinaActiva.id));toast2(msg("Quitada", "Removed"));}}><Ic name="trash-2" size={15}/></button>
                             </div>
                           </div>
                         </div>
                       );
                     })()}
                     <button className="hov" style={{background:"#162234",color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={async()=>{
-                      const rutinaLocal=routineForAssign;if(!rutinaLocal){toast2(es?"Creá una rutina en RUTINAS":"Create a routine in ROUTINES");return;}
+                      const rutinaLocal=routineForAssign;if(!rutinaLocal){toast2(msg("Creá una rutina en RUTINAS", "Create a routine in ROUTINES"));return;}
                       const ex=rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
                       const rutinaNombre=rutinaLocal.name||"Rutina";
                       var msg = ex
@@ -4040,7 +4047,7 @@ function GymApp() {
                       const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:sanitizeRoutineDaysForWrite(rutinaLocal.days||[]),alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
                       setLoadingSB(false);
-                    }}>{(rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id))?(<><Ic name="refresh-cw" size={16}/>{es?"Cambiar rutina":"Change routine"}</>):(<><Ic name="plus" size={16}/>{es?"Asignar rutina":"Assign routine"}</>)}</button>
+                    }}>{(rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id))?(<><Ic name="refresh-cw" size={16}/>{msg("Cambiar rutina", "Change routine")}</>):(<><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</>)}</button>
                     {/* ── SUGERENCIAS ── */}
                     {(()=>{
                       const rutSB = rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
@@ -4077,7 +4084,7 @@ function GymApp() {
                           >
                             <div style={{display:"flex",alignItems:"center",gap:8}}>
                               <Ic name="info" size={16} color="#F59E0B"/>
-                              <div style={{fontSize:11,fontWeight:800,color:"#F59E0B",letterSpacing:2,textTransform:"uppercase"}}>{es?"SUGERENCIAS":"SUGGESTIONS"}</div>
+                              <div style={{fontSize:11,fontWeight:800,color:"#F59E0B",letterSpacing:2,textTransform:"uppercase"}}>{msg("SUGERENCIAS", "SUGGESTIONS")}</div>
                               <span style={{fontSize:12,fontWeight:800,color:textMuted,background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:999,padding:"2px 8px"}}>{sugs.length}</span>
                             </div>
                             <Ic
@@ -4111,11 +4118,11 @@ function GymApp() {
                                             if(sug.sugSets) exConSug.sets = sug.sugSets;
                                             if(sug.sugPause) exConSug.pause = sug.sugPause;
                                             setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:exConSug});
-                                          }} style={{padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{es?"APLICAR":"APPLY"}</button>
+                                          }} style={{padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{msg("APLICAR", "APPLY")}</button>
                                           <button className="hov" onClick={function(){
                                             var el=document.getElementById(sugKey);
                                             if(el){el.style.opacity="0";el.style.height="0";el.style.padding="0";el.style.margin="0";el.style.overflow="hidden";el.style.transition="all .3s ease";}
-                                          }} style={{padding:"5px 14px",background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"IGNORAR":"IGNORE"}</button>
+                                          }} style={{padding:"5px 14px",background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("IGNORAR", "IGNORE")}</button>
                                         </div>
                                       </div>
                                     </div>
@@ -4130,13 +4137,13 @@ function GymApp() {
                     <div style={{marginTop:12,borderTop:"1px solid "+border,paddingTop:12}}>
                       <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,
                         textTransform:"uppercase",marginBottom:8}}>
-                        <Ic name="bookmark" size={14} color={textMuted}/> {es?"Nota del día":"Daily note"}
+                        <Ic name="bookmark" size={14} color={textMuted}/> {msg("Nota del día", "Daily note")}
                       </div>
                       <textarea
                         style={{width:"100%",background:bgSub,color:textMain,border:"1px solid "+border,
                           borderRadius:12,padding:"8px 12px",fontSize:15,fontFamily:"Inter,sans-serif",
                           resize:"none",lineHeight:1.5,outline:"none",minHeight:80}}
-                        placeholder={es?"Escribí una nota, recordatorio o indicación para el alumno...":"Write a note, reminder or instruction for this athlete..."}
+                        placeholder={msg("Escribí una nota, recordatorio o indicación para el alumno...", "Write a note, reminder or instruction for this athlete...")}
                         value={notaDiaInput}
                         onChange={e=>setNotaDiaInput(e.target.value)}
                       />
@@ -4153,11 +4160,11 @@ function GymApp() {
                               texto:notaDiaInput.trim(),
                               fecha:new Date().toLocaleDateString("es-AR")
                             });
-                            toast2(es?"Nota enviada ✓":"Note sent ✓");
+                            toast2(msg("Nota enviada ✓", "Note sent ✓"));
                             setNotaDiaInput("");
                           }catch(e){toast2("Error al enviar nota");}
                         }}>
-                        {es?"Enviar nota":"Send note"}
+                        {msg("Enviar nota", "Send note")}
                       </button>
                     </div>
 
@@ -4190,34 +4197,34 @@ function GymApp() {
         const setObStep = setOnboardStep;
         const steps = [
           {
-            icon:"👋",title:es?"¡Bienvenido/a!":"Welcome!",
-            subtitle:es?"Configurá tu cuenta en 3 pasos":"Set up your account in 3 steps",
+            icon:"👋",title:msg("¡Bienvenido/a!", "Welcome!"),
+            subtitle:msg("Configurá tu cuenta en 3 pasos", "Set up your account in 3 steps"),
             body:null,
             items:[
-              {n:1,text:es?"Creá tu primera rutina":"Create your first routine",done:routines.length>0},
-              {n:2,text:es?"Agregá un alumno":"Add an athlete",done:alumnos.length>0},
-              {n:3,text:es?"Asignale la rutina":"Assign the routine",done:false},
+              {n:1,text:msg("Creá tu primera rutina", "Create your first routine"),done:routines.length>0},
+              {n:2,text:msg("Agregá un alumno", "Add an athlete"),done:alumnos.length>0},
+              {n:3,text:msg("Asignale la rutina", "Assign the routine"),done:false},
             ],
-            cta:es?"EMPEZAR →":"GET STARTED →",action:()=>setObStep(1)
+            cta:msg("EMPEZAR →", "GET STARTED →"),action:()=>setObStep(1)
           },{
-            icon:"📋",title:es?"Paso 1 — Rutina":"Step 1 — Routine",
-            subtitle:es?"Creá tu primera rutina":"Create your first routine",
-            body:es?"Organizá los días, ejercicios y series. La podés editar cuando quieras.":"Organize days, exercises and sets. You can edit it anytime.",
-            cta:routines.length>0?(es?"Rutina lista ✓ → Siguiente":"Routine ready ✓ → Next"):(es?"CREAR RUTINA →":"CREATE ROUTINE →"),
+            icon:"📋",title:msg("Paso 1 — Rutina", "Step 1 — Routine"),
+            subtitle:msg("Creá tu primera rutina", "Create your first routine"),
+            body:msg("Organizá los días, ejercicios y series. La podés editar cuando quieras.", "Organize days, exercises and sets. You can edit it anytime."),
+            cta:routines.length>0?(msg("Rutina lista ✓ → Siguiente", "Routine ready ✓ → Next")):(msg("CREAR RUTINA →", "CREATE ROUTINE →")),
             action:()=>{if(routines.length===0){setShowWelcome(false);setOnboardStep(1);setTab("routines");}else setObStep(2);},
             skip:()=>setObStep(2)
           },{
-            icon:"👥",title:es?"Paso 2 — Alumno":"Step 2 — Athlete",
-            subtitle:es?"Agregá tu primer alumno":"Add your first athlete",
-            body:es?"Creá su acceso con email y contraseña. Desde ALUMNOS podés ver su historial.":"Create their access. From ATHLETES you can see their history.",
-            cta:alumnos.length>0?(es?"Alumno listo ✓ → Siguiente":"Athlete ready ✓ → Next"):(es?"AGREGAR ALUMNO →":"ADD ATHLETE →"),
+            icon:"👥",title:msg("Paso 2 — Alumno", "Step 2 — Athlete"),
+            subtitle:msg("Agregá tu primer alumno", "Add your first athlete"),
+            body:msg("Creá su acceso con email y contraseña. Desde ALUMNOS podés ver su historial.", "Create their access. From ATHLETES you can see their history."),
+            cta:alumnos.length>0?(msg("Alumno listo ✓ → Siguiente", "Athlete ready ✓ → Next")):(msg("AGREGAR ALUMNO →", "ADD ATHLETE →")),
             action:()=>{if(alumnos.length===0){setShowWelcome(false);setOnboardStep(2);setTab("alumnos");setNewAlumnoForm(true);}else setObStep(3);},
             skip:()=>setObStep(3)
           },{
-            icon:"🚀",title:es?"¡Todo listo!":"All set!",
-            subtitle:es?"Ya podés usar IRON TRACK":"You're ready to use IRON TRACK",
-            body:es?"Desde el dashboard vas a ver la actividad de tus alumnos y quién necesita atención.":"From the dashboard see your athletes' activity and who needs attention.",
-            cta:es?"ABRIR IRON TRACK 💪":"OPEN IRON TRACK 💪",
+            icon:"🚀",title:msg("¡Todo listo!", "All set!"),
+            subtitle:msg("Ya podés usar IRON TRACK", "You're ready to use IRON TRACK"),
+            body:msg("Desde el dashboard vas a ver la actividad de tus alumnos y quién necesita atención.", "From the dashboard see your athletes' activity and who needs attention."),
+            cta:msg("ABRIR IRON TRACK 💪", "OPEN IRON TRACK 💪"),
             action:()=>setShowWelcome(false)
           }
         ];
@@ -4268,7 +4275,7 @@ function GymApp() {
                 <button className="hov" onClick={step.skip}
                   style={{width:"100%",padding:"12px",background:"transparent",color:textMuted,
                     border:"none",fontSize:15,cursor:"pointer",fontFamily:"inherit"}}>
-                  {es?"Saltar este paso":"Skip this step"}
+                  {msg("Saltar este paso", "Skip this step")}
                 </button>
               )}
             </div>
@@ -4281,7 +4288,7 @@ function GymApp() {
           <div style={{background:"#0a1628",borderRadius:"20px 20px 0 0",padding:"12px 18px 36px",width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.22)",animation:"slideUpFade 0.35s ease",maxHeight:"92dvh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,.45)"}}
             onClick={e=>e.stopPropagation()}>
             <div style={{width:40,height:4,background:"#3b82f6",borderRadius:2,margin:"0 auto 16px"}}/>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:18,color:"#fff",letterSpacing:0.5}}>{es?"Mi perfil":"My profile"}</div>
+            <div style={{fontSize:18,fontWeight:800,marginBottom:18,color:"#fff",letterSpacing:0.5}}>{msg("Mi perfil", "My profile")}</div>
             <input ref={profileFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
               const f=e.target.files&&e.target.files[0];
               if(!f) return;
@@ -4297,14 +4304,14 @@ function GymApp() {
               </div>
               <button type="button" className="hov" style={{marginTop:10,background:"rgba(59,130,246,.15)",border:"1px solid rgba(59,130,246,.35)",borderRadius:10,padding:"8px 16px",color:"#3b82f6",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
                 onClick={()=>profileFileRef.current&&profileFileRef.current.click()}>
-                {es?"Cambiar foto":"Change photo"}
+                {msg("Cambiar foto", "Change photo")}
               </button>
             </div>
             {[
-              {k:"nombre",lbl:es?"Nombre":"First name",ph:""},
-              {k:"apellido",lbl:es?"Apellido":"Last name",ph:""},
+              {k:"nombre",lbl:msg("Nombre", "First name"),ph:""},
+              {k:"apellido",lbl:msg("Apellido", "Last name"),ph:""},
               {k:"email",lbl:"Email",ph:"email@",type:"email"},
-              {k:"phone",lbl:es?"Celular":"Phone",ph:"+54 ...",type:"tel"},
+              {k:"phone",lbl:msg("Celular", "Phone"),ph:"+54 ...",type:"tel"},
             ].map(row=>(
               <div key={row.k} style={{marginBottom:14}}>
                 <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",marginBottom:6,letterSpacing:0.5}}>{row.lbl}</div>
@@ -4334,10 +4341,10 @@ function GymApp() {
                   localStorage.setItem("it_session",JSON.stringify(next));
                   setSessionData(next);
                   setProfileModalOpen(false);
-                  toast2(es?"Perfil guardado ✓":"Profile saved ✓");
+                  toast2(msg("Perfil guardado ✓", "Profile saved ✓"));
                 }catch(err){ toast2("Error"); }
               }}>
-              {es?"Guardar cambios":"Save changes"}
+              {msg("Guardar cambios", "Save changes")}
             </button>
           </div>
         </div>
@@ -4367,12 +4374,12 @@ function GymApp() {
           <div style={{background:"#0a1628",borderRadius:"16px 16px 0 0",paddingTop:20,paddingLeft:16,paddingRight:16,paddingBottom:120,width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.2)",animation:"slideUpFade 0.3s ease",maxHeight:"92dvh",overflowX:"hidden",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}
             onClick={e=>e.stopPropagation()}>
             <div style={{width:40,height:4,background:"#3b82f6",borderRadius:2,margin:"0 auto 20px"}}/>
-            <div style={{fontSize:18,fontWeight:800,letterSpacing:1,marginBottom:20,color:"#fff"}}><Ic name="settings" size={18} color="#3b82f6"/> {es?"CONFIGURACIÓN":"SETTINGS"}</div>
+            <div style={{fontSize:18,fontWeight:800,letterSpacing:1,marginBottom:20,color:"#fff"}}><Ic name="settings" size={18} color="#3b82f6"/> {msg("CONFIGURACIÓN", "SETTINGS")}</div>
               <>
                 <div style={{marginBottom:22}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{es?"APARIENCIA":"APPEARANCE"}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{msg("APARIENCIA", "APPEARANCE")}</div>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(255,255,255,.04)",border:"1px solid rgba(148,163,184,.2)",borderRadius:14,padding:"14px 16px"}}>
-                    <span style={{fontSize:15,fontWeight:600,color:"#e2e8f0"}}>{es?"Modo oscuro":"Dark mode"}</span>
+                    <span style={{fontSize:15,fontWeight:600,color:"#e2e8f0"}}>{msg("Modo oscuro", "Dark mode")}</span>
                     <button type="button" className="hov" onClick={()=>{const v=!darkMode;setDarkMode(v);localStorage.setItem("it_dark",v?"true":"false");}}
                       style={{width:52,height:28,borderRadius:14,border:"none",background:darkMode?"#22c55e":"#475569",position:"relative",cursor:"pointer",transition:"background .25s"}}>
                       <span style={{position:"absolute",top:3,left:darkMode?26:3,width:22,height:22,borderRadius:"50%",background:"#fff",transition:"left .25s ease",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
@@ -4380,8 +4387,8 @@ function GymApp() {
                   </div>
                 </div>
                 <div style={{marginBottom:22}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{es?"IDIOMA":"LANGUAGE"}</div>
-                  {[{code:"es",label:es?"Español":"Spanish"},{code:"en",label:"English"}].map(opt=>(
+                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{msg("IDIOMA", "LANGUAGE")}</div>
+                  {[{code:"es",label:msg("Español", "Spanish")},{code:"en",label:"English"}].map(opt=>(
                     <button key={opt.code} type="button" className="hov" onClick={()=>{setLang(opt.code);localStorage.setItem("it_lang",opt.code);}}
                       style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",marginBottom:8,background:lang===opt.code?"rgba(59,130,246,.12)":"rgba(255,255,255,.03)",border:"1px solid "+(lang===opt.code?"rgba(59,130,246,.4)":"rgba(148,163,184,.15)"),borderRadius:12,cursor:"pointer",fontFamily:"inherit"}}>
                       <span style={{fontSize:15,fontWeight:600,color:"#e2e8f0"}}>{opt.label}</span>
@@ -4390,34 +4397,34 @@ function GymApp() {
                   ))}
                 </div>
                 <div style={{marginBottom:22}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{es?"AYUDA":"HELP"}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{msg("AYUDA", "HELP")}</div>
                   <a href="https://wa.me/541164461075" target="_blank" rel="noreferrer" style={{display:"block",textDecoration:"none",marginBottom:10}}>
                     <div style={{padding:"14px 16px",background:"rgba(59,130,246,.1)",border:"1px solid rgba(59,130,246,.25)",borderRadius:12}}>
-                      <div style={{fontSize:15,fontWeight:800,color:"#3b82f6"}}>{es?"Soporte":"Support"}</div>
-                      <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{es?"Contactá con nosotros":"Contact us"}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:"#3b82f6"}}>{msg("Soporte", "Support")}</div>
+                      <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{msg("Contactá con nosotros", "Contact us")}</div>
                     </div>
                   </a>
                   <a href="mailto:soporte@irontrack.app?subject=Feedback" style={{display:"block",textDecoration:"none"}}>
                     <div style={{padding:"14px 16px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(148,163,184,.15)",borderRadius:12}}>
-                      <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0"}}>{es?"Enviar comentarios":"Send feedback"}</div>
-                      <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{es?"Ayudanos a mejorar":"Help us improve"}</div>
+                      <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0"}}>{msg("Enviar comentarios", "Send feedback")}</div>
+                      <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{msg("Ayudanos a mejorar", "Help us improve")}</div>
                     </div>
                   </a>
                   <div style={{textAlign:"center",marginTop:12,fontSize:12,color:"#64748b"}}>Iron Track v1.0.0</div>
                 </div>
                 <RecordatoriosPanel es={es} darkMode={darkMode} toast2={toast2}/>
                 <div style={{marginTop:22,paddingTop:16,borderTop:"1px solid rgba(239,68,68,.25)"}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#f87171",letterSpacing:1.2,marginBottom:10}}>{es?"ZONA DE PELIGRO":"DANGER ZONE"}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#f87171",letterSpacing:1.2,marginBottom:10}}>{msg("ZONA DE PELIGRO", "DANGER ZONE")}</div>
                   <button type="button" className="hov" style={{width:"100%",padding:"14px",background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.35)",borderRadius:12,color:"#f87171",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
-                    onClick={()=>{if(confirm(es?"¿Cerrar sesión?":"Log out?")){setSettingsOpen(false);clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}}>
-                    <Ic name="log-out" size={18} color="#f87171"/> {es?"Cerrar sesión":"Log out"}
+                    onClick={()=>{if(confirm(msg("¿Cerrar sesión?", "Log out?"))){setSettingsOpen(false);clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}}>
+                    <Ic name="log-out" size={18} color="#f87171"/> {msg("Cerrar sesión", "Log out")}
                   </button>
                 </div>
               </>
             <button className="hov"
               style={{width:"100%",padding:"12px",marginTop:16,marginBottom:32,background:"rgba(148,163,184,.12)",border:"1px solid rgba(148,163,184,.2)",borderRadius:12,color:"#cbd5e1",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
               onClick={()=>setSettingsOpen(false)}>
-              {es?"CERRAR":"CLOSE"}
+              {msg("CERRAR", "CLOSE")}
             </button>
           </div>
         </div>
@@ -4439,7 +4446,7 @@ function GymApp() {
           }}>
             <div style={{fontSize:64,marginBottom:12,filter:"drop-shadow(0 0 24px #f59e0b)",animation:"pulse 1s infinite"}}>🏆</div>
             <div style={{fontSize:15,fontWeight:900,color:"#fbbf24",letterSpacing:4,marginBottom:12,textTransform:"uppercase"}}>
-              {es?"¡NUEVO PR!":"NEW PR!"}
+              {msg("¡NUEVO PR!", "NEW PR!")}
             </div>
             <div style={{fontSize:24,fontWeight:900,color:"#FFFFFF",marginBottom:8,lineHeight:1.2}}>
               {prCelebration.ejercicio}
@@ -4458,7 +4465,7 @@ function GymApp() {
               </div>
             )}
             <div style={{fontSize:12,color:"#8B9AB244",marginTop:16}}>
-              {es?"Tocá para cerrar":"Tap to close"}
+              {msg("Tocá para cerrar", "Tap to close")}
             </div>
           </div>
         </div>
@@ -4473,10 +4480,10 @@ function GymApp() {
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
               {[
-                ["⏱",es?"DURACIÓN":"DURATION",resumenSesion.durMin+" min","#2563EB"],
-                ["🏋️",es?"EJERCICIOS":"EXERCISES",resumenSesion.ejercicios,"#2563EB"],
-                ["⚖️",es?"KG LEVANTADOS":"KG LIFTED",resumenSesion.volTotal.toLocaleString()+" kg","#60A5FA"],
-                [resumenSesion.prsNuevos>0?"🏆":"✓",es?"RÉCORD PERSONAL":"PERSONAL RECORD",resumenSesion.prsNuevos>0?(resumenSesion.prsNuevos+" PR!"):(es?"Sin PR":"No PR"),resumenSesion.prsNuevos>0?"#60A5FA":"#8B9AB2"],
+                ["⏱",msg("DURACIÓN", "DURATION"),resumenSesion.durMin+" min","#2563EB"],
+                ["🏋️",msg("EJERCICIOS", "EXERCISES"),resumenSesion.ejercicios,"#2563EB"],
+                ["⚖️",msg("KG LEVANTADOS", "KG LIFTED"),resumenSesion.volTotal.toLocaleString()+" kg","#60A5FA"],
+                [resumenSesion.prsNuevos>0?"🏆":"✓",msg("RÉCORD PERSONAL", "PERSONAL RECORD"),resumenSesion.prsNuevos>0?(resumenSesion.prsNuevos+" PR!"):(msg("Sin PR", "No PR")),resumenSesion.prsNuevos>0?"#60A5FA":"#8B9AB2"],
               ].map(([icon,label,val,color])=>(
                 <div key={label} style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:12,padding:"8px 12px 10px",border:"1px solid "+border}}>
                   <div style={{fontSize:18}}>{icon}</div>
@@ -4510,10 +4517,10 @@ function GymApp() {
 
                         <button className="hov" style={{width:"100%",padding:"12px",background:darkMode?"#162234":"#E2E8F0",border:"none",borderRadius:12,color:textMuted,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}
                 onClick={()=>setResumenSesion(null)}>
-                {es?"Cerrar":"Close"}
+                {msg("Cerrar", "Close")}
               </button>
               <div style={{marginBottom:4}}>
-                <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8,textAlign:"center"}}>{es?"COMPARTIR ENTRENAMIENTO":"SHARE WORKOUT"}</div>
+                <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8,textAlign:"center"}}>{msg("COMPARTIR ENTRENAMIENTO", "SHARE WORKOUT")}</div>
                 <button className="hov" style={{
                   width:"100%",padding:"16px",borderRadius:12,border:"none",cursor:"pointer",
                   fontFamily:"inherit",fontSize:15,fontWeight:900,letterSpacing:1,
@@ -4548,10 +4555,10 @@ function GymApp() {
                     ctx.fillRect(80, 260, 920, 2);
                     // Stats grandes
                     const stats = [
-                      {val: resumenSesion.durMin+"'", label: es?"DURACIÓN":"DURATION"},
-                      {val: resumenSesion.ejercicios, label: es?"EJERCICIOS":"EXERCISES"},
+                      {val: resumenSesion.durMin+"'", label: msg("DURACIÓN", "DURATION")},
+                      {val: resumenSesion.ejercicios, label: msg("EJERCICIOS", "EXERCISES")},
                       {val: resumenSesion.totalSets, label: "SETS"},
-                      {val: (resumenSesion.volTotal/1000).toFixed(1)+"t", label: es?"TONELAJE":"VOLUME"},
+                      {val: (resumenSesion.volTotal/1000).toFixed(1)+"t", label: msg("TONELAJE", "VOLUME")},
                     ];
                     stats.forEach((s,i)=>{
                       const x = 80 + i*240;
@@ -4566,12 +4573,12 @@ function GymApp() {
                     if(resumenSesion.prsNuevos > 0){
                       ctx.fillStyle = "#60A5FA";
                       ctx.font = "900 48px 'Arial Black', Arial";
-                      ctx.fillText(""+resumenSesion.prsNuevos+" PR "+(es?"NUEVO":"NEW")+(resumenSesion.prsNuevos>1?"S":"")+"!", 80, 560);
+                      ctx.fillText(""+resumenSesion.prsNuevos+" PR "+(msg("NUEVO", "NEW"))+(resumenSesion.prsNuevos>1?"S":"")+"!", 80, 560);
                     }
                     // Semana
                     ctx.fillStyle = "#8B9AB2";
                     ctx.font = "700 32px Arial";
-                    ctx.fillText((es?"SEMANA":"WEEK")+" "+resumenSesion.semana+" / 4", 80, 650);
+                    ctx.fillText((msg("SEMANA", "WEEK"))+" "+resumenSesion.semana+" / 4", 80, 650);
                     // Hashtag
                     ctx.fillStyle = "#2D4057";
                     ctx.font = "700 28px Arial";
@@ -4594,12 +4601,12 @@ function GymApp() {
                         const a = document.createElement("a");
                         a.href=url; a.download="irontrack-sesion.png"; a.click();
                         URL.revokeObjectURL(url);
-                        toast2(es?"Imagen guardada!":"Image saved!");
+                        toast2(msg("Imagen guardada!", "Image saved!"));
                       }
                     },"image/png");
-                  } catch(e){ console.error(e); toast2(es?"Error al compartir":"Share error"); }
+                  } catch(e){ console.error(e); toast2(msg("Error al compartir", "Share error")); }
                 }}>
-                  <Ic name="upload" size={16}/> {es?"COMPARTIR / GUARDAR IMAGEN":"SHARE / SAVE IMAGE"}
+                  <Ic name="upload" size={16}/> {msg("COMPARTIR / GUARDAR IMAGEN", "SHARE / SAVE IMAGE")}
                 </button>
               </div>
           </div>
@@ -4633,14 +4640,14 @@ function GymApp() {
                   style={{display:"flex",alignItems:"center",gap:8,background:"#162234",border:"1px solid #2D4057",borderRadius:12,padding:"8px 16px",textDecoration:"none"}}>
                   <span style={{fontSize:28}}>▶️</span>
                   <div>
-                    <div style={{fontSize:15,fontWeight:700,color:textMain}}>{es?"Ver video en YouTube":"Watch on YouTube"}</div>
-                    <div style={{fontSize:11,color:textMuted}}>{es?"Tutorial de técnica":"Technique tutorial"}</div>
+                    <div style={{fontSize:15,fontWeight:700,color:textMain}}>{msg("Ver video en YouTube", "Watch on YouTube")}</div>
+                    <div style={{fontSize:11,color:textMuted}}>{msg("Tutorial de técnica", "Technique tutorial")}</div>
                   </div>
                 </a>
               )}
             </div>
-            <span style={lbl}>{es?"HISTORIAL":"HISTORY"}</span>
-            {(progress[detailEx.id]?.sets||[]).length===0&&<div style={{color:textMuted,fontSize:15,margin:"8px 0 10px"}}>{es?"Sin registros":"No records"}</div>}
+            <span style={lbl}>{msg("HISTORIAL", "HISTORY")}</span>
+            {(progress[detailEx.id]?.sets||[]).length===0&&<div style={{color:textMuted,fontSize:15,margin:"8px 0 10px"}}>{msg("Sin registros", "No records")}</div>}
             {(progress[detailEx.id]?.sets||[]).slice(0,10).map((s2,i)=>(
               <div key={detailEx.id+"-hist-"+(s2.date||"")+"-"+(s2.kg??"")+"-"+(s2.reps??"")+"-"+(s2.week ?? "nw")+"-"+i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),fontSize:15}}>
                 <span>{s2.kg}kg x {s2.reps} reps</span>
@@ -4663,7 +4670,7 @@ function GymApp() {
       )}
       {false&&logModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:110,display:"flex",alignItems:"flex-end"}} onClick={()=>setLogModal(null)}>
-          <LogForm darkMode={darkMode} ex={logModal} es={es} btn={btn} inp={inp} lbl={lbl} tag={tag} fmtP={fmtP} progress={progress}
+          <LogForm darkMode={darkMode} ex={logModal} btn={btn} inp={inp} lbl={lbl} tag={tag} fmtP={fmtP} progress={progress}
             onLog={(kg,reps,note,pause,rpe)=>{logSet(logModal.id,kg,reps,note,rpe);if(pause>0)startTimer(pause,PATS[logModal.pattern]?.color);setLogModal(null);}}
             onClose={()=>setLogModal(null)}/>
         </div>
@@ -4716,12 +4723,12 @@ function GymApp() {
           onClick={()=>setNewR(null)}
         >
           <div style={{background:bgCard,margin:0,width:"100%",maxWidth:520,borderRadius:16,padding:"20px 16px",maxHeight:"min(85dvh, calc(100dvh - 32px))",overflowY:"auto",flexShrink:0}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:22,fontWeight:800,letterSpacing:1,marginBottom:4}}>{es?"Nueva rutina":"New routine"}</div>
-            <div style={{fontSize:13,color:textMuted,marginBottom:14}}>{es?"Elegí una plantilla o en blanco. Podés afinar después.":"Pick a template or start blank. Refine anytime."}</div>
-            <span style={lbl}>{es?"INICIO RÁPIDO":"QUICK START"}</span>
+            <div style={{fontSize:22,fontWeight:800,letterSpacing:1,marginBottom:4}}>{msg("Nueva rutina", "New routine")}</div>
+            <div style={{fontSize:13,color:textMuted,marginBottom:14}}>{msg("Elegí una plantilla o en blanco. Podés afinar después.", "Pick a template or start blank. Refine anytime.")}</div>
+            <span style={lbl}>{msg("INICIO RÁPIDO", "QUICK START")}</span>
             <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14,marginTop:6}}>
               <button type="button" className="hov" style={{...btn(newR.templateId==="blank"?"#2563EB":undefined),padding:"10px 14px",fontSize:14,fontWeight:700,borderRadius:12}} onClick={()=>setNewR(p=>({...p,templateId:"blank",numDays:p.numDays||3,days:emptyDays(p.numDays||3,es)}))}>
-                {es?"En blanco":"Blank"}
+                {msg("En blanco", "Blank")}
               </button>
               {ROUTINE_TEMPLATES.map(function(T){
                 var active=newR.templateId===T.id;
@@ -4738,10 +4745,10 @@ function GymApp() {
                 );
               })}
             </div>
-            <div style={{marginBottom:10}}><span style={lbl}>{es?"NOMBRE":"NAME"}</span><input style={inp} value={newR.name} onChange={e=>setNewR(p=>({...p,name:e.target.value}))} placeholder={es?"Ej: PPL Juan":"E.g: John PPL"}/></div>
+            <div style={{marginBottom:10}}><span style={lbl}>{msg("NOMBRE", "NAME")}</span><input style={inp} value={newR.name} onChange={e=>setNewR(p=>({...p,name:e.target.value}))} placeholder={msg("Ej: PPL Juan", "E.g: John PPL")}/></div>
             {newR.templateId==="blank"&&(
               <div style={{marginBottom:10}}>
-                <span style={lbl}>{es?"DÍAS":"DAYS"}</span>
+                <span style={lbl}>{msg("DÍAS", "DAYS")}</span>
                 <div style={{display:"flex",gap:8}}>
                   {[1,2,3,4,5,6,7].map(n=>(
                     <button key={n} type="button" className="hov" style={{...btn(newR.numDays===n?"#2563EB":undefined),padding:"8px 0",flex:1,fontSize:18}} onClick={()=>setNewR(p=>({...p,numDays:n,days:emptyDays(n,es)}))}>
@@ -4758,48 +4765,48 @@ function GymApp() {
                   if(!T) return null;
                   var n=(newR.days||[]).length;
                   var ex=(newR.days||[]).reduce(function(a,d){return a+(d.exercises||[]).length;},0);
-                  return(es?T.hintEs:T.hintEn)+" · "+n+(es?" días · ":" days · ")+ex+(es?" ejercicios":" exercises");
+                  return(es?T.hintEs:T.hintEn)+" · "+n+(msg(" días · ", " days · "))+ex+(msg(" ejercicios", " exercises"));
                 })()}
               </div>
             )}
             <button type="button" className="hov" style={{width:"100%",padding:"10px",marginBottom:12,background:"transparent",border:"1px dashed "+border,borderRadius:12,color:textMuted,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>setNewR(p=>({...p,showAdvanced:!p.showAdvanced}))}>
-              {newR.showAdvanced?(es?"▲ Menos opciones":"▲ Fewer options"):(es?"▼ Nota, alumno, nombres de día":"▼ Note, client, day names")}
+              {newR.showAdvanced?(msg("▲ Menos opciones", "▲ Fewer options")):(msg("▼ Nota, alumno, nombres de día", "▼ Note, client, day names"))}
             </button>
             {newR.showAdvanced&&(
               <div style={{marginBottom:12}}>
                 <div style={{marginBottom:8}}>
-                  <span style={lbl}>{es?"NOTA (opcional)":"NOTE (optional)"}</span>
-                  <input style={inp} value={newR.note||""} onChange={e=>setNewR(p=>({...p,note:e.target.value}))} placeholder={es?"Ej: Lun, Mie, Vie":"E.g. Mon, Wed, Fri"}/>
+                  <span style={lbl}>{msg("NOTA (opcional)", "NOTE (optional)")}</span>
+                  <input style={inp} value={newR.note||""} onChange={e=>setNewR(p=>({...p,note:e.target.value}))} placeholder={msg("Ej: Lun, Mie, Vie", "E.g. Mon, Wed, Fri")}/>
                 </div>
                 <div style={{marginBottom:8}}>
-                  <span style={lbl}>{es?"ALUMNO (opcional)":"CLIENT (optional)"}</span>
-                  <input style={inp} value={newR.alumno||""} onChange={e=>setNewR(p=>({...p,alumno:e.target.value}))} placeholder={es?"Asigná también desde la tarjeta del alumno":"Or assign from client card"}/>
+                  <span style={lbl}>{msg("ALUMNO (opcional)", "CLIENT (optional)")}</span>
+                  <input style={inp} value={newR.alumno||""} onChange={e=>setNewR(p=>({...p,alumno:e.target.value}))} placeholder={msg("Asigná también desde la tarjeta del alumno", "Or assign from client card")}/>
                 </div>
-                <span style={lbl}>{es?"NOMBRE DE CADA DÍA":"NAME EACH DAY"}</span>
+                <span style={lbl}>{msg("NOMBRE DE CADA DÍA", "NAME EACH DAY")}</span>
                 <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:6}}>
                   {(newR.days||[]).map(function(d,di){return(
                     <div key={"new-routine-day-"+di} style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:13,fontWeight:700,color:textMuted,width:52,flexShrink:0}}>{es?"Día":"Day"} {di+1}</span>
+                      <span style={{fontSize:13,fontWeight:700,color:textMuted,width:52,flexShrink:0}}>{msg("Día", "Day")} {di+1}</span>
                       <input style={{...inp,marginBottom:0,flex:1}} value={d.label||""} onChange={function(e){
                         var val=e.target.value;
                         setNewR(function(p){return{...p,days:p.days.map(function(dd,ddi){return ddi===di?{...dd,label:val}:dd})}});
-                      }} placeholder={es?"Ej: Empuje, Pierna…":"E.g. Push, Legs…"}/>
+                      }} placeholder={msg("Ej: Empuje, Pierna…", "E.g. Push, Legs…")}/>
                     </div>
                   )})}
                 </div>
               </div>
             )}
             <div style={{display:"flex",gap:8}}>
-              <button type="button" className="hov" style={{...btn(),flex:1,padding:"10px"}} onClick={()=>setNewR(null)}>{es?"CANCELAR":"CANCEL"}</button>
+              <button type="button" className="hov" style={{...btn(),flex:1,padding:"10px"}} onClick={()=>setNewR(null)}>{msg("CANCELAR", "CANCEL")}</button>
               <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"10px",fontSize:17,fontWeight:800}} onClick={()=>{
-                if(!newR.name.trim()){toast2(es?"Pon un nombre":"Add a name");return;}
+                if(!newR.name.trim()){toast2(msg("Pon un nombre", "Add a name"));return;}
                 var payload={name:newR.name,numDays:newR.numDays,days:newR.days,note:newR.note||"",alumno:newR.alumno||"",collapsed:false};
                 var newId=uid();
                 setRoutines(p=>[...p,{...payload,id:newId,created:new Date().toLocaleDateString("es-AR")}]);
                 setAssignRoutineId(newId);
                 setNewR(null);
-                toast2(es?"Rutina creada ✓":"Routine created ✓");
-              }}>{es?"CREAR":"CREATE"}</button>
+                toast2(msg("Rutina creada ✓", "Routine created ✓"));
+              }}>{msg("CREAR", "CREATE")}</button>
             </div>
           </div>
         </div>
@@ -4810,17 +4817,17 @@ function GymApp() {
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setDupDayModal(null)}>
           <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,border:"1px solid "+border}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:4}}>
-              {es?"Duplicar":"Duplicate"} {dupDayModal.days[dupDayModal.dIdx]?.label||("Día "+(dupDayModal.dIdx+1))}
+              {msg("Duplicar", "Duplicate")} {dupDayModal.days[dupDayModal.dIdx]?.label||("Día "+(dupDayModal.dIdx+1))}
             </div>
             <div style={{fontSize:13,color:textMuted,marginBottom:16}}>
-              {es?"Seleccioná los días destino":"Select destination days"}
+              {msg("Seleccioná los días destino", "Select destination days")}
             </div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
               {dupDayModal.days.map(function(d,di){
                 if(di===dupDayModal.dIdx) return (
                   <div key={"dup-day-src-"+dupDayModal.dIdx+"-mark-"+di} style={{padding:"10px 16px",borderRadius:12,background:"#2563EB22",border:"2px solid #2563EB",opacity:0.5}}>
                     <div style={{fontSize:13,fontWeight:800,color:"#2563EB"}}>{d.label||("Día "+(di+1))}</div>
-                    <div style={{fontSize:10,color:textMuted}}>{es?"Origen":"Source"}</div>
+                    <div style={{fontSize:10,color:textMuted}}>{msg("Origen", "Source")}</div>
                   </div>
                 );
                 var isSelected = dupDayModal.selected.indexOf(di)!==-1;
@@ -4840,20 +4847,20 @@ function GymApp() {
                     <div style={{fontSize:10,color:textMuted}}>
                       {tieneEj?((d.warmup||[]).length+(d.exercises||[]).length)+" ej.":"vacío"}
                     </div>
-                    {isSelected&&<div style={{fontSize:10,fontWeight:700,color:"#22C55E",marginTop:2}}>✓ {es?"Seleccionado":"Selected"}</div>}
+                    {isSelected&&<div style={{fontSize:10,fontWeight:700,color:"#22C55E",marginTop:2}}>✓ {msg("Seleccionado", "Selected")}</div>}
                   </div>
                 );
               })}
             </div>
             {dupDayModal.selected.some(function(di){return ((dupDayModal.days[di]?.warmup||[]).length+(dupDayModal.days[di]?.exercises||[]).length)>0})&&(
               <div style={{background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:8,padding:"8px 10px",marginBottom:12,fontSize:12,color:"#F59E0B"}}>
-                ⚠ {es?"Algunos días seleccionados tienen ejercicios. Se reemplazarán.":"Some selected days have exercises. They will be replaced."}
+                ⚠ {msg("Algunos días seleccionados tienen ejercicios. Se reemplazarán.", "Some selected days have exercises. They will be replaced.")}
               </div>
             )}
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setDupDayModal(null)} style={{flex:1,padding:12,background:bgSub,color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"CANCELAR":"CANCEL"}</button>
+              <button onClick={()=>setDupDayModal(null)} style={{flex:1,padding:12,background:bgSub,color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("CANCELAR", "CANCEL")}</button>
               <button onClick={function(){
-                if(dupDayModal.selected.length===0){toast2(es?"Seleccioná al menos un día":"Select at least one day");return;}
+                if(dupDayModal.selected.length===0){toast2(msg("Seleccioná al menos un día", "Select at least one day"));return;}
                 var src=dupDayModal.sourceDay;
                 var sel=dupDayModal.selected;
                 setRoutines(function(p){return p.map(function(rr){
@@ -4863,10 +4870,10 @@ function GymApp() {
                     return {...dd,warmup:(src.warmup||[]).map(function(e){return {...e}}),exercises:(src.exercises||[]).map(function(e){return {...e}})};
                   })};
                 })});
-                toast2((es?"Duplicado a ":"Duplicated to ")+sel.map(function(i){return dupDayModal.days[i]?.label||("Día "+(i+1))}).join(", ")+" ✓");
+                toast2((msg("Duplicado a ", "Duplicated to "))+sel.map(function(i){return dupDayModal.days[i]?.label||("Día "+(i+1))}).join(", ")+" ✓");
                 setDupDayModal(null);
               }} style={{flex:1,padding:12,background:dupDayModal.selected.length>0?"#2563EB":"#2D4057",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-                {es?"DUPLICAR":"DUPLICATE"} {dupDayModal.selected.length>0&&("("+dupDayModal.selected.length+")")}
+                {msg("DUPLICAR", "DUPLICATE")} {dupDayModal.selected.length>0&&("("+dupDayModal.selected.length+")")}
               </button>
             </div>
           </div>
@@ -4883,7 +4890,7 @@ function GymApp() {
                 </div>
                 <div>
                   <div style={{fontSize:15,fontWeight:800,color:textMain}}>{chatModal.alumnoNombre}</div>
-                  <div style={{fontSize:11,color:textMuted}}>{es?"Chat interno":"Internal chat"}</div>
+                  <div style={{fontSize:11,color:textMuted}}>{msg("Chat interno", "Internal chat")}</div>
                 </div>
               </div>
               <button onClick={()=>setChatModal(null)} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer",padding:"4px"}}><Ic name="x" size={18}/></button>
@@ -4944,15 +4951,15 @@ function GymApp() {
       {aliasModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-end"}} onClick={()=>setAliasModal(false)}>
           <div style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:20,width:"100%",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>💰 {es?"Datos de Pago":"Payment Info"}</div>
-            <div style={{fontSize:13,color:textMuted,marginBottom:16}}>{es?"Configurá tu alias o CBU para recibir pagos":"Set up your alias or CBU to receive payments"}</div>
+            <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>💰 {msg("Datos de Pago", "Payment Info")}</div>
+            <div style={{fontSize:13,color:textMuted,marginBottom:16}}>{msg("Configurá tu alias o CBU para recibir pagos", "Set up your alias or CBU to receive payments")}</div>
             {(()=>{
               const form = aliasForm;
               const setForm = setAliasForm;
               const save = () => { sb.saveConfig(form).then(()=>{
                     setAliasData(form);
                     setAliasModal(false);
-                    toast2(es?"Datos de pago guardados ✓":"Payment info saved ✓");
+                    toast2(msg("Datos de pago guardados ✓", "Payment info saved ✓"));
                   }).catch(()=>toast2("Error al guardar")); };
               return(
                 <div>
@@ -4960,15 +4967,15 @@ function GymApp() {
                   <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"8px 16px",fontSize:15,width:"100%",fontFamily:"inherit",marginBottom:8}} value={form.alias} onChange={e=>setForm(p=>({...p,alias:e.target.value}))} placeholder="tu.alias.mp"/>
                   <div style={{fontSize:13,color:textMuted,fontWeight:500,marginBottom:8}}>CBU (opcional)</div>
                   <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"8px 16px",fontSize:15,width:"100%",fontFamily:"inherit",marginBottom:8}} value={form.cbu} onChange={e=>setForm(p=>({...p,cbu:e.target.value}))} placeholder="0000000000000000000000"/>
-                  <div style={{fontSize:13,color:textMuted,fontWeight:500,marginBottom:8}}>{es?"BANCO / BILLETERA":"BANK / WALLET"}</div>
+                  <div style={{fontSize:13,color:textMuted,fontWeight:500,marginBottom:8}}>{msg("BANCO / BILLETERA", "BANK / WALLET")}</div>
                   <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"8px 16px",fontSize:15,width:"100%",fontFamily:"inherit",marginBottom:8}} value={form.banco} onChange={e=>setForm(p=>({...p,banco:e.target.value}))} placeholder="Mercado Pago / Banco Nación / etc"/>
-                  <div style={{fontSize:13,color:textMuted,fontWeight:500,marginBottom:8}}>{es?"MONTO MENSUAL":"MONTHLY FEE"}</div>
+                  <div style={{fontSize:13,color:textMuted,fontWeight:500,marginBottom:8}}>{msg("MONTO MENSUAL", "MONTHLY FEE")}</div>
                   <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"8px 16px",fontSize:15,width:"100%",fontFamily:"inherit",marginBottom:8}} value={form.monto} onChange={e=>setForm(p=>({...p,monto:e.target.value}))} placeholder="$ 15.000"/>
-                  <div style={{fontSize:13,color:textMuted,fontWeight:500,marginBottom:8}}>{es?"NOTA (opcional)":"NOTE (optional)"}</div>
-                  <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"8px 16px",fontSize:15,width:"100%",fontFamily:"inherit",marginBottom:16}} value={form.nota} onChange={e=>setForm(p=>({...p,nota:e.target.value}))} placeholder={es?"Ej: Transferir antes del 5 de cada mes":"E.g.: Transfer before the 5th of each month"}/>
+                  <div style={{fontSize:13,color:textMuted,fontWeight:500,marginBottom:8}}>{msg("NOTA (opcional)", "NOTE (optional)")}</div>
+                  <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"8px 16px",fontSize:15,width:"100%",fontFamily:"inherit",marginBottom:16}} value={form.nota} onChange={e=>setForm(p=>({...p,nota:e.target.value}))} placeholder={msg("Ej: Transferir antes del 5 de cada mes", "E.g.: Transfer before the 5th of each month")}/>
                   <div style={{display:"flex",gap:8}}>
-                    <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",color:textMain,border:"none",borderRadius:12,padding:"12px",flex:1,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>setAliasModal(false)}>{es?"Cancelar":"Cancel"}</button>
-                    <button className="hov" style={{background:green,color:darkMode?"#fff":"#fff",border:"none",borderRadius:12,padding:"12px",flex:2,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={save}>{es?"Guardar":"Save"}</button>
+                    <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",color:textMain,border:"none",borderRadius:12,padding:"12px",flex:1,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>setAliasModal(false)}>{msg("Cancelar", "Cancel")}</button>
+                    <button className="hov" style={{background:green,color:darkMode?"#fff":"#fff",border:"none",borderRadius:12,padding:"12px",flex:2,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={save}>{msg("Guardar", "Save")}</button>
                   </div>
                 </div>
               );
@@ -5026,19 +5033,19 @@ function GymApp() {
             <div style={{flex:"none",padding: coachDesktopNavHidden ? "18px 24px 0 24px" : "16px 16px 0 16px",background:bgCard}}>
               <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:12}}>
                 <div style={{minWidth:0,paddingRight:8,flex:1}}>
-                  <div id="add-ex-modal-title" style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{es?"Agregar ejercicios":"Add exercises"}</div>
+                  <div id="add-ex-modal-title" style={{fontSize:22,fontWeight:800,letterSpacing:1}}>{msg("Agregar ejercicios", "Add exercises")}</div>
                   <div style={{fontSize:13,color:textMuted,marginTop:6,maxWidth: coachDesktopNavHidden ? "none" : 320,lineHeight:1.45,wordBreak:"break-word"}}>
                     {(addExModal.bloque||"exercises")==="warmup"
-                      ? (es?"Tocá para marcar varios en entrada en calor; confirmá abajo.":"Tap to select warm-up exercises, then confirm.")
-                      : (es?"Tocá para marcar varios en bloque principal; confirmá abajo.":"Tap to select main exercises, then confirm.")}
+                      ? (msg("Tocá para marcar varios en entrada en calor; confirmá abajo.", "Tap to select warm-up exercises, then confirm."))
+                      : (msg("Tocá para marcar varios en bloque principal; confirmá abajo.", "Tap to select main exercises, then confirm."))}
                   </div>
                 </div>
-                <button type="button" className="hov" style={{...btn(),padding:"6px",flexShrink:0}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}} aria-label={es?"Cerrar":"Close"}><Ic name="x" size={20}/></button>
+                <button type="button" className="hov" style={{...btn(),padding:"6px",flexShrink:0}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}} aria-label={msg("Cerrar", "Close")}><Ic name="x" size={20}/></button>
               </div>
-              <input style={{...inp,marginBottom:12,width:"100%",boxSizing:"border-box"}} placeholder={es?"Buscar...":"Search..."} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
+              <input style={{...inp,marginBottom:12,width:"100%",boxSizing:"border-box"}} placeholder={msg("Buscar...", "Search...")} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
               <div style={{marginBottom:16}}>
                 <div style={{fontSize:12,fontWeight:700,color:textMuted,letterSpacing:"0.06em",marginBottom:10,textTransform:"uppercase"}}>
-                  {es?"Patrones":"Patterns"}
+                  {msg("Patrones", "Patterns")}
                 </div>
                 <div style={{position:"relative",overflow:"hidden"}}>
                   <div
@@ -5071,7 +5078,7 @@ function GymApp() {
               </div>
               <div style={{marginBottom:14}}>
                 <div style={{fontSize:11,fontWeight:600,color:"#64748b",letterSpacing:"0.06em",marginBottom:8,textTransform:"uppercase",opacity:0.92}}>
-                  {es?"Músculos":"Muscles"}
+                  {msg("Músculos", "Muscles")}
                 </div>
                 <div style={{position:"relative",overflow:"hidden"}}>
                   <div
@@ -5135,7 +5142,7 @@ function GymApp() {
               {allEx.filter(e=>{
                 const q=addExSearch.toLowerCase();
                 if(addExPat&&e.pattern!==addExPat) return false;
-                if(addExMuscle && !(formatBibMuscleDisplay(e.muscle, es)||"").toLowerCase()
+                if(addExMuscle && !(formatBibMuscleDisplay(e.muscle, lang)||"").toLowerCase()
                   .includes(addExMuscle.toLowerCase())) return false;
                 if(!q) return true;
                 return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
@@ -5162,7 +5169,7 @@ function GymApp() {
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:18,fontWeight:700,lineHeight:1.25,wordBreak:"break-word"}}>{es?ex.name:ex.nameEn}</div>
                       <div style={{fontSize:12,fontWeight:700,color:pat.color,textTransform:"uppercase",letterSpacing:.4,marginTop:4,lineHeight:1.3}}>{es?pat.label:pat.labelEn}</div>
-                      {(formatBibMuscleDisplay(ex.muscle, es)||ex.equip)&&<div style={{fontSize:14,color:textMuted,marginTop:2,lineHeight:1.35,wordBreak:"break-word"}}>{[formatBibMuscleDisplay(ex.muscle, es),ex.equip].filter(Boolean).join(" · ")}</div>}
+                      {(formatBibMuscleDisplay(ex.muscle, lang)||ex.equip)&&<div style={{fontSize:14,color:textMuted,marginTop:2,lineHeight:1.35,wordBreak:"break-word"}}>{[formatBibMuscleDisplay(ex.muscle, lang),ex.equip].filter(Boolean).join(" · ")}</div>}
                     </div>
                     <div style={{width:28,height:28,borderRadius:"50%",border:"none",boxShadow:sel?"inset 0 0 0 2px "+pat.color:"inset 0 0 0 2px "+border,background:sel?pat.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:4}}>
                       {sel ? <Ic name="check-sm" size={16} color={pat.color}/> : null}
@@ -5186,7 +5193,7 @@ function GymApp() {
               }}
               onClick={e=>e.stopPropagation()}
             >
-          <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{es?"CANCELAR":"CANCEL"}</button>
+          <button type="button" className="hov" style={{...btn(),flex:1,padding:"12px",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} onClick={()=>{setAddExModal(null);setAddExSelectedIds([]);}}>{msg("CANCELAR", "CANCEL")}</button>
           <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"12px",fontWeight:800,opacity:addExSelectedIds.length?1:0.5,textTransform:"uppercase",letterSpacing:".5px",fontSize:13}} disabled={!addExSelectedIds.length} onClick={async function(){
             if(!addExModal||addExSelectedIds.length===0) return;
             var blk=addExModal.bloque||"exercises";
@@ -5196,7 +5203,7 @@ function GymApp() {
             var day=r&&r.days?r.days[dIdx]:null;
             var existing=new Set((day&&day[blk]?day[blk]:[]).map(function(e){return e.id;}));
             var ids=addExSelectedIds.filter(function(id){return !existing.has(id);});
-            if(ids.length===0){toast2(es?"Ya están en ese bloque":"Already in that block");return;}
+            if(ids.length===0){toast2(msg("Ya están en ese bloque", "Already in that block"));return;}
             var newExs=ids.map(function(id){
               var ex=allEx.find(function(e){return e.id===id;});
               if(!ex) return null;
@@ -5228,10 +5235,10 @@ function GymApp() {
                 setRutinasSB(function(prev){return prev.map(function(rw){return rw.id===rSB.id?{...rw,datos:{...rw.datos,days:diasAct}}:rw;});});
               }catch(e){console.error("Add batch save error:",e);}
             }
-            toast2((es?"Agregados ":"Added ")+newExs.length+(es?" ejercicios":" exercises"));
+            toast2((msg("Agregados ", "Added "))+newExs.length+(msg(" ejercicios", " exercises")));
             setAddExModal(null);
             setAddExSelectedIds([]);
-          }}>{es?"AÑADIR SELECCIONADOS":"ADD SELECTED"}{addExSelectedIds.length?" ("+addExSelectedIds.length+")":""}</button>
+          }}>{msg("AÑADIR SELECCIONADOS", "ADD SELECTED")}{addExSelectedIds.length?" ("+addExSelectedIds.length+")":""}</button>
             </div>
           </div>
         </div>
@@ -5385,6 +5392,7 @@ function GymApp() {
       )}
       </div>
     </div>
+    </IronTrackI18nProvider>
   );
 }
 
@@ -5756,8 +5764,8 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones: sesione
   if(sesionesData.length===0) return (
     <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
       <div style={{fontSize:44,marginBottom:12}}>📋</div>
-      <div style={{fontSize:18,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin sesiones aún":"No sessions yet"}</div>
-      <div style={{fontSize:13,color:textMuted,lineHeight:1.5}}>{es?"Completá tu primer entrenamiento para ver el historial aquí":"Complete your first workout to see your history here"}</div>
+      <div style={{fontSize:18,fontWeight:700,color:textMain,marginBottom:8}}>{msg("Sin sesiones aún", "No sessions yet")}</div>
+      <div style={{fontSize:13,color:textMuted,lineHeight:1.5}}>{msg("Completá tu primer entrenamiento para ver el historial aquí", "Complete your first workout to see your history here")}</div>
     </div>
   );
 
@@ -5771,7 +5779,7 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones: sesione
         const uniqueDays = dayLabels.length ? new Set(dayLabels).size : list.length;
         const done = uniqueDays>=expDays;
         const wkDisplay = list[0]?.semana != null && list[0]?.semana !== "" ? list[0].semana : wk;
-        const label = (es?"Semana ":"Week ")+wkDisplay;
+        const label = (msg("Semana ", "Week "))+wkDisplay;
         const expanded = openWeek===wk;
         return (
           <div key={"hist-wk-"+wk} style={{background:bgCard,borderRadius:12,marginBottom:8,border:"1px solid "+border,overflow:"hidden"}}>
@@ -5787,7 +5795,7 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones: sesione
                 {done ? (
                   <span style={{display:"flex",alignItems:"center",gap:4,fontSize:13,fontWeight:800,color:accent}}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                    {es?"Listo":"Done"}
+                    {msg("Listo", "Done")}
                   </span>
                 ) : (
                   <span style={{fontSize:13,fontWeight:800,color:primary,background:"rgba(59,130,246,.12)",borderRadius:8,padding:"4px 10px"}}>
@@ -5802,11 +5810,11 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones: sesione
                   <div key={s.id||("sesion-"+wk+"-"+i)} style={{background:_dm?"#0f1a2a":"#fff",borderRadius:10,padding:"12px 14px",marginBottom:8,border:"1px solid "+border}}>
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8,marginBottom:6}}>
                       <div>
-                        <div style={{fontSize:15,fontWeight:800,color:accent}}>✅ {s.dia_label||(es?"Día":"Day")}</div>
+                        <div style={{fontSize:15,fontWeight:800,color:accent}}>✅ {s.dia_label||(msg("Día", "Day"))}</div>
                         <div style={{fontSize:12,color:textMuted,marginTop:2}}>{s.fecha}{s.hora?(" · "+s.hora):""}</div>
                       </div>
                     </div>
-                    <div style={{fontSize:12,color:primary,fontWeight:700,marginBottom:6}}>{s.rutina_nombre||(es?"Entrenamiento":"Workout")}</div>
+                    <div style={{fontSize:12,color:primary,fontWeight:700,marginBottom:6}}>{s.rutina_nombre||(msg("Entrenamiento", "Workout"))}</div>
                     {s.ejercicios&&(
                       <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
                         {s.ejercicios.split(",").map(exId=>{
@@ -5895,15 +5903,15 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
       {fotos.length===0&&(
       <div style={{textAlign:"center",padding:"32px 16px"}}>
         <div style={{fontSize:44,marginBottom:12}}>📸</div>
-        <div style={{fontSize:18,fontWeight:700,color:textMain,marginBottom:8}}>{es?"Sin fotos aún":"No photos yet"}</div>
+        <div style={{fontSize:18,fontWeight:700,color:textMain,marginBottom:8}}>{msg("Sin fotos aún", "No photos yet")}</div>
         <div style={{fontSize:13,color:textMuted,lineHeight:1.5,marginBottom:16}}>
-          {es?"Subí tu primera foto para empezar a trackear tu cambio físico":"Upload your first photo to start tracking your physical progress"}
+          {msg("Subí tu primera foto para empezar a trackear tu cambio físico", "Upload your first photo to start tracking your physical progress")}
         </div>
         {!esEntrenador&&(
           <button onClick={()=>fileRef.current?.click()}
             style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:12,
               padding:"12px 24px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-            📸 {es?"Subir primera foto":"Upload first photo"}
+            📸 {msg("Subir primera foto", "Upload first photo")}
           </button>
         )}
       </div>
@@ -5955,7 +5963,8 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
   );
 }
 
-function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, videoOverrides, setVideoOverrides, setVideoModal, openNewExerciseTick = 0}) {
+function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOverrides, setVideoOverrides, setVideoModal, openNewExerciseTick = 0}) {
+  const { msg, lang } = useIronTrackI18n();
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
@@ -5996,14 +6005,14 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
   const musculos = ["todos","Cuadriceps","Gluteo","Isquios","Pecho","Dorsal","Hombro","Biceps","Triceps","Core","Pantorrilla"];
   const patColors = {empuje:"#8B9AB2",traccion:"#8B9AB2",rodilla:"#8B9AB2",bisagra:"#8B9AB2",core:"#8B9AB2",movilidad:"#8B9AB2",cardio:"#8B9AB2",oly:"#8B9AB2"};
   const patLabel = p => ({
-    todos:es?"TODOS":"ALL", empuje:es?"EMPUJE":"PUSH", traccion:es?"TRACCION":"PULL",
-    rodilla:es?"RODILLA":"KNEE", bisagra:es?"BISAGRA":"HINGE", core:"CORE",
-    movilidad:es?"MOVILIDAD":"MOBILITY", cardio:"CARDIO", oly:es?"OLIMPICO":"OLYMPIC",
+    todos:msg("TODOS", "ALL"), empuje:msg("EMPUJE", "PUSH"), traccion:msg("TRACCION", "PULL"),
+    rodilla:msg("RODILLA", "KNEE"), bisagra:msg("BISAGRA", "HINGE"), core:"CORE",
+    movilidad:msg("MOVILIDAD", "MOBILITY"), cardio:"CARDIO", oly:msg("OLIMPICO", "OLYMPIC"),
   })[p] || p.toUpperCase();
-  const musLabel = m => m==="todos"?(es?"TODOS":"ALL"):m==="Dorsal"?(es?"DORSAL":"BACK"):m==="Gluteo"?(es?"GLUTEO":"GLUTE"):m==="Isquios"?(es?"ISQUIOS":"HAMSTRINGS"):m==="Pecho"?(es?"PECHO":"CHEST"):m==="Hombro"?(es?"HOMBRO":"SHOULDER"):m==="Pantorrilla"?(es?"PANTORRILLA":"CALVES"):m.toUpperCase();
+  const musLabel = m => m==="todos"?(msg("TODOS", "ALL")):m==="Dorsal"?(msg("DORSAL", "BACK")):m==="Gluteo"?(msg("GLUTEO", "GLUTE")):m==="Isquios"?(msg("ISQUIOS", "HAMSTRINGS")):m==="Pecho"?(msg("PECHO", "CHEST")):m==="Hombro"?(msg("HOMBRO", "SHOULDER")):m==="Pantorrilla"?(msg("PANTORRILLA", "CALVES")):m.toUpperCase();
 
   const exFiltrados = allEx.filter(e=>{
-    const nombre = es?e.name:(e.nameEn||e.name);
+    const nombre = pickExerciseName(e, lang);
     const matchQ = !busq || nombre.toLowerCase().includes(busq.toLowerCase());
     const matchPat = filtPat==="todos" || e.pattern===filtPat;
     const matchMus = filtMus==="todos" || bibMuscleFilterHaystack(e.muscle).includes(filtMus.toLowerCase());
@@ -6013,22 +6022,22 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
   const exFiltradosSorted = React.useMemo(function () {
     var list = exFiltrados.slice();
     if (sortModo === 0) return list;
-    var loc = es ? "es" : "en";
+    var loc = localeForSort(lang);
     list.sort(function (a, b) {
-      var na = (es ? a.name : (a.nameEn || a.name)) || "";
-      var nb = (es ? b.name : (b.nameEn || b.name)) || "";
+      var na = pickExerciseName(a, lang) || "";
+      var nb = pickExerciseName(b, lang) || "";
       var cmp = na.localeCompare(nb, loc, { sensitivity: "base" });
       return sortModo === 1 ? cmp : -cmp;
     });
     return list;
-  }, [exFiltrados, sortModo, es]);
+  }, [exFiltrados, sortModo, lang]);
 
   const counts = {};
   allEx.forEach(e=>{ counts[e.name.toLowerCase()]=(counts[e.name.toLowerCase()]||0)+1; });
   const dupCount = Object.values(counts).filter(v=>v>1).length;
 
   const guardarEdicion = async () => {
-    if(!editNombre.trim()){toast2(es?"Ingresa un nombre":"Enter a name");return;}
+    if(!editNombre.trim()){toast2(msg("Ingresa un nombre", "Enter a name"));return;}
     const isCustom = !!(customEx||[]).find(c=>c.id===editModal.id);
     if(isCustom) {
       const updated = customEx.map(e=>e.id===editModal.id?sanitizeExerciseSnapshotForWrite({...e,name:editNombre,nameEn:editNombre,video_url:(editYT||"").trim()}):sanitizeExerciseSnapshotForWrite(e));
@@ -6043,16 +6052,16 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
         if(setVideoOverrides) setVideoOverrides(function(prev){return {...prev, [editModal.id]: editYT}});
       } catch(e){ console.error("[videoOverride]",e); }
     }
-    setEditModal(null); toast2(es?"Link actualizado ✓":"Link updated ✓");
+    setEditModal(null); toast2(msg("Link actualizado ✓", "Link updated ✓"));
   };
   const borrarEjercicio = async (id) => {
     const updated = customEx.filter(e=>e.id!==id);
     setCustomEx(updated);
     try { await sb.deleteCustomEx(id); } catch(e){}
-    setBorrarId(null); toast2(es?"Ejercicio eliminado ✓":"Exercise deleted ✓");
+    setBorrarId(null); toast2(msg("Ejercicio eliminado ✓", "Exercise deleted ✓"));
   };
   const agregarEjercicio = async () => {
-    if(!newNombre.trim()){toast2(es?"Ingresa un nombre":"Enter a name");return;}
+    if(!newNombre.trim()){toast2(msg("Ingresa un nombre", "Enter a name"));return;}
     var muscleStored = newMusKeys.length ? JSON.stringify(BIB_MUSCLE_ORDER.filter(function (k) { return newMusKeys.indexOf(k) >= 0; })) : "";
     const newEx = sanitizeExerciseSnapshotForWrite({id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, pattern:newPat, muscle:muscleStored, equip:newEquip||"Libre", video_url:(newYT||"").trim(), isCustom:true});
     const updated = [...(customEx||[]), newEx];
@@ -6062,20 +6071,20 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
       await sb.addCustomEx({id:newEx.id, name:newEx.name, name_en:newEx.nameEn, pattern:newEx.pattern, muscle:newEx.muscle, equip:newEx.equip, video_url:newEx.video_url!=null?newEx.video_url:null, entrenador_id:"entrenador_principal"});
     } catch(e){ console.error("[addCustomEx]",e); }
     setNewNombre(""); setNewPat("empuje"); setNewMusKeys([]); setNewEquip(""); setNewYT("");
-    setTab(0); toast2(es?"Ejercicio agregado ✓":"Exercise added ✓");
+    setTab(0); toast2(msg("Ejercicio agregado ✓", "Exercise added ✓"));
   };
   const inpS = {background:bg,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",color:textMain,fontSize:15,width:"100%",fontFamily:"inherit",outline:"none",marginBottom:8};
 
   return (
     <div className="min-w-0 max-w-full">
       <div style={{display:"flex",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),marginBottom:12,minWidth:0}}>
-        {[es?"GESTIONAR":"MANAGE", es?"+ NUEVO":"+ NEW"].map((t,i)=>(
+        {[msg("GESTIONAR", "MANAGE"), msg("+ NUEVO", "+ NEW")].map((t,i)=>(
           <button key={i===0?"bib-tab-manage":"bib-tab-new"} onClick={()=>setTab(i)} style={{flex:1,minWidth:0,padding:"12px 8px",border:"none",background:"none",
             fontFamily:"inherit",fontSize:16,fontWeight:800,cursor:"pointer",
             color:tab===i?"#2563EB":"#8B9AB2",borderBottom:tab===i?"2px solid #3B82F6":"2px solid transparent"}}>
             {t}{i===0&&dupCount>0?(
               <span
-                title={es?`Hay ${dupCount} nombres de ejercicio duplicados`:`There are ${dupCount} duplicate exercise names`}
+                title={msg(`Hay ${dupCount} nombres de ejercicio duplicados`, `There are ${dupCount} duplicate exercise names`)}
                 style={{marginLeft:8,background:"#2563EB",color:"#fff",borderRadius:12,padding:"1px 7px",fontSize:13,display:"inline-flex",alignItems:"center",justifyContent:"center"}}
               >
                 <Ic name="alert-triangle" size={12} color="#fff"/>
@@ -6087,10 +6096,10 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
 
       {tab===0&&(
         <div>
-          <input style={{...inpS,marginBottom:8}} placeholder={es?"🔍 Buscar ejercicio...":"🔍 Search exercise..."} value={busq} onChange={e=>setBusq(e.target.value)}/>
+          <input style={{...inpS,marginBottom:8}} placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")} value={busq} onChange={e=>setBusq(e.target.value)}/>
 
           <div style={{display:"flex",background:bgSub,border:"1px solid "+border,borderRadius:12,padding:4,gap:4,marginBottom:8}}>
-            {[es?"POR PATRON":"BY PATTERN", es?"POR MUSCULO":"BY MUSCLE"].map((t,i)=>(
+            {[msg("POR PATRON", "BY PATTERN"), msg("POR MUSCULO", "BY MUSCLE")].map((t,i)=>(
               <button key={i===0?"bib-filt-patron":"bib-filt-muscle"} onClick={()=>{setModoFiltro(i===0?"patron":"musculo");setFiltPat("todos");setFiltMus("todos");}}
                 style={{flex:1,padding:"8px",border:"none",borderRadius:8,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",
                   background:modoFiltro===(i===0?"patron":"musculo")?"#2563EB":"transparent",
@@ -6131,12 +6140,12 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
 
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap",minWidth:0}}>
             <div style={{fontSize:15,color:textMuted,fontWeight:700,flex:"1 1 8rem",minWidth:0,overflowWrap:"anywhere"}}>
-              {es?"Mostrando":"Showing"} {exFiltrados.length} {es?"ejercicios de":"exercises of"} {allEx.length}
+              {msg("Mostrando", "Showing")} {exFiltrados.length} {msg("ejercicios de", "exercises of")} {allEx.length}
             </div>
             <button
               type="button"
               onClick={function () { setSortModo(function (m) { return (m + 1) % 3; }); }}
-              title={sortModo === 0 ? (es ? "Sin orden definido — clic para A-Z" : "Default order — click for A-Z") : sortModo === 1 ? (es ? "Orden: A-Z — clic para Z-A" : "Order: A-Z — click for Z-A") : (es ? "Orden: Z-A — clic para quitar orden" : "Order: Z-A — click to clear sort")}
+              title={sortModo === 0 ? (msg("Sin orden definido — clic para A-Z", "Default order — click for A-Z")) : sortModo === 1 ? (msg("Orden: A-Z — clic para Z-A", "Order: A-Z — click for Z-A")) : (msg("Orden: Z-A — clic para quitar orden", "Order: Z-A — click to clear sort"))}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -6154,7 +6163,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
               }}
             >
               <Ic name="arrow-up-down" size={18} color={sortModo === 0 ? "#8B9AB2" : "#2563EB"} />
-              {es ? "Ordenar" : "Sort"}
+              {msg("Ordenar", "Sort")}
             </button>
           </div>
 
@@ -6163,8 +6172,8 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
             const isDup = counts[e.name.toLowerCase()]>1;
             const patCol = patColors[e.pattern]||"#8B9AB2";
             const isCustom = !!(customEx||[]).find(c=>c.id===e.id);
-            const nombre = es?e.name:(e.nameEn||e.name);
-            const muscleLine = formatBibMuscleDisplay(e.muscle, es);
+            const nombre = pickExerciseName(e, lang);
+            const muscleLine = formatBibMuscleDisplay(e.muscle, lang);
             const ytUrl = resolveVideoUrl(e, null, ytOverrides);
             return (
               <div key={e.id} style={{background:bgCard,border:"1px solid #2D4057",borderRadius:12,padding:"16px",marginBottom:8,minWidth:0}}>
@@ -6204,13 +6213,13 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
 
       {tab===1&&(
         <div>
-          <div style={{fontSize:15,color:textMuted,marginBottom:16}}>{es?"El ejercicio quedara disponible en la biblioteca para armar rutinas.":"The exercise will be available in the library to build routines."}</div>
+          <div style={{fontSize:15,color:textMuted,marginBottom:16}}>{msg("El ejercicio quedara disponible en la biblioteca para armar rutinas.", "The exercise will be available in the library to build routines.")}</div>
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{es?"NOMBRE *":"NAME *"}</div>
-            <input style={inpS} value={newNombre} onChange={e=>setNewNombre(e.target.value)} placeholder={es?"Ej: Press inclinado con mancuernas":"Ex: Incline Dumbbell Press"}/>
+            <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{msg("NOMBRE *", "NAME *")}</div>
+            <input style={inpS} value={newNombre} onChange={e=>setNewNombre(e.target.value)} placeholder={msg("Ej: Press inclinado con mancuernas", "Ex: Incline Dumbbell Press")}/>
           </div>
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{es?"PATRON":"PATTERN"}</div>
+            <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{msg("PATRON", "PATTERN")}</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {["empuje","traccion","rodilla","bisagra","core","movilidad","cardio","oly"].map(p=>(
                 <button key={p} onClick={()=>setNewPat(p)} style={{padding:"8px 14px",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",
@@ -6223,7 +6232,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
             </div>
           </div>
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{es?"MUSCULO":"MUSCLE"}</div>
+            <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{msg("MUSCULO", "MUSCLE")}</div>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {BIB_MUSCLE_OPTIONS.map(function (o) {
                 var sel = newMusKeys.indexOf(o.k) >= 0;
@@ -6248,34 +6257,34 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
                       color: sel ? "#2563EB" : "#8B9AB2",
                     }}
                   >
-                    {es ? o.chipEs : o.chipEn}
+                    {msg(o.chipEs, o.chipEn)}
                   </button>
                 );
               })}
             </div>
             <div style={{fontSize: 13, color: textMuted, marginTop: 8, lineHeight: 1.4 }}>
-              {es ? "Seleccionados: " : "Selected: "}
+              {msg("Seleccionados: ", "Selected: ")}
               {BIB_MUSCLE_ORDER.filter(function (k) { return newMusKeys.indexOf(k) >= 0; })
                 .map(function (k) {
                   var opt = BIB_MUSCLE_OPTIONS.find(function (x) { return x.k === k; });
-                  return opt ? (es ? opt.selEs : opt.selEn) : k;
+                  return opt ? msg(opt.selEs, opt.selEn) : k;
                 })
                 .join(", ") || "—"}
             </div>
           </div>
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{es?"EQUIPAMIENTO":"EQUIPMENT"}</div>
-            <input style={inpS} value={newEquip} onChange={e=>setNewEquip(e.target.value)} placeholder={es?"Ej: Barra, Mancuernas, Libre":"Ex: Barbell, Dumbbells, Bodyweight"}/>
+            <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>{msg("EQUIPAMIENTO", "EQUIPMENT")}</div>
+            <input style={inpS} value={newEquip} onChange={e=>setNewEquip(e.target.value)} placeholder={msg("Ej: Barra, Mancuernas, Libre", "Ex: Barbell, Dumbbells, Bodyweight")}/>
           </div>
           <div style={{marginBottom:24}}>
             <div style={{fontSize:15,fontWeight:800,color:textMuted,letterSpacing:1,marginBottom:8}}>LINK YOUTUBE</div>
             <input style={inpS} value={newYT} onChange={e=>setNewYT(e.target.value)} placeholder="https://youtube.com/..."/>
             {newYT&&(newYT.includes("youtube")||newYT.includes("youtu.be"))&&(
-              <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>▶️ {es?"Link valido ✓":"Valid link ✓"}</div>
+              <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>▶️ {msg("Link valido ✓", "Valid link ✓")}</div>
             )}
           </div>
           <button onClick={agregarEjercicio} style={{width:"100%",padding:12,background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-            {es?"+ AGREGAR EJERCICIO":"+ ADD EXERCISE"}
+            {msg("+ AGREGAR EJERCICIO", "+ ADD EXERCISE")}
           </button>
         </div>
       )}
@@ -6285,14 +6294,14 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
       {editModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setEditModal(null)}>
           <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",width:"100%",maxHeight:"80dvh",minHeight:0,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:16}}>{es?"Editar ejercicio":"Edit exercise"}</div>
+            <div style={{fontSize:18,fontWeight:800,marginBottom:16}}>{msg("Editar ejercicio", "Edit exercise")}</div>
             <div style={{marginBottom:12}}>
-              <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{es?"NOMBRE":"NAME"}</div>
+              <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{msg("NOMBRE", "NAME")}</div>
               <input style={inpS} value={editNombre} onChange={e=>setEditNombre(e.target.value)}/>
             </div>
             <div style={{marginBottom:16}}>
               <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>LINK YOUTUBE</div>
-              <div style={{fontSize:11,color:"#60A5FA",marginBottom:8}}><Ic name="info" size={14} color="#60a5fa"/> {es?"Ideal: video corto -30 seg (YouTube Shorts)":"Ideal: short video -30 sec (YouTube Shorts)"}</div>
+              <div style={{fontSize:11,color:"#60A5FA",marginBottom:8}}><Ic name="info" size={14} color="#60a5fa"/> {msg("Ideal: video corto -30 seg (YouTube Shorts)", "Ideal: short video -30 sec (YouTube Shorts)")}</div>
               <input style={inpS} value={editYT} onChange={e=>setEditYT(e.target.value)} placeholder="https://youtube.com/shorts/..."/>
               {editYT&&(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(()=>{
                 var videoId = null;
@@ -6301,28 +6310,28 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
                   else if(editYT.includes("v=")) videoId = editYT.split("v=")[1].split("&")[0];
                   else if(editYT.includes("youtu.be/")) videoId = editYT.split("youtu.be/")[1].split("?")[0];
                 } catch(e){}
-                if(!videoId) return <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>✓ {es?"Link detectado":"Link detected"}</div>;
+                if(!videoId) return <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>✓ {msg("Link detectado", "Link detected")}</div>;
                 return (
                   <div style={{marginTop:10}}>
-                    <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{es?"PREVIEW":"PREVIEW"}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{msg("PREVIEW", "PREVIEW")}</div>
                     <div style={{display:"flex",gap:10,alignItems:"center"}}>
                       <img loading="lazy" src={"https://img.youtube.com/vi/"+videoId+"/mqdefault.jpg"} style={{width:120,height:68,borderRadius:8,objectFit:"cover",border:"1px solid "+border}} onError={function(e){e.target.style.display="none"}}/>
                       <div>
-                        <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✓ {es?"Video detectado":"Video detected"}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✓ {msg("Video detectado", "Video detected")}</div>
                         <div style={{fontSize:11,color:textMuted,marginTop:2}}>ID: {videoId}</div>
-                        <a href={editYT} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#2563EB",textDecoration:"none",marginTop:4,display:"inline-block"}}>{es?"Abrir en YouTube ↗":"Open in YouTube ↗"}</a>
+                        <a href={editYT} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#2563EB",textDecoration:"none",marginTop:4,display:"inline-block"}}>{msg("Abrir en YouTube ↗", "Open in YouTube ↗")}</a>
                       </div>
                     </div>
                   </div>
                 );
               })()}
               {editYT&&!(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(
-                <div style={{marginTop:8,fontSize:12,color:"#F59E0B"}}>⚠ {es?"No parece un link de YouTube":"Doesn't look like a YouTube link"}</div>
+                <div style={{marginTop:8,fontSize:12,color:"#F59E0B"}}>⚠ {msg("No parece un link de YouTube", "Doesn't look like a YouTube link")}</div>
               )}
             </div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setEditModal(null)} style={{flex:1,padding:12,background:_dm?"#162234":"#E2E8F0",color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"CANCELAR":"CANCEL"}</button>
-              <button onClick={guardarEdicion} style={{flex:1,padding:12,background:"#2563EB",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"GUARDAR":"SAVE"}</button>
+              <button onClick={()=>setEditModal(null)} style={{flex:1,padding:12,background:_dm?"#162234":"#E2E8F0",color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("CANCELAR", "CANCEL")}</button>
+              <button onClick={guardarEdicion} style={{flex:1,padding:12,background:"#2563EB",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("GUARDAR", "SAVE")}</button>
             </div>
           </div>
         </div>
@@ -6332,11 +6341,11 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, es, darkMode, vid
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px"}} onClick={()=>setBorrarId(null)}>
           <div style={{background:bgCard,borderRadius:16,padding:20,width:"100%",maxWidth:320,border:"1px solid "+border,textAlign:"center"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:28,marginBottom:8}}>🗑️</div>
-            <div style={{fontSize:15,fontWeight:800,marginBottom:8}}>{es?"Borrar ejercicio?":"Delete exercise?"}</div>
-            <div style={{fontSize:13,color:textMuted,marginBottom:16}}>{es?"Esta accion no se puede deshacer":"This action cannot be undone"}</div>
+            <div style={{fontSize:15,fontWeight:800,marginBottom:8}}>{msg("Borrar ejercicio?", "Delete exercise?")}</div>
+            <div style={{fontSize:13,color:textMuted,marginBottom:16}}>{msg("Esta accion no se puede deshacer", "This action cannot be undone")}</div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setBorrarId(null)} style={{flex:1,padding:8,background:_dm?"#162234":"#E2E8F0",color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"CANCELAR":"CANCEL"}</button>
-              <button onClick={()=>borrarEjercicio(borrarId)} style={{flex:1,padding:8,background:"#2563EB",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{es?"BORRAR":"DELETE"}</button>
+              <button onClick={()=>setBorrarId(null)} style={{flex:1,padding:8,background:_dm?"#162234":"#E2E8F0",color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("CANCELAR", "CANCEL")}</button>
+              <button onClick={()=>borrarEjercicio(borrarId)} style={{flex:1,padding:8,background:"#2563EB",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("BORRAR", "DELETE")}</button>
             </div>
           </div>
         </div>
@@ -6371,7 +6380,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
 
   const procesarImagen = async (base64) => {
     setPaso(2); setProcesando(true); setProgreso(0);
-    const msgs = ["Detectando texto...","Reconociendo ejercicios...",es?"Buscando en biblioteca...":"Searching library...","Analizando series y reps...","Finalizando..."];
+    const msgs = ["Detectando texto...","Reconociendo ejercicios...",msg("Buscando en biblioteca...", "Searching library..."),"Analizando series y reps...","Finalizando..."];
     let i=0;
     const timer = setInterval(()=>{ if(i<msgs.length){setProgreso((i+1)*18);setStatusMsg(msgs[i]);i++;}else{clearInterval(timer);} },600);
 
@@ -6393,7 +6402,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
       const txt = data.content?.find(c=>c.type==="text")?.text||"{}";
       let parsed;
       try{ parsed=JSON.parse(txt); }catch(e){ parsed={nombreRutina:"Rutina Escaneada",ejercicios:[]}; }
-      setProgreso(100); setStatusMsg(es?"Analisis completo":"Analysis complete");
+      setProgreso(100); setStatusMsg(msg("Analisis completo", "Analysis complete"));
 
       // Cruzar con biblioteca
       const exConMatch = (parsed.ejercicios||[]).map(ej=>{
@@ -6473,8 +6482,8 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
     <div>
       {paso===1&&(
         <div>
-          <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>{es?"Escanear rutina en papel":"Scan paper routine"}</div>
-          <div style={{fontSize:13,color:textMuted,marginBottom:24}}>{es?"La IA detecta ejercicios, series y repeticiones automaticamente.":"AI automatically detects exercises, sets and reps."}</div>
+          <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>{msg("Escanear rutina en papel", "Scan paper routine")}</div>
+          <div style={{fontSize:13,color:textMuted,marginBottom:24}}>{msg("La IA detecta ejercicios, series y repeticiones automaticamente.", "AI automatically detects exercises, sets and reps.")}</div>
 
           <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handleFile}/>
           <input ref={fileGalRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleFile}/>
@@ -6482,22 +6491,22 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
           <div style={{display:"flex",gap:8,marginBottom:12}}>
             <button onClick={()=>fileRef.current.click()} style={{flex:1,padding:"16px 10px",background:"#2563EB22",border:"2px solid #243040",borderRadius:12,color:"#2563EB",fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
               <div style={{fontSize:36,marginBottom:8}}>📸</div>
-              <div>{es?"SACAR FOTO":"TAKE PHOTO"}</div>
-              <div style={{fontSize:11,color:textMuted,marginTop:4}}>{es?"Abrir camara":"Open camera"}</div>
+              <div>{msg("SACAR FOTO", "TAKE PHOTO")}</div>
+              <div style={{fontSize:11,color:textMuted,marginTop:4}}>{msg("Abrir camara", "Open camera")}</div>
             </button>
             <button onClick={()=>fileGalRef.current.click()} style={{flex:1,padding:"16px 10px",background:_dm?"#162234":"#E2E8F0",border:"2px solid #2d3748",borderRadius:12,color:textMuted,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",textAlign:"center"}}>
               <div style={{fontSize:36,marginBottom:8}}>🖼️</div>
-              <div>{es?"CARGAR ARCHIVO":"UPLOAD FILE"}</div>
-              <div style={{fontSize:11,color:textMuted,marginTop:4}}>{es?"Foto de galeria":"From gallery"}</div>
+              <div>{msg("CARGAR ARCHIVO", "UPLOAD FILE")}</div>
+              <div style={{fontSize:11,color:textMuted,marginTop:4}}>{msg("Foto de galeria", "From gallery")}</div>
             </button>
           </div>
 
           <div style={{background:bgSub,border:"1px solid "+border,borderRadius:12,padding:12}}>
-            <div style={{fontSize:13,fontWeight:500,color:textMuted,marginBottom:8,letterSpacing:.5}}>{es?"CONSEJOS":"TIPS"}</div>
+            <div style={{fontSize:13,fontWeight:500,color:textMuted,marginBottom:8,letterSpacing:.5}}>{msg("CONSEJOS", "TIPS")}</div>
             <div style={{fontSize:13,color:textMuted,display:"flex",flexDirection:"column",gap:8}}>
-              <div>{es?"✅ Buena iluminacion, sin sombras":"✅ Good lighting, no shadows"}</div>
-              <div>{es?"✅ Hoja bien centrada y legible":"✅ Sheet centered and legible"}</div>
-              <div>{es?"✅ Formatos: \"4x8\", \"3 series de 10\"":"✅ Formats: \"4x8\", \"3 sets of 10\""}</div>
+              <div>{msg("✅ Buena iluminacion, sin sombras", "✅ Good lighting, no shadows")}</div>
+              <div>{msg("✅ Hoja bien centrada y legible", "✅ Sheet centered and legible")}</div>
+              <div>{msg("✅ Formatos: \"4x8\", \"3 series de 10\"", "✅ Formats: \"4x8\", \"3 sets of 10\"")}</div>
             </div>
           </div>
         </div>
@@ -6515,8 +6524,8 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
       )}
       {paso===3&&resultado&&(
         <div>
-          <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>{es?"Revisa la rutina detectada":"Review detected routine"}</div>
-          <div style={{fontSize:13,color:textMuted,marginBottom:12}}>{es?"Podes editar antes de guardar.":"You can edit values before saving."}</div>
+          <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>{msg("Revisa la rutina detectada", "Review detected routine")}</div>
+          <div style={{fontSize:13,color:textMuted,marginBottom:12}}>{msg("Podes editar antes de guardar.", "You can edit values before saving.")}</div>
 
           <div style={{background:"#22c55e15",border:"1px solid #22c55e33",borderRadius:12,padding:"8px 12px",marginBottom:12,display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontSize:18}}>✅</span>
@@ -6527,12 +6536,12 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
           </div>
 
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{es?"NOMBRE":"NAME"}</div>
+            <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{msg("NOMBRE", "NAME")}</div>
             <input style={inpS} value={nombreRutina} onChange={e=>setNombreRutina(e.target.value)}/>
           </div>
           {resultado.ejercicios.filter(e=>e.match||e.selManual).length>0&&(
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:"#22C55E",letterSpacing:0.3,marginBottom:8}}>{es?"✅ ENCONTRADOS":"✅ FOUND"} ({resultado.ejercicios.filter(e=>e.match||e.selManual).length})</div>
+              <div style={{fontSize:11,fontWeight:700,color:"#22C55E",letterSpacing:0.3,marginBottom:8}}>{msg("✅ ENCONTRADOS", "✅ FOUND")} ({resultado.ejercicios.filter(e=>e.match||e.selManual).length})</div>
               {resultado.ejercicios.map((ej,i)=>{
                 if(!ej.match&&!ej.selManual) return null;
                 const ref = ej.selManual||ej.match;
@@ -6552,7 +6561,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
           )}
           {resultado.ejercicios.filter(e=>!e.match&&!e.selManual).length>0&&(
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:"#8B9AB2",letterSpacing:0.3,margin:"16px 0 7px"}}>{es?"⚠️ NO ENCONTRADOS":"⚠️ NOT FOUND"} ({resultado.ejercicios.filter(e=>!e.match&&!e.selManual).length})</div>
+              <div style={{fontSize:11,fontWeight:700,color:"#8B9AB2",letterSpacing:0.3,margin:"16px 0 7px"}}>{msg("⚠️ NO ENCONTRADOS", "⚠️ NOT FOUND")} ({resultado.ejercicios.filter(e=>!e.match&&!e.selManual).length})</div>
               {resultado.ejercicios.map((ej,i)=>{
                 if(ej.match||ej.selManual) return null;
                 const resBib = ej.busqueda?.length>=2 ? allEx.filter(e=>e.name.toLowerCase().includes(ej.busqueda.toLowerCase())).slice(0,4) : [];
@@ -6560,13 +6569,13 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
                   <div key={"scan-miss-"+(ej.nombre||"ej")+"-"+i} style={{background:bgCard,border:"1px solid #243040",borderRadius:12,padding:12,marginBottom:8}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                       <div>
-                        <div style={{fontSize:15,fontWeight:800,color:"#8B9AB2"}}>(es?"Detectado":"Detected")+": \""+ej.nombre+"\""</div>
+                        <div style={{fontSize:15,fontWeight:800,color:"#8B9AB2"}}>(msg("Detectado", "Detected"))+": \""+ej.nombre+"\""</div>
                         <div style={{fontSize:11,color:textMuted,marginTop:4}}>{ej.series||"?"} series · {ej.reps||"?"} reps</div>
                       </div>
                       <span style={{background:"#2563EB22",color:"#8B9AB2",border:"1px solid #243040",borderRadius:6,padding:"2px 7px",fontSize:11,fontWeight:700,flexShrink:0,marginLeft:8}}>SIN MATCH</span>
                     </div>
                     <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:.8,marginBottom:8}}>BUSCAR EN BIBLIOTECA</div>
-                    <input style={inpS} placeholder={es?"Escribi el nombre correcto...":"Type the correct name..."} value={ej.busqueda||""} onChange={e=>buscarEnBib(i,e.target.value)}/>
+                    <input style={inpS} placeholder={msg("Escribi el nombre correcto...", "Type the correct name...")} value={ej.busqueda||""} onChange={e=>buscarEnBib(i,e.target.value)}/>
                     {resBib.length>0&&(
                       <div style={{background:bg,border:"1px solid "+border,borderRadius:12,overflow:"hidden",marginTop:8}}>
                         {resBib.map(ex=>(
@@ -6581,7 +6590,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
                       </div>
                     )}
                     {ej.busqueda?.length>=2&&resBib.length===0&&(
-                      <div style={{fontSize:13,color:textMuted,textAlign:"center",padding:"8px 0"}}>{es?"Sin resultados — agregalo abajo":"No results — add it below"}</div>
+                      <div style={{fontSize:13,color:textMuted,textAlign:"center",padding:"8px 0"}}>{msg("Sin resultados — agregalo abajo", "No results — add it below")}</div>
                     )}
                     <div style={{fontSize:11,color:textMuted,textAlign:"center",margin:"8px 0 7px"}}>— o si no esta en biblioteca —</div>
                     <div style={{display:"flex",gap:8}}>
@@ -6596,7 +6605,7 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
 
           {}
           <div style={{marginTop:16,marginBottom:8}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:8}}>{es?"Asignar a alumno":"Assign to athlete"} <span style={{color:textMuted,fontWeight:400}}>(opcional)</span></div>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:8}}>{msg("Asignar a alumno", "Assign to athlete")} <span style={{color:textMuted,fontWeight:400}}>(opcional)</span></div>
             {alumnos.map(a=>(
               <div key={a.id} onClick={()=>setAlumnoSel(alumnoSel===a.id?null:a.id)} style={{background:bg,border:"2px solid "+(alumnoSel===a.id?"#2563EB":"#2D4057"),borderRadius:12,padding:"8px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
                 <div style={{width:32,height:32,background:"#2563EB22",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,color:"#2563EB",flexShrink:0}}>{a.nombre?.[0]}</div>
@@ -6671,19 +6680,19 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,paddingTop:4}}>
         <div>
           <div style={{fontSize:13,fontWeight:500,color:textMuted,letterSpacing:0.3}}>
-            {new Date().getHours()<12?(es?"BUENOS DÍAS":"GOOD MORNING"):new Date().getHours()<18?(es?"BUENAS TARDES":"GOOD AFTERNOON"):(es?"BUENAS NOCHES":"GOOD EVENING")}
+            {new Date().getHours()<12?(msg("BUENOS DÍAS", "GOOD MORNING", "BOM DIA")):new Date().getHours()<18?(msg("BUENAS TARDES", "GOOD AFTERNOON", "BOA TARDE")):(msg("BUENAS NOCHES", "GOOD EVENING", "BOA NOITE"))}
           </div>
           <div style={{fontSize:28,fontWeight:900,color:textMain,letterSpacing:0.5}}>IRON TRACK 💪</div>
         </div>
         <div style={{background:"#2563EB11",border:"1px solid #243040",borderRadius:12,padding:"8px 16px",textAlign:"center"}}>
           <div style={{fontSize:28,fontWeight:900,color:"#2563EB",lineHeight:1}}>{totalAlumnos}</div>
-          <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3}}>{es?"ALUMNOS":"ATHLETES"}</div>
+          <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3}}>{msg("ALUMNOS", "ATHLETES")}</div>
         </div>
       </div>
       {proximaAccion&&(
         <div style={{background:"linear-gradient(135deg,#243040,#24304008)",border:"1px solid #243040",borderRadius:16,padding:"16px",marginBottom:20}}>
           <div style={{fontSize:11,fontWeight:800,color:"#2563EB",letterSpacing:2,marginBottom:8,textTransform:"uppercase"}}>
-            ⚡ {es?"ACCIÓN RECOMENDADA":"RECOMMENDED ACTION"}
+            ⚡ {msg("ACCIÓN RECOMENDADA", "RECOMMENDED ACTION")}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
             <div style={ava("#2563EB")}>{(proximaAccion.nombre||proximaAccion.email||"?").slice(0,2).toUpperCase()}</div>
@@ -6691,15 +6700,15 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
               <div style={{fontSize:22,fontWeight:900,color:textMain}}>{proximaAccion.nombre||proximaAccion.email}</div>
               <div style={{fontSize:13,color:textMuted,fontWeight:500}}>
                 {alumnosSinEntrenar.includes(proximaAccion)
-                  ? (es?"Sin actividad hace 3+ días":"No activity for 3+ days")
-                  : (es?"Revisar progreso":"Review progress")}
+                  ? (msg("Sin actividad hace 3+ días", "No activity for 3+ days"))
+                  : (msg("Revisar progreso", "Review progress"))}
               </div>
             </div>
           </div>
           <div style={{display:"flex",gap:8}}>
             <button className="hov" onClick={()=>onVerAlumno?.(proximaAccion)}
               style={{flex:1,padding:"8px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-              <><Ic name="eye" size={14}/> {es?"Ver progreso":"View progress"}</>
+              <><Ic name="eye" size={14}/> {msg("Ver progreso", "View progress")}</>
             </button>
             <button className="hov" onClick={()=>onChatAlumno?.(proximaAccion)}
               style={{padding:"8px 16px",background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
@@ -6728,13 +6737,13 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
   onVerProgreso={(a) => onVerAlumno?.({ id: a.id })}
   onAccion={(a) => onChatAlumno?.({ id: a.id })}
 />
-      <div style={{...sec}}>{es?"ESTA SEMANA":"THIS WEEK"}</div>
+      <div style={{...sec}}>{msg("ESTA SEMANA", "THIS WEEK")}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:20}}>
         {[
-          {v:totalSesiones,       lbl:es?"SESIONES":"SESSIONS",   col:"#22C55E"},
-          {v:alumnosSinEntrenar.length, lbl:es?"SIN ENTRENAR":"INACTIVE",  col:textMuted},
-          {v:alumnos.filter(a=>(pagosEstado[a.id]||"pendiente")==="pendiente").length, lbl:es?"PAGO PEND.":"PAYMENT DUE", col:"#fbbf24"},
-          {v:alumnos.filter(a=>pagosEstado[a.id]==="vencido").length, lbl:es?"VENCIDOS":"OVERDUE", col:"#f87171"},
+          {v:totalSesiones,       lbl:msg("SESIONES", "SESSIONS"),   col:"#22C55E"},
+          {v:alumnosSinEntrenar.length, lbl:msg("SIN ENTRENAR", "INACTIVE"),  col:textMuted},
+          {v:alumnos.filter(a=>(pagosEstado[a.id]||"pendiente")==="pendiente").length, lbl:msg("PAGO PEND.", "PAYMENT DUE"), col:"#fbbf24"},
+          {v:alumnos.filter(a=>pagosEstado[a.id]==="vencido").length, lbl:msg("VENCIDOS", "OVERDUE"), col:"#f87171"},
         ].map((s,i)=>(
           <div key={"dash-kpi-"+String(s.lbl).replace(/\s/g,"-")+"-"+i} style={{background:bgCard,border:"1px solid "+s.col+"33",borderRadius:12,padding:"16px 14px"}}>
             <div style={{fontSize:36,fontWeight:900,color:s.col,lineHeight:1}}>{s.v}</div>
@@ -6744,13 +6753,13 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
       </div>
       {alumnosSinEntrenar.length>0&&(
         <>
-          <div style={{...sec}}><Ic name="alert-triangle" size={14} color="#F59E0B"/> {es?"INACTIVOS +3 DÍAS":"INACTIVE +3 DAYS"}</div>
+          <div style={{...sec}}><Ic name="alert-triangle" size={14} color="#F59E0B"/> {msg("INACTIVOS +3 DÍAS", "INACTIVE +3 DAYS")}</div>
           <div style={{background:bgCard,border:"1px solid #243040",borderRadius:12,marginBottom:20,overflow:"hidden"}}>
             {alumnosSinEntrenar.map((a,i)=>{
               const ulS=sesiones?.filter(s=>s.alumno_id===a.id).sort((x,y)=>new Date(y.created_at||y.fecha)-new Date(x.created_at||x.fecha))[0];
               const dias=ulS?Math.floor((hoy-new Date(ulS.created_at||ulS.fecha))/(1000*60*60*24)):null;
               const tel=a.telefono||"";
-              const waMsg=encodeURIComponent((es?"Hola ":"Hey ")+a.nombre+(es?"! 👋 Vi que no entrenaste en los últimos días. ¿Todo bien? Cuando puedas retomamos 💪":"! 👋 Noticed you haven't trained in a few days. Everything ok? Let's get back at it 💪"));
+              const waMsg=encodeURIComponent((msg("Hola ", "Hey "))+a.nombre+(msg("! 👋 Vi que no entrenaste en los últimos días. ¿Todo bien? Cuando puedas retomamos 💪", "! 👋 Noticed you haven't trained in a few days. Everything ok? Let's get back at it 💪")));
               return(
               <div key={a.id||i} style={{display:"flex",alignItems:"center",gap:12,padding:"16px",
                 borderBottom:i<alumnosSinEntrenar.length-1?"1px solid "+border:"none"}}>
@@ -6760,8 +6769,8 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   <div style={{display:"flex",alignItems:"center",gap:8,marginTop:4}}>
                     <div style={{width:7,height:7,borderRadius:"50%",background:"#EF4444",flexShrink:0}}/>
                     <div style={{fontSize:13,color:"#EF4444",fontWeight:700}}>
-                      {dias===null?(es?"Sin sesiones registradas":"No sessions yet"):
-                       dias===1?(es?"1 día sin entrenar":"1 day inactive"):
+                      {dias===null?(msg("Sin sesiones registradas", "No sessions yet")):
+                       dias===1?(msg("1 día sin entrenar", "1 day inactive")):
                        (es?`${dias} días sin entrenar`:`${dias} days inactive`)}
                     </div>
                   </div>
@@ -6774,7 +6783,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   {a.onesignal_id&&(
                     <button className="hov"
                       onClick={()=>{
-                        if(onNotificar) onNotificar(a.id, es?"¡Es hora de entrenar! 💪 Tu entrenador te espera.":"Time to train! 💪 Your coach is waiting.");
+                        if(onNotificar) onNotificar(a.id, msg("¡Es hora de entrenar! 💪 Tu entrenador te espera.", "Time to train! 💪 Your coach is waiting."));
                       }}
                       style={{background:"#EF444422",color:"#EF4444",border:"1px solid #EF444433",
                         borderRadius:8,padding:"8px 10px",fontSize:18,cursor:"pointer",fontFamily:"inherit"}}>
@@ -6784,7 +6793,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                   <button className="hov" onClick={()=>onVerAlumno?.(a)}
                     style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,
                       padding:"8px 12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-                    {es?"VER":"VIEW"}
+                    {msg("VER", "VIEW", "VER")}
                   </button>
                 </div>
               </div>
@@ -6796,8 +6805,8 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
       {alumnos.length>0&&(
         <>
           <div style={{...sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span>{es?"ALUMNOS":"ATHLETES"}</span>
-            <span style={{fontSize:11,color:textMuted,fontWeight:500}}>{alumnos.length} {es?"activos":"active"}</span>
+            <span>{msg("ALUMNOS", "ATHLETES")}</span>
+            <span style={{fontSize:11,color:textMuted,fontWeight:500}}>{alumnos.length} {msg("activos", "active")}</span>
           </div>
           <div style={{background:bgCard,border:"1px solid "+border,borderRadius:12,marginBottom:20,overflow:"hidden"}}>
             {alumnos.map((a,i)=>{
@@ -6916,7 +6925,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                 };
                 if(sinEntrenarMucho&&diasDesdeA===null) return {
                   tipo:"nuevo",
-                  msg: es ? "Todavía no registró ningún entrenamiento" : "No workouts logged yet",
+                  msg: msg("Todavía no registró ningún entrenamiento", "No workouts logged yet"),
                   color:"#8B9AB2", bg:"#162234", border:"#2D4057"
                 };
                 return null;
@@ -6926,7 +6935,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                 .sort((x,y)=>new Date(y.created_at||y.fecha)-new Date(x.created_at||x.fecha))[0];
               const diasDesde = ultimaSesion ? Math.floor((hoy-new Date(ultimaSesion.created_at||ultimaSesion.fecha||0))/(1000*60*60*24)) : null;
               const statusColor = diasDesde===null?"#8B9AB2":diasDesde===0?"#22C55E":diasDesde<7?"#2563EB":diasDesde<14?"#F59E0B":"#EF4444";
-              const statusLabel = diasDesde===null?(es?"Sin sesiones":"No sessions"):diasDesde===0?(es?"Hoy":"Today"):diasDesde===1?(es?"Ayer":"Yesterday"):`${diasDesde}d`;
+              const statusLabel = diasDesde===null?(msg("Sin sesiones", "No sessions")):diasDesde===0?(msg("Hoy", "Today")):diasDesde===1?(msg("Ayer", "Yesterday")):`${diasDesde}d`;
               const narrativa = getNarrativaAlumno();
 
               return(
@@ -6947,7 +6956,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                         {a.nombre||a.email}
                       </div>
                       <div style={{fontSize:11,color:textMuted,marginTop:1,display:"flex",alignItems:"center",gap:6}}>
-                        <span>{diasDesde===null?(es?"Sin actividad":"No activity"):diasDesde===0?(es?"Entrenó hoy":"Trained today"):`${statusLabel} ${es?"sin entrenar":"without training"}`}</span>
+                        <span>{diasDesde===null?(msg("Sin actividad", "No activity")):diasDesde===0?(msg("Entrenó hoy", "Trained today")):`${statusLabel} ${msg("sin entrenar", "without training")}`}</span>
                         {(()=>{
                           // Calcular racha del alumno desde sus sesiones en Supabase
                           const sesAlu = (sesiones||[]).filter(s=>s.alumno_id===a.id)
@@ -6983,9 +6992,9 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                     {(()=>{
                       const estado = pagosEstado[a.id]||"pendiente";
                       const cfg = {
-                        pagado:  {bg:"#0c2a1a",border:"#1a4a2a",color:"#4ade80",label:es?"Pagó":"Paid"},
-                        pendiente:{bg:"#1f1500",border:"#3d2e00",color:"#fbbf24",label:es?"Pendiente":"Due"},
-                        vencido: {bg:"#1a0808",border:"#3a1010",color:"#f87171",label:es?"Vencido":"Overdue"},
+                        pagado:  {bg:"#0c2a1a",border:"#1a4a2a",color:"#4ade80",label:msg("Pagó", "Paid")},
+                        pendiente:{bg:"#1f1500",border:"#3d2e00",color:"#fbbf24",label:msg("Pendiente", "Due")},
+                        vencido: {bg:"#1a0808",border:"#3a1010",color:"#f87171",label:msg("Vencido", "Overdue")},
                       }[estado];
                       return (
                         <div style={{
@@ -7024,7 +7033,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                     <div style={{marginLeft:46,marginTop:8}}>
                       {ultimaSes&&(
                         <div style={{fontSize:11,color:textMuted,marginBottom:6}}>
-                          <span style={{fontWeight:700}}>{es?"Última sesión":"Last session"}:</span> {ultimaSes.dia_label||"?"} · {ultimaSes.fecha||"?"} {ultimaSes.hora?" · "+ultimaSes.hora:""}
+                          <span style={{fontWeight:700}}>{msg("Última sesión", "Last session")}:</span> {ultimaSes.dia_label||"?"} · {ultimaSes.fecha||"?"} {ultimaSes.hora?" · "+ultimaSes.hora:""}
                         </div>
                       )}
                       {tendencia&&(
@@ -7032,7 +7041,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                           <span style={{fontSize:11,fontWeight:700,color:tendencia.dir==="sube"?"#22C55E":tendencia.dir==="baja"?"#EF4444":"#8B9AB2"}}>
                             {tendencia.dir==="sube"?"↑":tendencia.dir==="baja"?"↓":"→"} {tendencia.pct>0?"+":""}{tendencia.pct}%
                           </span>
-                          <span style={{fontSize:10,color:textMuted}}>{es?"tendencia carga":"load trend"}</span>
+                          <span style={{fontSize:10,color:textMuted}}>{msg("tendencia carga", "load trend")}</span>
                         </div>
                       )}
                       {topPRs.length>0&&(
@@ -7081,7 +7090,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
             </div>
             <button className="hov" onClick={()=>setModalPR(null)}
               style={{width:"100%",marginTop:12,padding:12,background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:12,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
-              {es?"Cerrar":"Close"}
+              {msg("Cerrar", "Close")}
             </button>
           </div>
         </div>
@@ -7121,15 +7130,15 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
   if(lista.length === 0) return (
     <div style={{textAlign:"center",padding:"60px 0",color:textMuted}}>
       <div style={{fontSize:48,marginBottom:12}}>💪</div>
-      <div style={{fontSize:18,fontWeight:700}}>{es?"Sin ejercicios en tu rutina":"No exercises in your routine"}</div>
-      <div style={{fontSize:13,marginTop:4,color:textMuted}}>{es?"Tu entrenador te asignará una rutina":"Your coach will assign you a routine"}</div>
+      <div style={{fontSize:18,fontWeight:700}}>{msg("Sin ejercicios en tu rutina", "No exercises in your routine")}</div>
+      <div style={{fontSize:13,marginTop:4,color:textMuted}}>{msg("Tu entrenador te asignará una rutina", "Your coach will assign you a routine")}</div>
     </div>
   );
 
   return (
     <div style={{paddingTop:8,paddingLeft:2,paddingRight:2}}>
       <div style={{fontSize:11,fontWeight:800,color:textMain,letterSpacing:2,marginBottom:16,textTransform:"uppercase"}}>
-        {es?"MIS EJERCICIOS":"MY EXERCISES"} ({lista.length})
+        {msg("MIS EJERCICIOS", "MY EXERCISES")} ({lista.length})
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:12}}>
       {lista.map(function(item) {
@@ -7979,10 +7988,10 @@ function LoginForm({es, btn, inp, lbl, onLogin, onClose, darkMode}) {
   const passOk = pass.length >= 6;
   return(
     <div>
-      <div style={{fontSize:28,fontWeight:800,letterSpacing:2,marginBottom:12,textAlign:"center"}}>{mode==="login"?(es?"INICIAR SESION":"LOG IN"):(es?"REGISTRO":"REGISTER")}</div>
-      {mode==="register"&&<div style={{marginBottom:8}}><span style={lbl}>{es?es?"NOMBRE":"NAME":"NAME"}</span><input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Tu nombre"/></div>}
+      <div style={{fontSize:28,fontWeight:800,letterSpacing:2,marginBottom:12,textAlign:"center"}}>{mode==="login"?(msg("INICIAR SESION", "LOG IN")):(msg("REGISTRO", "REGISTER"))}</div>
+      {mode==="register"&&<div style={{marginBottom:8}}><span style={lbl}>{es?msg("NOMBRE", "NAME"):"NAME"}</span><input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Tu nombre"/></div>}
       <div style={{marginBottom:8}}><span style={lbl}>EMAIL</span><input style={inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="email@ejemplo.com"/></div>
-      <div style={{marginBottom:12}}><span style={lbl}>{es?"CONTRASENA":"PASSWORD"}</span><input style={inp} type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="*****"/></div>
+      <div style={{marginBottom:12}}><span style={lbl}>{msg("CONTRASENA", "PASSWORD")}</span><input style={inp} type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="*****"/></div>
       <button className="hov" style={{...btn("#2563EB"),width:"100%",padding:"8px",fontSize:18,marginBottom:8}} onClick={()=>{
           const eErr=!emailOk;
           const pErr=!passOk;
@@ -7991,7 +8000,7 @@ function LoginForm({es, btn, inp, lbl, onLogin, onClose, darkMode}) {
           onLogin({name:mode==="register"?name:email.split("@")[0],email,id:email});
         }}>ENTRAR</button>
       <div style={{textAlign:"center",fontSize:15,color:textMuted,cursor:"pointer",marginBottom:8}} onClick={()=>setMode(m=>m==="login"?"register":"login")}>
-        {mode==="login"?(es?"No tenes cuenta? Registrate":"No account? Register"):(es?"Ya tenes cuenta? Iniciá sesion":"Already have an account? Log in")}
+        {mode==="login"?(msg("No tenes cuenta? Registrate", "No account? Register")):(msg("Ya tenes cuenta? Iniciá sesion", "Already have an account? Log in"))}
       </div>
       <button className="hov" style={{...btn(),width:"100%",padding:"8px",fontSize:15}} onClick={onClose}>CANCELAR</button>
     </div>
@@ -8062,7 +8071,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
           </div>
         </div>
 
-                <div style={{fontSize:12,fontWeight:700,letterSpacing:0.5,color:textMuted,marginBottom:8}}>{es?"MÉTODO DE PROGRESIÓN":"PROGRESSION METHOD"}</div>
+                <div style={{fontSize:12,fontWeight:700,letterSpacing:0.5,color:textMuted,marginBottom:8}}>{msg("MÉTODO DE PROGRESIÓN", "PROGRESSION METHOD")}</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16}}>
           {METODOS.map(m=>(
             <button key={m.id} className="hov" onClick={()=>setProgresion(m.id)}
@@ -8078,7 +8087,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
             {METODOS.find(m=>m.id===progresion)?.desc} — completá los valores de cada semana abajo
           </div>
         )}
-        <div style={{fontSize:12,fontWeight:700,letterSpacing:0.5,color:textMuted,marginBottom:8}}>{es?"VALORES POR SEMANA":"VALUES PER WEEK"}</div>
+        <div style={{fontSize:12,fontWeight:700,letterSpacing:0.5,color:textMuted,marginBottom:8}}>{msg("VALORES POR SEMANA", "VALUES PER WEEK")}</div>
         {weeks.map((w,wi)=>(
           <div key={(editEx.ex?.id||"ex")+"-edit-wk-"+wi} style={{background:_dm?"#162234":"#EEF2F7",borderRadius:12,padding:"8px 12px",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
@@ -8118,7 +8127,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
             </div>
             <input style={{...inp,padding:"8px 8px",fontSize:12}} value={w.note}
               onChange={e=>updW(wi,"note",e.target.value)}
-              placeholder={es?"Nota de semana (opcional)":"Week note (optional)"}/>
+              placeholder={msg("Nota de semana (opcional)", "Week note (optional)")}/>
           </div>
         ))}
 <div style={{display:"flex",gap:8,marginTop:8}}>

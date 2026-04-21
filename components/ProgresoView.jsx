@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { buildCoachProgresoModel, getRoutineForAlumno } from "./coachProgresoMetrics.js";
 import { coachType as T, coachSpace as S } from "./coachUiScale.js";
+import { useIronTrackI18n } from "../contexts/IronTrackI18nContext.jsx";
+import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 
 const C = {
   bg: "#0a0a0f",
@@ -27,12 +29,6 @@ const C = {
   red: "#ef4444",
   redDim: "#450a0a",
 };
-
-const PERIOD_OPTS = [
-  { id: "semanas4", label: "4 semanas" },
-  { id: "semanas8", label: "8 semanas" },
-  { id: "meses3", label: "3 meses" },
-];
 
 var selectBaseStyle = Object.assign({}, T.control, {
   width: "100%",
@@ -76,21 +72,21 @@ function formatWeeklyVolKgFull(v) {
 }
 
 /** Texto secundario leaderboard: sesiones completadas vs planificadas (misma ventana que el ranking) */
-function rankingSessionsLine(completed, planned, es) {
+function rankingSessionsLine(completed, planned, lang) {
   var c = completed != null ? completed : 0;
   var p = planned != null ? planned : 0;
   if (p <= 0) {
-    return es ? "Adherencia al plan" : "Plan adherence";
+    return M(lang, "Adherencia al plan", "Plan adherence", "Aderência ao plano");
   }
   return (
     c +
     "/" +
     p +
-    (es ? " sesiones completadas" : " sessions completed")
+    M(lang, " sesiones completadas", " sessions completed", " sessões concluídas")
   );
 }
 
-function emptyBox(es, title) {
+function emptyBox(lang, title) {
   return (
     <div
       style={{
@@ -104,7 +100,7 @@ function emptyBox(es, title) {
       }}
     >
       {title}
-      <div style={{ marginTop: 8, ...T.meta }}>{es ? "Sin datos suficientes" : "Not enough data"}</div>
+      <div style={{ marginTop: 8, ...T.meta }}>{M(lang, "Sin datos suficientes", "Not enough data", "Dados insuficientes")}</div>
     </div>
   );
 }
@@ -125,9 +121,20 @@ export default function ProgresoView({
   progresoGlobal = {},
   rutinasSBEntrenador = [],
   allEx = [],
-  es = true,
 }) {
+  const { lang } = useIronTrackI18n();
   const [periodo, setPeriodo] = useState("semanas4");
+
+  var periodOpts = useMemo(
+    function () {
+      return [
+        { id: "semanas4", label: M(lang, "4 semanas", "4 weeks", "4 semanas") },
+        { id: "semanas8", label: M(lang, "8 semanas", "8 weeks", "8 semanas") },
+        { id: "meses3", label: M(lang, "3 meses", "3 months", "3 meses") },
+      ];
+    },
+    [lang]
+  );
   const [alumnoSel, setAlumnoSel] = useState(null);
   const [diaIdx, setDiaIdx] = useState(0);
   const [ejercicioSelId, setEjercicioSelId] = useState(null);
@@ -149,10 +156,10 @@ export default function ProgresoView({
         .sort(function (a, b) {
           var na = String(a.nombre || a.email || "").toLowerCase();
           var nb = String(b.nombre || b.email || "").toLowerCase();
-          return na.localeCompare(nb, es ? "es" : "en", { sensitivity: "base" });
+          return na.localeCompare(nb, localeForSort(lang), { sensitivity: "base" });
         });
     },
-    [alumnos, es]
+    [alumnos, lang]
   );
 
   var rutinaActiva = useMemo(
@@ -212,10 +219,10 @@ export default function ProgresoView({
         alumnoSel: alumnoSel,
         diaIdx: diaIdx,
         ejercicioSelId: ejercicioSelId,
-        es: es,
+        lang: lang,
       });
     },
-    [alumnos, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, allEx, periodo, alumnoSel, diaIdx, ejercicioSelId, es]
+    [alumnos, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, allEx, periodo, alumnoSel, diaIdx, ejercicioSelId, lang]
   );
 
   var exerciseOptKey = useMemo(
@@ -324,9 +331,9 @@ export default function ProgresoView({
             borderBottom: "1px solid " + C.brd,
           }}
         >
-          <h2 style={{ ...T.screenTitle, color: C.t, margin: 0 }}>Progreso</h2>
+          <h2 style={{ ...T.screenTitle, color: C.t, margin: 0 }}>{M(lang, "Progreso", "Progress", "Progresso")}</h2>
         </header>
-        <div style={{ padding: S.pagePadding }}>{emptyBox(es, es ? "No tenés alumnos cargados" : "No athletes yet")}</div>
+        <div style={{ padding: S.pagePadding }}>{emptyBox(lang, M(lang, "No tenés alumnos cargados", "No athletes yet", "Não há alunos carregados"))}</div>
       </div>
     );
   }
@@ -356,14 +363,19 @@ export default function ProgresoView({
       >
         <div>
           <h2 style={{ ...T.screenTitle, color: C.t, margin: 0 }}>
-            Progreso
+            {M(lang, "Progreso", "Progress", "Progresso")}
           </h2>
           <p style={{ ...T.screenSubtitle, color: C.t2, margin: "6px 0 0 0" }}>
-            Seguimiento de carga, adherencia y records personales
+            {M(
+              lang,
+              "Seguimiento de carga, adherencia y records personales",
+              "Load tracking, adherence, and personal records",
+              "Acompanhamento de carga, aderência e recordes pessoais"
+            )}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {PERIOD_OPTS.map(function (opt) {
+          {periodOpts.map(function (opt) {
             var active = periodo === opt.id;
             return (
               <button
@@ -433,7 +445,7 @@ export default function ProgresoView({
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGapLoose }}>
               <TrendingUp size={16} color={C.blue} strokeWidth={2} />
               <span style={{ ...T.cardTitle, color: C.t }}>
-                {es ? "Evolución de carga" : "Load progression"}
+                {M(lang, "Evolución de carga", "Load progression")}
               </span>
             </div>
 
@@ -446,7 +458,7 @@ export default function ProgresoView({
                   marginBottom: 6,
                 }}
               >
-                {es ? "Alumno" : "Athlete"}
+                {M(lang, "Alumno", "Athlete")}
               </label>
               <select
                 value={alumnoSel != null ? String(alumnoSel) : ""}
@@ -469,10 +481,13 @@ export default function ProgresoView({
             {!rutinaActiva || diasRutina.length === 0 ? (
               <div style={{ marginBottom: S.blockGapLoose }}>
                 {emptyBox(
-                  es,
-                  es
-                    ? "Este alumno no tiene una rutina con días cargados"
-                    : "This athlete has no routine with training days"
+                  lang,
+                  M(
+                    lang,
+                    "Este alumno no tiene una rutina con días cargados",
+                    "This athlete has no routine with training days",
+                    "Este aluno não tem rotina com dias de treino carregados"
+                  )
                 )}
               </div>
             ) : (
@@ -486,7 +501,7 @@ export default function ProgresoView({
                       marginBottom: 6,
                     }}
                   >
-                    {es ? "Día de entrenamiento" : "Training day"}
+                    {M(lang, "Día de entrenamiento", "Training day")}
                   </label>
                   <select
                     value={String(Math.min(diaIdx, Math.max(0, diasRutina.length - 1)))}
@@ -498,7 +513,7 @@ export default function ProgresoView({
                     {diasRutina.map(function (d, i) {
                       var lbl = d && d.label ? String(d.label).trim() : "";
                       if (!lbl) {
-                        lbl = es ? "Día " + (i + 1) : "Day " + (i + 1);
+                        lbl = M(lang, "Día " + (i + 1), "Day " + (i + 1), "Dia " + (i + 1));
                       }
                       return (
                         <option key={"dia-rut-" + i} value={String(i)}>
@@ -511,9 +526,12 @@ export default function ProgresoView({
 
                 {(model.exerciseOptions || []).length === 0 ? (
                   <div style={{ ...T.subtitle, color: C.t2, marginBottom: S.blockGapLoose }}>
-                    {es
-                      ? "Este día no tiene ejercicios en la rutina. Podés elegir otro día o revisar la rutina del alumno."
-                      : "This day has no exercises in the routine. Pick another day or review the athlete's plan."}
+                    {M(
+                      lang,
+                      "Este día no tiene ejercicios en la rutina. Podés elegir otro día o revisar la rutina del alumno.",
+                      "This day has no exercises in the routine. Pick another day or review the athlete's plan.",
+                      "Este dia não tem exercícios na rotina. Escolha outro dia ou revise o plano do aluno."
+                    )}
                   </div>
                 ) : (
                   <>
@@ -529,7 +547,7 @@ export default function ProgresoView({
                             letterSpacing: 0.3,
                           }}
                         >
-                          {es ? "Calentamiento" : "Warm-up"}
+                          {M(lang, "Calentamiento", "Warm-up")}
                         </div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           {(model.exerciseOptions || [])
@@ -576,7 +594,7 @@ export default function ProgresoView({
                             letterSpacing: 0.3,
                           }}
                         >
-                          {es ? "Principal" : "Main"}
+                          {M(lang, "Principal", "Main")}
                         </div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                           {(model.exerciseOptions || [])
@@ -618,13 +636,16 @@ export default function ProgresoView({
 
             {rutinaActiva && diasRutina.length > 0 && (model.exerciseOptions || []).length > 0 ? (
               !model.hasChartData || chartComputed.empty ? (
-                emptyBox(es, es ? "No hay registros de carga para este ejercicio" : "No load records for this exercise")
+                emptyBox(lang, M(lang, "No hay registros de carga para este ejercicio", "No load records for this exercise", "Sem registros de carga para este exercício"))
               ) : (
                 <>
                   <p style={{ ...T.subtitle, color: C.t2, margin: "0 0 10px 0" }}>
-                    {es
-                      ? "Bloque actual (4 semanas, lun–dom). Máx. kg registrado por semana."
-                      : "Current block (4 weeks, Mon–Sun). Max kg logged per week."}
+                    {M(
+                      lang,
+                      "Bloque actual (4 semanas, lun–dom). Máx. kg registrado por semana.",
+                      "Current block (4 weeks, Mon–Sun). Max kg logged per week.",
+                      "Bloco atual (4 semanas, seg–dom). Máx. kg registrado por semana."
+                    )}
                   </p>
                   <svg viewBox="0 0 300 100" width="100%" height={124} style={{ display: "block" }}>
                     {(chartComputed.polySegments || []).map(function (seg, si) {
@@ -693,11 +714,11 @@ export default function ProgresoView({
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGapLoose }}>
               <CheckCircle size={16} color={C.green} strokeWidth={2} />
               <span style={{ ...T.cardTitle, color: C.t }}>
-                {es ? "Adherencia al plan" : "Plan adherence"}
+                {M(lang, "Adherencia al plan", "Plan adherence")}
               </span>
             </div>
             {model.adherenciaRows.length === 0 ? (
-              emptyBox(es, es ? "Ningún alumno tiene rutina asignada" : "No athletes with an assigned plan")
+              emptyBox(lang, M(lang, "Ningún alumno tiene rutina asignada", "No athletes with an assigned plan", "Nenhum aluno tem rotina atribuída"))
             ) : (
               model.adherenciaRows.map(function (row) {
                 return (
@@ -774,11 +795,11 @@ export default function ProgresoView({
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
               <Star size={16} color={C.yel} strokeWidth={2} />
               <span style={{ ...T.cardTitle, color: C.t }}>
-                {es ? "PRs recientes" : "Recent PRs"}
+                {M(lang, "PRs recientes", "Recent PRs")}
               </span>
             </div>
             {model.prsRecientes.length === 0 ? (
-              emptyBox(es, es ? "Todavía no hay PRs registrados" : "No PRs logged yet")
+              emptyBox(lang, M(lang, "Todavía no hay PRs registrados", "No PRs logged yet", "Ainda não há PRs registrados"))
             ) : (
               model.prsRecientes.slice(0, 4).map(function (row, idx) {
                 var list = model.prsRecientes.slice(0, 4);
@@ -838,13 +859,16 @@ export default function ProgresoView({
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <BarChart2 size={16} color={C.blue} strokeWidth={2} />
                 <span style={{ ...T.cardTitle, color: C.t }}>
-                  {es ? "Volumen semanal (kg)" : "Weekly volume (kg)"}
+                  {M(lang, "Volumen semanal (kg)", "Weekly volume (kg)")}
                 </span>
               </div>
               <p style={{ ...T.subtitle, color: C.t2, margin: "8px 0 0 0" }}>
-                {es
-                  ? "Bloque actual (4 semanas, lun–dom) · todos los alumnos"
-                  : "Current block (4 weeks, Mon–Sun) · all athletes"}
+                {M(
+                  lang,
+                  "Bloque actual (4 semanas, lun–dom) · todos los alumnos",
+                  "Current block (4 weeks, Mon–Sun) · all athletes",
+                  "Bloco atual (4 semanas, seg–dom) · todos os alunos"
+                )}
               </p>
             </div>
             <div
@@ -890,7 +914,7 @@ export default function ProgresoView({
                     prevVol != null ? bar.v - prevVol : null;
                   var diffLine = "";
                   if (vidx === 0) {
-                    diffLine = es ? "Inicio del bloque" : "Block start";
+                    diffLine = M(lang, "Inicio del bloque", "Block start");
                   } else if (diffVsPrev != null) {
                     var sign = diffVsPrev > 0 ? "+" : "";
                     diffLine =
@@ -899,7 +923,7 @@ export default function ProgresoView({
                         maximumFractionDigits: 0,
                       }) +
                       " kg " +
-                      (es ? "vs anterior" : "vs prev.");
+                      (M(lang, "vs anterior", "vs prev."));
                   }
                   var barGrad =
                     "linear-gradient(180deg, #7dd3fc 0%, #3b82f6 42%, #1d4ed8 100%)";
@@ -1018,7 +1042,7 @@ export default function ProgresoView({
             </div>
             {maxV <= 0 ? (
               <p style={{ ...T.subtitle, color: C.t2, margin: "12px 0 0 0", textAlign: "center" }}>
-                {es ? "Sin volumen registrado en este bloque." : "No volume logged in this block."}
+                {M(lang, "Sin volumen registrado en este bloque.", "No volume logged in this block.")}
               </p>
             ) : null}
           </div>
@@ -1061,10 +1085,10 @@ export default function ProgresoView({
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ ...T.cardTitle, fontWeight: 800, color: C.t }}>
-                    {es ? "Ranking de progreso" : "Progress ranking"}
+                    {M(lang, "Ranking de progreso", "Progress ranking")}
                   </div>
                   <div style={{ ...T.subtitle, color: C.t2, marginTop: 4 }}>
-                    {es ? "Bloque actual · 4 semanas" : "Current block · 4 weeks"}
+                    {M(lang, "Bloque actual · 4 semanas", "Current block · 4 weeks")}
                   </div>
                 </div>
               </div>
@@ -1083,11 +1107,11 @@ export default function ProgresoView({
                   alignSelf: "flex-start",
                 }}
               >
-                {es ? "Adherencia" : "Adherence"}
+                {M(lang, "Adherencia", "Adherence")}
               </span>
             </div>
             {model.ranking.length === 0 ? (
-              emptyBox(es, es ? "Sin métricas de adherencia" : "No adherence metrics")
+              emptyBox(lang, M(lang, "Sin métricas de adherencia", "No adherence metrics", "Sem métricas de aderência"))
             ) : (
               <div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1163,7 +1187,7 @@ export default function ProgresoView({
                             {row.n}
                           </div>
                           <div style={{ fontSize: 12, color: C.t2, marginTop: 4, lineHeight: 1.35 }}>
-                            {rankingSessionsLine(row.completed, row.planned, es)}
+                            {rankingSessionsLine(row.completed, row.planned, lang)}
                           </div>
                         </div>
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -1203,7 +1227,7 @@ export default function ProgresoView({
                         paddingLeft: 2,
                       }}
                     >
-                      {es ? "Resto del ranking" : "Rest of leaderboard"}
+                      {M(lang, "Resto del ranking", "Rest of leaderboard")}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                       {rankingRest.map(function (row, j) {
@@ -1330,11 +1354,11 @@ export default function ProgresoView({
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
               <PieChart size={16} color={C.blue} strokeWidth={2} />
               <span style={{ ...T.cardTitle, color: C.t }}>
-                {es ? "Volumen por patrón muscular" : "Volume by movement pattern"}
+                {M(lang, "Volumen por patrón muscular", "Volume by movement pattern")}
               </span>
             </div>
             <p style={{ ...T.subtitle, color: C.t2, margin: 0, paddingLeft: 26 }}>
-              {es ? "Bloque actual · 4 semanas" : "Current block · 4 weeks"}
+              {M(lang, "Bloque actual · 4 semanas", "Current block · 4 weeks")}
             </p>
           </div>
           {(model.patronTotalVol == null ? 0 : model.patronTotalVol) <= 0 ? (
@@ -1349,9 +1373,12 @@ export default function ProgresoView({
                 border: "1px solid " + C.brd,
               }}
             >
-              {es
-                ? "Sin volumen registrado en el bloque para estos patrones (últimas 4 semanas)."
-                : "No volume logged in this block for these patterns (last 4 weeks)."}
+              {M(
+                lang,
+                "Sin volumen registrado en el bloque para estos patrones (últimas 4 semanas).",
+                "No volume logged in this block for these patterns (last 4 weeks).",
+                "Sem volume registrado no bloco para estes padrões (últimas 4 semanas)."
+              )}
             </p>
           ) : null}
           <div style={{ display: "flex", flexDirection: "column", gap: S.blockGapLoose }}>
@@ -1470,7 +1497,7 @@ export default function ProgresoView({
                     >
                       {(g.exercises || []).length === 0 ? (
                         <div style={{ ...T.subtitle, color: C.t2 }}>
-                          {es ? "Sin series registradas en este bloque." : "No sets logged in this block."}
+                          {M(lang, "Sin series registradas en este bloque.", "No sets logged in this block.")}
                         </div>
                       ) : (
                         (g.exercises || []).map(function (ex, exi) {
@@ -1507,7 +1534,17 @@ export default function ProgresoView({
                                 }}
                               >
                                 {ex.series}{" "}
-                                {es ? (ex.series === 1 ? "serie" : "series") : ex.series === 1 ? "set" : "sets"}
+                                {lang === "es"
+                                  ? ex.series === 1
+                                    ? "serie"
+                                    : "series"
+                                  : lang === "pt"
+                                    ? ex.series === 1
+                                      ? "série"
+                                      : "séries"
+                                    : ex.series === 1
+                                      ? "set"
+                                      : "sets"}
                               </span>
                             </div>
                           );

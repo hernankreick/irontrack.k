@@ -1,5 +1,6 @@
 import React from "react";
 import { ChevronDown, ClipboardList, Dumbbell, Plus, UserPlus } from "lucide-react";
+import { irontrackMsg as M } from "../lib/irontrackMsg.js";
 
 const DS = {
   primary: "#3b82f6",
@@ -48,10 +49,13 @@ export default function GlobalCreateMenu({
   triggerStyle,
   showChevron = true,
   plusSize = 16,
-  label = "CREAR",
+  label: labelProp,
+  /** es | en | pt — textos del menú desplegable */
+  lang = "es",
   /** Si true, siempre muestra el dropdown (no solo rutina en &lt;1024). */
   alwaysShowDropdown = false,
 }) {
+  var label = labelProp != null ? labelProp : M(lang, "CREAR", "CREATE", "CRIAR");
   var isDesktop = useMinWidth(1024);
   var showMenuUi = alwaysShowDropdown || isDesktop;
   var uid = React.useId().replace(/:/g, "");
@@ -69,25 +73,25 @@ export default function GlobalCreateMenu({
       return [
         {
           id: "alumno",
-          label: "Nuevo alumno",
+          label: M(lang, "Nuevo alumno", "New athlete", "Novo aluno"),
           Icon: UserPlus,
           action: onNuevoAlumno,
         },
         {
           id: "rutina",
-          label: "Nueva rutina",
+          label: M(lang, "Nueva rutina", "New routine", "Nova rotina"),
           Icon: ClipboardList,
           action: onNuevaRutina,
         },
         {
           id: "ejercicio",
-          label: "Nuevo ejercicio",
+          label: M(lang, "Nuevo ejercicio", "New exercise", "Novo exercício"),
           Icon: Dumbbell,
           action: onNuevoEjercicio,
         },
       ];
     },
-    [onNuevoAlumno, onNuevaRutina, onNuevoEjercicio]
+    [lang, onNuevoAlumno, onNuevaRutina, onNuevoEjercicio]
   );
 
   React.useEffect(

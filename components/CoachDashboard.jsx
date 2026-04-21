@@ -14,6 +14,7 @@ import GlobalSearch from "./GlobalSearch.jsx";
 import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
 import { coachType as T, coachSpace as S } from "./coachUiScale.js";
+import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 
 const C = {
   card: "#12121a",
@@ -50,20 +51,23 @@ export function navItemStyle(isActive) {
   };
 }
 
-const WEEK_BARS = [
-  { d: "L", p: 100 },
-  { d: "M", p: 100 },
-  { d: "X", p: 75 },
-  { d: "J", p: 100 },
-  { d: "V", p: 50 },
-  { d: "S", p: 0 },
-  { d: "D", p: 0 },
-];
+/** Barras semana demo: letras según locale (LMXJVSD / MTWTFSS / STQQSSD). */
+function weekBarsForLang(lang) {
+  var letters =
+    lang === "en"
+      ? ["M", "T", "W", "T", "F", "S", "S"]
+      : lang === "pt"
+        ? ["S", "T", "Q", "Q", "S", "S", "D"]
+        : ["L", "M", "X", "J", "V", "S", "D"];
+  var p = [100, 100, 75, 100, 50, 0, 0];
+  return letters.map(function (d, i) {
+    return { d: d, p: p[i] };
+  });
+}
 
-/** Acciones rápidas — metadatos visuales (gradientes, sombras, variables CSS hover). */
-const QUICK = [
-  {
-    action: "message",
+/** Metadatos visuales compartidos por acción rápida (gradientes, sombras). */
+const QUICK_VISUAL = {
+  message: {
     gradient: "linear-gradient(152deg, #2563eb 0%, #3730a3 42%, #0f172a 88%)",
     border: "rgba(255,255,255,0.1)",
     shadow: "0 6px 28px rgba(15,23,42,0.55), 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.12)",
@@ -74,11 +78,8 @@ const QUICK = [
     orbShadow: "0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.35)",
     Icon: MessageSquare,
     iconColor: "#ffffff",
-    title: "Enviar mensaje",
-    sub: "a tu equipo",
   },
-  {
-    action: "routine",
+  routine: {
     gradient: "linear-gradient(152deg, #7c3aed 0%, #5b21b6 40%, #0c0a12 88%)",
     border: "rgba(255,255,255,0.1)",
     shadow: "0 6px 28px rgba(12,10,18,0.6), 0 2px 8px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.1)",
@@ -89,11 +90,8 @@ const QUICK = [
     orbShadow: "0 4px 18px rgba(88,28,135,0.45), inset 0 1px 0 rgba(255,255,255,0.3)",
     Icon: FilePlus,
     iconColor: "#f5f3ff",
-    title: "Crear rutina",
-    sub: "personalizada",
   },
-  {
-    action: "review",
+  review: {
     gradient: "linear-gradient(152deg, #059669 0%, #0d9488 38%, #022c22 88%)",
     border: "rgba(255,255,255,0.1)",
     shadow: "0 6px 28px rgba(2,44,34,0.55), 0 2px 8px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1)",
@@ -104,10 +102,32 @@ const QUICK = [
     orbShadow: "0 4px 18px rgba(4,120,87,0.4), inset 0 1px 0 rgba(255,255,255,0.28)",
     Icon: Eye,
     iconColor: "#ecfdf5",
-    title: "Revisar alumnos",
-    sub: "que necesitan atención",
   },
-];
+};
+
+function buildQuickActions(lang) {
+  var v = QUICK_VISUAL;
+  return [
+    {
+      action: "message",
+      ...v.message,
+      title: M(lang, "Enviar mensaje", "Send message", "Enviar mensagem"),
+      sub: M(lang, "a tu equipo", "to your team", "à sua equipe"),
+    },
+    {
+      action: "routine",
+      ...v.routine,
+      title: M(lang, "Crear rutina", "Create routine", "Criar rotina"),
+      sub: M(lang, "personalizada", "custom", "personalizada"),
+    },
+    {
+      action: "review",
+      ...v.review,
+      title: M(lang, "Revisar alumnos", "Review athletes", "Rever alunos"),
+      sub: M(lang, "que necesitan atención", "who need attention", "que precisam de atenção"),
+    },
+  ];
+}
 
 function pctColor(p) {
   if (p >= 70) return C.green;
@@ -122,15 +142,19 @@ function pctBracketColor(p) {
   return "#22C55E";
 }
 
-function estadoTextColor(row) {
+function estadoTextColor(row, lang) {
   if (row.cat === "sin_rutina") return "#EF4444";
   if (row.cat === "inactivo") return "#F59E0B";
-  return sesionColor(row.ult);
+  return sesionColor(row.ult, lang);
 }
 
-function sesionColor(s) {
-  if (s === "Hoy") return C.green;
-  if (s === "Sin actividad" || s === "Sin rutina") return C.red;
+function sesionColor(s, lang) {
+  if (s == null || s === "") return C.t2;
+  var today = M(lang, "Hoy", "Today", "Hoje");
+  var noAct = M(lang, "Sin actividad", "No activity", "Sem atividade");
+  var noRut = M(lang, "Sin rutina", "No routine", "Sem rotina");
+  if (s === today) return C.green;
+  if (s === noAct || s === noRut) return C.red;
   return C.t2;
 }
 
@@ -224,15 +248,15 @@ function countProgresoSince(a, progresoGlobal, sinceMs) {
   }).length;
 }
 
-function formatUltimaSesion(lastMs, es, sinRutina) {
-  if (sinRutina) return es ? "Sin rutina" : "No routine";
-  if (lastMs == null) return es ? "Sin actividad" : "No activity";
+function formatUltimaSesion(lastMs, lang, sinRutina) {
+  if (sinRutina) return M(lang, "Sin rutina", "No routine", "Sem rotina");
+  if (lastMs == null) return M(lang, "Sin actividad", "No activity", "Sem atividade");
   var days = Math.floor((Date.now() - lastMs) / 86400000);
-  if (days <= 0) return es ? "Hoy" : "Today";
-  if (days === 1) return es ? "Ayer" : "Yesterday";
-  if (days < 14) return es ? "Hace " + days + " días" : days + "d ago";
-  if (days < 45) return es ? "Hace " + Math.floor(days / 7) + " sem." : Math.floor(days / 7) + "w ago";
-  return es ? "Sin actividad" : "No activity";
+  if (days <= 0) return M(lang, "Hoy", "Today", "Hoje");
+  if (days === 1) return M(lang, "Ayer", "Yesterday", "Ontem");
+  if (days < 14) return M(lang, "Hace " + days + " días", days + "d ago", "Há " + days + " dias");
+  if (days < 45) return M(lang, "Hace " + Math.floor(days / 7) + " sem.", Math.floor(days / 7) + "w ago", "Há " + Math.floor(days / 7) + " sem.");
+  return M(lang, "Sin actividad", "No activity", "Sem atividade");
 }
 
 function computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal) {
@@ -256,7 +280,7 @@ function computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal) {
  * Alertas derivadas solo de datos reales (sin inventar alumnos).
  * Prioridad: sin rutina > inactivo > poca actividad en la semana (con rutina).
  */
-function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, es) {
+function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
   var ses = sesionesGlobales || [];
   var out = [];
@@ -272,10 +296,10 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, es) 
         alumnoId: a.id,
         initials: initials,
         name: name,
-        badge: es ? "Sin rutina" : "No routine",
+        badge: M(lang, "Sin rutina", "No routine", "Sem rotina"),
         bc: C.yel,
         bd: C.yelDim,
-        desc: es ? "No tiene rutina asignada en el sistema." : "No routine assigned.",
+        desc: M(lang, "No tiene rutina asignada en el sistema.", "No routine assigned.", "Sem rotina atribuída no sistema."),
         severity: 0,
       });
       return;
@@ -286,12 +310,15 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, es) 
         alumnoId: a.id,
         initials: initials,
         name: name,
-        badge: es ? "Sin actividad reciente" : "Inactive",
+        badge: M(lang, "Sin actividad reciente", "Inactive", "Inativo recentemente"),
         bc: C.red,
         bd: C.redDim,
-        desc: es
-          ? "Sin sesiones ni registros en las últimas 3 semanas."
-          : "No sessions or logs in the last 3 weeks.",
+        desc: M(
+          lang,
+          "Sin sesiones ni registros en las últimas 3 semanas.",
+          "No sessions or logs in the last 3 weeks.",
+          "Sem sessões nem registros nas últimas 3 semanas."
+        ),
         severity: 1,
       });
       return;
@@ -305,35 +332,38 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, es) 
         alumnoId: a.id,
         initials: initials,
         name: name,
-        badge: es ? "Poca actividad" : "Low activity",
+        badge: M(lang, "Poca actividad", "Low activity", "Pouca atividade"),
         bc: C.yel,
         bd: C.yelDim,
-        desc: es
-          ? "Sin sesiones ni registros en la última semana."
-          : "No sessions or logs in the last week.",
+        desc: M(
+          lang,
+          "Sin sesiones ni registros en la última semana.",
+          "No sessions or logs in the last week.",
+          "Sem sessões nem registros na última semana."
+        ),
         severity: 2,
       });
     }
   });
   out.sort(function (x, y) {
     if (x.severity !== y.severity) return x.severity - y.severity;
-    return String(x.name).localeCompare(String(y.name), es ? "es" : "en");
+    return String(x.name).localeCompare(String(y.name), localeForSort(lang));
   });
   return out.slice(0, 12);
 }
 
-function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, es) {
+function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, lang) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
   return alumnos
     .map(function (a) {
       var cat = catFn(a);
       var pct = computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal);
       var lastMs = getLastActivityMs(a, sesionesGlobales, progresoGlobal);
-      var ult = formatUltimaSesion(lastMs, es, cat === "sin_rutina");
+      var ult = formatUltimaSesion(lastMs, lang, cat === "sin_rutina");
       return {
         id: a.id,
         initials: coachInitials(a),
-        name: coachDisplayName(a) || (es ? "Alumno" : "Athlete"),
+        name: coachDisplayName(a) || M(lang, "Alumno", "Athlete", "Aluno"),
         pct: pct,
         ult: ult,
         cat: cat,
@@ -344,7 +374,7 @@ function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, 
     })
     .sort(function (a, b) {
       if (a.pct !== b.pct) return a.pct - b.pct;
-      return String(a.name).localeCompare(String(b.name), es ? "es" : "en");
+      return String(a.name).localeCompare(String(b.name), localeForSort(lang));
     });
 }
 
@@ -361,7 +391,7 @@ export default function CoachDashboard({
   progresoGlobal = {},
   rutinasSBEntrenador = [],
   allEx = [],
-  es = true,
+  lang = "es",
   onEnviarMensaje,
   onCrearRutina,
   onRevisarAlumnos,
@@ -391,16 +421,40 @@ export default function CoachDashboard({
 
   var coachAlertsReal = React.useMemo(
     function () {
-      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, es);
+      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang);
     },
-    [alumnos, catFn, sesionesGlobales, progresoGlobal, es]
+    [alumnos, catFn, sesionesGlobales, progresoGlobal, lang]
   );
 
   var coachActiveRows = React.useMemo(
     function () {
-      return buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, es);
+      return buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, lang);
     },
-    [alumnos, catFn, sesionesGlobales, progresoGlobal, es]
+    [alumnos, catFn, sesionesGlobales, progresoGlobal, lang]
+  );
+
+  var weekBars = React.useMemo(
+    function () {
+      return weekBarsForLang(lang);
+    },
+    [lang]
+  );
+
+  var quickActions = React.useMemo(
+    function () {
+      return buildQuickActions(lang);
+    },
+    [lang]
+  );
+
+  var greetingLine = React.useMemo(
+    function () {
+      var h = new Date().getHours();
+      if (h < 12) return M(lang, "Buenos días", "Good morning", "Bom dia");
+      if (h < 18) return M(lang, "Buenas tardes", "Good afternoon", "Boa tarde");
+      return M(lang, "Buenas noches", "Good evening", "Boa noite");
+    },
+    [lang]
   );
 
   /** Resumen stats (mock alineado al dashboard) — solo layout mobile vs desktop. */
@@ -437,7 +491,6 @@ export default function CoachDashboard({
         progresoGlobal={progresoGlobal}
         rutinasSBEntrenador={rutinasSBEntrenador}
         allEx={allEx}
-        es={es}
       />
     );
   }
@@ -494,10 +547,11 @@ export default function CoachDashboard({
         >
           <div>
             <h2 style={{ ...T.screenTitle, color: C.t, margin: 0 }}>
-              Buenas noches, Entrenador
+              {greetingLine}
+              {M(lang, ", Entrenador", ", Coach", ", Treinador")}
             </h2>
             <p style={{ ...T.screenSubtitle, color: C.t2, margin: "6px 0 0 0" }}>
-              Acá tenés el resumen de tu equipo
+              {M(lang, "Acá tenés el resumen de tu equipo", "Here's your team's summary", "Aqui está o resumo da sua equipe")}
             </p>
           </div>
           <div
@@ -524,12 +578,12 @@ export default function CoachDashboard({
                 ejercicios={globalSearchData.ejercicios}
                 sesiones={globalSearchData.sesiones}
                 onNavigate={onGlobalSearchNavigate}
-                placeholder="Buscar alumno, rutina, ejercicio..."
+                placeholder={M(lang, "Buscar alumno, rutina, ejercicio...", "Search athlete, routine, exercise...", "Buscar aluno, rotina, exercício...")}
                 compactInputEnd
               />
             </div>
             <CoachNotificationCenter
-              es={es}
+              lang={lang}
               alertRows={coachAlertsReal}
               alumnos={alumnos}
               onRevisarAlumno={onRevisar}
@@ -539,13 +593,14 @@ export default function CoachDashboard({
               useFixedMobilePanel={isMobile}
             />
             <GlobalCreateMenu
+              lang={lang}
               onNuevoAlumno={onNuevoAlumno}
               onNuevaRutina={onNuevaRutina}
               onNuevoEjercicio={onNuevoEjercicio}
               alwaysShowDropdown={true}
               showChevron={false}
               plusSize={15}
-              label="CREAR"
+              label={M(lang, "CREAR", "CREATE", "CRIAR")}
               triggerStyle={{
                 background: C.blue,
                 color: "#fff",
@@ -601,7 +656,7 @@ export default function CoachDashboard({
                   flexDirection: "column",
                 }}
               >
-                <span style={{ ...T.labelMd, color: "#9CA3AF" }}>Esta semana</span>
+                <span style={{ ...T.labelMd, color: "#9CA3AF" }}>{M(lang, "Esta semana", "This week", "Esta semana")}</span>
                 <div
                   style={{
                     ...T.numberStat,
@@ -613,7 +668,7 @@ export default function CoachDashboard({
                   {sesionesCompletadas}/{sesionesTotales}
                 </div>
                 <div style={{ ...T.subtitle, color: "#9CA3AF", marginTop: 4 }}>
-                  sesiones completadas
+                  {M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
                 </div>
                 <div style={{ flex: 1, minHeight: S.blockGap }} />
                 <div
@@ -648,7 +703,7 @@ export default function CoachDashboard({
                   flexDirection: "column",
                 }}
               >
-                <span style={{ ...T.labelMd, color: "#9CA3AF" }}>Rendimiento</span>
+                <span style={{ ...T.labelMd, color: "#9CA3AF" }}>{M(lang, "Rendimiento", "Performance", "Desempenho")}</span>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
                   <span style={{ ...T.numberStat, color: "#F9FAFB" }}>{rendimientoScore}</span>
                   <span style={{ ...T.cardTitleSemibold, color: "#9CA3AF", fontSize: 15 }}>/100</span>
@@ -665,7 +720,7 @@ export default function CoachDashboard({
                   }}
                 >
                   <ArrowUp size={13} strokeWidth={2.5} />
-                  +{rendimientoDeltaPts} pts vs sem. ant.
+                  +{rendimientoDeltaPts} {M(lang, "pts vs sem. ant.", "pts vs last wk", "pts vs sem. ant.")}
                 </div>
                 <div style={{ flex: 1, minHeight: S.blockGap }} />
                 <div
@@ -710,14 +765,14 @@ export default function CoachDashboard({
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
                   <Info size={16} color={C.t2} strokeWidth={2} />
                   <span style={{ ...T.cardTitleSemibold, color: C.t }}>
-                    Cumplimiento semanal
+                    {M(lang, "Cumplimiento semanal", "Weekly completion", "Cumprimento semanal")}
                   </span>
                 </div>
                 <div style={{ ...T.numberHero, color: C.t }}>
                   16 / 24
                 </div>
                 <div style={{ ...T.subtitle, color: C.t2, marginTop: 6 }}>
-                  sesiones completadas
+                  {M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
                 </div>
                 <div
                   style={{
@@ -730,7 +785,7 @@ export default function CoachDashboard({
                     ...T.bodySemibold,
                   }}
                 >
-                  Quedan 2 días para completar
+                  {M(lang, "Quedan 2 días para completar", "2 days left to complete", "Faltam 2 dias para concluir")}
                 </div>
                 <div
                   style={{
@@ -741,7 +796,7 @@ export default function CoachDashboard({
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {WEEK_BARS.map((row) => (
+                    {weekBars.map((row) => (
                       <div
                         key={row.d}
                         style={{
@@ -840,7 +895,7 @@ export default function CoachDashboard({
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
                   <Info size={16} color={C.t2} strokeWidth={2} />
                   <span style={{ ...T.cardTitleSemibold, color: C.t }}>
-                    Tu rendimiento
+                    {M(lang, "Tu rendimiento", "Your performance", "Seu desempenho")}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -863,7 +918,7 @@ export default function CoachDashboard({
                       }}
                     >
                       <ArrowUp size={14} strokeWidth={2.5} />
-                      +8 pts vs semana pasada
+                      +8 {M(lang, "pts vs semana pasada", "pts vs last week", "pts vs semana passada")}
                     </div>
                   </div>
                   <div style={{ position: "relative", width: 68, height: 68, flexShrink: 0 }}>
@@ -921,7 +976,7 @@ export default function CoachDashboard({
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <AlertCircle size={17} color={C.yel} strokeWidth={2} />
                 <span style={{ ...T.cardTitleSemibold, color: C.t }}>
-                  Alertas inteligentes
+                  {M(lang, "Alertas inteligentes", "Smart alerts", "Alertas inteligentes")}
                 </span>
               </div>
               <button
@@ -938,7 +993,7 @@ export default function CoachDashboard({
                   if (typeof onRevisarAlumnos === "function") onRevisarAlumnos();
                 }}
               >
-                Ver todas →
+                {M(lang, "Ver todas →", "See all →", "Ver todas →")}
               </button>
             </div>
             {coachAlertsReal.length === 0 ? (
@@ -953,9 +1008,12 @@ export default function CoachDashboard({
                   color: C.t2,
                 }}
               >
-                {es
-                  ? "No hay alertas por ahora. Cuando un alumno necesite atención (sin rutina, inactividad o poca actividad semanal), aparecerá acá."
-                  : "No alerts right now. When an athlete needs attention, it will show here."}
+                {M(
+                  lang,
+                  "No hay alertas por ahora. Cuando un alumno necesite atención (sin rutina, inactividad o poca actividad semanal), aparecerá acá.",
+                  "No alerts right now. When an athlete needs attention, it will show here.",
+                  "Sem alertas por enquanto. Quando um aluno precisar de atenção, aparecerá aqui."
+                )}
               </div>
             ) : (
               <div
@@ -1034,7 +1092,7 @@ export default function CoachDashboard({
                             onRevisar(alumId);
                           }}
                         >
-                          REVISAR
+                          {M(lang, "REVISAR", "REVIEW", "REVISAR")}
                         </button>
                         <button
                           type="button"
@@ -1056,7 +1114,7 @@ export default function CoachDashboard({
                             onVerPerfil(alumId);
                           }}
                         >
-                          VER PERFIL
+                          {M(lang, "VER PERFIL", "VIEW PROFILE", "VER PERFIL")}
                         </button>
                       </div>
                     </div>
@@ -1074,7 +1132,7 @@ export default function CoachDashboard({
                 marginBottom: S.blockGap,
               }}
             >
-              ACCIONES RÁPIDAS
+              {M(lang, "ACCIONES RÁPIDAS", "QUICK ACTIONS", "AÇÕES RÁPIDAS")}
             </div>
             <div
               style={{
@@ -1083,12 +1141,12 @@ export default function CoachDashboard({
                 gap: 14,
               }}
             >
-              {QUICK.map(function (item) {
+              {quickActions.map(function (item) {
                 var Qi = item.Icon;
-                var cta = es ? "Abrir" : "Open";
+                var cta = M(lang, "Abrir", "Open", "Abrir");
                 return (
                   <div
-                    key={item.title}
+                    key={item.action}
                     role="button"
                     tabIndex={0}
                     className="cd-quick-card"
@@ -1214,7 +1272,7 @@ export default function CoachDashboard({
               }}
             >
               <span style={{ ...T.cardTitleSemibold, color: C.t }}>
-                Alumnos activos
+                {M(lang, "Alumnos activos", "Active athletes", "Alunos ativos")}
               </span>
               <button
                 type="button"
@@ -1230,7 +1288,7 @@ export default function CoachDashboard({
                   if (typeof onRevisarAlumnos === "function") onRevisarAlumnos();
                 }}
               >
-                Ver todos →
+                {M(lang, "Ver todos →", "See all →", "Ver todos →")}
               </button>
             </div>
             {coachActiveRows.length === 0 ? (
@@ -1245,15 +1303,18 @@ export default function CoachDashboard({
                   border: `1px dashed ${C.brd}`,
                 }}
               >
-                {es
-                  ? "Todavía no tenés alumnos cargados. Agregá alumnos desde Alumnos o con «Crear»."
-                  : "No athletes yet. Add them from Athletes or «Create»."}
+                {M(
+                  lang,
+                  "Todavía no tenés alumnos cargados. Agregá alumnos desde Alumnos o con «Crear».",
+                  "No athletes yet. Add them from Athletes or «Create».",
+                  "Ainda não há alunos. Adicione em Alunos ou em «Criar»."
+                )}
               </div>
             ) : isMobile ? (
               <div style={{ maxHeight: 440, overflowY: "auto" }}>
                 {coachActiveRows.map(function (row, idx) {
                   var br = pctBracketColor(row.pct);
-                  var estadoCol = estadoTextColor(row);
+                  var estadoCol = estadoTextColor(row, lang);
                   return (
                     <div
                       key={String(row.id)}
@@ -1361,7 +1422,7 @@ export default function CoachDashboard({
                     borderBottom: `1px solid #1e1e2e33`,
                   }}
                 >
-                  {["ALUMNO", "CUMPLIMIENTO", "ÚLTIMA SESIÓN"].map((h) => (
+                  {[M(lang, "ALUMNO", "ATHLETE", "ALUNO"), M(lang, "CUMPLIMIENTO", "COMPLIANCE", "CUMPRIMENTO"), M(lang, "ÚLTIMA SESIÓN", "LAST SESSION", "ÚLTIMA SESSÃO")].map((h) => (
                     <div
                       key={h}
                       style={{
@@ -1447,7 +1508,7 @@ export default function CoachDashboard({
                           />
                         </div>
                       </div>
-                      <div style={{ ...T.subtitle, color: sesionColor(row.ult) }}>
+                      <div style={{ ...T.subtitle, color: sesionColor(row.ult, lang) }}>
                         {row.ult}
                       </div>
                     </div>

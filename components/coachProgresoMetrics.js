@@ -4,6 +4,7 @@
  */
 
 import { FALLBACK_EXERCISE_NAME } from "../lib/exerciseResolve.js";
+import { irontrackMsg as M, pickExerciseName } from "../lib/irontrackMsg.js";
 
 const DAY_MS = 86400000;
 const PALETTE = ["#22c55e", "#f59e0b", "#3b82f6", "#a78bfa", "#ec4899", "#14b8a6", "#eab308", "#64748b"];
@@ -92,10 +93,10 @@ function pctColor(p) {
   return "#ef4444";
 }
 
-function exName(exMap, ejId, es) {
+function exName(exMap, ejId, lang) {
   var e = exMap[ejId];
-  if (e && (e.name || e.nameEn)) return es ? e.name || e.nameEn : e.nameEn || e.name;
-  return FALLBACK_EXERCISE_NAME[es ? "es" : "en"];
+  if (e && (e.name || e.nameEn)) return pickExerciseName(e, lang) || (e.nameEn || e.name);
+  return FALLBACK_EXERCISE_NAME[lang === "es" ? "es" : "en"];
 }
 
 /**
@@ -127,7 +128,7 @@ export function getRoutineForAlumno(rutinasSBEntrenador, alumnoId) {
 /**
  * Ejercicios de un día concreto de la rutina (orden: calentamiento → principal; sin duplicar id).
  */
-export function exercisesForRoutineDay(rutinasSBEntrenador, alumnoId, dayIdx, exMap, es) {
+export function exercisesForRoutineDay(rutinasSBEntrenador, alumnoId, dayIdx, exMap, lang) {
   var rut = getRoutineForAlumno(rutinasSBEntrenador, alumnoId);
   var days = rut && rut.datos ? rut.datos.days || [] : [];
   var day = days[dayIdx];
@@ -142,7 +143,7 @@ export function exercisesForRoutineDay(rutinasSBEntrenador, alumnoId, dayIdx, ex
       seen[sid] = true;
       out.push({
         id: ex.id,
-        name: exName(exMap, ex.id, es),
+        name: exName(exMap, ex.id, lang),
         section: section,
       });
     });
@@ -166,8 +167,12 @@ export function buildCoachProgresoModel(params) {
   var alumnoSel = params.alumnoSel;
   var ejercicioSelId = params.ejercicioSelId;
   var diaIdx = params.diaIdx != null && params.diaIdx >= 0 ? params.diaIdx : 0;
-  var es = params.es !== false;
-
+  var lang =
+    params.lang != null
+      ? params.lang
+      : params.es === false
+        ? "en"
+        : "es";
   var exMap = {};
   for (var xi = 0; xi < allEx.length; xi++) {
     var ex = allEx[xi];
@@ -397,7 +402,7 @@ export function buildCoachProgresoModel(params) {
     var offsetWeeks = wi - (LOAD_BLOCK_WEEKS - 1);
     var wkStartMs = currentMondayMs + offsetWeeks * 7 * DAY_MS;
     var wkEndMs = wkStartMs + 7 * DAY_MS;
-    weekLabels.push(es ? "Semana " + (wi + 1) : "Week " + (wi + 1));
+    weekLabels.push(M(lang, "Semana " + (wi + 1), "Week " + (wi + 1), "Semana " + (wi + 1)));
     var maxKg = null;
     if (alumnoSel && ejercicioSelId) {
       var rows = progresoGlobal[alumnoSel] || [];
@@ -459,7 +464,7 @@ export function buildCoachProgresoModel(params) {
     return b.fechaMs - a.fechaMs;
   });
 
-  function fmtRel(ms, esLoc) {
+  function fmtRel(ms, loc) {
     if (!ms) return "—";
     var d = new Date(ms);
     var today = new Date();
@@ -467,10 +472,11 @@ export function buildCoachProgresoModel(params) {
     var dd = new Date(d);
     dd.setHours(0, 0, 0, 0);
     var diff = Math.round((today - dd) / DAY_MS);
-    if (diff === 0) return esLoc ? "Hoy" : "Today";
-    if (diff === 1) return esLoc ? "Ayer" : "Yesterday";
-    if (diff < 7) return esLoc ? "Hace " + diff + "d" : diff + "d ago";
-    return d.toLocaleDateString(esLoc ? "es-AR" : "en-US", { day: "2-digit", month: "short" });
+    if (diff === 0) return M(loc, "Hoy", "Today", "Hoje");
+    if (diff === 1) return M(loc, "Ayer", "Yesterday", "Ontem");
+    if (diff < 7) return M(loc, "Hace " + diff + "d", diff + "d ago", "Há " + diff + "d");
+    var l = loc === "es" ? "es-AR" : loc === "pt" ? "pt-BR" : "en-US";
+    return d.toLocaleDateString(l, { day: "2-digit", month: "short" });
   }
 
   var prsRecientes = prEvents.slice(0, 8).map(function (ev) {
@@ -486,10 +492,10 @@ export function buildCoachProgresoModel(params) {
     return {
       initials: ini,
       n: label,
-      ex: exName(exMap, ev.ejercicio_id, es),
+      ex: exName(exMap, ev.ejercicio_id, lang),
       val: Math.round(ev.kg * 10) / 10 + " kg",
-      delta: ev.prevKg != null ? "+" + Math.round(ev.deltaKg * 10) / 10 + " kg" : es ? "Nuevo PR" : "New PR",
-      date: fmtRel(ev.fechaMs, es),
+      delta: ev.prevKg != null ? "+" + Math.round(ev.deltaKg * 10) / 10 + " kg" : M(lang, "Nuevo PR", "New PR", "Novo PR"),
+      date: fmtRel(ev.fechaMs, lang),
       color: col,
     };
   });
@@ -519,7 +525,7 @@ export function buildCoachProgresoModel(params) {
     });
     volBars.push({
       v: vsum,
-      s: es ? "Semana " + (wv + 1) : "Week " + (wv + 1),
+      s: M(lang, "Semana " + (wv + 1), "Week " + (wv + 1), "Semana " + (wv + 1)),
     });
     if (vsum > maxVol) maxVol = vsum;
   }
@@ -579,7 +585,7 @@ export function buildCoachProgresoModel(params) {
       .map(function (ejId) {
         return {
           ejercicio_id: ejId,
-          name: exName(exMap, ejId, es),
+          name: exName(exMap, ejId, lang),
           series: bag[ejId],
         };
       })
@@ -588,7 +594,7 @@ export function buildCoachProgresoModel(params) {
       });
     return {
       key: def.key,
-      label: es ? def.labelEs : def.labelEn,
+      label: M(lang, def.labelEs, def.labelEn, def.labelEn),
       p: pct,
       vol: v,
       color: def.color,
@@ -601,55 +607,51 @@ export function buildCoachProgresoModel(params) {
     {
       val: adherN > 0 ? adherAvg + "%" : "—",
       color: "#3b82f6",
-      label: es ? "Adherencia promedio" : "Avg. adherence",
+      label: M(lang, "Adherencia promedio", "Avg. adherence", "Aderência média"),
       delta:
         adherN > 0
           ? (adherDeltaPct >= 0 ? "↑ " : "↓ ") +
             Math.abs(adherDeltaPct) +
             "% " +
-            (es ? "vs período anterior" : "vs prev. period")
-          : es
-            ? "Sin datos suficientes"
-            : "Not enough data",
+            M(lang, "vs período anterior", "vs prev. period", "vs período anterior")
+          : M(lang, "Sin datos suficientes", "Not enough data", "Dados insuficientes"),
       deltaColor: adherDeltaPct >= 0 ? "#22c55e" : "#ef4444",
     },
     {
       val: String(prsPeriod),
       color: "#22c55e",
-      label: es ? "PRs este período" : "PRs this period",
+      label: M(lang, "PRs este período", "PRs this period", "PRs neste período"),
       delta:
         prsPrev > 0 || prsPeriod > 0
-          ? (prDelta >= 0 ? "↑ " : "↓ ") + Math.abs(prDelta) + " " + (es ? "vs período anterior" : "vs prev.")
-          : es
-            ? "Sin datos suficientes"
-            : "Not enough data",
+          ? (prDelta >= 0 ? "↑ " : "↓ ") + Math.abs(prDelta) + " " + M(lang, "vs período anterior", "vs prev.", "vs período anterior")
+          : M(lang, "Sin datos suficientes", "Not enough data", "Dados insuficientes"),
       deltaColor: prDelta >= 0 ? "#22c55e" : "#eab308",
     },
     {
       val: volPeriod > 0 ? volSemPromTon.toFixed(1) + "t" : "—",
       color: "#eab308",
-      label: es ? "Volumen semanal prom." : "Avg. weekly volume",
+      label: M(lang, "Volumen semanal prom.", "Avg. weekly volume", "Volume semanal médio"),
       delta:
         volPeriod > 0
-          ? (volTonDelta >= 0 ? "↑ " : "↓ ") + Math.abs(volTonDelta).toFixed(2) + "t " + (es ? "vs ant." : "vs prev.")
-          : es
-            ? "Sin datos suficientes"
-            : "Not enough data",
+          ? (volTonDelta >= 0 ? "↑ " : "↓ ") + Math.abs(volTonDelta).toFixed(2) + "t " + M(lang, "vs ant.", "vs prev.", "vs ant.")
+          : M(lang, "Sin datos suficientes", "Not enough data", "Dados insuficientes"),
       deltaColor: volTonDelta >= 0 ? "#22c55e" : "#ef4444",
     },
     {
       val: String(stalled),
       color: stalled > 0 ? "#ef4444" : "#71717a",
-      label: es ? "Alumnos estancados" : "Athletes stalled",
-      delta:
-        es
-          ? "Sin mejora (PR) en 3 sem. · con rutina"
-          : "No PR in 3 wks · with plan",
+      label: M(lang, "Alumnos estancados", "Athletes stalled", "Alunos estagnados"),
+      delta: M(
+        lang,
+        "Sin mejora (PR) en 3 sem. · con rutina",
+        "No PR in 3 wks · with plan",
+        "Sem melhora (PR) em 3 sem. · com rotina"
+      ),
       deltaColor: stalled > 0 ? "#ef4444" : "#71717a",
     },
   ];
 
-  var exerciseOptions = exercisesForRoutineDay(rutinasSBEntrenador, alumnoSel, diaIdx, exMap, es);
+  var exerciseOptions = exercisesForRoutineDay(rutinasSBEntrenador, alumnoSel, diaIdx, exMap, lang);
 
   return {
     alumnoRows: alumnoRows,

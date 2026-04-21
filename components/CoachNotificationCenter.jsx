@@ -1,6 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { Bell, Check, MessageSquare, Target, Trophy, Zap } from "lucide-react";
+import { irontrackMsg as M } from "../lib/irontrackMsg.js";
 
 const LS_READ = "it_coach_notif_read_v1";
 
@@ -34,27 +35,27 @@ function saveReadIds(ids) {
   } catch (e) {}
 }
 
-function formatRelative(atMs, es) {
+function formatRelative(atMs, lang) {
   var sec = Math.max(0, Math.floor((Date.now() - atMs) / 1000));
-  if (sec < 60) return es ? "Ahora" : "Just now";
+  if (sec < 60) return M(lang, "Ahora", "Just now", "Agora");
   var m = Math.floor(sec / 60);
-  if (m < 60) return es ? "Hace " + m + " min" : m + "m ago";
+  if (m < 60) return M(lang, "Hace " + m + " min", m + "m ago", "Há " + m + " min");
   var h = Math.floor(m / 60);
-  if (h < 24) return es ? "Hace " + h + " h" : h + "h ago";
+  if (h < 24) return M(lang, "Hace " + h + " h", h + "h ago", "Há " + h + " h");
   var d = Math.floor(h / 24);
-  if (d === 1) return es ? "Ayer" : "Yesterday";
-  return es ? "Hace " + d + " días" : d + "d ago";
+  if (d === 1) return M(lang, "Ayer", "Yesterday", "Ontem");
+  return M(lang, "Hace " + d + " días", d + "d ago", "Há " + d + " dias");
 }
 
 /**
  * Notificaciones demo (MVP). Se mezclan con alertas reales del dashboard.
  * `action` describe el destino al hacer click (para cablear datos reales después).
  */
-function buildMockNotifications(alumnos, es) {
+function buildMockNotifications(alumnos, lang) {
   var a0 = (alumnos && alumnos[0]) || null;
   var a1 = (alumnos && alumnos[1]) || null;
-  var n0 = a0 ? (a0.nombre || a0.email || "Alumno").trim() : es ? "María G." : "Alex R.";
-  var n1 = a1 ? (a1.nombre || a1.email || "Alumno").trim() : es ? "Lucas P." : "Jordan K.";
+  var n0 = a0 ? (a0.nombre || a0.email || "Alumno").trim() : M(lang, "María G.", "Alex R.", "Maria G.");
+  var n1 = a1 ? (a1.nombre || a1.email || "Alumno").trim() : M(lang, "Lucas P.", "Jordan K.", "Lucas P.");
   var id0 = a0 && a0.id != null ? String(a0.id) : null;
   var id1 = a1 && a1.id != null ? String(a1.id) : null;
   var now = Date.now();
@@ -65,7 +66,7 @@ function buildMockNotifications(alumnos, es) {
       important: true,
       alumnoName: n0,
       alumnoId: id0,
-      preview: es ? "Te envió un mensaje sobre la próxima semana." : "Sent you a message about next week.",
+      preview: M(lang, "Te envió un mensaje sobre la próxima semana.", "Sent you a message about next week.", "Enviou uma mensagem sobre a próxima semana."),
       atMs: now - 4 * 60 * 1000,
       hintChat: true,
       action: id0 ? { kind: "alumno", alumnoId: id0 } : { kind: "tab", tab: "alumnos" },
@@ -76,7 +77,7 @@ function buildMockNotifications(alumnos, es) {
       important: true,
       alumnoName: n1,
       alumnoId: id1,
-      preview: es ? "Avisó molestia en rodilla post sentadilla." : "Reported knee discomfort after squats.",
+      preview: M(lang, "Avisó molestia en rodilla post sentadilla.", "Reported knee discomfort after squats.", "Relatou desconforto no joelho após agachamento."),
       atMs: now - 52 * 60 * 1000,
       hintChat: true,
       action: id1 ? { kind: "alumno", alumnoId: id1 } : { kind: "tab", tab: "alumnos" },
@@ -87,7 +88,7 @@ function buildMockNotifications(alumnos, es) {
       important: true,
       alumnoName: n0,
       alumnoId: id0,
-      preview: es ? "Lleva 5 días sin registrar entreno." : "No logged workout for 5 days.",
+      preview: M(lang, "Lleva 5 días sin registrar entreno.", "No logged workout for 5 days.", "Há 5 dias sem registrar treino."),
       atMs: now - 3 * 60 * 60 * 1000,
       action: id0 ? { kind: "alumno", alumnoId: id0 } : { kind: "tab", tab: "alumnos" },
     },
@@ -97,7 +98,7 @@ function buildMockNotifications(alumnos, es) {
       important: true,
       alumnoName: n1,
       alumnoId: id1,
-      preview: es ? "Volumen semanal muy por debajo del plan." : "Weekly volume well below plan.",
+      preview: M(lang, "Volumen semanal muy por debajo del plan.", "Weekly volume well below plan.", "Volume semanal bem abaixo do plano."),
       atMs: now - 26 * 60 * 60 * 1000,
       action: id1 ? { kind: "alumno", alumnoId: id1 } : { kind: "tab", tab: "alumnos" },
     },
@@ -107,14 +108,14 @@ function buildMockNotifications(alumnos, es) {
       important: false,
       alumnoName: n0,
       alumnoId: id0,
-      preview: es ? "Nuevo PR en press banca — 82,5 kg." : "New bench PR — 82.5 kg.",
+      preview: M(lang, "Nuevo PR en press banca — 82,5 kg.", "New bench PR — 82.5 kg.", "Novo PR no supino — 82,5 kg."),
       atMs: now - 18 * 60 * 60 * 1000,
       action: id0 ? { kind: "alumno", alumnoId: id0 } : { kind: "tab", tab: "progress" },
     },
   ];
 }
 
-function mapAlertsToNotifications(alertRows, es) {
+function mapAlertsToNotifications(alertRows) {
   if (!Array.isArray(alertRows)) return [];
   return alertRows.map(function (a) {
     var important = a.severity <= 1;
@@ -132,29 +133,29 @@ function mapAlertsToNotifications(alertRows, es) {
   });
 }
 
-function categoryMeta(cat, es) {
+function categoryMeta(cat, lang) {
   switch (cat) {
     case "mensaje":
       return {
-        label: es ? "Mensaje" : "Message",
+        label: M(lang, "Mensaje", "Message", "Mensagem"),
         Icon: MessageSquare,
         color: C.blue,
       };
     case "adherencia":
       return {
-        label: es ? "Adherencia" : "Adherence",
+        label: M(lang, "Adherencia", "Adherence", "Aderência"),
         Icon: Target,
         color: C.yel,
       };
     case "seguimiento":
       return {
-        label: es ? "Seguimiento" : "Follow-up",
+        label: M(lang, "Seguimiento", "Follow-up", "Acompanhamento"),
         Icon: Zap,
         color: C.red,
       };
     case "logro":
       return {
-        label: es ? "Logro" : "Win",
+        label: M(lang, "Logro", "Win", "Conquista"),
         Icon: Trophy,
         color: C.green,
       };
@@ -167,7 +168,7 @@ function categoryMeta(cat, es) {
  * Campanita + panel de notificaciones (MVP: mezcla alertas reales del coach + mocks locales).
  */
 export default function CoachNotificationCenter({
-  es = true,
+  lang = "es",
   /** Misma forma que devuelve buildCoachAlerts en CoachDashboard */
   alertRows = [],
   alumnos = [],
@@ -187,8 +188,8 @@ export default function CoachNotificationCenter({
 
   var allItems = React.useMemo(
     function () {
-      var real = mapAlertsToNotifications(alertRows, es);
-      var mock = buildMockNotifications(alumnos, es);
+      var real = mapAlertsToNotifications(alertRows);
+      var mock = buildMockNotifications(alumnos, lang);
       var seen = {};
       var out = [];
       real.forEach(function (x) {
@@ -204,7 +205,7 @@ export default function CoachNotificationCenter({
       });
       return out;
     },
-    [alertRows, alumnos, es]
+    [alertRows, alumnos, lang]
   );
 
   var unreadCount = React.useMemo(
@@ -340,7 +341,7 @@ export default function CoachNotificationCenter({
           flexShrink: 0,
         }}
       >
-        <div style={{ fontSize: 15, fontWeight: 800, color: C.t }}>{es ? "Notificaciones" : "Notifications"}</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: C.t }}>{M(lang, "Notificaciones", "Notifications", "Notificações")}</div>
         {unreadCount > 0 ? (
           <button
             type="button"
@@ -359,16 +360,16 @@ export default function CoachNotificationCenter({
             }}
           >
             <Check size={14} strokeWidth={2.5} />
-            {es ? "Marcar leídas" : "Mark read"}
+            {M(lang, "Marcar leídas", "Mark read", "Marcar como lidas")}
           </button>
         ) : null}
       </div>
 
       <div style={{ display: "flex", gap: 6, padding: "8px 10px 10px", borderBottom: "1px solid " + C.brd, flexShrink: 0 }}>
         {[
-          { id: "all", label: es ? "Todas" : "All" },
-          { id: "important", label: es ? "Importantes" : "Important" },
-          { id: "unread", label: es ? "No leídas" : "Unread" },
+          { id: "all", label: M(lang, "Todas", "All", "Todas") },
+          { id: "important", label: M(lang, "Importantes", "Important", "Importantes") },
+          { id: "unread", label: M(lang, "No leídas", "Unread", "Não lidas") },
         ].map(function (t) {
           var active = filter === t.id;
           return (
@@ -408,15 +409,15 @@ export default function CoachNotificationCenter({
         {filtered.length === 0 ? (
           <div style={{ padding: "36px 20px", textAlign: "center" }}>
             <div style={{ fontSize: 40, marginBottom: 10, opacity: 0.35 }}>📭</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.t, marginBottom: 6 }}>{es ? "Sin notificaciones" : "No notifications"}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.t, marginBottom: 6 }}>{M(lang, "Sin notificaciones", "No notifications", "Sem notificações")}</div>
             <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.45 }}>
-              {es ? "Cuando haya alertas o mensajes relevantes, aparecerán acá." : "When there are relevant alerts or messages, they will show up here."}
+              {M(lang, "Cuando haya alertas o mensajes relevantes, aparecerán acá.", "When there are relevant alerts or messages, they will show up here.", "Quando houver alertas ou mensagens relevantes, aparecerão aqui.")}
             </div>
           </div>
         ) : (
           filtered.map(function (item) {
             var unread = readIds.indexOf(item.id) < 0;
-            var meta = categoryMeta(item.category, es);
+            var meta = categoryMeta(item.category, lang);
             var Icon = meta.Icon;
             return (
               <button
@@ -458,14 +459,14 @@ export default function CoachNotificationCenter({
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 2 }}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: meta.color, letterSpacing: 0.3 }}>{meta.label}</span>
                     {!unread ? (
-                      <span style={{ fontSize: 10, fontWeight: 700, color: C.t2, textTransform: "uppercase" }}>{es ? "Leída" : "Read"}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: C.t2, textTransform: "uppercase" }}>{M(lang, "Leída", "Read", "Lida")}</span>
                     ) : (
-                      <span style={{ fontSize: 10, fontWeight: 800, color: C.blue, textTransform: "uppercase" }}>{es ? "Nueva" : "New"}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: C.blue, textTransform: "uppercase" }}>{M(lang, "Nueva", "New", "Nova")}</span>
                     )}
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: C.t, marginBottom: 2 }}>{item.alumnoName}</div>
                   <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.35, marginBottom: 4 }}>{item.preview}</div>
-                  <div style={{ fontSize: 11, color: C.t2 }}>{formatRelative(item.atMs, es)}</div>
+                  <div style={{ fontSize: 11, color: C.t2 }}>{formatRelative(item.atMs, lang)}</div>
                 </div>
               </button>
             );
@@ -474,9 +475,12 @@ export default function CoachNotificationCenter({
       </div>
 
       <div style={{ padding: "8px 12px", borderTop: "1px solid " + C.brd, fontSize: 11, color: C.t2, flexShrink: 0, lineHeight: 1.35 }}>
-        {es
-          ? "Las alertas de adherencia usan datos reales del equipo. Mensajes y otros eventos son demo hasta conectar backend."
-          : "Adherence alerts use real team data. Messages and other events are demo until backend is wired."}
+        {M(
+          lang,
+          "Las alertas de adherencia usan datos reales del equipo. Mensajes y otros eventos son demo hasta conectar backend.",
+          "Adherence alerts use real team data. Messages and other events are demo until backend is wired.",
+          "Os alertas de aderência usam dados reais da equipe. Mensagens e outros eventos são demo até conectar o backend."
+        )}
       </div>
     </>
   );
@@ -488,7 +492,7 @@ export default function CoachNotificationCenter({
         type="button"
         aria-expanded={open}
         aria-haspopup="true"
-        aria-label={es ? "Notificaciones" : "Notifications"}
+        aria-label={M(lang, "Notificaciones", "Notifications", "Notificações")}
         onClick={function () {
           setOpen(function (v) {
             return !v;
@@ -539,7 +543,7 @@ export default function CoachNotificationCenter({
         <div
           ref={panelRef}
           role="dialog"
-          aria-label={es ? "Centro de notificaciones" : "Notification center"}
+          aria-label={M(lang, "Centro de notificaciones", "Notification center", "Central de notificações")}
           style={absolutePanelStyle}
         >
           {panelInner}
@@ -551,7 +555,7 @@ export default function CoachNotificationCenter({
           <div
             ref={panelRef}
             role="dialog"
-            aria-label={es ? "Centro de notificaciones" : "Notification center"}
+            aria-label={M(lang, "Centro de notificaciones", "Notification center", "Central de notificações")}
             style={fixedMobilePanelStyle}
           >
             {panelInner}

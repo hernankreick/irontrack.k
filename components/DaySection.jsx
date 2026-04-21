@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   DndContext, PointerSensor, useSensor, useSensors, DragOverlay,
 } from '@dnd-kit/core';
@@ -8,6 +8,7 @@ import {
 import { Copy, Trash2, Plus, Pencil } from 'lucide-react';
 import { ExerciseCard } from './ExerciseCard.jsx';
 import { coachType as T, coachSpace as S } from './coachUiScale.js';
+import { irontrackMsg as M } from '../lib/irontrackMsg.js';
 
 const BLOCK_ACCENT = {
   warmup:    '#f59e0b',
@@ -18,6 +19,7 @@ const BLOCK_ACCENT = {
 function SortableBlock({
   exercises,
   label,
+  addExerciseLabel,
   count,
   accent,
   onAddExercise,
@@ -132,7 +134,7 @@ function SortableBlock({
         }}
       >
         <Plus size={13} />
-        Añadir ejercicio
+        {addExerciseLabel}
       </button>
     </div>
   );
@@ -150,12 +152,20 @@ export function DaySection({
   onReorderWarmup,
   onReorderExercises,
   onRenameDay,
+  lang = 'es',
 }) {
   const warmup    = day.warmup    || [];
   const exercises = day.exercises || [];
 
   const [editandoNombre, setEditandoNombre] = useState(false);
   const [nombre, setNombre] = useState(day.name);
+
+  useEffect(
+    function () {
+      setNombre(day.name);
+    },
+    [day.name]
+  );
 
   const guardarNombre = () => {
     setEditandoNombre(false);
@@ -216,7 +226,7 @@ export function DaySection({
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               borderRadius: 8,
             }}
-            title="Copiar dia"
+            title={M(lang, 'Copiar día', 'Copy day', 'Copiar dia')}
           >
             <Copy size={16} />
           </button>
@@ -228,7 +238,7 @@ export function DaySection({
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               borderRadius: 8,
             }}
-            title="Eliminar dia"
+            title={M(lang, 'Eliminar día', 'Delete day', 'Eliminar dia')}
           >
             <Trash2 size={16} />
           </button>
@@ -238,7 +248,8 @@ export function DaySection({
       {/* ENTRADA EN CALOR */}
       <SortableBlock
         blockKey="warmup"
-        label="Entrada en calor"
+        label={M(lang, 'Entrada en calor', 'Warm-up', 'Aquecimento')}
+        addExerciseLabel={M(lang, 'Añadir ejercicio', 'Add exercise', 'Adicionar exercício')}
         accent={BLOCK_ACCENT.warmup}
         exercises={warmup}
         count={warmup.length}
@@ -251,7 +262,8 @@ export function DaySection({
       {/* BLOQUE PRINCIPAL */}
       <SortableBlock
         blockKey="exercises"
-        label="Bloque principal"
+        label={M(lang, 'Bloque principal', 'Main block', 'Bloco principal')}
+        addExerciseLabel={M(lang, 'Añadir ejercicio', 'Add exercise', 'Adicionar exercício')}
         accent={BLOCK_ACCENT.exercises}
         exercises={exercises}
         count={exercises.length}

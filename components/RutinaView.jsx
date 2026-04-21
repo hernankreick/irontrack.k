@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import { ScanLine, Plus, Save, Pencil } from 'lucide-react';
 import { Ic } from './Ic.jsx';
 import { DaySection } from './DaySection.jsx';
@@ -6,8 +6,18 @@ import { EditExerciseModal } from './EditExerciseModal.jsx';
 import { emptyDays } from '../lib/routineTemplates.js';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from '../lib/exerciseResolve.js';
 import { coachType as T, coachSpace as S } from './coachUiScale.js';
+import { irontrackMsg as M } from '../lib/irontrackMsg.js';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+/** Etiqueta de día visible según idioma (re-etiqueta Día n / Day n guardado en datos). */
+function routineDayDisplayName(d, di, lang) {
+  var raw = d.label != null ? String(d.label).trim() : '';
+  if (!raw) return M(lang, 'Día', 'Day', 'Dia') + ' ' + (di + 1);
+  var mm = raw.match(/^(Día|Day|Dia)\s+(\d+)$/i);
+  if (mm) return M(lang, 'Día', 'Day', 'Dia') + ' ' + mm[2];
+  return raw;
+}
 
 // ── SVG: Icono mancuerna para estado vacío ──────────────────────────
 function DumbbellIcon({ color }) {
@@ -20,7 +30,7 @@ function DumbbellIcon({ color }) {
 
 // ── Tarjeta de rutina ────────────────────────────────────────────────
 function RutinaCard({
-  r, es, darkMode, border, textMain, textMuted, bgCard, bgSub,
+  r, es, lang, darkMode, border, textMain, textMuted, bgCard, bgSub,
   allEx, setRoutines, toast2, btn, card, routines,
   setDupDayModal, alumnos, sb, setAssignRoutineId,
   setHasUnsaved, setEditingExercise, onOpenLibrary,
@@ -63,9 +73,9 @@ function RutinaCard({
         }
       }
       setLastSaved(new Date());
-      toast2(es ? 'Rutina guardada ✓' : 'Routine saved ✓');
+      toast2(M(lang, 'Rutina guardada ✓', 'Routine saved ✓', 'Rotina salva ✓'));
     } catch (e) {
-      toast2('Error al guardar');
+      toast2(M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar'));
     }
     setSaving(false);
   };
@@ -130,7 +140,7 @@ function RutinaCard({
             )}
             <div style={{ display: 'flex', gap: S.gridTight, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ ...T.meta, color: textMuted, fontWeight: 600 }}>
-                {r.days.length} {es ? 'días' : 'days'} · {totalEx} {es ? 'ejercicios' : 'exercises'}
+                {r.days.length} {M(lang, 'días', 'days', 'dias')} · {totalEx} {M(lang, 'ejercicios', 'exercises', 'exercícios')}
               </span>
               {r.scanned && (
                 <span style={{
@@ -142,7 +152,7 @@ function RutinaCard({
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}>
                   <Ic name="image" size={11} color="#2563EB" />
-                  {es ? 'Escaneada' : 'Scanned'}
+                  {M(lang, 'Escaneada', 'Scanned', 'Digitalizada')}
                 </span>
               )}
               {r.saved && (
@@ -154,7 +164,7 @@ function RutinaCard({
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                 }}>
                   <Ic name="check" size={11} color="#22C55E" />
-                  {es ? 'GUARDADA' : 'SAVED'}
+                  {M(lang, 'GUARDADA', 'SAVED', 'SALVA')}
                 </span>
               )}
             </div>
@@ -164,7 +174,7 @@ function RutinaCard({
           <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
             <button
               className="hov"
-              title={es ? 'Duplicar rutina' : 'Duplicate routine'}
+              title={M(lang, 'Duplicar rutina', 'Duplicate routine', 'Duplicar rotina')}
               style={ghostBtn()}
               onClick={() => {
                 const copia = {
@@ -181,7 +191,7 @@ function RutinaCard({
                 };
                 setRoutines(p => [...p, copia]);
                 setAssignRoutineId(copia.id);
-                toast2((es ? 'Rutina duplicada' : 'Routine duplicated') + ' ✓');
+                toast2(M(lang, 'Rutina duplicada', 'Routine duplicated', 'Rotina duplicada') + ' ✓');
               }}
             >
               <Ic name="copy" size={15} color={textMuted} />
@@ -189,12 +199,12 @@ function RutinaCard({
 
             <button
               className="hov"
-              title={es ? 'Eliminar rutina' : 'Delete routine'}
+              title={M(lang, 'Eliminar rutina', 'Delete routine', 'Excluir rotina')}
               style={ghostBtn()}
               onClick={() => {
-                if (!confirm(es ? `¿Eliminar "${r.name}"?` : `Delete "${r.name}"?`)) return;
+                if (!confirm(M(lang, `¿Eliminar "${r.name}"?`, `Delete "${r.name}"?`, `Excluir "${r.name}"?`))) return;
                 setRoutines(p => p.filter(x => x.id !== r.id));
-                toast2((es ? 'Rutina eliminada' : 'Routine deleted') + ' ✓');
+                toast2(M(lang, 'Rutina eliminada', 'Routine deleted', 'Rotina excluída') + ' ✓');
               }}
             >
               <Ic name="trash-2" size={15} color={textMuted} />
@@ -224,7 +234,7 @@ function RutinaCard({
               ) : (
                 <Ic name="chevron-up" size={15} color={textMuted} />
               )}
-              {collapsed ? (es ? 'VER' : 'VIEW') : (es ? 'CERRAR' : 'CLOSE')}
+              {collapsed ? M(lang, 'VER', 'VIEW', 'VER') : M(lang, 'CERRAR', 'CLOSE', 'FECHAR')}
             </button>
           </div>
         </div>
@@ -251,7 +261,7 @@ function RutinaCard({
               fontFamily: 'inherit',
             }}
           >
-            <option value="">{es ? 'Sin asignar' : 'Unassigned'}</option>
+            <option value="">{M(lang, 'Sin asignar', 'Unassigned', 'Não atribuído')}</option>
             {alumnos.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
           </select>
 
@@ -290,22 +300,22 @@ function RutinaCard({
                 >
                   <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
                 </svg>
-                {es ? 'GUARDANDO' : 'SAVING'}
+                {M(lang, 'GUARDANDO', 'SAVING', 'SALVANDO')}
               </>
             ) : (
               <>
                 <Ic name="save" size={14} color="#fff" />
-                {es ? 'GUARDAR' : 'SAVE'}
+                {M(lang, 'GUARDAR', 'SAVE', 'SALVAR')}
               </>
             )}
           </button>
         </div>
 
-        {lastSaved && (
+            {lastSaved && (
           <div style={{ ...T.meta, color: textMuted, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Ic name="check-circle" size={11} color="#22C55E" />
-            {es ? 'Guardado a las' : 'Saved at'}{' '}
-            {lastSaved.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+            {M(lang, 'Guardado a las', 'Saved at', 'Salvo às')}{' '}
+            {lastSaved.toLocaleTimeString(lang === 'en' ? 'en-US' : lang === 'pt' ? 'pt-BR' : 'es-AR', { hour: '2-digit', minute: '2-digit' })}
           </div>
         )}
       </div>
@@ -334,21 +344,23 @@ function RutinaCard({
             return (
               <DaySection
                 key={di}
+                lang={lang}
                 day={{
                   id:        di,
-                  name:      d.label || `${es ? 'Día' : 'Day'} ${di + 1}`,
+                  name:      routineDayDisplayName(d, di, lang),
                   warmup:    enrichList(d.warmup),
                   exercises: enrichList(d.exercises),
                 }}
                 onCopyDay={() => {
-                  if (r.days.length < 2) { toast2(es ? 'No hay otros días' : 'No other days'); return; }
+                  if (r.days.length < 2) { toast2(M(lang, 'No hay otros días', 'No other days', 'Não há outros dias')); return; }
                   setDupDayModal({ rId: r.id, dIdx: di, days: r.days, selected: [], sourceDay: d });
                 }}
                 onDeleteDay={() => {
-                  if (!confirm(es
-                    ? `¿Eliminar "${d.label || `Día ${di + 1}`}"?`
-                    : `Delete day ${di + 1}?`
-                  )) return;
+                  if (!confirm(M(lang,
+                    `¿Eliminar "${d.label || `Día ${di + 1}`}"?`,
+                    `Delete "${d.label || `Day ${di + 1}`}"?`,
+                    `Excluir "${d.label || `Dia ${di + 1}`}"?`
+                  ))) return;
                   setRoutines(p => p.map(rr => rr.id !== r.id ? rr : {
                     ...rr, days: rr.days.filter((_, i) => i !== di),
                   }));
@@ -417,11 +429,14 @@ function RutinaCard({
 export function RutinaView(props) {
   const {
     setTab, border, textMuted, bgCard, textMain, darkMode, bgSub, es,
+    lang: langProp,
     setFiltroRut, btn, card, setNewR, routines, setRoutines, allEx, PATS,
     setEditEx, toast2, setAddExModal, setAddExSearch, setAddExPat, setAddExMuscle,
     setAddExSelectedIds, setDupDayModal, alumnos, sb, setAssignRoutineId,
     desktopCoachStableLayout = false,
   } = props;
+
+  const lang = langProp || (es ? 'es' : 'en');
 
   const [hasUnsaved, setHasUnsaved]           = useState(false);
   const [editingExercise, setEditingExercise] = useState(null);
@@ -481,9 +496,9 @@ export function RutinaView(props) {
         }
       }
       setHasUnsaved(false);
-      toast2(es ? 'Cambios guardados ✓' : 'Changes saved ✓');
+      toast2(M(lang, 'Cambios guardados ✓', 'Changes saved ✓', 'Alterações salvas ✓'));
     } catch (e) {
-      toast2('Error al guardar');
+      toast2(M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar'));
     }
   };
 
@@ -538,7 +553,7 @@ export function RutinaView(props) {
           minHeight: 44,
         }}>
           <ScanLine size={16} />
-          {es ? 'ESCANEAR RUTINA EXISTENTE' : 'SCAN EXISTING ROUTINE'}
+          {M(lang, 'ESCANEAR RUTINA EXISTENTE', 'SCAN EXISTING ROUTINE', 'DIGITALIZAR ROTINA EXISTENTE')}
         </button>
 
         {/* ── Botón nueva rutina ── */}
@@ -556,7 +571,7 @@ export function RutinaView(props) {
           days: emptyDays(3, es), note: '', alumno: '', showAdvanced: false,
         })}>
           <Plus size={18} color="#fff" />
-          {es ? 'NUEVA RUTINA' : 'NEW ROUTINE'}
+          {M(lang, 'NUEVA RUTINA', 'NEW ROUTINE', 'NOVA ROTINA')}
         </button>
 
         {/* ── Lista de rutinas ── */}
@@ -567,10 +582,10 @@ export function RutinaView(props) {
           }}>
             <DumbbellIcon color={textMuted} />
             <div style={{ marginTop: S.blockGap, ...T.cardTitle, color: textMuted }}>
-              {es ? 'Sin rutinas todavía' : 'No routines yet'}
+              {M(lang, 'Sin rutinas todavía', 'No routines yet', 'Ainda sem rotinas')}
             </div>
             <div style={{ marginTop: 4, ...T.subtitle, color: textMuted }}>
-              {es ? 'Creá tu primera rutina con el botón de arriba.' : 'Create your first routine above.'}
+              {M(lang, 'Creá tu primera rutina con el botón de arriba.', 'Create your first routine with the button above.', 'Crie sua primeira rotina com o botão acima.')}
             </div>
           </div>
         ) : (
@@ -578,7 +593,9 @@ export function RutinaView(props) {
             <RutinaCard
               key={r.id}
               r={r}
-              es={es} darkMode={darkMode} border={border}
+              es={es}
+              lang={lang}
+              darkMode={darkMode} border={border}
               textMain={textMain} textMuted={textMuted}
               bgCard={bgCard} bgSub={bgSub}
               allEx={allEx}
@@ -656,8 +673,8 @@ export function RutinaView(props) {
         >
           <Save size={16} />
           {hasUnsaved
-            ? (es ? 'Guardar cambios' : 'Save changes')
-            : (es ? 'Sin cambios' : 'No changes')
+            ? M(lang, 'Guardar cambios', 'Save changes', 'Salvar alterações')
+            : M(lang, 'Sin cambios', 'No changes', 'Sem alterações')
           }
         </button>
       </div>
