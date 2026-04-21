@@ -694,42 +694,82 @@ return(
 }
 
 /**
- * Dispara notificación local de entrenamiento si coincide día/hora y está activo.
- * Depende de permiso granted y de que la app esté abierta (o pestaña con timers razonables).
+ * Dispara recordatorio si coincide día/hora (app abierta / pestaña activa).
+ * Notificación del sistema solo con permiso granted; vibración y tono siempre que el navegador lo permita.
  */
 function checkTrainingReminderTick() {
   if (typeof window === "undefined") return;
   try {
     if (localStorage.getItem("it_notif_on") !== "true") return;
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
     var diasRaw = localStorage.getItem("it_notif_dias") || "[]";
     var dias = JSON.parse(diasRaw);
     if (!Array.isArray(dias) || dias.length === 0) return;
     dias = dias.map(function (d) { return typeof d === "string" ? parseInt(d, 10) : d; }).filter(function (x) { return x === 0 || x > 0; });
     if (dias.length === 0) return;
     var hora = (localStorage.getItem("it_notif_hora") || "08:00").trim();
+    var hparts = hora.split(":");
+    var targetH = parseInt(hparts[0], 10);
+    var targetM = parseInt(hparts[1] != null ? hparts[1] : "0", 10);
+    if (isNaN(targetH) || isNaN(targetM)) return;
     var now = new Date();
     var jsD = now.getDay();
     var uiIdx = jsD === 0 ? 6 : jsD - 1;
     if (dias.indexOf(uiIdx) === -1) return;
     var pad = function (n) { return String(n).padStart(2, "0"); };
+    if (now.getHours() !== targetH || now.getMinutes() !== targetM) return;
     var hhmm = pad(now.getHours()) + ":" + pad(now.getMinutes());
-    if (hhmm !== hora) return;
     var stamp = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) + "_" + hhmm;
     if (localStorage.getItem("it_notif_last_fired") === stamp) return;
     localStorage.setItem("it_notif_last_fired", stamp);
-    var lang = localStorage.getItem("it_lang") || "es";
-    var title = "IronTrack — ¡Hora de entrenar!";
-    var body = "Tocá para abrir la app y registrar tu sesión.";
-    if (lang === "en") {
-      title = "IronTrack — Time to train!";
-      body = "Open the app to log your workout.";
-    } else if (lang === "pt") {
-      title = "IronTrack — Hora de treinar!";
-      body = "Abra o app para registrar a sessão.";
+    playTrainingReminderFeedback();
+    if ("Notification" in window && Notification.permission === "granted") {
+      var lang = localStorage.getItem("it_lang") || "es";
+      var title = "IronTrack — ¡Hora de entrenar!";
+      var body = "Tocá para abrir la app y registrar tu sesión.";
+      if (lang === "en") {
+        title = "IronTrack — Time to train!";
+        body = "Open the app to log your workout.";
+      } else if (lang === "pt") {
+        title = "IronTrack — Hora de treinar!";
+        body = "Abra o app para registrar a sessão.";
+      }
+      new Notification(title, {
+        body: body,
+        tag: "irontrack-training-" + stamp,
+        silent: false,
+        vibrate: [200, 100, 200, 100, 280],
+      });
     }
-    new Notification(title, { body: body, tag: "irontrack-training-" + stamp, silent: false });
   } catch (e) { /* ignore */ }
+}
+
+/** Vibración + tono corto cuando suena el recordatorio (complementa la notificación del sistema). */
+function playTrainingReminderFeedback() {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate([200, 90, 200, 90, 280]);
+    }
+  } catch (e) { /* ignore */ }
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    var ctx = new AC();
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = 740;
+    o.connect(g);
+    g.connect(ctx.destination);
+    var t = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.11, t + 0.025);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    o.start(t);
+    o.stop(t + 0.22);
+    o.onended = function () {
+      try { ctx.close(); } catch (e2) { /* ignore */ }
+    };
+  } catch (e3) { /* ignore (autoplay / AudioContext) */ }
 }
 
 const IconPlan = ({size=20, color="currentColor"}) => (
@@ -1609,7 +1649,7 @@ function GymApp() {
       if (document.visibilityState === "visible") checkTrainingReminderTick();
     }
     checkTrainingReminderTick();
-    var id = setInterval(checkTrainingReminderTick, 30000);
+    var id = setInterval(checkTrainingReminderTick, 15000);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", checkTrainingReminderTick);
     return function () {
@@ -3641,7 +3681,7 @@ function GymApp() {
         )}
         {tab==="library"&&(
           <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto"}>
-            {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal}/>}
+            {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal} msg={msg}/>}
             {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>}
           </div>
         )}
@@ -4430,72 +4470,118 @@ function GymApp() {
           </div>
         );
       })()}
-      {profileModalOpen&&sessionData&&esAlumno&&(
-        <div style={{position:"fixed",inset:0,zIndex:350,background:"rgba(10,22,40,.78)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:"env(safe-area-inset-bottom,0px)"}}
-          onClick={()=>setProfileModalOpen(false)}>
-          <div style={{background:"#0a1628",borderRadius:"20px 20px 0 0",padding:"12px 18px calc(28px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.22)",animation:"slideUpFade 0.35s ease",maxHeight:"min(92dvh, 100dvh - env(safe-area-inset-top, 0px) - 8px)",minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",boxShadow:"0 -8px 40px rgba(0,0,0,.45)"}}
-            onClick={e=>e.stopPropagation()}>
-            <div style={{width:40,height:4,background:"#3b82f6",borderRadius:2,margin:"0 auto 16px"}}/>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:18,color:"#fff",letterSpacing:0.5}}>{msg("Mi perfil", "My profile")}</div>
-            <input ref={profileFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
-              const f=e.target.files&&e.target.files[0];
-              if(!f) return;
-              const r=new FileReader();
-              r.onload=ev=>setProfileEdit(p=>({...p,avatarDataUrl:ev.target.result}));
-              r.readAsDataURL(f);
-            }}/>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:20}}>
-              <div style={{width:96,height:96,borderRadius:"50%",background:profileEdit.avatarDataUrl?"transparent":"linear-gradient(135deg,#3b82f6,#1d4ed8)",overflow:"hidden",border:"3px solid rgba(59,130,246,.4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,fontWeight:900,color:"#fff"}}>
-                {profileEdit.avatarDataUrl
-                  ? <img src={profileEdit.avatarDataUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                  : (sessionData.name||"A").slice(0,2).toUpperCase()}
+      {profileModalOpen && sessionData && esAlumno && typeof document !== "undefined" && createPortal(
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 400,
+            background: "rgba(10,22,40,.78)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            paddingBottom: "env(safe-area-inset-bottom,0px)",
+          }}
+          onClick={function () { setProfileModalOpen(false); }}
+        >
+          <div
+            style={{
+              background: "#0a1628",
+              borderRadius: "20px 20px 0 0",
+              width: "100%",
+              maxWidth: 480,
+              border: "1px solid rgba(59,130,246,.22)",
+              animation: "slideUpFade 0.35s ease",
+              maxHeight: "min(90dvh, 100svh - env(safe-area-inset-top, 0px) - 12px)",
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 -8px 40px rgba(0,0,0,.45)",
+              overflow: "hidden",
+            }}
+            onClick={function (e) { e.stopPropagation(); }}
+          >
+            <div style={{ flexShrink: 0, padding: "12px 18px 0" }}>
+              <div style={{ width: 40, height: 4, background: "#3b82f6", borderRadius: 2, margin: "0 auto 16px" }} />
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 14, color: "#fff", letterSpacing: 0.5 }}>{msg("Mi perfil", "My profile")}</div>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                WebkitOverflowScrolling: "touch",
+                overscrollBehavior: "contain",
+                padding: "0 18px 12px",
+              }}
+            >
+              <input ref={profileFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={function (e) {
+                var f = e.target.files && e.target.files[0];
+                if (!f) return;
+                var r = new FileReader();
+                r.onload = function (ev) { setProfileEdit(function (p) { return { ...p, avatarDataUrl: ev.target.result }; }); };
+                r.readAsDataURL(f);
+              }} />
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 20 }}>
+                <div style={{ width: 96, height: 96, borderRadius: "50%", background: profileEdit.avatarDataUrl ? "transparent" : "linear-gradient(135deg,#3b82f6,#1d4ed8)", overflow: "hidden", border: "3px solid rgba(59,130,246,.4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 900, color: "#fff" }}>
+                  {profileEdit.avatarDataUrl
+                    ? <img src={profileEdit.avatarDataUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : (sessionData.name || "A").slice(0, 2).toUpperCase()}
+                </div>
+                <button type="button" className="hov" style={{ marginTop: 10, background: "rgba(59,130,246,.15)", border: "1px solid rgba(59,130,246,.35)", borderRadius: 10, padding: "8px 16px", color: "#3b82f6", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                  onClick={function () { profileFileRef.current && profileFileRef.current.click(); }}>
+                  {msg("Cambiar foto", "Change photo")}
+                </button>
               </div>
-              <button type="button" className="hov" style={{marginTop:10,background:"rgba(59,130,246,.15)",border:"1px solid rgba(59,130,246,.35)",borderRadius:10,padding:"8px 16px",color:"#3b82f6",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
-                onClick={()=>profileFileRef.current&&profileFileRef.current.click()}>
-                {msg("Cambiar foto", "Change photo")}
+              {[
+                { k: "nombre", lbl: msg("Nombre", "First name"), ph: "" },
+                { k: "apellido", lbl: msg("Apellido", "Last name"), ph: "" },
+                { k: "email", lbl: "Email", ph: "email@", type: "email" },
+                { k: "phone", lbl: msg("Celular", "Phone"), ph: "+54 ...", type: "tel" },
+              ].map(function (row) {
+                return (
+                  <div key={row.k} style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 6, letterSpacing: 0.5 }}>{row.lbl}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, background: bgSub, border: "1px solid " + border, borderRadius: 12, padding: "4px 4px 4px 12px" }}>
+                      {row.k === "email" ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg> :
+                        row.k === "phone" ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+                          : <Ic name="user" size={18} color="#64748b" />}
+                      <input style={{ flex: 1, background: "transparent", border: "none", color: textMain, fontSize: 15, padding: "10px 8px", outline: "none", fontFamily: "inherit" }}
+                        value={row.k === "phone" ? profileEdit.phone : (row.k === "email" ? profileEdit.email : profileEdit[row.k])}
+                        onChange={function (e) {
+                          var v = e.target.value;
+                          if (row.k === "phone") setProfileEdit(function (p) { return { ...p, phone: v }; });
+                          else if (row.k === "email") setProfileEdit(function (p) { return { ...p, email: v }; });
+                          else setProfileEdit(function (p) { return { ...p, [row.k]: v }; });
+                        }}
+                        type={row.type || "text"}
+                        placeholder={row.ph}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ flexShrink: 0, padding: "12px 18px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "1px solid rgba(59,130,246,.25)", background: "#0a1628" }}>
+              <button type="button" className="hov" style={{ width: "100%", padding: "14px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(59,130,246,.35)" }}
+                onClick={function () {
+                  try {
+                    var fullName = [profileEdit.nombre, profileEdit.apellido].filter(Boolean).join(" ").trim() || profileEdit.email || "Atleta";
+                    var next = { ...sessionData, name: fullName, email: profileEdit.email, phone: profileEdit.phone, avatarUrl: profileEdit.avatarDataUrl || sessionData.avatarUrl };
+                    localStorage.setItem("it_session", JSON.stringify(next));
+                    setSessionData(next);
+                    setProfileModalOpen(false);
+                    toast2(msg("Perfil guardado ✓", "Profile saved ✓"));
+                  } catch (err) { toast2("Error"); }
+                }}>
+                {msg("Guardar cambios", "Save changes")}
               </button>
             </div>
-            {[
-              {k:"nombre",lbl:msg("Nombre", "First name"),ph:""},
-              {k:"apellido",lbl:msg("Apellido", "Last name"),ph:""},
-              {k:"email",lbl:"Email",ph:"email@",type:"email"},
-              {k:"phone",lbl:msg("Celular", "Phone"),ph:"+54 ...",type:"tel"},
-            ].map(row=>(
-              <div key={row.k} style={{marginBottom:14}}>
-                <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",marginBottom:6,letterSpacing:0.5}}>{row.lbl}</div>
-                <div style={{display:"flex",alignItems:"center",gap:10,background:bgSub,border:"1px solid "+border,borderRadius:12,padding:"4px 4px 4px 12px"}}>
-                  {row.k==="email" ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> :
-                   row.k==="phone" ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                   : <Ic name="user" size={18} color="#64748b"/>}
-                  <input style={{flex:1,background:"transparent",border:"none",color:textMain,fontSize:15,padding:"10px 8px",outline:"none",fontFamily:"inherit"}}
-                    value={row.k==="phone"?profileEdit.phone:(row.k==="email"?profileEdit.email:profileEdit[row.k])}
-                    onChange={e=>{
-                      const v=e.target.value;
-                      if(row.k==="phone") setProfileEdit(p=>({...p,phone:v}));
-                      else if(row.k==="email") setProfileEdit(p=>({...p,email:v}));
-                      else setProfileEdit(p=>({...p,[row.k]:v}));
-                    }}
-                    type={row.type||"text"}
-                    placeholder={row.ph}
-                  />
-                </div>
-              </div>
-            ))}
-            <button type="button" className="hov" style={{width:"100%",padding:"14px",background:"#3b82f6",color:"#fff",border:"none",borderRadius:12,fontSize:16,fontWeight:800,cursor:"pointer",fontFamily:"inherit",marginTop:8,boxShadow:"0 4px 20px rgba(59,130,246,.35)"}}
-              onClick={()=>{
-                try{
-                  const fullName=[profileEdit.nombre,profileEdit.apellido].filter(Boolean).join(" ").trim()||profileEdit.email||"Atleta";
-                  const next={...sessionData,name:fullName,email:profileEdit.email,phone:profileEdit.phone,avatarUrl:profileEdit.avatarDataUrl||sessionData.avatarUrl};
-                  localStorage.setItem("it_session",JSON.stringify(next));
-                  setSessionData(next);
-                  setProfileModalOpen(false);
-                  toast2(msg("Perfil guardado ✓", "Profile saved ✓"));
-                }catch(err){ toast2("Error"); }
-              }}>
-              {msg("Guardar cambios", "Save changes")}
-            </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {settingsOpen && !esAlumno && sessionData && tab !== "settings" && tab !== "perfil" && (
         <SettingsPage
@@ -4516,66 +4602,100 @@ function GymApp() {
           entrenadorId={sessionData.entrenadorId || "entrenador_principal"}
         />
       )}
-      {settingsOpen && esAlumno && (
-        <div style={{position:"fixed",inset:0,background:"rgba(10,22,40,.75)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",zIndex:350,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:"env(safe-area-inset-bottom,0px)"}}
-          onClick={()=>setSettingsOpen(false)}>
-          <div style={{background:"#0a1628",borderRadius:"16px 16px 0 0",paddingTop:20,paddingLeft:16,paddingRight:16,paddingBottom:"calc(96px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.2)",animation:"slideUpFade 0.3s ease",maxHeight:"min(92dvh, 100dvh - env(safe-area-inset-top, 0px) - 8px)",minHeight:0,overflowX:"hidden",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}
-            onClick={e=>e.stopPropagation()}>
-            <div style={{width:40,height:4,background:"#3b82f6",borderRadius:2,margin:"0 auto 20px"}}/>
-            <div style={{fontSize:18,fontWeight:800,letterSpacing:1,marginBottom:20,color:"#fff"}}><Ic name="settings" size={18} color="#3b82f6"/> {msg("CONFIGURACIÓN", "SETTINGS")}</div>
-              <>
-                <div style={{marginBottom:22}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{msg("APARIENCIA", "APPEARANCE")}</div>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(255,255,255,.04)",border:"1px solid rgba(148,163,184,.2)",borderRadius:14,padding:"14px 16px"}}>
-                    <span style={{fontSize:15,fontWeight:600,color:"#e2e8f0"}}>{msg("Modo oscuro", "Dark mode")}</span>
-                    <button type="button" className="hov" onClick={()=>{const v=!darkMode;setDarkMode(v);localStorage.setItem("it_dark",v?"true":"false");}}
-                      style={{width:52,height:28,borderRadius:14,border:"none",background:darkMode?"#22c55e":"#475569",position:"relative",cursor:"pointer",transition:"background .25s"}}>
-                      <span style={{position:"absolute",top:3,left:darkMode?26:3,width:22,height:22,borderRadius:"50%",background:"#fff",transition:"left .25s ease",boxShadow:"0 1px 4px rgba(0,0,0,.3)"}}/>
-                    </button>
-                  </div>
-                </div>
-                <div style={{marginBottom:22}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{msg("IDIOMA", "LANGUAGE")}</div>
-                  {[{code:"es",label:msg("Español", "Spanish")},{code:"en",label:"English"}].map(opt=>(
-                    <button key={opt.code} type="button" className="hov" onClick={()=>{setLang(opt.code);localStorage.setItem("it_lang",opt.code);}}
-                      style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px",marginBottom:8,background:lang===opt.code?"rgba(59,130,246,.12)":"rgba(255,255,255,.03)",border:"1px solid "+(lang===opt.code?"rgba(59,130,246,.4)":"rgba(148,163,184,.15)"),borderRadius:12,cursor:"pointer",fontFamily:"inherit"}}>
-                      <span style={{fontSize:15,fontWeight:600,color:"#e2e8f0"}}>{opt.label}</span>
-                      {lang===opt.code ? <span style={{color:"#22c55e",fontSize:18,fontWeight:900}}>✓</span> : <span style={{width:18}}/>}
-                    </button>
-                  ))}
-                </div>
-                <div style={{marginBottom:22}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",letterSpacing:1.2,marginBottom:10}}>{msg("AYUDA", "HELP")}</div>
-                  <a href="https://wa.me/541164461075" target="_blank" rel="noreferrer" style={{display:"block",textDecoration:"none",marginBottom:10}}>
-                    <div style={{padding:"14px 16px",background:"rgba(59,130,246,.1)",border:"1px solid rgba(59,130,246,.25)",borderRadius:12}}>
-                      <div style={{fontSize:15,fontWeight:800,color:"#3b82f6"}}>{msg("Soporte", "Support")}</div>
-                      <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{msg("Contactá con nosotros", "Contact us")}</div>
-                    </div>
-                  </a>
-                  <a href="mailto:soporte@irontrack.app?subject=Feedback" style={{display:"block",textDecoration:"none"}}>
-                    <div style={{padding:"14px 16px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(148,163,184,.15)",borderRadius:12}}>
-                      <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0"}}>{msg("Enviar comentarios", "Send feedback")}</div>
-                      <div style={{fontSize:12,color:"#94a3b8",marginTop:4}}>{msg("Ayudanos a mejorar", "Help us improve")}</div>
-                    </div>
-                  </a>
-                  <div style={{textAlign:"center",marginTop:12,fontSize:12,color:"#64748b"}}>Iron Track v1.0.0</div>
-                </div>
-                <RecordatoriosPanel es={es} darkMode={darkMode} toast2={toast2} msg={msg}/>
-                <div style={{marginTop:22,paddingTop:16,borderTop:"1px solid rgba(239,68,68,.25)"}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#f87171",letterSpacing:1.2,marginBottom:10}}>{msg("ZONA DE PELIGRO", "DANGER ZONE")}</div>
-                  <button type="button" className="hov" style={{width:"100%",padding:"14px",background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.35)",borderRadius:12,color:"#f87171",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
-                    onClick={()=>{if(confirm(msg("¿Cerrar sesión?", "Log out?"))){setSettingsOpen(false);clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}}>
-                    <Ic name="log-out" size={18} color="#f87171"/> {msg("Cerrar sesión", "Log out")}
+      {settingsOpen && esAlumno && typeof document !== "undefined" && createPortal(
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 400,
+            background: "rgba(10,22,40,.75)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            paddingBottom: "env(safe-area-inset-bottom,0px)",
+          }}
+          onClick={function () { setSettingsOpen(false); }}
+        >
+          <div
+            style={{
+              background: "#0a1628",
+              borderRadius: "16px 16px 0 0",
+              width: "100%",
+              maxWidth: 480,
+              border: "1px solid rgba(59,130,246,.2)",
+              animation: "slideUpFade 0.3s ease",
+              maxHeight: "min(90dvh, 100svh - env(safe-area-inset-top, 0px) - 12px)",
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+            onClick={function (e) { e.stopPropagation(); }}
+          >
+            <div style={{ flexShrink: 0, padding: "20px 16px 12px" }}>
+              <div style={{ width: 40, height: 4, background: "#3b82f6", borderRadius: 2, margin: "0 auto 16px" }} />
+              <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: 1, color: "#fff" }}><Ic name="settings" size={18} color="#3b82f6" /> {msg("CONFIGURACIÓN", "SETTINGS")}</div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowX: "hidden", overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", padding: "0 16px 8px" }}>
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.2, marginBottom: 10 }}>{msg("APARIENCIA", "APPEARANCE")}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(255,255,255,.04)", border: "1px solid rgba(148,163,184,.2)", borderRadius: 14, padding: "14px 16px" }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: "#e2e8f0" }}>{msg("Modo oscuro", "Dark mode")}</span>
+                  <button type="button" className="hov" onClick={function () { var v = !darkMode; setDarkMode(v); localStorage.setItem("it_dark", v ? "true" : "false"); }}
+                    style={{ width: 52, height: 28, borderRadius: 14, border: "none", background: darkMode ? "#22c55e" : "#475569", position: "relative", cursor: "pointer", transition: "background .25s" }}>
+                    <span style={{ position: "absolute", top: 3, left: darkMode ? 26 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left .25s ease", boxShadow: "0 1px 4px rgba(0,0,0,.3)" }} />
                   </button>
                 </div>
-              </>
-            <button className="hov"
-              style={{width:"100%",padding:"12px",marginTop:16,marginBottom:32,background:"rgba(148,163,184,.12)",border:"1px solid rgba(148,163,184,.2)",borderRadius:12,color:"#cbd5e1",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
-              onClick={()=>setSettingsOpen(false)}>
-              {msg("CERRAR", "CLOSE")}
-            </button>
+              </div>
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.2, marginBottom: 10 }}>{msg("IDIOMA", "LANGUAGE")}</div>
+                {[{ code: "es", label: msg("Español", "Spanish") }, { code: "en", label: "English" }].map(function (opt) {
+                  return (
+                    <button key={opt.code} type="button" className="hov" onClick={function () { setLang(opt.code); localStorage.setItem("it_lang", opt.code); }}
+                      style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", marginBottom: 8, background: lang === opt.code ? "rgba(59,130,246,.12)" : "rgba(255,255,255,.03)", border: "1px solid " + (lang === opt.code ? "rgba(59,130,246,.4)" : "rgba(148,163,184,.15)"), borderRadius: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                      <span style={{ fontSize: 15, fontWeight: 600, color: "#e2e8f0" }}>{opt.label}</span>
+                      {lang === opt.code ? <span style={{ color: "#22c55e", fontSize: 18, fontWeight: 900 }}>✓</span> : <span style={{ width: 18 }} />}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: 1.2, marginBottom: 10 }}>{msg("AYUDA", "HELP")}</div>
+                <a href="https://wa.me/541164461075" target="_blank" rel="noreferrer" style={{ display: "block", textDecoration: "none", marginBottom: 10 }}>
+                  <div style={{ padding: "14px 16px", background: "rgba(59,130,246,.1)", border: "1px solid rgba(59,130,246,.25)", borderRadius: 12 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#3b82f6" }}>{msg("Soporte", "Support")}</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{msg("Contactá con nosotros", "Contact us")}</div>
+                  </div>
+                </a>
+                <a href="mailto:soporte@irontrack.app?subject=Feedback" style={{ display: "block", textDecoration: "none" }}>
+                  <div style={{ padding: "14px 16px", background: "rgba(255,255,255,.04)", border: "1px solid rgba(148,163,184,.15)", borderRadius: 12 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#e2e8f0" }}>{msg("Enviar comentarios", "Send feedback")}</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{msg("Ayudanos a mejorar", "Help us improve")}</div>
+                  </div>
+                </a>
+                <div style={{ textAlign: "center", marginTop: 12, fontSize: 12, color: "#64748b" }}>Iron Track v1.0.0</div>
+              </div>
+              <RecordatoriosPanel es={es} darkMode={darkMode} toast2={toast2} msg={msg} />
+              <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid rgba(239,68,68,.25)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#f87171", letterSpacing: 1.2, marginBottom: 10 }}>{msg("ZONA DE PELIGRO", "DANGER ZONE")}</div>
+                <button type="button" className="hov" style={{ width: "100%", padding: "14px", background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.35)", borderRadius: 12, color: "#f87171", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                  onClick={function () { if (confirm(msg("¿Cerrar sesión?", "Log out?"))) { setSettingsOpen(false); clearAllIronTrackPrefixedKeys(); syncStateWithLocalStorage(); } }}>
+                  <Ic name="log-out" size={18} color="#f87171" /> {msg("Cerrar sesión", "Log out")}
+                </button>
+              </div>
+            </div>
+            <div style={{ flexShrink: 0, padding: "10px 16px calc(12px + env(safe-area-inset-bottom, 0px))", borderTop: "1px solid rgba(148,163,184,.2)", background: "#0a1628" }}>
+              <button className="hov"
+                style={{ width: "100%", padding: "12px", background: "rgba(148,163,184,.12)", border: "1px solid rgba(148,163,184,.2)", borderRadius: 12, color: "#cbd5e1", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                onClick={function () { setSettingsOpen(false); }}>
+                {msg("CERRAR", "CLOSE")}
+              </button>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {prCelebration&&(
         <div onClick={()=>setPrCelebration(null)} style={{
@@ -7248,7 +7368,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
 }
 
 
-const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, routines, videoOverrides, setVideoModal}) {
+const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, routines, videoOverrides, setVideoModal, msg}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bgCard = _dm?"#162234":"#FFFFFF";
   const bgSub = _dm?"#162234":"#EEF2F7";
