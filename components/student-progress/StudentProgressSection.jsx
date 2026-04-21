@@ -1,19 +1,67 @@
 import React from 'react'
-import { Trophy, Image as ImageIcon, BarChart3, Settings, Calendar, Flame, TrendingUp } from 'lucide-react'
-import IronTrackLogo from '@/components/IronTrackLogo.jsx'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Settings, Medal } from 'lucide-react'
 import { ProgressChartsPanel } from './ProgressChartsPanel.jsx'
 import { ProgressSessionsPanel } from './ProgressSessionsPanel.jsx'
 import { ProgressPhotosPanel } from './ProgressPhotosPanel.jsx'
-import StatCard from './StatCard.jsx'
 import {
   averageImprovementPercent,
   computeDayStreak,
   countPRsThisMonth,
+  buildWeeklyVolumeModel,
+  hasAnyTrainingData,
+  trainingDaysThisWeek,
 } from './progressMetrics.js'
 
+function HeroSparkSvg({ series, accent }) {
+  const w = 108
+  const h = 56
+  const pad = 4
+  const vals = series.map((v) => Number(v) || 0)
+  if (!vals.length) return <svg width={w} height={h} aria-hidden />
+  const mx = Math.max(...vals, 1e-9)
+  const denom = vals.length > 1 ? vals.length - 1 : 1
+  const coords = vals.map((v, i) => {
+    const x = pad + (i / denom) * (w - pad * 2)
+    const y = pad + (1 - v / mx) * (h - pad * 2)
+    return [x, y]
+  })
+  const lineJoined = coords.map(([x, y]) => `${x},${y}`).join(' ')
+  const bottom = h - pad
+  const firstX = coords[0][0]
+  const lastX = coords[coords.length - 1][0]
+  const areaPath = `M ${firstX},${bottom} L ${coords.map(([x, y]) => `${x},${y}`).join(' L ')} L ${lastX},${bottom} Z`
+  const [lx, ly] = coords[coords.length - 1]
+
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0 overflow-visible" aria-hidden>
+      <defs>
+        <linearGradient id="hero-sp-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={accent} stopOpacity={0.35} />
+          <stop offset="100%" stopColor={accent} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <path d={areaPath} fill="url(#hero-sp-fill)" stroke="none" />
+      <polyline
+        fill="none"
+        stroke={accent}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        points={lineJoined}
+      />
+      <circle cx={lx} cy={ly} r={3} fill={accent} stroke="#0A0B0D" strokeWidth={1.25} />
+    </svg>
+  )
+}
+
+function formatTonnes(n) {
+  if (n == null || Number.isNaN(n)) return '—'
+  const v = Math.round(n * 100) / 100
+  return v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+}
+
 /**
- * Sección Progreso (alumno) — diseño mobile-first tema oscuro.
+ * Sección Progreso (alumno) — editorial oscuro, tokens locales.
  */
 export default function StudentProgressSection({
   progress,
@@ -27,10 +75,21 @@ export default function StudentProgressSection({
   expectedDaysPerWeek,
   onSettings,
   onAvatarClick,
+  onRegistrarPrimerEntrenamiento,
   esEntrenador = false,
 }) {
   const [sbData, setSbData] = React.useState([])
   const [loadingSb, setLoadingSb] = React.useState(true)
+  const [subView, setSubView] = React.useState('main')
+  const [seenAch, setSeenAch] = React.useState(() => {
+    try {
+      const raw = localStorage.getItem('irontrack_sp_ach_seen')
+      const j = JSON.parse(raw || '[]')
+      return new Set(Array.isArray(j) ? j : [])
+    } catch {
+      return new Set()
+    }
+  })
 
   React.useEffect(() => {
     const alumnoId =
@@ -65,55 +124,181 @@ export default function StudentProgressSection({
     }
   }, [sesiones, allEx, EX, progress, sbData])
 
+  const volModel = React.useMemo(
+    () => buildWeeklyVolumeModel(progress, sbData, sesiones),
+    [progress, sbData, sesiones]
+  )
+
+  const hasData = React.useMemo(
+    () => hasAnyTrainingData(sesiones, progress, sbData),
+    [sesiones, progress, sbData]
+  )
+
+  const metaDays = Math.max(1, parseInt(expectedDaysPerWeek, 10) || 3)
+  const daysHit = trainingDaysThisWeek(sesiones, progress, sbData)
+
+  const displayName = (sessionData?.name || '').trim() || (es ? 'Atleta' : 'Athlete')
   const initials = (sessionData?.name || 'U').slice(0, 2).toUpperCase()
+
+  const markAchSeen = (id) => {
+    setSeenAch((prev) => {
+      const n = new Set(prev)
+      n.add(id)
+      try {
+        localStorage.setItem('irontrack_sp_ach_seen', JSON.stringify([...n]))
+      } catch {
+        /* noop */
+      }
+      return n
+    })
+  }
+
+  const achievements = React.useMemo(() => {
+    const list = [
+      {
+        id: 'first_log',
+        title: es ? 'Primera serie' : 'First set',
+        sub: es ? 'Registrá tu primer entrenamiento' : 'Log your first workout',
+        unlocked: stats.totalSessions > 0 || hasData,
+      },
+      {
+        id: 'week_volume',
+        title: es ? 'Volumen constante' : 'Steady volume',
+        sub: es ? 'Completá 3 días en una semana' : 'Train 3 days in one week',
+        unlocked: daysHit >= 3,
+      },
+      {
+        id: 'pr_month',
+        title: es ? 'Mes de PRs' : 'PR month',
+        sub: es ? 'Conseguí un PR este mes' : 'Hit a PR this month',
+        unlocked: stats.prsThisMonth > 0,
+      },
+      {
+        id: 'streak7',
+        title: es ? 'Racha sólida' : 'Solid streak',
+        sub: es ? '7 días seguidos entrenando' : '7-day training streak',
+        unlocked: stats.streak >= 7,
+      },
+      {
+        id: 'sessions20',
+        title: es ? 'Constancia' : 'Consistency',
+        sub: es ? '20 sesiones registradas' : '20 logged sessions',
+        unlocked: stats.totalSessions >= 20,
+      },
+    ]
+    return list
+  }, [es, stats, daysHit, hasData])
+
+  const kpiRows = [
+    {
+      id: 'ses',
+      label: es ? 'Sesiones' : 'Sessions',
+      val: !hasData ? null : stats.totalSessions > 0 ? stats.totalSessions : null,
+      sub: es ? 'Total' : 'Total',
+    },
+    {
+      id: 'pr',
+      label: es ? 'PRs del mes' : 'PRs (mo)',
+      val: !hasData ? null : stats.prsThisMonth > 0 ? stats.prsThisMonth : null,
+      sub: es ? 'Récords' : 'Records',
+      pr: true,
+    },
+    {
+      id: 'str',
+      label: es ? 'Racha' : 'Streak',
+      val: !hasData ? null : stats.streak > 0 ? stats.streak : null,
+      sub: es ? 'Días seguidos' : 'Days',
+    },
+    {
+      id: 'avg',
+      label: es ? 'Mejora Δ' : 'Avg Δ',
+      val:
+        !hasData || stats.overall === 0
+          ? null
+          : `${stats.overall > 0 ? '+' : ''}${stats.overall}%`,
+      sub: es ? 'Promedio' : 'Avg',
+    },
+  ]
+
+  const shellStyle = {
+    fontFamily: "Inter, sans-serif",
+    boxSizing: 'border-box',
+    ['--sp-bg']: '#0A0B0D',
+    ['--sp-surface']: '#14161A',
+    ['--sp-surface-high']: '#1A1D22',
+    ['--sp-stroke']: 'rgba(255,255,255,0.065)',
+    ['--sp-fg']: '#f3f4f6',
+    ['--sp-muted']: 'rgba(243,244,246,0.5)',
+    /** Alineado con navegación alumno / tema app (`#3b82f6`, logo `#2563eb`). */
+    ['--sp-accent']: '#3b82f6',
+    ['--sp-pr']: '#f59e0b',
+    ['--page-gutter']: 'clamp(14px, 4vw, 20px)',
+  }
 
   return (
     <div
-      className="student-progress-scope flex w-full flex-col overflow-x-hidden bg-[#0d1117] text-[#f0f6ff]"
+      className="student-progress-scope flex w-full flex-col overflow-x-hidden text-[#f3f4f6] sp-scroll-hide"
       style={{
-        fontFamily:
-          "'Geist Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
-        boxSizing: 'border-box',
-        ['--background']: '#0d1117',
-        ['--foreground']: '#f0f6ff',
-        ['--card']: '#131b2e',
-        ['--border']: '#1e3050',
-        ['--muted']: '#1a2540',
-        ['--muted-foreground']: '#7c8db0',
-        ['--primary']: '#2563eb',
-        ['--success']: '#4ade80',
-        ['--warning']: '#f59e0b',
-        ['--page-gutter']: 'clamp(14px, 4vw, 20px)',
+        ...shellStyle,
+        background: 'var(--sp-bg)',
+        fontVariantNumeric: 'tabular-nums',
       }}
     >
-      <header className="shrink-0 bg-[#0d1117] pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))]">
+      <header
+        className="shrink-0 border-b pt-[max(0.75rem,env(safe-area-inset-top,0px))]"
+        style={{ borderColor: 'var(--sp-stroke)', background: 'var(--sp-bg)' }}
+      >
         <div
-          className="mx-auto flex w-full max-w-[32rem] items-center justify-between gap-4"
+          className="mx-auto flex w-full max-w-[32rem] items-start justify-between gap-3 pb-3"
           style={{ paddingInline: 'var(--page-gutter)', boxSizing: 'border-box' }}
         >
-          <div className="min-w-0 shrink">
-            <IronTrackLogo
-              size={20}
-              color="#2563eb"
-              barColor="#4ade80"
-              showBar
-              mode={es ? 'MODO ALUMNO' : 'ATHLETE MODE'}
-              modeColor="#4ade80"
-            />
+          <div className="min-w-0">
+            <div
+              className="leading-none tracking-wide"
+              style={{
+                fontFamily: "'Barlow Condensed','Arial Black',sans-serif",
+                fontSize: 18,
+                fontWeight: 900,
+                letterSpacing: 2,
+                textTransform: 'uppercase',
+                color: 'var(--sp-accent)',
+              }}
+            >
+              IRONTRACK
+            </div>
+            <div className="mt-1.5 text-[11px] font-medium leading-snug" style={{ color: 'var(--sp-muted)' }}>
+              {es ? 'Modo Alumno' : 'Athlete mode'} · {displayName}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {/* Mismas formas que Plan / Ejercicios (App.jsx): settings = btn rounded-lg; avatar = 36×36 rounded 10px */}
             <button
               type="button"
-              className="hov flex items-center justify-center rounded-lg border-0 bg-[#2D4057] p-2 text-white"
+              className="flex h-9 items-center justify-center rounded-[10px] border px-2.5 transition-colors"
+              style={{
+                borderColor: 'var(--sp-stroke)',
+                background: 'transparent',
+                color: 'var(--sp-muted)',
+              }}
               aria-label={es ? 'Configuración' : 'Settings'}
+              onMouseDown={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+              }}
               onClick={() => onSettings?.()}
             >
-              <Settings className="h-[18px] w-[18px]" strokeWidth={2} />
+              <Settings className="h-[17px] w-[17px]" strokeWidth={2} />
             </button>
             <button
               type="button"
-              className="hov flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border-0 bg-gradient-to-br from-[#1E3A5F] to-[#2563EB] text-[13px] font-extrabold leading-none text-white"
+              className="flex h-[34px] w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 text-[11px] font-bold leading-none text-white transition-opacity"
+              style={{
+                background: 'linear-gradient(135deg, #1e3a8a, var(--sp-accent))',
+              }}
               onClick={() => onAvatarClick?.()}
               aria-label={es ? 'Menú usuario' : 'User menu'}
             >
@@ -124,79 +309,281 @@ export default function StudentProgressSection({
       </header>
 
       <div
-        className="relative z-0 mx-auto flex w-full max-w-[32rem] flex-col gap-5 pb-6 pt-0"
+        className="relative z-0 mx-auto flex w-full max-w-[32rem] flex-col gap-5 pb-8 pt-4"
         style={{ paddingInline: 'var(--page-gutter)', boxSizing: 'border-box' }}
       >
-        <div
-          className="mx-auto mb-0 grid w-full max-w-md grid-cols-2 gap-3 sm:gap-4 lg:max-w-none lg:grid-cols-4 lg:gap-5"
-          style={{ marginTop: '1rem' }}
-        >
-          <StatCard
-            icon={<Calendar className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
-            iconBg="bg-[#2563eb]/20"
-            value={stats.totalSessions}
-            label={es ? 'Sesiones' : 'Sessions'}
-            sub={es ? 'Total registradas' : 'Total logged'}
-          />
-          <StatCard
-            icon={<Trophy className="h-6 w-6 text-[#4ade80]" strokeWidth={2.5} />}
-            iconBg="bg-[#4ade80]/20"
-            value={stats.prsThisMonth}
-            label={es ? 'PRs del mes' : 'PRs this month'}
-            sub={es ? 'Nuevos récords' : 'New records'}
-            highlight
-          />
-          <StatCard
-            icon={<Flame className="h-6 w-6 text-[#2563eb]" strokeWidth={2.5} />}
-            iconBg="bg-[#2563eb]/20"
-            value={`${stats.streak} ${es ? 'días' : 'days'}`}
-            label={es ? 'Racha' : 'Streak'}
-            sub={es ? 'Seguidos' : 'In a row'}
-          />
-          <StatCard
-            icon={<TrendingUp className="h-6 w-6 text-[#4ade80]" strokeWidth={2.5} />}
-            iconBg="bg-[#4ade80]/20"
-            value={`${stats.overall > 0 ? '+' : ''}${stats.overall}%`}
-            label={es ? 'Mejora total' : 'Overall Δ'}
-            sub={es ? 'Promedio' : 'Average'}
-            highlight
-          />
-        </div>
+        {subView !== 'main' && (
+          <button
+            type="button"
+            className="mb-1 w-fit border-0 bg-transparent text-[12px] font-semibold"
+            style={{ color: 'var(--sp-accent)' }}
+            onClick={() => setSubView('main')}
+          >
+            ← {es ? 'Volver' : 'Back'}
+          </button>
+        )}
 
-        <div className="mt-2 mb-6 w-full">
-        <Tabs defaultValue="graficos" className="flex w-full flex-col gap-5">
-          <TabsList className="grid h-auto min-h-12 w-full grid-cols-3 gap-8 rounded-xl py-4">
-            <TabsTrigger value="sesiones" className="gap-1.5 px-4 py-4">
-              <Trophy className="h-4 w-4" />
-              <span className="hidden sm:inline">{es ? 'Sesiones' : 'Sessions'}</span>
-              <span className="sm:hidden">Ses.</span>
-            </TabsTrigger>
-            <TabsTrigger value="fotos" className="gap-1.5 px-4 py-4">
-              <ImageIcon className="h-4 w-4" />
-              {es ? 'Fotos' : 'Photos'}
-            </TabsTrigger>
-            <TabsTrigger value="graficos" className="gap-1.5 px-4 py-4">
-              <BarChart3 className="h-4 w-4" />
-              {es ? 'Gráficos' : 'Charts'}
-            </TabsTrigger>
-          </TabsList>
+        {subView === 'sessions' && (
+          <ProgressSessionsPanel
+            sharedParam={sharedParam}
+            sb={sb}
+            EX={EX}
+            es={es}
+            sesiones={sesiones}
+            expectedDaysPerWeek={expectedDaysPerWeek}
+          />
+        )}
 
-          <TabsContent value="sesiones" className="sp-fade-in mt-2">
-            <ProgressSessionsPanel
-              sharedParam={sharedParam}
-              sb={sb}
-              EX={EX}
-              es={es}
-              sesiones={sesiones}
-              expectedDaysPerWeek={expectedDaysPerWeek}
-            />
-          </TabsContent>
+        {subView === 'photos' && (
+          <ProgressPhotosPanel sharedParam={sharedParam} sb={sb} es={es} esEntrenador={esEntrenador} />
+        )}
 
-          <TabsContent value="fotos" className="sp-fade-in mt-2">
-            <ProgressPhotosPanel sharedParam={sharedParam} sb={sb} es={es} esEntrenador={esEntrenador} />
-          </TabsContent>
+        {subView === 'main' && (
+          <>
+            {!loadingSb && !hasData ? (
+              <div
+                className="rounded-[14px] border p-5"
+                style={{
+                  borderColor: 'var(--sp-stroke)',
+                  background:
+                    'linear-gradient(145deg, rgba(59, 130, 246, 0.12), var(--sp-surface))',
+                }}
+              >
+                <div
+                  className="leading-tight"
+                  style={{
+                    fontFamily: "Inter, sans-serif",
+                    fontSize: 20,
+                    fontWeight: 700,
+                  }}
+                >
+                  {es ? `Empecemos fuerte, ${displayName}.` : `Let's start strong, ${displayName}.`}
+                </div>
+                <p className="mt-2 text-[13px] leading-relaxed" style={{ color: 'var(--sp-muted)' }}>
+                  {es
+                    ? 'Tu volumen y tus PRs aparecerán acá cuando registres entrenos. Empezá por una sesión completa.'
+                    : 'Volume and PRs show up here once you log workouts. Start with one full session.'}
+                </p>
+                <button
+                  type="button"
+                  className="mt-4 min-h-[44px] w-full rounded-full px-4 py-2.5 text-[13px] font-semibold transition-colors"
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.18)',
+                    color: 'var(--sp-accent)',
+                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                  }}
+                  onMouseDown={(e) => {
+                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.26)'
+                  }}
+                  onMouseUp={(e) => {
+                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.18)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.18)'
+                  }}
+                  onClick={() => onRegistrarPrimerEntrenamiento?.()}
+                >
+                  {es ? 'Registrar primer entrenamiento' : 'Log first workout'}
+                </button>
+              </div>
+            ) : null}
 
-          <TabsContent value="graficos" className="sp-fade-in mt-2">
+            {!loadingSb && hasData ? (
+              <section>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--sp-muted)' }}>
+                  {es ? 'Volumen de la semana' : 'Weekly volume'}
+                </div>
+                <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+                  <div className="flex min-w-0 flex-wrap items-end gap-2">
+                    <span
+                      className="num leading-none tabular-nums"
+                      style={{
+                        fontFamily: "'Barlow Condensed',sans-serif",
+                        fontSize: 56,
+                        fontWeight: 800,
+                        letterSpacing: '-0.02em',
+                        color: 'var(--sp-fg)',
+                      }}
+                    >
+                      {formatTonnes(volModel.volWeekTon)}
+                    </span>
+                    <span className="pb-2 text-[13px] font-medium" style={{ color: 'var(--sp-muted)' }}>
+                      ton
+                    </span>
+                  </div>
+                  <HeroSparkSvg series={volModel.sparkDaily} accent="#3b82f6" />
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {volModel.deltaPct != null && volModel.deltaPct !== 0 ? (
+                    <span
+                      className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tabular-nums"
+                      style={{
+                        background: 'rgba(59, 130, 246, 0.14)',
+                        color: 'var(--sp-accent)',
+                      }}
+                    >
+                      {volModel.deltaPct > 0 ? '+' : ''}
+                      {volModel.deltaPct}%
+                    </span>
+                  ) : null}
+                  <span className="text-[11px]" style={{ color: 'var(--sp-muted)' }}>
+                    {es ? 'vs semana pasada' : 'vs last week'}
+                  </span>
+                </div>
+
+                <div className="mt-5 flex items-end justify-between gap-3">
+                  <div className="flex flex-1 justify-between gap-1">
+                    {volModel.weekBars.map((b) => (
+                      <div key={b.dayKey} className="flex flex-1 flex-col items-center gap-1">
+                        <div
+                          className="w-full max-w-[28px] rounded-sm"
+                          style={{
+                            height: 22,
+                            border:
+                              b.isToday && !b.hit
+                                ? '1px dashed rgba(243,244,246,0.28)'
+                                : b.hit
+                                  ? 'none'
+                                  : '1px solid var(--sp-stroke)',
+                            background: b.hit ? 'rgba(59, 130, 246, 0.35)' : 'transparent',
+                          }}
+                        />
+                        <span className="text-[9px] font-semibold" style={{ color: 'var(--sp-muted)' }}>
+                          {b.letter}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div
+                      className="num tabular-nums leading-none"
+                      style={{
+                        fontFamily: "'Barlow Condensed',sans-serif",
+                        fontSize: 18,
+                        fontWeight: 800,
+                        color: 'var(--sp-fg)',
+                      }}
+                    >
+                      {daysHit}/{metaDays}
+                    </div>
+                    <div className="mt-1 text-[9px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--sp-muted)' }}>
+                      {es ? 'Meta sem' : 'Week goal'}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {/* KPI strip */}
+            <div
+              className="grid grid-cols-4 rounded-[12px] border"
+              style={{
+                borderColor: 'var(--sp-stroke)',
+                background: 'var(--sp-surface)',
+                minHeight: 70,
+              }}
+            >
+              {kpiRows.map((k, idx) => (
+                <div
+                  key={k.id}
+                  className="flex flex-col justify-center px-2 py-2.5 text-center"
+                  style={{
+                    borderLeft: idx > 0 ? '1px solid var(--sp-stroke)' : undefined,
+                  }}
+                >
+                  <div
+                    className="text-[9px] font-semibold uppercase tracking-[0.12em]"
+                    style={{ color: 'var(--sp-muted)' }}
+                  >
+                    {k.label}
+                  </div>
+                  <div
+                    className="num mt-1 tabular-nums leading-none"
+                    style={{
+                      fontFamily: "'Barlow Condensed',sans-serif",
+                      fontSize: 22,
+                      fontWeight: 800,
+                      letterSpacing: '-0.02em',
+                      color: k.pr ? 'var(--sp-pr)' : 'var(--sp-fg)',
+                    }}
+                  >
+                    {k.val == null || k.val === '' ? '—' : k.val}
+                  </div>
+                  <div className="mt-1 text-[9.5px] leading-tight" style={{ color: 'var(--sp-muted)' }}>
+                    {k.sub}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Achievements */}
+            <div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--sp-muted)' }}>
+                {es ? 'Logros' : 'Achievements'}
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-1 sp-scroll-hide">
+                {achievements.map((a) => {
+                  const locked = !a.unlocked
+                  const showDot = a.unlocked && !seenAch.has(a.id)
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      className="relative flex w-[146px] shrink-0 flex-col rounded-[12px] border p-3 text-left transition-opacity"
+                      style={{
+                        borderColor: locked ? 'var(--sp-stroke)' : 'var(--sp-stroke)',
+                        borderStyle: locked ? 'dashed' : 'solid',
+                        background: 'var(--sp-surface-high)',
+                        opacity: locked ? 0.55 : 1,
+                      }}
+                      onClick={() => {
+                        if (a.unlocked) markAchSeen(a.id)
+                      }}
+                    >
+                      {showDot ? (
+                        <span
+                          className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full"
+                          style={{ background: 'var(--sp-pr)' }}
+                        />
+                      ) : null}
+                      <Medal
+                        className="h-5 w-5 shrink-0"
+                        strokeWidth={2}
+                        style={{ color: locked ? 'var(--sp-muted)' : 'var(--sp-pr)' }}
+                      />
+                      <div className="mt-2 text-[12px] font-semibold leading-snug" style={{ color: 'var(--sp-fg)' }}>
+                        {a.title}
+                      </div>
+                      <div className="mt-1 text-[10px] leading-snug" style={{ color: 'var(--sp-muted)' }}>
+                        {locked ? a.sub : es ? 'Desbloqueado' : 'Unlocked'}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Links sesiones / fotos */}
+            <div className="flex flex-wrap gap-4 border-t pt-3 text-[12px] font-semibold" style={{ borderColor: 'var(--sp-stroke)' }}>
+              <button
+                type="button"
+                className="border-0 bg-transparent p-0"
+                style={{ color: 'var(--sp-accent)' }}
+                onClick={() => setSubView('sessions')}
+              >
+                {es ? 'Historial de sesiones' : 'Session history'}
+              </button>
+              <button
+                type="button"
+                className="border-0 bg-transparent p-0"
+                style={{ color: 'var(--sp-accent)' }}
+                onClick={() => setSubView('photos')}
+              >
+                {es ? 'Fotos de progreso' : 'Progress photos'}
+              </button>
+            </div>
+
             <ProgressChartsPanel
               progress={progress}
               EX={EX}
@@ -204,10 +591,10 @@ export default function StudentProgressSection({
               es={es}
               sbData={sbData}
               loadingSb={loadingSb}
+              emptySkeleton={!loadingSb && !hasData}
             />
-          </TabsContent>
-        </Tabs>
-        </div>
+          </>
+        )}
       </div>
     </div>
   )

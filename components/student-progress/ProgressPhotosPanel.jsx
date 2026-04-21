@@ -99,7 +99,7 @@ export function ProgressPhotosPanel({ sharedParam, sb, es, esEntrenador }) {
               <img
                 src={f.imagen}
                 alt=""
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="h-full w-full object-cover"
               />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-2 text-xs font-bold text-white">{f.fecha}</div>

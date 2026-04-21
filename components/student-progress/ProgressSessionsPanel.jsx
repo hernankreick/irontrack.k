@@ -63,7 +63,11 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
     return (
       <div className="flex flex-col gap-6">
         {[1, 2, 3].map((i) => (
-          <div key={`sk-ses-${i}`} className="sk h-16 rounded-xl" />
+          <div
+            key={`sk-ses-${i}`}
+            className="sk h-16 rounded-[12px]"
+            style={{ border: '1px solid rgba(255,255,255,0.065)', background: '#14161A' }}
+          />
         ))}
       </div>
     )
@@ -72,9 +76,10 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
   if (sesionesData.length === 0) {
     return (
       <div className="py-10 text-center">
-        <div className="mb-3 text-4xl">📋</div>
-        <div className="mb-2 text-lg font-bold text-[#f0f6ff]">{es ? 'Sin sesiones aún' : 'No sessions yet'}</div>
-        <p className="text-sm text-[#7c8db0]">
+        <div className="mb-2 text-lg font-semibold" style={{ color: 'var(--sp-fg, #f3f4f6)' }}>
+          {es ? 'Sin sesiones aún' : 'No sessions yet'}
+        </div>
+        <p className="text-sm" style={{ color: 'rgba(243,244,246,0.5)' }}>
           {es
             ? 'Completá tu primer entrenamiento para ver el historial aquí'
             : 'Complete your first workout to see your history here'}
@@ -102,14 +107,16 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
         return (
           <div
             key={`hist-wk-${wk}`}
-            className="overflow-hidden rounded-xl border border-[#1e3050] bg-[#131b2e]"
+            className="overflow-hidden rounded-[12px] border bg-[var(--sp-surface,#14161A)]"
+            style={{ borderColor: 'rgba(255,255,255,0.065)' }}
           >
             <button
               type="button"
               className={cn(
                 'flex min-h-[48px] w-full items-center justify-between gap-2 px-4 py-4 text-left transition-colors',
-                expanded ? 'bg-[#162038]' : 'bg-[#131b2e]'
+                expanded ? 'bg-[var(--sp-surface-high,#1A1D22)]' : ''
               )}
+              style={{ background: expanded ? undefined : 'var(--sp-surface,#14161A)' }}
               onClick={() => setOpenWeek(expanded ? null : wk)}
             >
               <div className="flex items-center gap-2">
@@ -117,46 +124,56 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
                   className="inline-flex transition-transform"
                   style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
                 >
-                  <ChevronRight className="h-5 w-5 text-[#2563eb]" />
+                  <ChevronRight className="h-5 w-5" strokeWidth={2} style={{ color: '#3b82f6' }} />
                 </span>
-                <span className="text-base font-extrabold text-[#f0f6ff]">{label}</span>
+                <span className="text-base font-bold" style={{ color: 'var(--sp-fg,#f3f4f6)' }}>
+                  {label}
+                </span>
               </div>
               <Badge
                 variant="default"
-                className={cn(
-                  'shrink-0 border text-[11px]',
-                  done
-                    ? 'border-[#4ade80]/40 bg-[#4ade80]/15 text-[#4ade80]'
-                    : 'border-[#2563eb]/35 bg-[#2563eb]/15 text-[#3b82f6]'
-                )}
+                className="shrink-0 border text-[11px]"
+                style={{
+                  borderColor: done ? 'rgba(59, 130, 246, 0.35)' : 'rgba(255,255,255,0.065)',
+                  background: done ? 'rgba(59, 130, 246, 0.14)' : 'transparent',
+                  color: '#3b82f6',
+                }}
               >
                 {ratio}
               </Badge>
             </button>
 
             {expanded && (
-              <div className="flex flex-col gap-6 border-t border-[#1e3050] bg-[#0d1117]/50 px-2 py-4">
+              <div
+                className="flex flex-col gap-6 border-t px-2 py-4"
+                style={{ borderColor: 'rgba(255,255,255,0.065)', background: 'rgba(10,11,13,0.5)' }}
+              >
                 {list.map((s, i) => (
                   <div
                     key={s.id || `sesion-${wk}-${i}`}
-                    className="rounded-xl border border-[#1e3050] bg-[#131b2e] p-3"
+                    className="rounded-[12px] border p-3"
+                    style={{ borderColor: 'rgba(255,255,255,0.065)', background: 'var(--sp-surface,#14161A)' }}
                   >
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2">
-                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#4ade80]" />
+                        <CheckCircle2
+                          className="mt-0.5 h-5 w-5 shrink-0"
+                          strokeWidth={2}
+                          style={{ color: '#3b82f6' }}
+                        />
                         <div>
-                          <div className="font-extrabold text-[#4ade80]">
-                            {s.dia_label || (es ? 'Día' : 'Day')}
+                          <div className="font-bold" style={{ color: 'var(--sp-fg,#f3f4f6)' }}>
+                            {s.dia_label || (es ? 'Sesión' : 'Session')}
                           </div>
-                          <div className="mt-0.5 text-xs text-[#7c8db0]">
+                          <div className="mt-0.5 text-xs" style={{ color: 'rgba(243,244,246,0.5)' }}>
                             {s.fecha}
                             {s.hora ? ` · ${s.hora}` : ''}
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="mb-2 text-xs font-bold uppercase tracking-wide text-[#4ade80]">
-                      {s.rutina_nombre || (es ? 'full body' : 'full body')}
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'rgba(243,244,246,0.45)' }}>
+                      {s.rutina_nombre || ''}
                     </div>
                     {s.ejercicios && (
                       <div className="flex flex-wrap gap-1.5">
@@ -165,7 +182,11 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
                           return ex ? (
                             <span
                               key={`${s.id}-${exId}`}
-                              className="rounded-md bg-[#1a2540] px-2 py-1 text-[11px] font-semibold text-[#7c8db0]"
+                              className="rounded-md px-2 py-1 text-[11px] font-semibold"
+                              style={{
+                                background: 'var(--sp-surface-high,#1A1D22)',
+                                color: 'rgba(243,244,246,0.55)',
+                              }}
                             >
                               {es ? ex.name : ex.nameEn || ex.name}
                             </span>

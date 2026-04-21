@@ -2642,7 +2642,7 @@ function GymApp() {
           (showCoachDesktopShell && !esAlumno
             ? "px-0 "
             : tab === "progress" && showAlumnoProgressStack
-              ? "px-5 "
+              ? "px-0 "
               : esAlumno && (tab === "plan" || tab === "library")
                 ? "px-7 "
                 : "px-6 ") +
@@ -2700,7 +2700,7 @@ function GymApp() {
           overscrollBehavior: "contain",
           background: darkMode
             ? esAlumno && tab === "progress"
-              ? "#0d1117"
+              ? "#0A0B0D"
               : "#0B1120"
             : showCoachDesktopShell && !esAlumno
               ? "#ffffff"
@@ -3743,6 +3743,7 @@ function GymApp() {
             expectedDaysPerWeek={routineDaysCount}
             onSettings={()=>setSettingsOpen(true)}
             onAvatarClick={()=>setUserMenuOpen(function(v){ return !v; })}
+            onRegistrarPrimerEntrenamiento={()=>setTab("plan")}
             esEntrenador={false}
           />
         )}
@@ -5614,9 +5615,11 @@ function GymApp() {
       {!hideGlobalBottomNavCoachDash && !(showCoachDesktopShell && coachDesktop1024) && (
       <nav style={{
         position:"fixed",bottom:0,left:0,right:0,
-        background:darkMode?"rgba(15,25,35,0.96)":"rgba(255,255,255,0.96)",
-        backdropFilter:"blur(12px)",
-        borderTop:"1px solid "+(darkMode?"#1E2D40":"#E2E8F0"),
+        background: esAlumno && tab==="progress"
+          ? "rgba(10,11,13,0.92)"
+          : darkMode?"rgba(15,25,35,0.96)":"rgba(255,255,255,0.96)",
+        backdropFilter: esAlumno && tab==="progress" ? "blur(20px)" : "blur(12px)",
+        borderTop:"1px solid "+(esAlumno && tab==="progress" ? "rgba(255,255,255,0.065)" : (darkMode?"#1E2D40":"#E2E8F0")),
         display:"flex",zIndex:40,
         paddingBottom:"env(safe-area-inset-bottom,0px)"
       }}>
