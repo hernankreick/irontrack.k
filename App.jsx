@@ -426,7 +426,7 @@ const sb = {
 const uid = () => Math.random().toString(36).slice(2,9);
 
 
-function PagoAlumno({aliasData, es, toast2, darkMode}) {
+function PagoAlumno({aliasData, es, toast2, darkMode, msg}) {
   const {bg, bgCard, bgSub, border, textMain, textMuted} = getTheme(darkMode);
   const [pagoVisible, setPagoVisible] = React.useState(() =>
     localStorage.getItem("it_pago_cerrado") !== "true"
@@ -529,7 +529,7 @@ function PagoAlumno({aliasData, es, toast2, darkMode}) {
   );
 }
 
-function FotosSlider({fotos, es, darkMode, toast2, sb, sessionData, setFotos}) {
+function FotosSlider({fotos, es, darkMode, toast2, sb, sessionData, setFotos, msg}) {
   const {bg, bgCard, bgSub, border, textMain, textMuted} = getTheme(darkMode);
 const [sliderPos, setSliderPos] = React.useState(50);
 const [isDragging, setIsDragging] = React.useState(false);
@@ -593,7 +593,7 @@ function getTheme(darkMode) {
   };
 }
 
-function RecordatoriosPanel({es, darkMode, toast2}) {
+function RecordatoriosPanel({es, darkMode, toast2, msg}) {
   const {bg, bgCard, bgSub, border, textMain, textMuted} = getTheme(darkMode);
 const DIAS = es
   ? ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"]
@@ -2655,7 +2655,7 @@ function GymApp() {
               : "min-w-0 w-full"
           }
         >
-        {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} toast2={toast2}/>}
+        {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} darkMode={darkMode} toast2={toast2} msg={msg}/>}
         {(tab==="plan"||tab==="progress")&&!esAlumno&&sessionData?.role==="entrenador"&&(
               <CoachDashboard
                 activeNav={tab==="progress"?"progreso":"dashboard"}
@@ -4411,9 +4411,9 @@ function GymApp() {
         );
       })()}
       {profileModalOpen&&sessionData&&esAlumno&&(
-        <div style={{position:"fixed",inset:0,zIndex:205,background:"rgba(10,22,40,.78)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+        <div style={{position:"fixed",inset:0,zIndex:350,background:"rgba(10,22,40,.78)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:"env(safe-area-inset-bottom,0px)"}}
           onClick={()=>setProfileModalOpen(false)}>
-          <div style={{background:"#0a1628",borderRadius:"20px 20px 0 0",padding:"12px 18px 36px",width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.22)",animation:"slideUpFade 0.35s ease",maxHeight:"92dvh",overflowY:"auto",boxShadow:"0 -8px 40px rgba(0,0,0,.45)"}}
+          <div style={{background:"#0a1628",borderRadius:"20px 20px 0 0",padding:"12px 18px calc(28px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.22)",animation:"slideUpFade 0.35s ease",maxHeight:"min(92dvh, 100dvh - env(safe-area-inset-top, 0px) - 8px)",minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain",boxShadow:"0 -8px 40px rgba(0,0,0,.45)"}}
             onClick={e=>e.stopPropagation()}>
             <div style={{width:40,height:4,background:"#3b82f6",borderRadius:2,margin:"0 auto 16px"}}/>
             <div style={{fontSize:18,fontWeight:800,marginBottom:18,color:"#fff",letterSpacing:0.5}}>{msg("Mi perfil", "My profile")}</div>
@@ -4497,9 +4497,9 @@ function GymApp() {
         />
       )}
       {settingsOpen && esAlumno && (
-        <div style={{position:"fixed",inset:0,background:"rgba(10,22,40,.75)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center",overflow:"hidden"}}
+        <div style={{position:"fixed",inset:0,background:"rgba(10,22,40,.75)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",zIndex:350,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:"env(safe-area-inset-bottom,0px)"}}
           onClick={()=>setSettingsOpen(false)}>
-          <div style={{background:"#0a1628",borderRadius:"16px 16px 0 0",paddingTop:20,paddingLeft:16,paddingRight:16,paddingBottom:120,width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.2)",animation:"slideUpFade 0.3s ease",maxHeight:"92dvh",overflowX:"hidden",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}
+          <div style={{background:"#0a1628",borderRadius:"16px 16px 0 0",paddingTop:20,paddingLeft:16,paddingRight:16,paddingBottom:"calc(96px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:480,border:"1px solid rgba(59,130,246,.2)",animation:"slideUpFade 0.3s ease",maxHeight:"min(92dvh, 100dvh - env(safe-area-inset-top, 0px) - 8px)",minHeight:0,overflowX:"hidden",overflowY:"auto",WebkitOverflowScrolling:"touch",overscrollBehavior:"contain"}}
             onClick={e=>e.stopPropagation()}>
             <div style={{width:40,height:4,background:"#3b82f6",borderRadius:2,margin:"0 auto 20px"}}/>
             <div style={{fontSize:18,fontWeight:800,letterSpacing:1,marginBottom:20,color:"#fff"}}><Ic name="settings" size={18} color="#3b82f6"/> {msg("CONFIGURACIÓN", "SETTINGS")}</div>
@@ -4540,7 +4540,7 @@ function GymApp() {
                   </a>
                   <div style={{textAlign:"center",marginTop:12,fontSize:12,color:"#64748b"}}>Iron Track v1.0.0</div>
                 </div>
-                <RecordatoriosPanel es={es} darkMode={darkMode} toast2={toast2}/>
+                <RecordatoriosPanel es={es} darkMode={darkMode} toast2={toast2} msg={msg}/>
                 <div style={{marginTop:22,paddingTop:16,borderTop:"1px solid rgba(239,68,68,.25)"}}>
                   <div style={{fontSize:11,fontWeight:700,color:"#f87171",letterSpacing:1.2,marginBottom:10}}>{msg("ZONA DE PELIGRO", "DANGER ZONE")}</div>
                   <button type="button" className="hov" style={{width:"100%",padding:"14px",background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.35)",borderRadius:12,color:"#f87171",fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
@@ -5962,7 +5962,7 @@ function HistorialSesiones({sharedParam, sb, EX, darkMode, es, sesiones: sesione
   );
 }
 
-function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
+function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2, msg}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
@@ -6026,7 +6026,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2}) {
           {uploading ? "Subiendo..." : "📸 SUBIR FOTO DE PROGRESO"}
         </button>
       )}
-      {fotos.length>=2&&<FotosSlider es={es} darkMode={darkMode} toast2={toast2} sb={sb} sessionData={sessionData}/>}
+      {fotos.length>=2&&<FotosSlider es={es} darkMode={darkMode} toast2={toast2} sb={sb} sessionData={sessionData} msg={msg}/>}
 
       {fotos.length===0&&(
       <div style={{textAlign:"center",padding:"32px 16px"}}>
