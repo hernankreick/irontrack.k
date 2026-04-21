@@ -24,7 +24,8 @@ import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
-import { Calendar as CalNavIcon, Dumbbell, TrendingUp as TrendNavIcon } from 'lucide-react';
+import { Calendar as CalNavIcon, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
+import { getAndroidAppDownloadUrl } from './lib/androidAppLink.js';
 
 
 /** Barra de pausa del alumno (fuera de sesión): el countdown vive aquí para no re-renderizar GymApp cada tick. */
@@ -941,6 +942,9 @@ function GymApp() {
   const msg = useCallback(function (esStr, enStr, ptStr) {
     return irontrackMsg(lang, esStr, enStr, ptStr);
   }, [lang]);
+  const androidAppDownloadUrl = useMemo(function () {
+    return getAndroidAppDownloadUrl();
+  }, []);
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
   const [progress, setProgress] = useState(() => { try{return JSON.parse(localStorage.getItem("it_pg")||"{}")}catch(e){return {}} });
   const [user, setUser] = useState(() => { try{return JSON.parse(localStorage.getItem("it_u")||"null")}catch(e){return null} });
@@ -2418,6 +2422,68 @@ function GymApp() {
         </div>
         <div className="relative flex items-center gap-2">
           {session&&<span style={{...tag("#22C55E"),fontSize:13}}>✓ Sesion activa</span>}
+          {esAlumno && tab === "plan" && (
+            androidAppDownloadUrl ? (
+              <a
+                className="hov"
+                href={androidAppDownloadUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={msg("Descargar app para Android", "Download Android app", "Baixar app Android")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 10px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(61,220,132,0.35)",
+                  background: "rgba(61,220,132,0.08)",
+                  color: "#86efac",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  textDecoration: "none",
+                  fontFamily: "inherit",
+                  flexShrink: 0,
+                }}
+              >
+                <DownloadNavIcon size={16} strokeWidth={2.25} aria-hidden />
+                <span className="hidden min-[380px]:inline">{msg("Android", "Android", "Android")}</span>
+              </a>
+            ) : (
+              <button
+                type="button"
+                className="hov"
+                aria-label={msg("App Android (enlace pendiente)", "Android app (link pending)", "App Android (link pendente)")}
+                onClick={function () {
+                  toast2(
+                    msg(
+                      "El enlace de descarga Android aún no está configurado. Consultá con tu entrenador.",
+                      "The Android download link is not set yet. Ask your coach.",
+                      "O link de download Android ainda não está configurado. Pergunte ao seu treinador."
+                    )
+                  );
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 10px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(148,163,184,0.35)",
+                  background: "rgba(148,163,184,0.08)",
+                  color: textMuted,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  flexShrink: 0,
+                }}
+              >
+                <DownloadNavIcon size={16} strokeWidth={2.25} aria-hidden />
+                <span className="hidden min-[380px]:inline">{msg("Android", "Android", "Android")}</span>
+              </button>
+            )
+          )}
           <button className="hov" style={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSettingsOpen(true)}><Ic name="settings" size={18} color={textMuted}/></button>
           {sessionData&&esAlumno
             ? <button className="hov" style={{width:36,height:36,background:"linear-gradient(135deg,#1E3A5F,#2563EB)",border:"none",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff"}} onClick={()=>setUserMenuOpen(!userMenuOpen)}>
