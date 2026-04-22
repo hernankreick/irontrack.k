@@ -993,6 +993,52 @@ function GymApp() {
   const androidAppDownloadUrl = useMemo(function () {
     return getAndroidAppDownloadUrl();
   }, []);
+  /** PWA instalada: ocultar CTA "Instalar app" en header alumno. */
+  const [isPWAInstalled, setIsPWAInstalled] = useState(false);
+  /** Evento beforeinstallprompt (Chrome/Edge); null si no aplica. */
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
+
+  useLayoutEffect(function () {
+    if (typeof window === "undefined") return undefined;
+    function computePWAInstalled() {
+      try {
+        if (window.matchMedia("(display-mode: standalone)").matches) return true;
+        if (window.matchMedia("(display-mode: fullscreen)").matches) return true;
+        if (window.matchMedia("(display-mode: minimal-ui)").matches) return true;
+      } catch (e) {}
+      try {
+        if (window.navigator.standalone === true) return true;
+      } catch (e2) {}
+      return false;
+    }
+    function refreshInstalled() {
+      setIsPWAInstalled(computePWAInstalled());
+    }
+    refreshInstalled();
+    var mq = window.matchMedia("(display-mode: standalone)");
+    var onDisplayModeChange = function () {
+      refreshInstalled();
+    };
+    if (mq.addEventListener) mq.addEventListener("change", onDisplayModeChange);
+    else mq.addListener(onDisplayModeChange);
+    function onBeforeInstallPrompt(e) {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    }
+    function onAppInstalled() {
+      setIsPWAInstalled(true);
+      setDeferredInstallPrompt(null);
+    }
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+    return function () {
+      if (mq.removeEventListener) mq.removeEventListener("change", onDisplayModeChange);
+      else mq.removeListener(onDisplayModeChange);
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, []);
+
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
   const [progress, setProgress] = useState(() => { try{return JSON.parse(localStorage.getItem("it_pg")||"{}")}catch(e){return {}} });
   const [user, setUser] = useState(() => { try{return JSON.parse(localStorage.getItem("it_u")||"null")}catch(e){return null} });
@@ -1051,6 +1097,9 @@ function GymApp() {
   const studentHeaderShellLockedHeightPxRef = useRef(0);
   const shellMeasureRafRef = useRef(null);
   const scrollRef = useRef(null);
+  /** Barra superior fija (alumno): transform al llegar al final del scroll. */
+  const alumnoAppHeaderRef = useRef(null);
+  const alumnoTopBarSpacerRef = useRef(null);
   const profileFileRef = useRef(null);
   const lastScrollY = useRef(0);
   const tickingRef = useRef(false);
@@ -1135,6 +1184,29 @@ function GymApp() {
         return;
       }
       var ctx = planScrollCtxRef.current;
+      /** Ocultar header global del alumno al final del scroll (Plan / Ejercicios / Progreso). */
+      var nav = alumnoAppHeaderRef.current;
+      if (nav && ctx.alumnoFixedTabs) {
+        var scrollable = attachedEl.scrollHeight > attachedEl.clientHeight + 40;
+        var fromBottom = attachedEl.scrollHeight - attachedEl.clientHeight - attachedEl.scrollTop;
+        var hideTop = scrollable && fromBottom <= 40;
+        var tr = hideTop ? "translate3d(0,-110%,0)" : "translate3d(0,0,0)";
+        nav.style.transform = tr;
+        nav.style.transition = planScrollDiag.planHeaderLayerTransitions ? "transform 0.22s ease" : "none";
+        var sp = alumnoTopBarSpacerRef.current;
+        if (sp) {
+          sp.style.height = hideTop ? "0px" : ctx.alumnoTopBarPx + "px";
+          sp.style.transition = planScrollDiag.planHeaderLayerTransitions ? "height 0.22s ease" : "none";
+        }
+      } else if (nav && !ctx.alumnoFixedTabs) {
+        nav.style.transform = "";
+        nav.style.transition = "";
+        var sp0 = alumnoTopBarSpacerRef.current;
+        if (sp0) {
+          sp0.style.height = "";
+          sp0.style.transition = "";
+        }
+      }
       if (!ctx.headerCollapse || !ctx.alumnoPlan) {
         tickingRef.current = false;
         return;
@@ -1650,6 +1722,18 @@ function GymApp() {
     setTimeout(() => setToast(null), 2200);
   }, []);
 
+  const onAlumnoInstallAppClick = useCallback(async function () {
+    if (deferredInstallPrompt) {
+      try {
+        deferredInstallPrompt.prompt();
+        await deferredInstallPrompt.userChoice;
+      } catch (e) {}
+      setDeferredInstallPrompt(null);
+    } else if (androidAppDownloadUrl) {
+      window.open(androidAppDownloadUrl, "_blank", "noopener,noreferrer");
+    }
+  }, [deferredInstallPrompt, androidAppDownloadUrl]);
+
   /** Recordatorios de entrenamiento (alumno): comprobar hora mientras la app está abierta. */
   React.useEffect(function () {
     if (typeof window === "undefined") return;
@@ -2069,13 +2153,32 @@ function GymApp() {
   /** En desktop el coach usa sidebar App; en móvil necesita la bottom nav también en Dashboard. */
   const hideGlobalBottomNavCoachDash =
     !esAlumno && sessionData?.role === "entrenador" && coachDesktopBleedTab && coachDesktop1024;
-  const alumnoTopBarFixed = !!(esAlumno && (tab === "plan" || tab === "library"));
+  const alumnoTopBarFixed = !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress"));
   const alumnoTopBarHeight = alumnoTopBarFixed ? 74 : 0;
 
   planScrollCtxRef.current = {
     alumnoPlan: !!(esAlumno && tab === "plan"),
     headerCollapse: !!planScrollDiag.headerCollapseOnScroll,
+    alumnoFixedTabs: !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress")),
+    alumnoTopBarPx: alumnoTopBarHeight,
   };
+
+  /** Al cambiar de pestaña, restaurar barra superior (por si quedó oculta al final del scroll). */
+  useLayoutEffect(
+    function () {
+      var nav = alumnoAppHeaderRef.current;
+      var sp = alumnoTopBarSpacerRef.current;
+      if (nav) {
+        nav.style.transform = "";
+        nav.style.transition = "";
+      }
+      if (sp && alumnoTopBarFixed) {
+        sp.style.height = alumnoTopBarHeight + "px";
+        sp.style.transition = "";
+      }
+    },
+    [tab, alumnoTopBarFixed, alumnoTopBarHeight]
+  );
 
   /** Altura del shell: medición monótona (solo crece) + height fija = slot estable; el colapso es solo transform/opacity. */
   useLayoutEffect(function () {
@@ -2416,8 +2519,9 @@ function GymApp() {
           className={showCoachDesktopShell ? "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden" : undefined}
           style={showCoachDesktopShell ? undefined : { display: "contents" }}
         >
-      {!(esAlumno && tab === "progress") && !coachSuppressTopNav && (
+      {!coachSuppressTopNav && (
       <div
+        ref={alumnoAppHeaderRef}
         className={
           "relative z-50 flex items-center justify-between pb-3 pt-4 " +
           (darkMode ? "border-b border-[#2D4057] bg-[#0F1923]" : showCoachDesktopShell && !esAlumno ? "border-b border-slate-200 bg-white" : "border-b border-[#2D4057] bg-[#F0F4F8]")
@@ -2474,77 +2578,99 @@ function GymApp() {
             </button>
           )}
           <IronTrackLogo
-            size={22}
+            size={esAlumno ? 24 : 22}
             color="#2563EB"
+            {...(darkMode && (readOnly || esAlumno)
+              ? { ironColor: "#ffffff", trackColor: "#2563EB", barColor: "#2563EB" }
+              : darkMode && !esAlumno && sessionData
+                ? { ironColor: "#ffffff", trackColor: "#2563EB", barColor: "#2563EB" }
+                : {})}
             showBar={true}
-            mode={(readOnly||esAlumno)?(msg("MODO ALUMNO", "ATHLETE MODE")):(!esAlumno&&sessionData?(msg("MODO ENTRENADOR", "COACH MODE")):null)}
-            modeColor={(readOnly||esAlumno)?"#22C55E":"#2563EB"}
+            modeFontSize={esAlumno ? 12 : 11}
+            mode={
+              (readOnly || esAlumno) && sessionData
+                ? msg("Modo alumno", "Athlete mode") +
+                  ": " +
+                  (String(sessionData.name || "").trim() || msg("Atleta", "Athlete"))
+                : !esAlumno && sessionData
+                  ? msg("Modo entrenador", "Coach mode") +
+                    (String(sessionData.name || "").trim() ? ": " + String(sessionData.name || "").trim() : "")
+                  : null
+            }
+            modeColor={darkMode ? "#94a3b8" : "#64748B"}
           />
         </div>
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex items-center gap-3">
           {session&&<span style={{...tag("#22C55E"),fontSize:13}}>✓ Sesion activa</span>}
-          {esAlumno && tab === "plan" && (
-            androidAppDownloadUrl ? (
-              <a
-                className="hov"
-                href={androidAppDownloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={msg("Descargar app para Android", "Download Android app", "Baixar app Android")}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 10px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(61,220,132,0.35)",
-                  background: "rgba(61,220,132,0.08)",
-                  color: "#86efac",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  textDecoration: "none",
-                  fontFamily: "inherit",
-                  flexShrink: 0,
-                }}
-              >
-                <DownloadNavIcon size={16} strokeWidth={2.25} aria-hidden />
-                <span className="hidden min-[380px]:inline">{msg("Android", "Android", "Android")}</span>
-              </a>
-            ) : (
-              <button
-                type="button"
-                className="hov"
-                aria-label={msg("App Android (enlace pendiente)", "Android app (link pending)", "App Android (link pendente)")}
-                onClick={function () {
-                  toast2(
-                    msg(
-                      "El enlace de descarga Android aún no está configurado. Consultá con tu entrenador.",
-                      "The Android download link is not set yet. Ask your coach.",
-                      "O link de download Android ainda não está configurado. Pergunte ao seu treinador."
-                    )
-                  );
-                }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 10px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(148,163,184,0.35)",
-                  background: "rgba(148,163,184,0.08)",
-                  color: textMuted,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  flexShrink: 0,
-                }}
-              >
-                <DownloadNavIcon size={16} strokeWidth={2.25} aria-hidden />
-                <span className="hidden min-[380px]:inline">{msg("Android", "Android", "Android")}</span>
-              </button>
-            )
-          )}
+          {esAlumno &&
+            (tab === "plan" || tab === "library" || tab === "progress") &&
+            !isPWAInstalled &&
+            (deferredInstallPrompt || androidAppDownloadUrl) && (
+              deferredInstallPrompt ? (
+                <button
+                  type="button"
+                  className="hov"
+                  onClick={onAlumnoInstallAppClick}
+                  aria-label={msg("Instalar app", "Install app", "Instalar app")}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    height: 44,
+                    minHeight: 44,
+                    paddingLeft: 20,
+                    paddingRight: 20,
+                    borderRadius: 9999,
+                    background: "#2563EB",
+                    color: "#fff",
+                    border: "none",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    flexShrink: 0,
+                    boxSizing: "border-box",
+                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.08)",
+                  }}
+                >
+                  <DownloadNavIcon size={19} strokeWidth={2.35} color="#ffffff" aria-hidden />
+                  {msg("Instalar app", "Install app", "Instalar app")}
+                </button>
+              ) : (
+                <a
+                  className="hov"
+                  href={androidAppDownloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={msg("Instalar app", "Install app", "Instalar app")}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    height: 44,
+                    minHeight: 44,
+                    paddingLeft: 20,
+                    paddingRight: 20,
+                    borderRadius: 9999,
+                    background: "#2563EB",
+                    color: "#fff",
+                    border: "none",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    textDecoration: "none",
+                    fontFamily: "inherit",
+                    flexShrink: 0,
+                    boxSizing: "border-box",
+                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.08)",
+                  }}
+                >
+                  <DownloadNavIcon size={19} strokeWidth={2.35} color="#ffffff" aria-hidden />
+                  {msg("Instalar app", "Install app", "Instalar app")}
+                </a>
+              )
+            )}
           <button className="hov" style={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSettingsOpen(true)}><Ic name="settings" size={18} color={textMuted}/></button>
           {sessionData&&esAlumno
             ? <button className="hov" style={{width:36,height:36,background:"linear-gradient(135deg,#1E3A5F,#2563EB)",border:"none",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff"}} onClick={()=>setUserMenuOpen(!userMenuOpen)}>
@@ -2557,7 +2683,9 @@ function GymApp() {
         </div>
       </div>
       )}
-      {alumnoTopBarFixed && <div style={{height: alumnoTopBarHeight}} />}
+      {alumnoTopBarFixed && (
+        <div ref={alumnoTopBarSpacerRef} style={{ height: alumnoTopBarHeight, flexShrink: 0 }} aria-hidden />
+      )}
       {sessionData && esAlumno && userMenuOpen && (
         <>
           <div style={{ position: "fixed", inset: 0, zIndex: 600 }} onClick={() => setUserMenuOpen(false)} />
@@ -2565,10 +2693,7 @@ function GymApp() {
             style={{
               position: "fixed",
               zIndex: 610,
-              top:
-                esAlumno && tab === "progress" && showAlumnoProgressStack
-                  ? "calc(max(2rem, env(safe-area-inset-top, 0px)) + 5.25rem)"
-                  : "calc(env(safe-area-inset-top, 0px) + 56px)",
+              top: "calc(env(safe-area-inset-top, 0px) + " + (alumnoTopBarFixed ? "78px" : "56px") + ")",
               right: 16,
               background: "#0a1628",
               border: "1px solid rgba(59,130,246,.25)",
@@ -2649,22 +2774,18 @@ function GymApp() {
           (showCoachDesktopShell && !esAlumno ? "overflow-x-hidden " : "") +
           (showCoachDesktopShell && !esAlumno
             ? "px-0 "
-            : tab === "progress" && showAlumnoProgressStack
-              ? "px-0 "
-              : esAlumno && (tab === "plan" || tab === "library")
-                ? "px-7 "
-                : "px-6 ") +
+            : esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
+              ? "px-7 "
+              : "px-6 ") +
           (showCoachDesktopShell && !esAlumno ? "lg:[scrollbar-gutter:stable] " : "") +
-          (!(esAlumno && tab === "progress") && !coachSuppressTopNav ? "mt-6 " : "") +
+          (!coachSuppressTopNav ? "mt-6 " : "") +
           (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
-          (tab === "progress" && showAlumnoProgressStack
+          (coachSuppressTopNav
             ? "pt-0 "
-            : tab === "progress"
-              ? "pt-[max(0.75rem,env(safe-area-inset-top,0px))] "
-              : coachSuppressTopNav
-                ? "pt-0 "
-              : esAlumno && (tab === "plan" || tab === "library")
-                ? "pt-8 "
+            : esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
+              ? "pt-8 "
+              : tab === "progress"
+                ? "pt-[max(0.75rem,env(safe-area-inset-top,0px))] "
                 : showCoachDesktopShell && !esAlumno
                   ? "pt-6 "
                   : "pt-6 ")
@@ -2677,11 +2798,9 @@ function GymApp() {
           height:
             showCoachDesktopShell && !esAlumno
               ? undefined
-              : esAlumno && tab === "progress" && showAlumnoProgressStack
-                ? "calc(100svh - 70px)"
-                : alumnoTopBarFixed
-                  ? "calc(100svh - 204px)"
-                  : "calc(100svh - 130px)",
+              : alumnoTopBarFixed
+                ? "calc(100svh - 204px)"
+                : "calc(100svh - 130px)",
           flex: alumnoFullScreenShell ? 1 : showCoachDesktopShell && !esAlumno ? 1 : undefined,
           minHeight: alumnoFullScreenShell ? 0 : showCoachDesktopShell && !esAlumno ? 0 : undefined,
           maxHeight: showCoachDesktopShell && !esAlumno ? "100%" : undefined,
@@ -2699,17 +2818,24 @@ function GymApp() {
                 ? "calc(1rem + env(safe-area-inset-bottom, 0px))"
                 : "calc(5.5rem + env(safe-area-inset-bottom, 0px))"
               : "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
-          paddingLeft: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
-          paddingRight: esAlumno && (tab === "plan" || tab === "library") ? 20 : undefined,
-          paddingTop: esAlumno && (tab === "plan" || tab === "library") ? 32 : undefined,
+          paddingLeft:
+            esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
+              ? 20
+              : undefined,
+          paddingRight:
+            esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
+              ? 20
+              : undefined,
+          paddingTop:
+            esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
+              ? 32
+              : undefined,
           WebkitOverflowScrolling: "touch",
           scrollBehavior: "auto",
           overflowAnchor: "none",
           overscrollBehavior: "contain",
           background: darkMode
-            ? esAlumno && tab === "progress"
-              ? "#0A0B0D"
-              : "#0B1120"
+            ? "#0B1120"
             : showCoachDesktopShell && !esAlumno
               ? "#ffffff"
               : "#F1F5F9",
@@ -3685,8 +3811,6 @@ function GymApp() {
             sharedParam={sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId}))}
             es={es}
             expectedDaysPerWeek={routineDaysCount}
-            onSettings={()=>setSettingsOpen(true)}
-            onAvatarClick={()=>setUserMenuOpen(function(v){ return !v; })}
             onRegistrarPrimerEntrenamiento={()=>setTab("plan")}
             esEntrenador={false}
           />

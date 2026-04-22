@@ -1,5 +1,5 @@
 import React from 'react'
-import { Settings, Medal } from 'lucide-react'
+import { Medal } from 'lucide-react'
 import { ProgressChartsPanel } from './ProgressChartsPanel.jsx'
 import { ProgressSessionsPanel } from './ProgressSessionsPanel.jsx'
 import { ProgressPhotosPanel } from './ProgressPhotosPanel.jsx'
@@ -73,8 +73,6 @@ export default function StudentProgressSection({
   sharedParam,
   es,
   expectedDaysPerWeek,
-  onSettings,
-  onAvatarClick,
   onRegistrarPrimerEntrenamiento,
   esEntrenador = false,
 }) {
@@ -138,7 +136,6 @@ export default function StudentProgressSection({
   const daysHit = trainingDaysThisWeek(sesiones, progress, sbData)
 
   const displayName = (sessionData?.name || '').trim() || (es ? 'Atleta' : 'Athlete')
-  const initials = (sessionData?.name || 'U').slice(0, 2).toUpperCase()
 
   const markAchSeen = (id) => {
     setSeenAch((prev) => {
@@ -244,60 +241,6 @@ export default function StudentProgressSection({
         fontVariantNumeric: 'tabular-nums',
       }}
     >
-      <header
-        className="shrink-0 border-b pt-[max(0.75rem,env(safe-area-inset-top,0px))]"
-        style={{ borderColor: 'var(--sp-stroke)', background: 'var(--sp-bg)' }}
-      >
-        <div
-          className="mx-auto flex w-full max-w-[32rem] items-start justify-between gap-3 pb-3"
-          style={{ paddingInline: 'var(--page-gutter)', boxSizing: 'border-box' }}
-        >
-          <div className="min-w-0">
-            <div
-              className="leading-none tracking-wide"
-              style={{
-                fontFamily: "'Barlow Condensed','Arial Black',sans-serif",
-                fontSize: 18,
-                fontWeight: 900,
-                letterSpacing: 2,
-                textTransform: 'uppercase',
-                color: 'var(--sp-accent)',
-              }}
-            >
-              IRONTRACK
-            </div>
-            <div className="mt-1.5 text-[11px] font-medium leading-snug" style={{ color: 'var(--sp-muted)' }}>
-              {es ? 'Modo Alumno' : 'Athlete mode'} · {displayName}
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              className="hov flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 transition-colors"
-              style={{
-                background: '#2D4057',
-                color: '#8B9AB2',
-              }}
-              aria-label={es ? 'Configuración' : 'Settings'}
-              onClick={() => onSettings?.()}
-            >
-              <Settings className="h-[18px] w-[18px]" strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              className="hov flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13px] font-extrabold leading-none text-white"
-              style={{
-                background: 'linear-gradient(135deg, #1E3A5F, #2563EB)',
-              }}
-              onClick={() => onAvatarClick?.()}
-              aria-label={es ? 'Menú usuario' : 'User menu'}
-            >
-              {initials}
-            </button>
-          </div>
-        </div>
-      </header>
-
       <div
         className="relative z-0 mx-auto flex w-full max-w-[32rem] flex-col gap-5 pb-8 pt-4"
         style={{ paddingInline: 'var(--page-gutter)', boxSizing: 'border-box' }}
