@@ -33,7 +33,7 @@ import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from 
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { Calendar as CalNavIcon, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
-import { getAndroidAppDownloadUrl } from './lib/androidAppLink.js';
+import { usePWAInstall } from './hooks/usePWAInstall.js';
 
 
 /** Barra de pausa del alumno (fuera de sesión): el countdown vive aquí para no re-renderizar GymApp cada tick. */
@@ -990,54 +990,7 @@ function GymApp() {
   const msg = useCallback(function (esStr, enStr, ptStr) {
     return irontrackMsg(lang, esStr, enStr, ptStr);
   }, [lang]);
-  const androidAppDownloadUrl = useMemo(function () {
-    return getAndroidAppDownloadUrl();
-  }, []);
-  /** PWA instalada: ocultar CTA "Instalar app" en header alumno. */
-  const [isPWAInstalled, setIsPWAInstalled] = useState(false);
-  /** Evento beforeinstallprompt (Chrome/Edge); null si no aplica. */
-  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null);
-
-  useLayoutEffect(function () {
-    if (typeof window === "undefined") return undefined;
-    function computePWAInstalled() {
-      try {
-        if (window.matchMedia("(display-mode: standalone)").matches) return true;
-        if (window.matchMedia("(display-mode: fullscreen)").matches) return true;
-        if (window.matchMedia("(display-mode: minimal-ui)").matches) return true;
-      } catch (e) {}
-      try {
-        if (window.navigator.standalone === true) return true;
-      } catch (e2) {}
-      return false;
-    }
-    function refreshInstalled() {
-      setIsPWAInstalled(computePWAInstalled());
-    }
-    refreshInstalled();
-    var mq = window.matchMedia("(display-mode: standalone)");
-    var onDisplayModeChange = function () {
-      refreshInstalled();
-    };
-    if (mq.addEventListener) mq.addEventListener("change", onDisplayModeChange);
-    else mq.addListener(onDisplayModeChange);
-    function onBeforeInstallPrompt(e) {
-      e.preventDefault();
-      setDeferredInstallPrompt(e);
-    }
-    function onAppInstalled() {
-      setIsPWAInstalled(true);
-      setDeferredInstallPrompt(null);
-    }
-    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-    window.addEventListener("appinstalled", onAppInstalled);
-    return function () {
-      if (mq.removeEventListener) mq.removeEventListener("change", onDisplayModeChange);
-      else mq.removeListener(onDisplayModeChange);
-      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", onAppInstalled);
-    };
-  }, []);
+  const { install: installPWA, canInstall: canInstallPWA } = usePWAInstall();
 
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
   const [progress, setProgress] = useState(() => { try{return JSON.parse(localStorage.getItem("it_pg")||"{}")}catch(e){return {}} });
@@ -1721,18 +1674,6 @@ function GymApp() {
     setToast(msg);
     setTimeout(() => setToast(null), 2200);
   }, []);
-
-  const onAlumnoInstallAppClick = useCallback(async function () {
-    if (deferredInstallPrompt) {
-      try {
-        deferredInstallPrompt.prompt();
-        await deferredInstallPrompt.userChoice;
-      } catch (e) {}
-      setDeferredInstallPrompt(null);
-    } else if (androidAppDownloadUrl) {
-      window.open(androidAppDownloadUrl, "_blank", "noopener,noreferrer");
-    }
-  }, [deferredInstallPrompt, androidAppDownloadUrl]);
 
   /** Recordatorios de entrenamiento (alumno): comprobar hora mientras la app está abierta. */
   React.useEffect(function () {
@@ -2604,72 +2545,56 @@ function GymApp() {
           {session&&<span style={{...tag("#22C55E"),fontSize:13}}>✓ Sesion activa</span>}
           {esAlumno &&
             (tab === "plan" || tab === "library" || tab === "progress") &&
-            !isPWAInstalled &&
-            (deferredInstallPrompt || androidAppDownloadUrl) && (
-              deferredInstallPrompt ? (
-                <button
-                  type="button"
-                  className="hov"
-                  onClick={onAlumnoInstallAppClick}
-                  aria-label={msg("Instalar app", "Install app", "Instalar app")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    height: 44,
-                    minHeight: 44,
-                    paddingLeft: 20,
-                    paddingRight: 20,
-                    borderRadius: 9999,
-                    background: "#2563EB",
-                    color: "#fff",
-                    border: "none",
-                    fontSize: 13,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    flexShrink: 0,
-                    boxSizing: "border-box",
-                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.08)",
-                  }}
-                >
-                  <DownloadNavIcon size={19} strokeWidth={2.35} color="#ffffff" aria-hidden />
-                  {msg("Instalar app", "Install app", "Instalar app")}
-                </button>
-              ) : (
-                <a
-                  className="hov"
-                  href={androidAppDownloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={msg("Instalar app", "Install app", "Instalar app")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    height: 44,
-                    minHeight: 44,
-                    paddingLeft: 20,
-                    paddingRight: 20,
-                    borderRadius: 9999,
-                    background: "#2563EB",
-                    color: "#fff",
-                    border: "none",
-                    fontSize: 13,
-                    fontWeight: 800,
-                    textDecoration: "none",
-                    fontFamily: "inherit",
-                    flexShrink: 0,
-                    boxSizing: "border-box",
-                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.08)",
-                  }}
-                >
-                  <DownloadNavIcon size={19} strokeWidth={2.35} color="#ffffff" aria-hidden />
-                  {msg("Instalar app", "Install app", "Instalar app")}
-                </a>
-              )
+            canInstallPWA && (
+              <button
+                type="button"
+                className="hov select-none"
+                onClick={function () {
+                  void installPWA();
+                }}
+                aria-label={msg("Instalar app", "Install app", "Instalar app")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  height: 42,
+                  minHeight: 42,
+                  padding: "0 16px",
+                  borderRadius: 9999,
+                  background: "#2563EB",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  flexShrink: 0,
+                  boxSizing: "border-box",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.08)",
+                  transition: "background-color 0.15s ease, transform 0.15s ease",
+                  WebkitTapHighlightColor: "transparent",
+                }}
+                onMouseEnter={function (e) {
+                  e.currentTarget.style.background = "#2f6df6";
+                }}
+                onMouseLeave={function (e) {
+                  e.currentTarget.style.background = "#2563EB";
+                  e.currentTarget.style.transform = "";
+                }}
+                onTouchStart={function (e) {
+                  e.currentTarget.style.transform = "scale(0.97)";
+                }}
+                onTouchEnd={function (e) {
+                  e.currentTarget.style.transform = "";
+                }}
+                onTouchCancel={function (e) {
+                  e.currentTarget.style.transform = "";
+                }}
+              >
+                <DownloadNavIcon size={20} strokeWidth={2.25} color="#ffffff" aria-hidden />
+                {msg("Instalar app", "Install app", "Instalar app")}
+              </button>
             )}
           <button className="hov" style={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSettingsOpen(true)}><Ic name="settings" size={18} color={textMuted}/></button>
           {sessionData&&esAlumno
