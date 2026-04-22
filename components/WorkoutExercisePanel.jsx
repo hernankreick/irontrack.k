@@ -1,5 +1,6 @@
 import React from 'react';
 import { Ic } from './Ic.jsx';
+import { ExerciseVideoPlayButton } from './ExerciseVideoPlayButton.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
 
@@ -152,12 +153,12 @@ export function WorkoutExercisePanel(props) {
               {ex.pause&&<span>⏱ {fmtTime(ex.pause)}</span>}
             </div>
           </div>
-          {(()=>{var vUrl=videoUrlResolved;if(!vUrl)return null;return(
-            <button className="hov" onClick={function(){var vid=getYTVideoId(vUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:displayName})}else{window.open(vUrl,"_blank")}}}
-              style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:8,padding:"6px 12px",fontSize:13,fontWeight:700,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",gap:4}}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>VER
-            </button>
-          )})()}
+          <ExerciseVideoPlayButton
+            hasVideo={!!videoUrlResolved}
+            onClick={function(){var vUrl=videoUrlResolved;var vid=getYTVideoId(vUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:displayName})}else{window.open(vUrl,"_blank")}}}
+            ariaLabel={es?"Ver video del ejercicio":"View exercise video"}
+            ariaLabelDisabled={es?"Video no disponible":"No video available"}
+          />
         </div>
         {(pr>0||ultimoSet)&&(
           <div style={{display:"flex",gap:8,marginTop:8}}>

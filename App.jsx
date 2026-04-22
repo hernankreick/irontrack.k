@@ -20,6 +20,7 @@ import IronTrackLogo from './components/IronTrackLogo.jsx';
 import StudentProgressSection from './components/student-progress/StudentProgressSection.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
 import { WeeklyPlanDayCard } from './components/student-plan/WeeklyPlanDayCard.jsx';
+import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import {
   estimateDayMinutes,
   uniqueMuscleChipsFromDay,
@@ -3520,7 +3521,12 @@ function GymApp() {
                                       <div style={{width:3,height:20,borderRadius:2,background:"#F59E0B44",flexShrink:0}}/>
                                       <div style={{flex:1,fontSize:16,fontWeight:700,color:textMain}}>{nombre}</div>
                                       <span style={{fontSize:13,color:"#A3B4CC",fontWeight:600}}>{ex.sets||"-"}×{ex.reps||"-"}</span>
-                                      {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:nombre});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
+                                      <ExerciseVideoPlayButton
+                                        hasVideo={!!vUrl}
+                                        onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:nombre});else window.open(vUrl,"_blank")}}
+                                        ariaLabel={msg("Ver video del ejercicio","View exercise video")}
+                                        ariaLabelDisabled={msg("Video no disponible","No video available")}
+                                      />
                                     </div>
                                   );
                                 })}
@@ -3548,7 +3554,12 @@ function GymApp() {
                                         <span style={{fontWeight:700}}>{s}×{rp}</span>{kg2&&<span>{kg2}kg</span>}{ex.pause&&<span>⏱ {fmtP(ex.pause)}</span>}
                                       </div>
                                     </div>
-                                    {vUrl&&<button onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:nombre});else window.open(vUrl,"_blank")}} style={{background:"#EF4444",color:"#fff",border:"none",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700,cursor:"pointer",flexShrink:0}}>▶</button>}
+                                    <ExerciseVideoPlayButton
+                                      hasVideo={!!vUrl}
+                                      onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:nombre});else window.open(vUrl,"_blank")}}
+                                      ariaLabel={msg("Ver video del ejercicio","View exercise video")}
+                                      ariaLabelDisabled={msg("Video no disponible","No video available")}
+                                    />
                                   </div>
                                 );
                               })}
@@ -7427,12 +7438,12 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
                   {ex.kg&&<span style={{fontSize:11,color:textMuted}}>{ex.kg}kg</span>}
                 </div>
               </div>
-              {tieneVideo&&(
-                <button onClick={function(){var vid=getYTVideoId(videoUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:nombre})}else{window.open(videoUrl,"_blank")}}}
-                  style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",
-                    background:"#EF4444",color:"#fff",border:"none",
-                    borderRadius:10,fontSize:16,flexShrink:0,fontWeight:700,cursor:"pointer"}}>▶</button>
-              )}
+              <ExerciseVideoPlayButton
+                hasVideo={tieneVideo}
+                onClick={function(){var vid=getYTVideoId(videoUrl);if(vid&&setVideoModal){setVideoModal({videoId:vid,nombre:nombre})}else{window.open(videoUrl,"_blank")}}}
+                ariaLabel={msg("Ver video del ejercicio","View exercise video")}
+                ariaLabelDisabled={msg("Video no disponible","No video available")}
+              />
             </div>
           </div>
         );
