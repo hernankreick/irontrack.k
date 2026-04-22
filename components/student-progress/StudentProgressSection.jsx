@@ -49,7 +49,7 @@ function HeroSparkSvg({ series, accent }) {
         strokeLinecap="round"
         points={lineJoined}
       />
-      <circle cx={lx} cy={ly} r={3} fill={accent} stroke="#0A0B0D" strokeWidth={1.25} />
+      <circle cx={lx} cy={ly} r={3} fill={accent} stroke="#0F1923" strokeWidth={1.25} />
     </svg>
   )
 }
@@ -220,24 +220,24 @@ export default function StudentProgressSection({
     },
   ]
 
+  /** Mismos tokens que App.jsx modo oscuro: bg / bgCard / bgSub / border / accent logo */
   const shellStyle = {
     fontFamily: "Inter, sans-serif",
     boxSizing: 'border-box',
-    ['--sp-bg']: '#0A0B0D',
-    ['--sp-surface']: '#14161A',
-    ['--sp-surface-high']: '#1A1D22',
-    ['--sp-stroke']: 'rgba(255,255,255,0.065)',
-    ['--sp-fg']: '#f3f4f6',
-    ['--sp-muted']: 'rgba(243,244,246,0.5)',
-    /** Alineado con navegación alumno / tema app (`#3b82f6`, logo `#2563eb`). */
-    ['--sp-accent']: '#3b82f6',
+    ['--sp-bg']: '#0F1923',
+    ['--sp-surface']: '#1E2D40',
+    ['--sp-surface-high']: '#162234',
+    ['--sp-stroke']: '#2D4057',
+    ['--sp-fg']: '#ffffff',
+    ['--sp-muted']: '#8B9AB2',
+    ['--sp-accent']: '#2563EB',
     ['--sp-pr']: '#f59e0b',
     ['--page-gutter']: 'clamp(14px, 4vw, 20px)',
   }
 
   return (
     <div
-      className="student-progress-scope flex w-full flex-col overflow-x-hidden text-[#f3f4f6] sp-scroll-hide"
+      className="student-progress-scope flex w-full flex-col overflow-x-hidden text-white sp-scroll-hide"
       style={{
         ...shellStyle,
         background: 'var(--sp-bg)',
@@ -273,31 +273,21 @@ export default function StudentProgressSection({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              className="flex h-9 items-center justify-center rounded-[10px] border px-2.5 transition-colors"
+              className="hov flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border-0 transition-colors"
               style={{
-                borderColor: 'var(--sp-stroke)',
-                background: 'transparent',
-                color: 'var(--sp-muted)',
+                background: '#2D4057',
+                color: '#8B9AB2',
               }}
               aria-label={es ? 'Configuración' : 'Settings'}
-              onMouseDown={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.background = 'transparent'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent'
-              }}
               onClick={() => onSettings?.()}
             >
-              <Settings className="h-[17px] w-[17px]" strokeWidth={2} />
+              <Settings className="h-[18px] w-[18px]" strokeWidth={2} />
             </button>
             <button
               type="button"
-              className="flex h-[34px] w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-0 text-[11px] font-bold leading-none text-white transition-opacity"
+              className="hov flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border-0 text-[13px] font-extrabold leading-none text-white"
               style={{
-                background: 'linear-gradient(135deg, #1e3a8a, var(--sp-accent))',
+                background: 'linear-gradient(135deg, #1E3A5F, #2563EB)',
               }}
               onClick={() => onAvatarClick?.()}
               aria-label={es ? 'Menú usuario' : 'User menu'}

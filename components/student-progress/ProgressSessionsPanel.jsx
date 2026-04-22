@@ -66,7 +66,7 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
           <div
             key={`sk-ses-${i}`}
             className="sk h-16 rounded-[12px]"
-            style={{ border: '1px solid rgba(255,255,255,0.065)', background: '#14161A' }}
+            style={{ border: '1px solid var(--sp-stroke, #2D4057)', background: 'var(--sp-surface, #1E2D40)' }}
           />
         ))}
       </div>
@@ -107,16 +107,16 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
         return (
           <div
             key={`hist-wk-${wk}`}
-            className="overflow-hidden rounded-[12px] border bg-[var(--sp-surface,#14161A)]"
+            className="overflow-hidden rounded-[12px] border border-[var(--sp-stroke,#2D4057)] bg-[var(--sp-surface,#1E2D40)]"
             style={{ borderColor: 'rgba(255,255,255,0.065)' }}
           >
             <button
               type="button"
               className={cn(
                 'flex min-h-[48px] w-full items-center justify-between gap-2 px-4 py-4 text-left transition-colors',
-                expanded ? 'bg-[var(--sp-surface-high,#1A1D22)]' : ''
+                expanded ? 'bg-[var(--sp-surface-high,#162234)]' : ''
               )}
-              style={{ background: expanded ? undefined : 'var(--sp-surface,#14161A)' }}
+              style={{ background: expanded ? undefined : 'var(--sp-surface,#1E2D40)' }}
               onClick={() => setOpenWeek(expanded ? null : wk)}
             >
               <div className="flex items-center gap-2">
@@ -146,13 +146,13 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
             {expanded && (
               <div
                 className="flex flex-col gap-6 border-t px-2 py-4"
-                style={{ borderColor: 'rgba(255,255,255,0.065)', background: 'rgba(10,11,13,0.5)' }}
+                style={{ borderColor: 'var(--sp-stroke, #2D4057)', background: 'rgba(15, 25, 35, 0.55)' }}
               >
                 {list.map((s, i) => (
                   <div
                     key={s.id || `sesion-${wk}-${i}`}
                     className="rounded-[12px] border p-3"
-                    style={{ borderColor: 'rgba(255,255,255,0.065)', background: 'var(--sp-surface,#14161A)' }}
+                    style={{ borderColor: 'var(--sp-stroke, #2D4057)', background: 'var(--sp-surface,#1E2D40)' }}
                   >
                     <div className="mb-2 flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2">
@@ -184,7 +184,7 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
                               key={`${s.id}-${exId}`}
                               className="rounded-md px-2 py-1 text-[11px] font-semibold"
                               style={{
-                                background: 'var(--sp-surface-high,#1A1D22)',
+                                background: 'var(--sp-surface-high,#162234)',
                                 color: 'rgba(243,244,246,0.55)',
                               }}
                             >

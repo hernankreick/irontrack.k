@@ -678,7 +678,7 @@ export function ProgressChartsPanel({
                     exId={ex.id}
                     accent="#3b82f6"
                     prHex="#f59e0b"
-                    bgHex="#0A0B0D"
+                    bgHex="#0F1923"
                     es={es}
                   />
 

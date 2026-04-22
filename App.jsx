@@ -18,6 +18,14 @@ import CoachDashboard from './components/CoachDashboard';
 import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import IronTrackLogo from './components/IronTrackLogo.jsx';
 import StudentProgressSection from './components/student-progress/StudentProgressSection.jsx';
+import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
+import { WeeklyPlanDayCard } from './components/student-plan/WeeklyPlanDayCard.jsx';
+import {
+  estimateDayMinutes,
+  uniqueMuscleChipsFromDay,
+  countPendingPrOpportunities,
+  formatHoyDateBadge,
+} from './components/student-plan/studentPlanHelpers.js';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
@@ -3260,77 +3268,38 @@ function GymApp() {
                     </div>
                   </div>
 
-                  {/* HOY — sin transition:all; altura acotada con line-clamp; contain:layout; sin backface (menos capas) */}
+                  {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
                   {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&(
-                    <div
-                      className="plan-hoy-cta-wrap"
-                      style={{
-                        background:"rgba(37,99,235,.07)",
-                        borderRadius:14,
-                        padding:"22px 20px",
-                        marginBottom:0,
-                        border:"1px solid rgba(37,99,235,.18)",
-                        position:"relative",
-                        overflow:"hidden",
+                    <CurrentWorkoutHero
+                      msg={msg}
+                      textMain={textMain}
+                      textMuted={textMuted}
+                      hoyBadgeText={formatHoyDateBadge(msg, lang)}
+                      semDiaLine={
+                        msg("Sem", "Wk") + " " + (currentWeek + 1) + " · " + msg("Día", "Day") + " " + (nextDayIdx + 1)
+                      }
+                      titleText={
+                        todayDay.label
+                          ? todayDay.label
+                          : r0?.name
+                            ? r0.name + " · " + msg("Día", "Day") + " " + (nextDayIdx + 1)
+                            : msg("Día", "Day") + " " + (nextDayIdx + 1)
+                      }
+                      muscleChips={uniqueMuscleChipsFromDay(todayDay, allEx, 8)}
+                      exerciseCount={(todayDay.warmup || []).length + (todayDay.exercises || []).length}
+                      durationMinutes={estimateDayMinutes(todayDay, currentWeek)}
+                      pendingPrCount={countPendingPrOpportunities(todayDay, progress, currentWeek)}
+                      ctaLabel={msg("Empezar entrenamiento", "Start workout")}
+                      onStart={function () {
+                        const snap = {};
+                        [...(todayDay.warmup || []), ...(todayDay.exercises || [])].forEach(function (ex) {
+                          snap[ex.id] = progress[ex.id]?.max || 0;
+                        });
+                        setPreSessionPRs({ ...snap });
+                        setSessionPRList([]);
+                        setSession({ rId: r0.id, dIdx: nextDayIdx, exIdx: 0, startTime: Date.now() });
                       }}
-                    >
-                      <div style={{position:"absolute",left:0,top:0,bottom:0,width:3,background:"#2563EB",borderRadius:"3px 0 0 3px",pointerEvents:"none",zIndex:0}}/>
-                      <div className="plan-hoy-cta-head" style={{ position: "relative", zIndex: 1 }}>
-                        <div style={{minWidth:0,flex:1}}>
-                          <div className="plan-hoy-cta-kicker" style={{ color: "#2563EB" }}>{msg("HOY", "TODAY")}</div>
-                          <div className="plan-hoy-cta-title" style={{ color: textMain }}>
-                            {todayDay.label||("Día "+(nextDayIdx+1))}
-                          </div>
-                          <div className="plan-hoy-cta-sub" style={{ color: textMuted }}>
-                            {((todayDay.warmup||[]).length+(todayDay.exercises||[]).length)} {msg("ejercicios", "exercises")} · {r0?.name}
-                          </div>
-                        </div>
-                        <div
-                          className="plan-hoy-cta-badge"
-                          style={{
-                            background:"rgba(37,99,235,.15)",
-                            borderColor:"rgba(37,99,235,.25)",
-                            color:"#2563EB",
-                          }}
-                        >
-                          {msg("Sem", "Wk")} {currentWeek+1}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="plan-hoy-cta-btn"
-                        style={{
-                          width:"100%",
-                          padding:"0 15px",
-                          background:"#2563EB",
-                          color:"#fff",
-                          border:"none",
-                          borderRadius:12,
-                          fontSize:16,
-                          fontWeight:800,
-                          cursor:"pointer",
-                          fontFamily:"inherit",
-                          letterSpacing:.5,
-                          display:"flex",
-                          alignItems:"center",
-                          justifyContent:"center",
-                          gap:8,
-                          textTransform:"uppercase",
-                          whiteSpace:"nowrap",
-                          position:"relative",
-                          zIndex:1,
-                        }}
-                        onClick={()=>{
-                          const snap={};
-                          [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
-                          setPreSessionPRs({...snap});
-                          setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
-                        }}
-                      >
-                        <Ic name="zap" size={16} color="#fff"/>
-                        {msg("EMPEZAR AHORA", "START NOW")}
-                      </button>
-                    </div>
+                    />
                   )}
 
                   {/* DÍA YA ENTRENADO */}
@@ -3412,21 +3381,22 @@ function GymApp() {
               return (<div key={r.id} style={{marginBottom:20,marginTop:20}}>
                   {/* Título + meta (sin botón PDF arriba: exportación solo al final del plan) */}
                   {planScrollDiag.routineMetaPdf&&(
-                  <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:14}}>
+                  <div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:12}}>
                     <div style={{
-                      fontSize:28,
+                      fontSize:15,
                       fontWeight:800,
-                      letterSpacing:1,
-                      lineHeight:1.2,
+                      letterSpacing:0.2,
+                      lineHeight:1.25,
                       margin:0,
                       wordBreak:"break-word",
                       display:"-webkit-box",
                       WebkitLineClamp:2,
                       WebkitBoxOrient:"vertical",
                       overflow:"hidden",
+                      color:textMain,
                     }}>{r.name}</div>
                     <div style={{
-                      fontSize:15,
+                      fontSize:12,
                       color:textMuted,
                       lineHeight:1.35,
                       minWidth:0,
@@ -3434,11 +3404,21 @@ function GymApp() {
                       WebkitLineClamp:2,
                       WebkitBoxOrient:"vertical",
                       overflow:"hidden",
-                      paddingTop:2,
                     }}>{r.created} · {r.days.length} {msg("dias", "days")}{r.note?" · "+r.note:""}</div>
                   </div>
                   )}
-                  {planScrollDiag.dayList&&r.days.map((d,di)=>{
+                  {planScrollDiag.dayList&&(
+                  <>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:12,marginBottom:14,flexWrap:"wrap"}}>
+                    <span style={{fontSize:17,fontWeight:800,color:textMain,letterSpacing:0.2}}>{msg("Plan de la semana", "Weekly plan")}</span>
+                    <span style={{fontSize:12,color:textMuted,fontWeight:600,whiteSpace:"nowrap"}}>
+                      {r.days.length} {msg("días", "days")}
+                      {" · "}
+                      {completedDays.filter(function(k){return k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek);}).length}{" "}
+                      {msg("completados", "done")}
+                    </span>
+                  </div>
+                  {r.days.map((d,di)=>{
                     const dayKey=r.id+"-"+di+"-w"+currentWeek;
                     const isDayDone=completedDays.includes(dayKey);
                     const daysCompletedR=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length;
@@ -3447,32 +3427,33 @@ function GymApp() {
                     const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
                     const totalEj=((d.warmup||[]).length+(d.exercises||[]).length);
                     const isOpen=expandedPlanDay===r.id+"-"+di;
-                    const exNames=(d.exercises||[]).slice(0,3).map(function(ex){var inf=allEx.find(function(e){return e.id===ex.id});return resolveExerciseTitle(inf||null,ex,es);}).join(", ");
+                    const muscleLine=uniqueMuscleChipsFromDay(d,allEx,6).join(" · ");
+                    const estMin=estimateDayMinutes(d,currentWeek);
+                    const metaLine=totalEj+" "+msg("ej.", "ex.")+" · ~"+estMin+" "+msg("min", "min");
 
                     return(
-                      <div key={r.id+"-plan-day-"+di} style={{background:bgCard,border:"1px solid "+(isNextDay?"#2563EB":isDayDone?"#22C55E44":border),borderRadius:12,marginBottom:12,overflow:"hidden"}}>
-                        {/* Header del día - siempre visible */}
-                        <div onClick={function(){setExpandedPlanDay(isOpen?null:r.id+"-"+di)}} style={{padding:"18px 20px",cursor:"pointer",display:"flex",alignItems:"center",gap:12}}>
-                          <div style={{width:36,height:36,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,flexShrink:0,
-                            background:isDayDone?"#22C55E22":isNextDay?"#2563EB22":bgSub,
-                            color:isDayDone?"#22C55E":isNextDay?"#2563EB":textMuted,
-                            border:"1px solid "+(isDayDone?"#22C55E44":isNextDay?"#2563EB44":border)}}>
-                            {isDayDone?"✓":(di+1)}
-                          </div>
-                          <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:15,fontWeight:700,color:textMain}}>{d.label||((msg("Día ", "Day "))+(di+1))}</div>
-                            <div style={{fontSize:12,color:textMuted,marginTop:1}}>
-                              {totalEj} {msg("ejercicios", "exercises")}{!isOpen&&exNames?" · "+exNames:""}
-                            </div>
-                          </div>
-                          {isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#22C55E",flexShrink:0}}>{msg("Listo", "Done")}</span>}
-                          {isNextDay&&!isDayDone&&<span style={{fontSize:11,fontWeight:700,color:"#2563EB",flexShrink:0}}>{msg("Siguiente", "Next")}</span>}
-                          <span style={{fontSize:13,color:textMuted,flexShrink:0}}>{isOpen?"▲":"▼"}</span>
-                        </div>
-
-                        {/* Contenido expandido */}
-                        {isOpen&&(
-                          <div style={{padding:"0 20px 20px",borderTop:"1px solid "+border}}>
+                      <WeeklyPlanDayCard
+                        key={r.id+"-plan-day-"+di}
+                        onHeaderClick={function(){setExpandedPlanDay(isOpen?null:r.id+"-"+di)}}
+                        isOpen={isOpen}
+                        isDayDone={isDayDone}
+                        isNextDay={isNextDay}
+                        dayNumberDisplay={di+1}
+                        titleNode={msg("Día", "Day")+" "+(di+1)+(d.label?" · "+d.label:"")}
+                        muscleLine={muscleLine}
+                        metaLine={metaLine}
+                        hoyBadgeText={isNextDay&&!isDayDone?msg("HOY", "TODAY"):null}
+                        doneLabel={null}
+                        nextLabel={null}
+                        textMain={textMain}
+                        textMuted={textMuted}
+                        border={border}
+                        bgCard={bgCard}
+                        bgSub={bgSub}
+                        accent="#2563EB"
+                        success="#22C55E"
+                        children={isOpen?(
+                          <div style={{paddingTop:4}}>
                             {(d.warmup||[]).length>0&&(
                               <div style={{marginTop:12,marginBottom:12}}>
                                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
@@ -3541,10 +3522,12 @@ function GymApp() {
                               </div>
                             )}
                           </div>
-                        )}
-                      </div>
+                        ):null}
+                      />
                     );
                   })}
+                  </>
+                  )}
                   {/* Export PDF: no usa planScrollDiag (el bloque meta sí); solo rutina con días — mismo tab Plan que envuelve este mapa. */}
                   {(r.days||[]).length>0&&(
                     <button
@@ -3575,45 +3558,6 @@ function GymApp() {
                       {msg("Descargar Rutina en PDF", "Download routine as PDF")}
                     </button>
                   )}
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                    background:bgCard,borderRadius:12,padding:"14px 20px",border:"1px solid "+border,
-                    marginBottom:8}}>
-                    <button className="hov"
-                      onClick={()=>currentWeek>0&&setCurrentWeek(w=>w-1)}
-                      style={{width:36,height:36,borderRadius:8,border:"1px solid "+border,
-                        background:currentWeek>0?bgSub:"transparent",
-                        color:currentWeek>0?textMain:border,
-                        fontSize:18,cursor:currentWeek>0?"pointer":"default",
-                        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>‹</button>
-                    <div style={{flex:1,textAlign:"center",padding:"0 8px"}}>
-                      <div style={{fontSize:15,fontWeight:700,color:textMain,marginBottom:8}}>
-                        {msg("Semana", "Week")} <span style={{color:"#2563EB",fontWeight:800}}>{currentWeek+1}</span>
-                        <span style={{fontSize:11,color:textMuted,fontWeight:400,marginLeft:8}}>
-                          {completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length}/{r.days.length} {msg("días", "days")}
-                        </span>
-                      </div>
-                      <div style={{display:"flex",gap:4,justifyContent:"center"}}>
-                        {[0,1,2,3].map(w=>{
-                          const done=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+w)).length>0;
-                          const active=w===currentWeek;
-                          return(
-                            <div key={w} onClick={()=>setCurrentWeek(w)} className="hov"
-                              style={{height:4,borderRadius:2,transition:"all .25s ease",cursor:"pointer",
-                                width:active?24:8,
-                                background:active?"#2563EB":done?"#22C55E":"#2D4057"}}/>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <button className="hov"
-                      onClick={()=>currentWeek<3&&setCurrentWeek(w=>w+1)}
-                      style={{width:36,height:36,borderRadius:8,border:"1px solid "+border,
-                        background:currentWeek<3?bgSub:"transparent",
-                        color:currentWeek<3?textMain:border,
-                        fontSize:18,cursor:currentWeek<3?"pointer":"default",
-                        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>›</button>
-                  </div>
 
                   {/* Sparkline de tendencia 30 días */}
                 {(()=>{
@@ -5615,11 +5559,9 @@ function GymApp() {
       {!hideGlobalBottomNavCoachDash && !(showCoachDesktopShell && coachDesktop1024) && (
       <nav style={{
         position:"fixed",bottom:0,left:0,right:0,
-        background: esAlumno && tab==="progress"
-          ? "rgba(10,11,13,0.92)"
-          : darkMode?"rgba(15,25,35,0.96)":"rgba(255,255,255,0.96)",
-        backdropFilter: esAlumno && tab==="progress" ? "blur(20px)" : "blur(12px)",
-        borderTop:"1px solid "+(esAlumno && tab==="progress" ? "rgba(255,255,255,0.065)" : (darkMode?"#1E2D40":"#E2E8F0")),
+        background: darkMode ? "rgba(15,25,35,0.96)" : "rgba(255,255,255,0.96)",
+        backdropFilter: "blur(12px)",
+        borderTop:"1px solid "+(darkMode?"#1E2D40":"#E2E8F0"),
         display:"flex",zIndex:40,
         paddingBottom:"env(safe-area-inset-bottom,0px)"
       }}>
