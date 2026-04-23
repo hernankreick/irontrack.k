@@ -54,6 +54,30 @@ export function uniqueMuscleChipsFromDay(day, allEx, cap) {
 }
 
 /**
+ * Cuántos ejercicios del día (calor + principal) tienen al menos un set registrado hoy
+ * (misma semana, misma data que el plan).
+ */
+export function countExercisesWithLogToday(day, progress, hoy, currentWeek) {
+  if (!day) return 0;
+  const ids = []
+    .concat((day.warmup || []).map((e) => e.id), (day.exercises || []).map((e) => e.id))
+    .filter(Boolean);
+  if (ids.length === 0) return 0;
+  var n = 0;
+  ids.forEach(function (id) {
+    const sets = (progress && progress[id] && progress[id].sets) || [];
+    if (
+      sets.some(function (s) {
+        return s.date === hoy && (s.week === undefined || s.week === currentWeek);
+      })
+    ) {
+      n++;
+    }
+  });
+  return n;
+}
+
+/**
  * Cuenta ejercicios del bloque principal donde el kg programado supera el máximo guardado
  * (solo si ya había un PR previo: evita inflar con todas las cargas "nuevas").
  */

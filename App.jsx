@@ -23,9 +23,7 @@ import { WeeklyPlanDayCard } from './components/student-plan/WeeklyPlanDayCard.j
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import {
   estimateDayMinutes,
-  uniqueMuscleChipsFromDay,
-  countPendingPrOpportunities,
-  formatHoyDateBadge,
+  countExercisesWithLogToday,
 } from './components/student-plan/studentPlanHelpers.js';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
@@ -2010,6 +2008,20 @@ function GymApp() {
   const activeR = session ? routines.find(r=>r.id===session.rId) : null;
   const activeDay = activeR ? activeR.days[session.dIdx] : null;
   const esAlumno = readOnly || sessionData?.role==="alumno";
+  const alumnoPlanHeaderDayNum = useMemo(
+    function () {
+      if (!esAlumno || tab !== "plan" || !routines[0]) return null;
+      const r0 = routines[0];
+      const totalDays = r0.days?.length || 0;
+      if (totalDays === 0) return null;
+      const daysCompletedThisWeek = completedDays.filter(function (k) {
+        return k.startsWith((r0.id || "") + "-") && k.endsWith("-w" + currentWeek);
+      }).length;
+      if (daysCompletedThisWeek >= totalDays) return null;
+      return daysCompletedThisWeek + 1;
+    },
+    [esAlumno, tab, routines, completedDays, currentWeek]
+  );
   const showAlumnoProgressStack = (readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId);
   const coachDesktop1024 = useDesktopMin1024();
   /** Shell coach (sidebar App + dashboard embebido): todos los anchos; la barra lateral se oculta por CSS por debajo de lg. */
@@ -2465,7 +2477,7 @@ function GymApp() {
       <div
         ref={alumnoAppHeaderRef}
         className={
-          "relative z-50 flex items-center justify-between pb-3 pt-4 " +
+          "relative z-50 flex w-full min-w-0 items-center justify-between gap-1 pb-3 pt-4 " +
           (darkMode ? "border-b border-[#2D4057] bg-[#0F1923]" : showCoachDesktopShell && !esAlumno ? "border-b border-slate-200 bg-white" : "border-b border-[#2D4057] bg-[#F0F4F8]")
         }
         style={{
@@ -2481,7 +2493,7 @@ function GymApp() {
           boxShadow: alumnoTopBarFixed ? "0 8px 24px rgba(0,0,0,.18)" : undefined,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
           {showCoachDesktopShell && !coachDesktop1024 && (
             <button
               onClick={() => setMobileDrawerOpen(true)}
@@ -2542,7 +2554,37 @@ function GymApp() {
             modeColor={darkMode ? "#94a3b8" : "#64748B"}
           />
         </div>
-        <div className="relative flex items-center gap-3">
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            paddingLeft: 4,
+            paddingRight: 4,
+          }}
+        >
+          {esAlumno && tab === "plan" && alumnoPlanHeaderDayNum != null && (
+            <p
+              style={{
+                margin: 0,
+                fontSize: 14,
+                fontWeight: 600,
+                textAlign: "center",
+                lineHeight: 1.25,
+                maxWidth: "100%",
+              }}
+            >
+              <span style={{ color: textMuted, fontWeight: 500 }}>{msg("Hoy toca:", "Today:", "Hoje é:")}</span>{" "}
+              <span style={{ color: "#3B82F6", fontWeight: 800, letterSpacing: 0.3 }}>
+                {String(msg("Día", "Day", "Dia")).toUpperCase()}{" "}
+                {alumnoPlanHeaderDayNum}
+              </span>
+            </p>
+          )}
+        </div>
+        <div className="relative flex flex-shrink-0 items-center gap-3">
           {session&&<span style={{...tag("#22C55E"),fontSize:13}}>✓ Sesion activa</span>}
           {esAlumno &&
             (tab === "plan" || tab === "library" || tab === "progress") &&
@@ -3211,6 +3253,15 @@ function GymApp() {
               const nextDayIdx = daysCompletedThisWeek < totalDays ? daysCompletedThisWeek : null;
               const todayDay = nextDayIdx !== null ? r0?.days?.[nextDayIdx] : null;
               const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeek)));
+              const totalEjHero = todayDay ? (todayDay.warmup || []).length + (todayDay.exercises || []).length : 0;
+              const doneEjHero = todayDay ? countExercisesWithLogToday(todayDay, progress, hoy, currentWeek) : 0;
+              const pctHero = totalEjHero > 0 ? Math.min(100, Math.round((100 * doneEjHero) / totalEjHero)) : 0;
+              const progressStatusHero =
+                pctHero === 0
+                  ? msg("Comienza tu entrenamiento", "Start your training", "Comece o treino")
+                  : pctHero < 100
+                    ? msg("Sigue con tu entrenamiento", "Keep going", "Continue o treino")
+                    : msg("Casi listo", "Almost there", "Quase pronto");
               return (
                 <div style={{ marginBottom: 0 }}>
                   {/*
@@ -3248,11 +3299,13 @@ function GymApp() {
                         : "none",
                     }}
                   >
-                  <div style={{marginBottom:12}}>
-                    <div style={{fontSize:13,color:textMuted,fontWeight:500,letterSpacing:0.3}}>
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: textMuted, fontWeight: 500, letterSpacing: 0.2, marginBottom: 4 }}>
                       {new Date().getHours()<12?(msg("BUENOS DÍAS", "GOOD MORNING", "BOM DIA")):new Date().getHours()<18?(msg("BUENAS TARDES", "GOOD AFTERNOON", "BOA TARDE")):(msg("BUENAS NOCHES", "GOOD EVENING", "BOA NOITE"))}
                     </div>
-                    <div style={{fontSize:28,fontWeight:900,color:textMain}}>{sessionData?.name?.split(" ")[0]||"Atleta"}</div>
+                    <div style={{ fontSize: 32, fontWeight: 900, color: textMain, lineHeight: 1.1, letterSpacing: -0.3 }}>
+                      {sessionData?.name?.split(" ")[0]||"Atleta"}
+                    </div>
                     {rachaActual>=2&&(
                       <div style={{display:"flex",alignItems:"center",gap:5,marginTop:4}}>
                         <div style={{
@@ -3326,22 +3379,17 @@ function GymApp() {
                       msg={msg}
                       textMain={textMain}
                       textMuted={textMuted}
-                      hoyBadgeText={formatHoyDateBadge(msg, lang)}
+                      hoyBadgeText={msg("HOY", "TODAY", "HOJE")}
                       semDiaLine={
-                        msg("Sem", "Wk") + " " + (currentWeek + 1) + " · " + msg("Día", "Day") + " " + (nextDayIdx + 1)
+                        msg("Semana", "Week", "Semana") + " " + (currentWeek + 1) + " · " + msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)
                       }
-                      titleText={
-                        todayDay.label
-                          ? todayDay.label
-                          : r0?.name
-                            ? r0.name + " · " + msg("Día", "Day") + " " + (nextDayIdx + 1)
-                            : msg("Día", "Day") + " " + (nextDayIdx + 1)
-                      }
-                      muscleChips={uniqueMuscleChipsFromDay(todayDay, allEx, 8)}
-                      exerciseCount={(todayDay.warmup || []).length + (todayDay.exercises || []).length}
+                      dayTitle={msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)}
+                      exerciseCount={totalEjHero}
                       durationMinutes={estimateDayMinutes(todayDay, currentWeek)}
-                      pendingPrCount={countPendingPrOpportunities(todayDay, progress, currentWeek)}
-                      ctaLabel={msg("Empezar entrenamiento", "Start workout")}
+                      completedExercises={doneEjHero}
+                      totalExercises={totalEjHero}
+                      progressStatusText={progressStatusHero}
+                      ctaLabel={msg("Comenzar entrenamiento", "Start workout", "Começar treino")}
                       onStart={function () {
                         const snap = {};
                         [...(todayDay.warmup || []), ...(todayDay.exercises || [])].forEach(function (ex) {
@@ -3430,6 +3478,7 @@ function GymApp() {
               </div>
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
+              const hoyStr = new Date().toLocaleDateString("es-AR");
               return (<div key={r.id} style={{marginBottom:20,marginTop:20}}>
                   {/* Título + meta (sin botón PDF arriba: exportación solo al final del plan) */}
                   {planScrollDiag.routineMetaPdf&&(
@@ -3479,9 +3528,15 @@ function GymApp() {
                     const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
                     const totalEj=((d.warmup||[]).length+(d.exercises||[]).length);
                     const isOpen=expandedPlanDay===r.id+"-"+di;
-                    const muscleLine=uniqueMuscleChipsFromDay(d,allEx,6).join(" · ");
                     const estMin=estimateDayMinutes(d,currentWeek);
-                    const metaLine=totalEj+" "+msg("ej.", "ex.")+" · ~"+estMin+" "+msg("min", "min");
+                    const metaLine=
+                      totalEj + " " + msg("ejercicios", "exercises", "exercícios") + " · ~" + estMin + " " + msg("min", "min", "min");
+                    const doneEjRow = isDayDone
+                      ? totalEj
+                      : isNextDay
+                        ? countExercisesWithLogToday(d, progress, hoyStr, currentWeek)
+                        : 0;
+                    const rightProgress = doneEjRow + "/" + totalEj;
 
                     return(
                       <WeeklyPlanDayCard
@@ -3490,11 +3545,12 @@ function GymApp() {
                         isOpen={isOpen}
                         isDayDone={isDayDone}
                         isNextDay={isNextDay}
+                        isFuture={isFuture}
                         dayNumberDisplay={di+1}
-                        titleNode={msg("Día", "Day")+" "+(di+1)+(d.label?" · "+d.label:"")}
-                        muscleLine={muscleLine}
+                        titleNode={msg("Día", "Day", "Dia") + " " + (di + 1)}
                         metaLine={metaLine}
-                        hoyBadgeText={isNextDay&&!isDayDone?msg("HOY", "TODAY"):null}
+                        rightProgress={rightProgress}
+                        hoyBadgeText={isNextDay&&!isDayDone?msg("HOY", "TODAY", "HOJE"):null}
                         doneLabel={null}
                         nextLabel={null}
                         textMain={textMain}
@@ -3597,27 +3653,57 @@ function GymApp() {
                       onClick={function(){ downloadRoutinePdf(r); }}
                       style={{
                         width:"100%",
-                        marginTop:12,
+                        marginTop:20,
                         marginBottom:12,
-                        padding:"16px 18px",
-                        background:"#2563EB",
+                        padding:"20px 20px 22px",
+                        background:"linear-gradient(180deg, rgba(37,99,235,0.22) 0%, rgba(15,23,42,0.9) 100%)",
                         color:"#fff",
-                        border:"none",
-                        borderRadius:12,
-                        fontFamily:"Barlow Condensed,sans-serif",
-                        fontSize:17,
-                        fontWeight:900,
-                        letterSpacing:0.5,
+                        border:"1px solid rgba(96,165,250,0.45)",
+                        borderRadius:16,
+                        fontFamily:"Barlow Condensed, DM Sans, system-ui, sans-serif",
                         cursor:"pointer",
                         display:"flex",
+                        flexDirection:"column",
                         alignItems:"center",
                         justifyContent:"center",
-                        gap:10,
+                        gap:6,
                         boxSizing:"border-box",
+                        textAlign:"center",
+                        boxShadow:"0 12px 32px rgba(0,0,0,0.25)",
                       }}
                     >
-                      <Ic name="download" size={20} color="#fff"/>
-                      {msg("Descargar Rutina en PDF", "Download routine as PDF")}
+                      <div
+                        style={{
+                          display:"flex",
+                          alignItems:"center",
+                          justifyContent:"center",
+                          gap:10,
+                        }}
+                      >
+                        <Ic name="download" size={22} color="#fff"/>
+                        <span
+                          style={{
+                            fontSize:16,
+                            fontWeight:900,
+                            letterSpacing:0.6,
+                            textTransform:"uppercase",
+                            lineHeight:1.2,
+                          }}
+                        >
+                          {msg("Descargar rutina (PDF)", "Download routine (PDF)", "Baixar rotina (PDF)")}
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize:12,
+                          fontWeight:600,
+                          color:"rgba(226,232,240,0.9)",
+                          maxWidth:280,
+                          lineHeight:1.35,
+                        }}
+                      >
+                        {msg("Lleva tu plan a donde quieras", "Take your plan anywhere", "Leve seu plano para onde quiser")}
+                      </span>
                     </button>
                   )}
 
