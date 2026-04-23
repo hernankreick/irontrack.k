@@ -4,6 +4,55 @@ import { ExerciseVideoPlayButton } from './ExerciseVideoPlayButton.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
 
+/**
+ * Píldoras de reps: 3 estados (fuera de rango / rango sugerido / seleccionada).
+ * Verde solo aquí; evita .hov global (transition:all + brightness) para transiciones controladas.
+ */
+function repPillButtonStyle(isSelected, inTargetRange) {
+  const base = {
+    minWidth: 36,
+    height: 36,
+    padding: "0 6px",
+    borderRadius: 8,
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    flexShrink: 0,
+    WebkitTapHighlightColor: "transparent",
+    transition:
+      "background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, color 160ms ease, transform 120ms ease",
+  };
+  if (isSelected) {
+    return {
+      ...base,
+      border: "1px solid rgba(22, 163, 74, 0.55)",
+      color: "#fff",
+      background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)",
+      boxShadow: "0 0 10px rgba(34, 197, 94, 0.28), 0 1px 2px rgba(0, 0, 0, 0.18)",
+      transform: "scale(1.02)",
+    };
+  }
+  if (inTargetRange) {
+    return {
+      ...base,
+      border: "1px solid rgba(34, 197, 94, 0.22)",
+      color: "rgba(220, 252, 231, 0.95)",
+      background: "rgba(34, 197, 94, 0.12)",
+      boxShadow: "none",
+      transform: "scale(1)",
+    };
+  }
+  return {
+    ...base,
+    border: "1px solid rgba(148, 163, 184, 0.16)",
+    color: "rgba(203, 213, 225, 0.9)",
+    background: "rgba(15, 23, 42, 0.95)",
+    boxShadow: "none",
+    transform: "scale(1)",
+  };
+}
+
 export function WorkoutExercisePanel(props) {
   const {
     activeExIdx,
@@ -289,7 +338,7 @@ export function WorkoutExercisePanel(props) {
                     type="number" value={kg} onChange={e=>setKg(e.target.value)}
                     placeholder="0"
                     style={{width:"100%",height:48,background:"#111827",border:"1px solid #1E3A5F",borderRadius:10,
-                      textAlign:"left",fontSize:20,fontWeight:800,color:"#fff",padding:"0 40px 0 14px",
+                      textAlign:"center",fontSize:20,fontWeight:800,color:"#fff",padding:"0 40px 0 40px",
                       fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
                   <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:14,fontWeight:600,color:"#475569",pointerEvents:"none"}}>kg</span>
                 </div>
@@ -320,7 +369,7 @@ export function WorkoutExercisePanel(props) {
                 var rMin=parseInt(prts[0])||8;
                 var rMax=prts[1]?parseInt(prts[1])||rMin:rMin;
                 if(rMax<rMin)rMax=rMin;
-                var lo=Math.max(1,rMin-3),hi=rMax+10;
+                var lo=Math.max(1,rMin-2),hi=rMax+2;
                 var pills=[];for(var n=lo;n<=hi;n++)pills.push(n);
                 return(
                   <div
@@ -336,14 +385,17 @@ export function WorkoutExercisePanel(props) {
                       var inR=pn>=rMin&&pn<=rMax;
                       var isT=parseInt(reps)===pn;
                       return(
-                        <button key={pn} className="hov"
-                          style={{minWidth:36,height:36,padding:"0 6px",border:"none",
-                            borderRadius:8,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",flexShrink:0,
-                            transition:"transform .15s,background .15s",
-                            background:isT?"#22C55E":inR?"#22C55E18":"#111827",
-                            color:isT?"#fff":inR?"#22C55E":"#475569",
-                            boxShadow:isT?"0 2px 8px rgba(34,197,94,0.3)":"none"}}
-                          onClick={function(){setReps(String(pn));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}}>{pn}</button>
+                        <button
+                          key={pn}
+                          type="button"
+                          style={repPillButtonStyle(isT, inR)}
+                          onClick={function(){
+                            setReps(String(pn));
+                            try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}
+                          }}
+                        >
+                          {pn}
+                        </button>
                       );
                     })}
                   </div>
