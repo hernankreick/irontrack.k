@@ -2226,7 +2226,7 @@ function GymApp() {
         });
       }
     });
-    exportRoutinePdfHtml(r, rows, es, toast2, { textMain, bgCard, border, darkMode, textMuted });
+    exportRoutinePdfHtml(r, rows, es, toast2, { textMain, bgCard, border, darkMode, textMuted, currentWeek });
   };
 
   // Pantalla de login
