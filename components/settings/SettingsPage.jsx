@@ -1,19 +1,67 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext, useMemo, createContext } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 
-// ── PALETA ────────────────────────────────────────────────────────────────────
-const C = {
-  bg:      '#0B0E11',
-  card:    '#111827',
-  border:  '#1A2535',
-  blue:    '#2563EB',
-  blueL:   '#3B82F6',
-  green:   '#22C55E',
-  red:     '#EF4444',
-  text:    '#F1F5F9',
-  muted:   '#64748B',
-  sub:     '#94A3B8',
-};
+// ── PALETA (alineada con `getTheme` de App.jsx) ─────────────────────────────
+const SettingsPaletteContext = createContext(null);
+
+/** Paleta de la pantalla coach Settings según `darkMode` de la app. */
+function coachSettingsPalette(darkMode) {
+  const dm = darkMode !== false;
+  if (dm) {
+    return {
+      bg: '#0B0E11',
+      card: '#111827',
+      border: '#1A2535',
+      blue: '#2563EB',
+      blueL: '#3B82F6',
+      green: '#22C55E',
+      red: '#EF4444',
+      text: '#F1F5F9',
+      muted: '#64748B',
+      sub: '#94A3B8',
+      chrome: '#0D1117',
+      navActiveBg: '#1D2D50',
+      navInactiveDangerText: '#FCA5A5',
+      currencySelBg: '#1D2D50',
+      proBadgeBg: '#1A2E1A',
+      proBadgeBorder: '#166534',
+      subscriptionBanner: 'linear-gradient(135deg, #1D2D50 0%, #0F1829 100%)',
+      deleteDisabledBg: '#4B1A1A',
+      deleteBtnDisabledFg: '#fff',
+      deleteWarnText: '#FCA5A5',
+      dangerCardBorder: '#4B1A1A',
+    };
+  }
+  return {
+    bg: '#F0F4F8',
+    card: '#FFFFFF',
+    border: '#E2E8F0',
+    blue: '#2563EB',
+    blueL: '#2563EB',
+    green: '#16A34A',
+    red: '#DC2626',
+    text: '#0F1923',
+    muted: '#64748B',
+    sub: '#475569',
+    chrome: '#FFFFFF',
+    navActiveBg: 'rgba(37,99,235,0.12)',
+    navInactiveDangerText: '#B91C1C',
+    currencySelBg: 'rgba(37,99,235,0.12)',
+    proBadgeBg: '#DCFCE7',
+    proBadgeBorder: '#166534',
+    subscriptionBanner: 'linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 100%)',
+    deleteDisabledBg: '#FECACA',
+    deleteBtnDisabledFg: '#991b1b',
+    deleteWarnText: '#B91C1C',
+    dangerCardBorder: '#FECACA',
+  };
+}
+
+function useSettingsPalette() {
+  const p = useContext(SettingsPaletteContext);
+  if (!p) return coachSettingsPalette(true);
+  return p;
+}
 
 const SUPPORTED_LANGS = ['es', 'en', 'pt'];
 
@@ -194,6 +242,7 @@ function initials(name) {
 }
 
 function Row({ label, desc, children }) {
+  const C = useSettingsPalette();
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -211,6 +260,7 @@ function Row({ label, desc, children }) {
 }
 
 function SectionTitle({ children }) {
+  const C = useSettingsPalette();
   return (
     <div style={{
       fontSize: 11, fontWeight: 600, letterSpacing: '1px',
@@ -221,6 +271,7 @@ function SectionTitle({ children }) {
 }
 
 function Input({ label, value, onChange, type = 'text', placeholder }) {
+  const C = useSettingsPalette();
   return (
     <div style={{ marginBottom: 14 }}>
       {label && (
@@ -246,6 +297,7 @@ function Input({ label, value, onChange, type = 'text', placeholder }) {
 }
 
 function BtnGroup({ options, value, onChange }) {
+  const C = useSettingsPalette();
   return (
     <div style={{
       display: 'flex', gap: 4,
@@ -271,6 +323,7 @@ function BtnGroup({ options, value, onChange }) {
 }
 
 function Toggle({ checked, onChange }) {
+  const C = useSettingsPalette();
   return (
     <button
       type="button"
@@ -293,6 +346,7 @@ function Toggle({ checked, onChange }) {
 }
 
 function SaveBtn({ onClick, saved, savedHint, saveLabel, savedLabel }) {
+  const C = useSettingsPalette();
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20, gap: 10, alignItems: 'center' }}>
       {saved && <span style={{ fontSize: 12, color: C.green }}>{savedHint ?? 'Saved ✓'}</span>}
@@ -315,6 +369,7 @@ function SaveBtn({ onClick, saved, savedHint, saveLabel, savedLabel }) {
 // SECCIÓN: PERFIL
 // ══════════════════════════════════════════════════════════════════════════════
 function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
+  const C = useSettingsPalette();
   const [fullName, setFullName] = useState(coach?.name || '');
   const [titulo,   setTitulo]   = useState(coach?.titulo || '');
   const [email,    setEmail]    = useState(coach?.email || '');
@@ -357,7 +412,7 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
           <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{email || coach?.email}</div>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            background: '#1A2E1A', border: '1px solid #166534',
+            background: C.proBadgeBg, border: `1px solid ${C.proBadgeBorder}`,
             borderRadius: 20, padding: '2px 10px', marginTop: 6,
             fontSize: 11, fontWeight: 600, color: C.green,
           }}>{t.proActive}</div>
@@ -387,6 +442,7 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
 // SECCIÓN: PREFERENCIAS
 // ══════════════════════════════════════════════════════════════════════════════
 function TabPreferencias({ lang, setLang, darkMode, setDarkMode, toast2 }) {
+  const C = useSettingsPalette();
   const P = coachUiStrings(lang).prefs;
   const [locale, setLocale] = useState(() => (SUPPORTED_LANGS.includes(lang) ? lang : 'es'));
   const [tema,   setTema]   = useState(darkMode ? 'night' : 'day');
@@ -410,7 +466,13 @@ function TabPreferencias({ lang, setLang, darkMode, setDarkMode, toast2 }) {
     setLang(locale);
     try { applyItPrefsToDocument({ lang: locale }); } catch(e) {}
     if (tema === 'night') { setDarkMode(true); try { localStorage.setItem('it_dark','true'); } catch(e) {} }
-    else                  { setDarkMode(false); try { localStorage.setItem('it_dark','false'); } catch(e) {} }
+    else if (tema === 'day') { setDarkMode(false); try { localStorage.setItem('it_dark','false'); } catch(e) {} }
+    else {
+      var sysDark = false;
+      try { sysDark = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch (e2) {}
+      setDarkMode(sysDark);
+      try { localStorage.setItem('it_dark', sysDark ? 'true' : 'false'); } catch(e3) {}
+    }
     setSaved(true); setTimeout(() => setSaved(false), 2200);
     toast2(P.toastSaved);
   };
@@ -427,7 +489,18 @@ function TabPreferencias({ lang, setLang, darkMode, setDarkMode, toast2 }) {
       <Row label={P.theme} desc={P.themeDesc}>
         <BtnGroup
           options={[{id:'night',label:P.night},{id:'day',label:P.day},{id:'system',label:P.system}]}
-          value={tema} onChange={setTema}
+          value={tema}
+          onChange={(next) => {
+            setTema(next);
+            if (next === 'night') { setDarkMode(true); try { localStorage.setItem('it_dark', 'true'); } catch (e) {} }
+            else if (next === 'day') { setDarkMode(false); try { localStorage.setItem('it_dark', 'false'); } catch (e) {} }
+            else {
+              var m = false;
+              try { m = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch (e2) {}
+              setDarkMode(m);
+              try { localStorage.setItem('it_dark', m ? 'true' : 'false'); } catch (e3) {}
+            }
+          }}
         />
       </Row>
 
@@ -453,6 +526,7 @@ function TabPreferencias({ lang, setLang, darkMode, setDarkMode, toast2 }) {
 // SECCIÓN: NEGOCIO
 // ══════════════════════════════════════════════════════════════════════════════
 function TabNegocio({ toast2, alumnosCount, t }) {
+  const C = useSettingsPalette();
   const [nombre,  setNombre]  = useState('');
   const [tel,     setTel]     = useState('');
   const [capMax,  setCapMax]  = useState(30);
@@ -513,7 +587,7 @@ function TabNegocio({ toast2, alumnosCount, t }) {
           {MONEDAS.map(m => (
             <button key={m} type="button" onClick={() => setMoneda(m)} style={{
               padding: '5px 12px', borderRadius: 7, border: `1px solid ${moneda === m ? C.blue : C.border}`,
-              background: moneda === m ? '#1D2D50' : 'transparent',
+              background: moneda === m ? C.currencySelBg : 'transparent',
               color: moneda === m ? C.blueL : C.muted,
               fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
             }}>{m}</button>
@@ -529,6 +603,7 @@ function TabNegocio({ toast2, alumnosCount, t }) {
 // SECCIÓN: SUSCRIPCIÓN
 // ══════════════════════════════════════════════════════════════════════════════
 function TabSuscripcion({ alumnosCount, rutinasActivasCount, t, lang }) {
+  const C = useSettingsPalette();
   const renewal = new Date(new Date().setMonth(new Date().getMonth() + 1))
     .toLocaleDateString(localeForSettingsDates(lang || 'es'), { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -551,7 +626,7 @@ function TabSuscripcion({ alumnosCount, rutinasActivasCount, t, lang }) {
     <div>
       <SectionTitle>{t.currentPlan}</SectionTitle>
       <div style={{
-        background: 'linear-gradient(135deg, #1D2D50 0%, #0F1829 100%)',
+        background: C.subscriptionBanner,
         border: `1px solid ${C.blue}`, borderRadius: 14, padding: '20px 22px', marginBottom: 20,
       }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1px', background: C.blue, color: '#fff', display: 'inline-flex', padding: '2px 10px', borderRadius: 20, marginBottom: 10 }}>{t.active}</div>
@@ -615,6 +690,7 @@ function TabNotificaciones({ t }) {
 // SECCIÓN: ZONA DE RIESGO
 // ══════════════════════════════════════════════════════════════════════════════
 function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
+  const C = useSettingsPalette();
   const [deletePhrase, setDeletePhrase] = useState('');
   const [showConfirm,  setShowConfirm]  = useState(false);
 
@@ -637,7 +713,7 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
       padding: '14px 18px', background: C.card,
-      border: '1px solid #4B1A1A', borderRadius: 10, marginBottom: 6,
+      border: `1px solid ${C.dangerCardBorder}`, borderRadius: 10, marginBottom: 6,
     }}>
       <div>
         <div style={{ fontSize: 14, fontWeight: 500, color: C.red }}>{label}</div>
@@ -675,8 +751,8 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
       {!showConfirm ? (
         dangerRow(t.deleteAccount, t.deleteAccountDesc, t.deleteAccountBtn, () => setShowConfirm(true))
       ) : (
-        <div style={{ background: C.card, border: '1px solid #4B1A1A', borderRadius: 10, padding: '16px 18px', marginBottom: 6 }}>
-          <div style={{ fontSize: 13, color: '#FCA5A5', marginBottom: 12 }}>
+        <div style={{ background: C.card, border: `1px solid ${C.dangerCardBorder}`, borderRadius: 10, padding: '16px 18px', marginBottom: 6 }}>
+          <div style={{ fontSize: 13, color: C.deleteWarnText, marginBottom: 12 }}>
             {t.confirmHtml[0]}<strong>{t.deleteWord}</strong>{t.confirmHtml[1]}
           </div>
           <input
@@ -691,8 +767,8 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
           />
           <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" onClick={doDelete} disabled={deletePhrase !== t.deleteWord} style={{
-              background: deletePhrase === t.deleteWord ? C.red : '#4B1A1A',
-              color: '#fff', border: 'none', borderRadius: 7, padding: '8px 18px',
+              background: deletePhrase === t.deleteWord ? C.red : C.deleteDisabledBg,
+              color: deletePhrase === t.deleteWord ? '#fff' : C.deleteBtnDisabledFg, border: 'none', borderRadius: 7, padding: '8px 18px',
               fontSize: 12, fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase',
               cursor: deletePhrase === t.deleteWord ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
             }}>{t.deleteAccountFinal}</button>
@@ -746,8 +822,10 @@ export default function SettingsPage({
   const ActiveTab = TABS[active] || TabPerfil;
 
   const embed = embedInMainColumn;
+  const pal = useMemo(() => coachSettingsPalette(darkMode), [darkMode]);
 
   return (
+    <SettingsPaletteContext.Provider value={pal}>
     <div style={embed ? {
       position: 'relative',
       flex: 1,
@@ -756,15 +834,15 @@ export default function SettingsPage({
       flexDirection: 'column',
       width: '100%',
       overflow: 'hidden',
-      background: C.bg,
-      color: C.text,
+      background: pal.bg,
+      color: pal.text,
       fontFamily: "'DM Sans', sans-serif",
       borderRadius: 12,
       boxSizing: 'border-box',
     } : {
       position: 'fixed', inset: 0, zIndex: 220,
       display: 'flex', flexDirection: 'column',
-      background: C.bg, color: C.text,
+      background: pal.bg, color: pal.text,
       fontFamily: "'DM Sans', sans-serif",
     }}>
       {/* HEADER — en embed el padding horizontal lo aplica el contenedor padre (misma columna que Alumnos/Rutinas) */}
@@ -774,14 +852,14 @@ export default function SettingsPage({
         minHeight: 52,
         height: embed ? undefined : 52,
         flexShrink: 0,
-        borderBottom: `1px solid ${C.border}`, background: '#0D1117',
+        borderBottom: `1px solid ${pal.border}`, background: pal.chrome,
       }}>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', color: C.muted }}>{ui.settingsHeader}</div>
-          <div style={{ fontSize: 20, fontFamily: 'Bebas Neue, sans-serif', letterSpacing: 2, lineHeight: 1.1 }}>{ui.coachMode}</div>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', color: pal.muted }}>{ui.settingsHeader}</div>
+          <div style={{ fontSize: 20, fontFamily: 'Bebas Neue, sans-serif', letterSpacing: 2, lineHeight: 1.1, color: pal.text }}>{ui.coachMode}</div>
         </div>
         <button type="button" onClick={onClose} style={{
-          background: 'transparent', border: `1px solid ${C.border}`, color: C.muted,
+          background: 'transparent', border: `1px solid ${pal.border}`, color: pal.muted,
           borderRadius: 7, padding: '5px 14px', fontSize: 12, fontWeight: 600,
           letterSpacing: '0.5px', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit',
         }}>{ui.close}</button>
@@ -793,18 +871,18 @@ export default function SettingsPage({
         {/* SIDEBAR */}
         <aside style={{
           width: 200, flexShrink: 0,
-          borderRight: `1px solid ${C.border}`,
-          background: '#0D1117',
+          borderRight: `1px solid ${pal.border}`,
+          background: pal.chrome,
           display: 'flex', flexDirection: 'column',
           overflowY: 'auto',
           padding: embed ? '16px 8px 16px 0' : '16px 10px',
         }}>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', color: C.muted, padding: embed ? '4px 0 10px' : '4px 8px 10px' }}>{ui.navigation}</div>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', color: pal.muted, padding: embed ? '4px 0 10px' : '4px 8px 10px' }}>{ui.navigation}</div>
           {sections.map((s, i) => {
             const isActive = active === s.id;
             return (
               <React.Fragment key={s.id}>
-                {s.danger && i > 0 && <div style={{ height: 1, background: C.border, margin: '8px 0' }} />}
+                {s.danger && i > 0 && <div style={{ height: 1, background: pal.border, margin: '8px 0' }} />}
                 <button
                   type="button"
                   onClick={() => setActive(s.id)}
@@ -813,9 +891,9 @@ export default function SettingsPage({
                     width: '100%', padding: '9px 10px', borderRadius: 8,
                     border: 'none', cursor: 'pointer', textAlign: 'left',
                     fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-                    background: isActive ? (s.danger ? 'rgba(239,68,68,.15)' : '#1D2D50') : 'transparent',
-                    color: isActive ? (s.danger ? C.red : C.blueL) : (s.danger ? '#FCA5A5' : C.sub),
-                    borderLeft: isActive ? `3px solid ${s.danger ? C.red : C.blueL}` : '3px solid transparent',
+                    background: isActive ? (s.danger ? 'rgba(239,68,68,.15)' : pal.navActiveBg) : 'transparent',
+                    color: isActive ? (s.danger ? pal.red : pal.blueL) : (s.danger ? pal.navInactiveDangerText : pal.sub),
+                    borderLeft: isActive ? `3px solid ${s.danger ? pal.red : pal.blueL}` : '3px solid transparent',
                     transition: 'all .15s',
                   }}
                 >{s.label}</button>
@@ -829,11 +907,11 @@ export default function SettingsPage({
           flex: 1,
           overflowY: 'auto',
           padding: embed ? '24px 0 24px 20px' : '24px 28px',
-          background: C.bg,
+          background: pal.bg,
           boxSizing: 'border-box',
         }}>
-          <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 22, fontFamily: 'Bebas Neue, sans-serif', letterSpacing: 2 }}>
+          <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${pal.border}` }}>
+            <div style={{ fontSize: 22, fontFamily: 'Bebas Neue, sans-serif', letterSpacing: 2, color: pal.text }}>
               {sections.find(s => s.id === active)?.label?.toUpperCase()}
             </div>
           </div>
@@ -841,5 +919,6 @@ export default function SettingsPage({
         </main>
       </div>
     </div>
+    </SettingsPaletteContext.Provider>
   );
 }
