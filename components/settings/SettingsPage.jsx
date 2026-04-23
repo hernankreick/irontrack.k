@@ -80,7 +80,6 @@ function coachUiStrings(lang) {
     settingsHeader: es ? 'Configuración' : pt ? 'Configuração' : 'Settings',
     coachMode: es ? 'MODO ENTRENADOR' : pt ? 'MODO TREINADOR' : 'COACH MODE',
     close: es ? 'CERRAR' : pt ? 'FECHAR' : 'CLOSE',
-    navigation: es ? 'Navegación' : pt ? 'Navegação' : 'Navigation',
     sectionLabels: {
       perfil: es ? 'Perfil' : pt ? 'Perfil' : 'Profile',
       preferencias: es ? 'Preferencias' : pt ? 'Preferências' : 'Preferences',
@@ -845,10 +844,10 @@ export default function SettingsPage({
       background: pal.bg, color: pal.text,
       fontFamily: "'DM Sans', sans-serif",
     }}>
-      {/* HEADER — en embed el padding horizontal lo aplica el contenedor padre (misma columna que Alumnos/Rutinas) */}
+      {/* HEADER — en embed añadimos aire horizontal; el padre sigue alineando la columna principal */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: embed ? '12px 0' : '0 24px',
+        padding: embed ? '12px 16px 12px 20px' : '0 24px',
         minHeight: 52,
         height: embed ? undefined : 52,
         flexShrink: 0,
@@ -875,9 +874,8 @@ export default function SettingsPage({
           background: pal.chrome,
           display: 'flex', flexDirection: 'column',
           overflowY: 'auto',
-          padding: embed ? '16px 8px 16px 0' : '16px 10px',
+          padding: embed ? '16px 8px 16px 12px' : '16px 10px',
         }}>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', color: pal.muted, padding: embed ? '4px 0 10px' : '4px 8px 10px' }}>{ui.navigation}</div>
           {sections.map((s, i) => {
             const isActive = active === s.id;
             return (
