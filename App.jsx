@@ -7465,6 +7465,11 @@ const C = {
   text:"#FFFFFF", sub:"#94A3B8", muted:"#4B6480",
 };
 const BLUE_GRAD  = "linear-gradient(135deg,#1E40AF 0%,#2563EB 55%,#3B82F6 100%)";
+/** Degradado del isotipo en landing (más luminoso y legible sobre foto oscura). */
+const LANDING_LOGO_GRAD =
+  "linear-gradient(135deg, #3b82f6 0%, #2563eb 60%, #1d4ed8 100%)";
+const LANDING_LOGO_SHADOW =
+  "0 12px 32px rgba(0,0,0,0.38), 0 4px 12px rgba(29, 78, 216, 0.22)";
 const GREEN_GRAD = "linear-gradient(135deg,#16A34A,#22C55E)";
 const GLOW       = "0 0 36px rgba(37,99,235,0.5),0 8px 24px rgba(0,0,0,0.4)";
 const GLOW_G     = "0 0 32px rgba(34,197,94,0.4)";
@@ -7483,18 +7488,19 @@ const GLOW_G     = "0 0 32px rgba(34,197,94,0.4)";
 */
 
 /* ═══════════════════════ SVG ICONS ═══════════════════════ */
-const BarSVG = ({w=56}) => (
-  <svg width={w} height={Math.round(w*0.56)} viewBox="0 0 78 44" fill="none">
-    <rect x="20" y="19" width="38" height="6" rx="3" fill="white"/>
-    <rect x="20" y="19" width="38" height="2" rx="1" fill="rgba(255,255,255,0.2)"/>
-    <rect x="4"  y="16" width="4"  height="12" rx="1.5" fill="rgba(255,255,255,0.45)"/>
-    <rect x="8"  y="10" width="6"  height="24" rx="2.5" fill="white"/>
-    <rect x="14" y="10" width="6"  height="24" rx="2.5" fill="rgba(255,255,255,0.75)"/>
-    <rect x="19" y="17" width="3"  height="10" rx="1.5" fill="#93C5FD"/>
-    <rect x="56" y="17" width="3"  height="10" rx="1.5" fill="#93C5FD"/>
-    <rect x="58" y="10" width="6"  height="24" rx="2.5" fill="rgba(255,255,255,0.75)"/>
-    <rect x="64" y="10" width="6"  height="24" rx="2.5" fill="white"/>
-    <rect x="70" y="16" width="4"  height="12" rx="1.5" fill="rgba(255,255,255,0.45)"/>
+/** Mancuerna minimal (solo landing paso 0). */
+const LandingDumbbellMark = ({ size = 52 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 64 64"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden={true}
+  >
+    <rect x="10" y="24" width="10" height="16" rx="3" fill="white" />
+    <rect x="24" y="29" width="16" height="6" rx="3" fill="white" />
+    <rect x="44" y="24" width="10" height="16" rx="3" fill="white" />
   </svg>
 );
 
@@ -7699,15 +7705,27 @@ const Step0 = ({onNext, onYaTengoCuenta}) => {
 
         {/* Logo */}
         <div style={{...a(0),display:"flex",flexDirection:"column",alignItems:"center",gap:16,marginBottom:18}}>
-          <div style={{width:92,height:92,borderRadius:24,background:BLUE_GRAD,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:GLOW,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",top:0,left:0,right:0,height:"45%",borderRadius:"24px 24px 50% 50%",background:"linear-gradient(to bottom,rgba(255,255,255,0.14),transparent)",pointerEvents:"none"}}/>
-            <BarSVG w={58}/>
+          <div
+            style={{
+              width: 92,
+              height: 92,
+              borderRadius: 24,
+              background: LANDING_LOGO_GRAD,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: LANDING_LOGO_SHADOW,
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <LandingDumbbellMark size={52} />
           </div>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:3,height:58,background:C.blue,borderRadius:2,boxShadow:`0 0 12px ${C.blue}`}}/>
+            <div style={{width:3,height:58,background:C.blue,borderRadius:2,boxShadow:"0 0 8px rgba(37,99,235,0.35)"}}/>
             <div>
               <div style={{fontSize:58,fontWeight:900,color:C.text,letterSpacing:4,lineHeight:.93,textShadow:"0 2px 20px rgba(0,0,0,0.9)"}}>IRON</div>
-              <div style={{fontSize:58,fontWeight:900,color:C.blue,letterSpacing:4,lineHeight:.93,textShadow:`0 0 28px rgba(37,99,235,0.85)`}}>TRACK</div>
+              <div style={{fontSize:58,fontWeight:900,color:C.blue,letterSpacing:4,lineHeight:.93,textShadow:"0 1px 0 rgba(0,0,0,0.25), 0 0 18px rgba(37,99,235,0.35)"}}>TRACK</div>
             </div>
           </div>
         </div>
