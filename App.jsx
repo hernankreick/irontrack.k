@@ -5263,7 +5263,7 @@ function GymApp() {
         </div>
       )}
       {editEx&&(
-        <EditExModal darkMode={darkMode} key={editEx.rId+"-"+editEx.dIdx+"-"+editEx.eIdx} editEx={editEx} btn={btn} inp={inp} allEx={allEx} es={es} PATS={PATS}
+        <EditExModal darkMode={darkMode} key={editEx.rId+"-"+editEx.dIdx+"-"+editEx.eIdx} editEx={editEx} btn={btn} inp={inp} allEx={allEx} es={es} PATS={PATS} msg={msg}
           onSave={async(updatedRaw)=>{
             const updated = sanitizeExerciseSnapshotForWrite(updatedRaw);
             const blq = editEx.bloque||"exercises";
@@ -8386,7 +8386,7 @@ function LoginForm({es, btn, inp, lbl, onLogin, onClose, darkMode}) {
   );
 }
 
-function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, allEx}) {
+function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, allEx, msg}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
