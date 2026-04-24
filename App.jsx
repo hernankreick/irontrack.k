@@ -2383,8 +2383,12 @@ function GymApp() {
       <style dangerouslySetInnerHTML={{__html:
         "@import url(https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap);" +
         "*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased}input,textarea,select{outline:none!important}" +
-        "::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:"+(darkMode?"#162234":"#8B9AB2")+";border-radius:2px}" +
-        "@media(min-width:1024px){.plan-main-scroll::-webkit-scrollbar{width:8px}.plan-main-scroll::-webkit-scrollbar-thumb{background:"+(darkMode?"#2a3d5c":"#94a3b8")+";border-radius:4px;border:2px solid transparent;background-clip:padding-box}}" +
+        "html{scrollbar-color:"+(darkMode?"#64748b #0f172a":"#64748b #e2e8f0")+"}" +
+        "::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:"+(darkMode?"rgba(15,23,42,.55)":"#e2e8f0")+";border-radius:8px}::-webkit-scrollbar-thumb{background:"+(darkMode?"#64748b":"#64748b")+";border-radius:8px;border:2px solid transparent;background-clip:padding-box}" +
+        ".plan-main-scroll{scrollbar-gutter:stable;scrollbar-color:"+(darkMode?"#94a3b8 #0b1120":"#64748b #f1f5f9")+"}" +
+        ".plan-main-scroll::-webkit-scrollbar{width:14px}" +
+        ".plan-main-scroll::-webkit-scrollbar-track{background:"+(darkMode?"rgba(15,23,42,.65)":"#e8edf3")+";border-radius:10px;margin:4px 0}" +
+        ".plan-main-scroll::-webkit-scrollbar-thumb{background:"+(darkMode?"#94a3b8":"#64748b")+";border-radius:10px;border:3px solid "+(darkMode?"#0b1120":"#f8fafc")+";background-clip:padding-box;min-height:48px}" +
         ".hov{transition:all .15s ease;cursor:pointer}.hov:hover{filter:brightness(1.15)}" +
         "@keyframes successPulse{0%{transform:scale(1)}30%{transform:scale(0.94)}60%{transform:scale(1.06)}100%{transform:scale(1)}}" +
         "@keyframes pillBounce{0%{transform:scale(1)}30%{transform:scale(1.25)}50%{transform:scale(0.9)}70%{transform:scale(1.1)}100%{transform:scale(1)}}" +
@@ -3791,15 +3795,13 @@ function GymApp() {
             bgSub={bgSub}
             lang={lang}
             es={es}
+            filtroRut={filtroRut}
             setFiltroRut={setFiltroRut}
-            btn={btn}
             card={card}
             setNewR={setNewR}
             routines={routines}
             setRoutines={setRoutines}
             allEx={allEx}
-            PATS={PATS}
-            setEditEx={setEditEx}
             toast2={toast2}
             setAddExModal={setAddExModal}
             setAddExSearch={setAddExSearch}
@@ -3811,6 +3813,7 @@ function GymApp() {
             sb={sb}
             setAssignRoutineId={setAssignRoutineId}
             desktopCoachStableLayout={coachDesktopNavHidden}
+            rutinasSBEntrenador={rutinasSBEntrenador}
           />
           </div>
         )}
@@ -5262,7 +5265,7 @@ function GymApp() {
           </div>
         </div>
       )}
-      {editEx&&(
+      {editEx&&typeof document!=="undefined"&&createPortal(
         <EditExModal darkMode={darkMode} key={editEx.rId+"-"+editEx.dIdx+"-"+editEx.eIdx} editEx={editEx} btn={btn} inp={inp} allEx={allEx} es={es} PATS={PATS} msg={msg}
           onSave={async(updatedRaw)=>{
             const updated = sanitizeExerciseSnapshotForWrite(updatedRaw);
@@ -5291,7 +5294,8 @@ function GymApp() {
             setEditEx(null);toast2("Guardado ✓");
           }}
           onClose={()=>setEditEx(null)}
-        />
+        />,
+        document.body
       )}
       {loginModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:130,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setLoginModal(false)}>
@@ -8422,11 +8426,43 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
   const color = pat?.color||"#2563EB";
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:125,overflowY:"auto"}} onClick={onClose}>
-      <div style={{background:bgCard,margin:"20px 16px",borderRadius:16,padding:"20px 16px",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+    <div
+      style={{
+        position:"fixed",
+        inset:0,
+        background:"rgba(0,0,0,.92)",
+        zIndex:210,
+        overflowY:"auto",
+        WebkitOverflowScrolling:"touch",
+        display:"flex",
+        flexDirection:"column",
+        alignItems:"center",
+        justifyContent:"safe center",
+        boxSizing:"border-box",
+        padding:"max(12px, env(safe-area-inset-top, 0px)) 16px max(12px, env(safe-area-inset-bottom, 0px))",
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background:bgCard,
+          color:textMain,
+          margin:0,
+          width:"100%",
+          maxWidth:560,
+          flexShrink:0,
+          borderRadius:16,
+          padding:"20px 16px",
+          maxHeight:"min(85dvh, calc(100dvh - 24px))",
+          overflowY:"auto",
+          border:"1px solid "+border,
+          boxSizing:"border-box",
+        }}
+        onClick={e=>e.stopPropagation()}
+      >
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <div style={{width:36,height:36,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:color,flexShrink:0}}>{pat?.icon||"·"}</div>
-          <div style={{fontSize:22,fontWeight:800,flex:1}}>{nombre}</div>
+          <div style={{fontSize:22,fontWeight:800,flex:1,color:textMain}}>{nombre}</div>
           <button className="hov" style={{...btn(),fontSize:22,padding:"4px 8px"}} onClick={onClose}>x</button>
         </div>
 

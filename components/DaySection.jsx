@@ -28,6 +28,7 @@ function SortableBlock({
   onReorderBlock,
   blockKey,
   darkMode = true,
+  addButtonClassName = '',
 }) {
   var blockBg = darkMode ? '#0f172a' : '#f8fafc';
   var blockBorder = darkMode ? `1px solid ${accent}22` : `1px solid ${accent}28`;
@@ -115,6 +116,8 @@ function SortableBlock({
 
       {/* Add button */}
       <button
+        type="button"
+        className={addButtonClassName || undefined}
         onClick={onAddExercise}
         style={{
           width: '100%',
@@ -160,6 +163,8 @@ export function DaySection({
   darkMode = true,
   textMain = '#0f172a',
   textMuted = '#64748b',
+  /** Clases CSS opcionales (p. ej. microinteracciones en vista Rutinas). */
+  premiumAddButtonClass = '',
 }) {
   var dayTitleColor = darkMode ? '#f1f5f9' : textMain;
   var dayInputColor = darkMode ? '#f1f5f9' : textMain;
@@ -258,7 +263,7 @@ export function DaySection({
       <SortableBlock
         blockKey="warmup"
         label={M(lang, 'Entrada en calor', 'Warm-up', 'Aquecimento')}
-        addExerciseLabel={M(lang, 'Añadir ejercicio', 'Add exercise', 'Adicionar exercício')}
+        addExerciseLabel={M(lang, 'Agregar ejercicios', 'Add exercises', 'Adicionar exercícios')}
         accent={BLOCK_ACCENT.warmup}
         exercises={warmup}
         count={warmup.length}
@@ -267,13 +272,14 @@ export function DaySection({
         onDeleteExercise={onDeleteExercise}
         onReorderBlock={onReorderWarmup}
         darkMode={darkMode}
+        addButtonClassName={premiumAddButtonClass}
       />
 
       {/* BLOQUE PRINCIPAL */}
       <SortableBlock
         blockKey="exercises"
         label={M(lang, 'Bloque principal', 'Main block', 'Bloco principal')}
-        addExerciseLabel={M(lang, 'Añadir ejercicio', 'Add exercise', 'Adicionar exercício')}
+        addExerciseLabel={M(lang, 'Agregar ejercicios', 'Add exercises', 'Adicionar exercícios')}
         accent={BLOCK_ACCENT.exercises}
         exercises={exercises}
         count={exercises.length}
@@ -282,6 +288,7 @@ export function DaySection({
         onDeleteExercise={onDeleteExercise}
         onReorderBlock={onReorderExercises}
         darkMode={darkMode}
+        addButtonClassName={premiumAddButtonClass}
       />
     </div>
   );
