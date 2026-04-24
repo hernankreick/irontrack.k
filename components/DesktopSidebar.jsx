@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { desktopSidebarTheme } from "./coachThemePalette.js";
+import { coachInitialsFromFullName } from "./coachUiScale.js";
 
 const LS_KEY = "irontrack_desktop_sidebar_collapsed";
 
@@ -180,18 +181,6 @@ export default function DesktopSidebar({
 
   function go(tabKey) {
     if (typeof onNavigate === "function") onNavigate(tabKey);
-  }
-
-  function initials(n) {
-    return String(n || "C")
-      .trim()
-      .split(/\s+/)
-      .map(function (p) {
-        return p.charAt(0);
-      })
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
   }
 
   return (
@@ -452,7 +441,7 @@ export default function DesktopSidebar({
                 flexShrink: 0,
               }}
             >
-              {initials(coachName)}
+              {coachInitialsFromFullName(coachName)}
             </div>
           )}
           {!collapsed ? <span>{footerLabels.perfil}</span> : null}

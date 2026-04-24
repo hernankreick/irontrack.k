@@ -15,6 +15,7 @@ import { exportRoutinePdfHtml } from './lib/routinePdfExport.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboard from './components/CoachDashboard';
+import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import IronTrackLogo from './components/IronTrackLogo.jsx';
 import StudentProgressSection from './components/student-progress/StudentProgressSection.jsx';
@@ -2827,6 +2828,7 @@ function GymApp() {
                 allEx={allEx}
                 lang={lang}
                 darkMode={darkMode}
+                coachName={sessionData?.name || ""}
                 onEnviarMensaje={function () {
                   var first = (alumnos || [])[0];
                   if (first) {
@@ -2993,7 +2995,7 @@ function GymApp() {
                       flexShrink: 0,
                     }}
                   >
-                    {(sessionData?.name || "E").slice(0, 2).toUpperCase()}
+                    {coachInitialsFromFullName(sessionData?.name)}
                   </div>
                   <div>
                     <div style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{sessionData?.name || "Entrenador"}</div>

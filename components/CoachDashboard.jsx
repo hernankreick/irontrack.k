@@ -13,7 +13,7 @@ import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import GlobalSearch from "./GlobalSearch.jsx";
 import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
-import { coachType as T, coachSpace as S } from "./coachUiScale.js";
+import { coachType as T, coachSpace as S, coachFirstNameFromFullName } from "./coachUiScale.js";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 
@@ -459,6 +459,8 @@ export default function CoachDashboard({
   getAlumnoCategoria,
   /** Alineado con `darkMode` de App (config Tema día/noche). */
   darkMode = true,
+  /** Nombre del entrenador (session) para saludo e iniciales en la shell. */
+  coachName = "",
 }) {
   var C = React.useMemo(
     function () {
@@ -513,6 +515,15 @@ export default function CoachDashboard({
       return M(lang, "Buenas noches", "Good evening", "Boa noite");
     },
     [lang]
+  );
+
+  var coachSaludoNombre = React.useMemo(
+    function () {
+      var first = coachFirstNameFromFullName(coachName);
+      if (first) return ", " + first;
+      return M(lang, ", Entrenador", ", Coach", ", Treinador");
+    },
+    [lang, coachName]
   );
 
   /** Resumen stats (mock alineado al dashboard) — solo layout mobile vs desktop. */
@@ -607,7 +618,7 @@ export default function CoachDashboard({
           <div>
             <h2 style={{ ...T.screenTitle, color: C.t, margin: 0 }}>
               {greetingLine}
-              {M(lang, ", Entrenador", ", Coach", ", Treinador")}
+              {coachSaludoNombre}
             </h2>
             <p style={{ ...T.screenSubtitle, color: C.t2, margin: "6px 0 0 0" }}>
               {M(lang, "Acá tenés el resumen de tu equipo", "Here's your team's summary", "Aqui está o resumo da sua equipe")}
