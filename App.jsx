@@ -7560,8 +7560,34 @@ const BLUE_GRAD  = "linear-gradient(135deg,#1E40AF 0%,#2563EB 55%,#3B82F6 100%)"
 /** Degradado del isotipo en landing (más luminoso y legible sobre foto oscura). */
 const LANDING_LOGO_GRAD =
   "linear-gradient(135deg, #3b82f6 0%, #2563eb 60%, #1d4ed8 100%)";
-const LANDING_LOGO_SHADOW =
-  "0 12px 32px rgba(0,0,0,0.38), 0 4px 12px rgba(29, 78, 216, 0.22)";
+/** Sombra isotipo — solo Step0 landing */
+const LANDING_LOGO_BOX_SHADOW =
+  "0 0 35px rgba(37,99,235,0.45), 0 18px 40px rgba(0,0,0,0.35)";
+const LANDING_CTA_GRAD = "linear-gradient(135deg, #1D4ED8, #3B82F6)";
+const LANDING_OVERLAY_GRAD =
+  "linear-gradient(180deg, rgba(5,12,24,0.55) 0%, rgba(5,12,24,0.2) 38%, rgba(5,12,24,0.88) 100%)";
+/** Misma columna que el landing: contenido centrado, no full-bleed en desktop. */
+const LANDING_MAX_W = 430;
+const ONBOARD_CONTENT_WRAP = {
+  width: "min(100%, " + LANDING_MAX_W + "px)",
+  minWidth: 0,
+  marginLeft: "auto",
+  marginRight: "auto",
+  boxSizing: "border-box",
+};
+/** Onboarding — selección de rol (paso 2) y nombre (paso 3); ancho generoso en desktop. */
+const ONBOARD_PROFILE_MAX_W = 720;
+const ONBOARD_PROFILE_WRAP = {
+  width: "min(100%, " + ONBOARD_PROFILE_MAX_W + "px)",
+  minWidth: 0,
+  marginLeft: "auto",
+  marginRight: "auto",
+  boxSizing: "border-box",
+};
+const ONBOARD_PROFILE_H_PAD = 24; /* 20–24px en mobile, fijo 24 pide spec */
+/** Onboarding pasos 1–2 (perfil + nombre) — fondo / card premium */
+const ONBOARD_PREMIUM_BG = "#0a0f1a";
+const ONBOARD_PREMIUM_CARD = "#0d1424";
 const GREEN_GRAD = "linear-gradient(135deg,#16A34A,#22C55E)";
 const GLOW       = "0 0 36px rgba(37,99,235,0.5),0 8px 24px rgba(0,0,0,0.4)";
 const GLOW_G     = "0 0 32px rgba(34,197,94,0.4)";
@@ -7580,7 +7606,7 @@ const GLOW_G     = "0 0 32px rgba(34,197,94,0.4)";
 */
 
 /* ═══════════════════════ SVG ICONS ═══════════════════════ */
-/** Mancuerna minimal (solo landing paso 0). */
+/** Mancuerna blanca simple (solo landing paso 0). */
 const LandingDumbbellMark = ({ size = 52 }) => (
   <svg
     width={size}
@@ -7641,6 +7667,13 @@ const UserTeamSVG = ({color,size=32}) => (
 const ChartSVG = ({color="#3B82F6",size=16}) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+  </svg>
+);
+
+const ClipboardSVG = ({ color = "#3B82F6", size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="5" y="3" width="14" height="20" rx="2"/>
+    <path d="M9 3V2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/>
   </svg>
 );
 
@@ -7759,16 +7792,70 @@ const BtnBack = ({onClick}) => (
   </button>
 );
 
-/* Contenedor de botones — siempre perfecto */
-const BtnRow = ({dots,total,current,children}) => (
-  <div style={{padding:"14px 24px 36px",flexShrink:0,background:C.bg}}>
-    <Dots total={total} current={current}/>
-    <div style={{
-      display:"flex",flexDirection:"row",
-      gap:10,
-      height:BTN_H,              /* altura fija del row = altura de los botones */
-    }}>
-      {children}
+/** “Paso X de 3” + barra de 3 segmentos (onboarding perfiles). */
+const OnboardingProgress3 = ({ text, filled, barMaxWidth, progressFontSize = 12 }) => (
+  <div>
+    <div
+      style={{
+        textAlign: "center",
+        fontSize: progressFontSize,
+        fontWeight: 600,
+        color: "rgba(255,255,255,0.55)",
+        marginBottom: 4,
+        letterSpacing: 0.2,
+        fontFamily: "system-ui,sans-serif",
+      }}
+    >
+      {text}
+    </div>
+    <div
+      style={{
+        display: "flex",
+        gap: 4,
+        marginBottom: 8,
+        marginLeft: "auto",
+        marginRight: "auto",
+        ...(barMaxWidth === "100%" ? { width: "100%" } : { maxWidth: barMaxWidth != null ? barMaxWidth : 260 }),
+      }}
+    >
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            flex: 1,
+            height: 3,
+            borderRadius: 2,
+            background: i < filled ? "#2563EB" : "rgba(255,255,255,0.14)",
+            transition: "background 0.25s ease",
+          }}
+        />
+      ))}
+    </div>
+  </div>
+);
+
+/* Contenedor de botones — siempre perfecto (opcional: texto de progreso en lugar de dots) */
+const BtnRow = ({ total, current, children, progressLabel, footerBg, progressBarFilled, contentWrap, progressBarWidth }) => (
+  <div style={{padding:"8px 0 18px",flexShrink:0,background:footerBg!=null?footerBg:C.bg}}>
+    <div style={{...(contentWrap || ONBOARD_CONTENT_WRAP),padding: "0 " + ONBOARD_PROFILE_H_PAD + "px" }}>
+      {progressLabel != null && progressLabel !== "" ? (
+        typeof progressBarFilled === "number" ? (
+          <OnboardingProgress3 text={progressLabel} filled={progressBarFilled} barMaxWidth={progressBarWidth != null ? progressBarWidth : 260} progressFontSize={13} />
+        ) : (
+          <div style={{textAlign:"center",fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.5)",marginBottom:12,letterSpacing:"0.2px",fontFamily:"system-ui,sans-serif"}}>
+            {progressLabel}
+          </div>
+        )
+      ) : (
+        <Dots total={total} current={current}/>
+      )}
+      <div style={{
+        display:"flex",flexDirection:"row",
+        gap:10,
+        height:BTN_H,
+      }}>
+        {children}
+      </div>
     </div>
   </div>
 );
@@ -7776,113 +7863,402 @@ const BtnRow = ({dots,total,current,children}) => (
 /* ═══════════════════════════════════════════
    PASO 0 — LANDING
 ═══════════════════════════════════════════ */
-const Step0 = ({onNext, onYaTengoCuenta}) => {
+const LANDING_GYM_URL =
+  "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1200&q=80";
+
+const LandingStepDots4 = () => (
+  <div
+    style={{
+      display: "flex",
+      gap: 8,
+      justifyContent: "center",
+      marginBottom: 0,
+    }}
+  >
+    {[0, 1, 2, 3].map((i) => (
+      <div
+        key={i}
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: i === 0 ? "#2563EB" : "rgba(255,255,255,0.22)",
+          transition: "background .25s",
+        }}
+      />
+    ))}
+  </div>
+);
+
+const Step0 = ({es, onNext, onYaTengoCuenta}) => {
   const [vis,setVis] = React.useState(false);
-  React.useEffect(()=>{const t=setTimeout(()=>setVis(true),100);return()=>clearTimeout(t);},[]);
-  const a = (d=0) => ({
-    opacity:vis?1:0,
-    transform:vis?"translateY(0)":"translateY(16px)",
-    transition:`all .6s cubic-bezier(.16,1,.3,1) ${d}ms`,
+  const [wide, setWide] = React.useState(
+    () => (typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : false),
+  );
+  React.useEffect(() => {
+    const t = setTimeout(() => setVis(true), 100);
+    return () => clearTimeout(t);
+  }, []);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const m = window.matchMedia("(min-width: 768px)");
+    const fn = () => setWide(m.matches);
+    fn();
+    m.addEventListener("change", fn);
+    return () => m.removeEventListener("change", fn);
+  }, []);
+  const a = (d = 0) => ({
+    opacity: vis ? 1 : 0,
+    transform: vis ? "translateY(0)" : "translateY(14px)",
+    transition: `all .6s cubic-bezier(.16,1,.3,1) ${d}ms`,
   });
+  const logoBox = wide ? 118 : 108;
+  const dumbbellIcon = Math.round(logoBox * 0.86);
+  const trackTitlePx = 54;
+  const trackBarH = Math.round(trackTitlePx * 0.9);
 
   return (
-    <div style={{flex:1,display:"flex",flexDirection:"column",position:"relative",overflow:"hidden",minHeight:780}}>
-      {/* Foto gym */}
-      <div style={{position:"absolute",inset:0,backgroundImage:"url(https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80)",backgroundSize:"cover",backgroundPosition:"center 25%",filter:"brightness(0.27) saturate(0.55)",backgroundColor:"#050C18"}}/>
-      <div style={{position:"absolute",inset:0,background:"linear-gradient(180deg,rgba(5,12,24,0.4) 0%,rgba(5,12,24,0.05) 20%,rgba(5,12,24,0.68) 56%,rgba(5,12,24,1) 86%)"}}/>
-      <div style={{position:"absolute",top:-80,left:"50%",transform:"translateX(-50%)",width:440,height:440,borderRadius:"50%",background:"radial-gradient(circle,rgba(37,99,235,0.2) 0%,transparent 70%)",pointerEvents:"none"}}/>
-
-      <div style={{position:"relative",zIndex:5,flex:1,minHeight:0,display:"flex",flexDirection:"column",boxSizing:"border-box"}}>
-        <div className="box-border flex w-full flex-1 min-h-0 flex-col items-center overflow-y-auto px-7 pt-[68px] pb-[140px]">
-
-        {/* Logo */}
-        <div style={{...a(0),display:"flex",flexDirection:"column",alignItems:"center",gap:16,marginBottom:18}}>
-          <div
-            style={{
-              width: 92,
-              height: 92,
-              borderRadius: 24,
-              background: LANDING_LOGO_GRAD,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: LANDING_LOGO_SHADOW,
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <LandingDumbbellMark size={52} />
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:3,height:58,background:C.blue,borderRadius:2,boxShadow:"0 0 8px rgba(37,99,235,0.35)"}}/>
-            <div>
-              <div style={{fontSize:58,fontWeight:900,color:C.text,letterSpacing:4,lineHeight:.93,textShadow:"0 2px 20px rgba(0,0,0,0.9)"}}>IRON</div>
-              <div style={{fontSize:58,fontWeight:900,color:C.blue,letterSpacing:4,lineHeight:.93,textShadow:"0 1px 0 rgba(0,0,0,0.25), 0 0 18px rgba(37,99,235,0.35)"}}>TRACK</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Propuesta de valor */}
-        <div style={{...a(130),textAlign:"center",marginBottom:28}}>
-          <div style={{fontSize:20,fontWeight:800,color:"rgba(255,255,255,0.92)",lineHeight:1.35,marginBottom:6}}>
-            Todo lo que necesitás<br/>para entrenar mejor.
-          </div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.38)",letterSpacing:"0.4px"}}>
-            Rutinas, alumnos y progresión — en un solo lugar
-          </div>
-        </div>
-
-        {/* Feature pills */}
-        <div style={{...a(210),width:"100%",display:"flex",flexDirection:"column",gap:10,marginBottom:0}}>
-          {[
-            {icon:<CoachSVG  color="#3B82F6" size={16}/>, text:"Panel de alumnos con seguimiento en tiempo real"},
-            {icon:<ChartSVG  color="#60A5FA" size={16}/>, text:"Progresión de cargas y PRs automáticos"},
-            {icon:<CalSVG    color="#22C55E" size={16}/>, text:"Planificación por bloques y semanas"},
-          ].map((f,i)=>(
-            <div key={i} style={{height:52,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:14,backdropFilter:"blur(8px)",display:"flex",alignItems:"center",gap:12,padding:"0 16px"}}>
-              <div style={{width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                {f.icon}
-              </div>
-              <span style={{fontSize:13,color:"rgba(255,255,255,0.5)",fontWeight:500}}>{f.text}</span>
-            </div>
-          ))}
-        </div>
-
-        <div style={{...a(300),width:"100%",marginTop:16}}>
-          <Dots total={5} current={0} marginBottom={8}/>
-        </div>
-        </div>
+    <div
+      style={{
+        flex: 1,
+        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        overflow: "hidden",
+        background: "#050A14",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
+      {/* Fondo gimnasio + blur sutil (capa con overflow) */}
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            width: "120%",
+            height: "120%",
+            transform: "translate(-50%,-50%)",
+            backgroundImage: 'url("' + LANDING_GYM_URL + '")',
+            backgroundSize: "cover",
+            backgroundPosition: "center 30%",
+            filter: "brightness(0.3) saturate(0.5) blur(3px)",
+          }}
+        />
+      </div>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: LANDING_OVERLAY_GRAD,
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: "15%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 400,
+          height: 400,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(37,99,235,0.12) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
 
       <div
-        className="fixed bottom-0 left-0 z-50 w-full bg-gradient-to-t from-black/95 via-black/70 to-transparent backdrop-blur-md px-4 pt-4 pb-6"
+        style={{
+          position: "relative",
+          zIndex: 5,
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
-        <button
-          type="button"
-          onClick={onNext}
-          className="flex h-16 w-full items-center justify-center gap-2 rounded-2xl border-0 font-bold shadow-lg transition-all duration-200 active:scale-95"
+        {/* Bloque central: scroll + centrado vertical */}
+        <div
           style={{
-            background:BLUE_GRAD,
-            color:C.text,
-            fontFamily:"system-ui,sans-serif",
-            fontSize:13,
-            letterSpacing:"1px",
-            textTransform:"uppercase",
-            cursor:"pointer",
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            padding: "24px 0",
+            WebkitOverflowScrolling: "touch",
           }}
         >
-          <ArrowSVG size={16}/>
-          Empezar gratis
-        </button>
-        <button
-          type="button"
-          onClick={onYaTengoCuenta}
-          className="mt-2 w-full cursor-pointer border-0 bg-transparent p-0 text-center text-sm opacity-70"
-          style={{fontFamily:"system-ui,sans-serif",fontWeight:600,color:C.text}}
+          <div
+            style={{ ...ONBOARD_CONTENT_WRAP, padding: "0 24px" }}
+          >
+            <div
+              style={{
+                ...a(0),
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                textAlign: "center",
+                marginBottom: 0,
+              }}
+            >
+              <div
+                style={{
+                  width: logoBox,
+                  height: logoBox,
+                  borderRadius: 28,
+                  background: LANDING_LOGO_GRAD,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: LANDING_LOGO_BOX_SHADOW,
+                  overflow: "hidden",
+                  marginBottom: 28,
+                }}
+              >
+                <LandingDumbbellMark size={dumbbellIcon} />
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textTransform: "uppercase",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: trackTitlePx,
+                    fontWeight: 900,
+                    color: "#FFFFFF",
+                    lineHeight: 0.9,
+                    letterSpacing: "-1px",
+                    textShadow: "0 2px 24px rgba(0,0,0,0.85)",
+                  }}
+                >
+                  IRON
+                </div>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginTop: 0,
+                    gap: 8,
+                    marginLeft: 4,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 3,
+                      height: trackBarH,
+                      minHeight: 36,
+                      background: "#2563EB",
+                      borderRadius: 2,
+                      boxShadow: "0 0 8px rgba(37,99,235,0.4)",
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: trackTitlePx,
+                      fontWeight: 900,
+                      color: "#2563EB",
+                      lineHeight: 0.9,
+                      letterSpacing: "-1px",
+                      textShadow: "0 0 20px rgba(37,99,235,0.35)",
+                    }}
+                  >
+                    TRACK
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                ...a(100),
+                textAlign: "center",
+                marginTop: 20,
+                marginBottom: 22,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 22,
+                  fontWeight: 800,
+                  color: "#FFFFFF",
+                  lineHeight: 1.15,
+                }}
+              >
+                {es ? "Convertí datos en resultados reales" : "Turn data into real results"}
+              </div>
+              <div
+                style={{
+                  fontSize: 15,
+                  color: "rgba(255,255,255,0.68)",
+                  textAlign: "center",
+                  lineHeight: 1.4,
+                  marginTop: 10,
+                }}
+              >
+                {es
+                  ? "Rutinas, alumnos y progresión — en un solo lugar."
+                  : "Routines, athletes, and progression — in one place."}
+              </div>
+            </div>
+
+            <div
+              style={{
+                ...a(200),
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                marginBottom: 8,
+              }}
+            >
+              {[
+                {
+                  icon: <ClipboardSVG color="#2563EB" size={20} />,
+                  t: es ? "Rutinas personalizadas" : "Personalized routines",
+                  s: es ? "Diseñadas para cada objetivo." : "Built for every goal.",
+                },
+                {
+                  icon: <UserGroupSVG color="#2563EB" size={20} />,
+                  t: es ? "Seguimiento de alumnos" : "Athlete tracking",
+                  s: es
+                    ? "Controlá el progreso en tiempo real."
+                    : "Track progress in real time.",
+                },
+                {
+                  icon: <ChartSVG color="#2563EB" size={20} />,
+                  t: es ? "Progresión inteligente" : "Smart progression",
+                  s: es ? "Mejorá semana a semana." : "Improve week by week.",
+                },
+              ].map((f, i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: "rgba(13,20,36,0.78)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 16,
+                    padding: "14px 16px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 16,
+                    backdropFilter: "blur(10px)",
+                    WebkitBackdropFilter: "blur(10px)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      minWidth: 44,
+                      borderRadius: 12,
+                      background: "rgba(6,10,20,0.7)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {f.icon}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, textAlign: "left" }}>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: "#FFFFFF" }}>{f.t}</span>
+                    <span style={{ fontSize: 14, color: "rgba(255,255,255,0.68)", lineHeight: 1.35 }}>{f.s}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* CTA + indicador + link — mismo ancho max que el contenido */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 6,
+            flexShrink: 0,
+            width: "100%",
+            paddingTop: 8,
+            paddingBottom: "max(20px, env(safe-area-inset-bottom, 0px))",
+            background:
+              "linear-gradient(0deg, rgba(5,8,16,0.96) 0%, rgba(5,8,16,0.5) 55%, transparent 100%)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            boxSizing: "border-box",
+          }}
         >
-          Ya tengo cuenta — ingresar
-        </button>
+          <div style={{ ...ONBOARD_CONTENT_WRAP, padding: "12px 24px 8px" }}>
+            <button
+              type="button"
+              onClick={onNext}
+              className="active:scale-[0.97]"
+              style={{
+                width: "100%",
+                maxWidth: "100%",
+                height: 64,
+                borderRadius: 16,
+                border: "none",
+                cursor: "pointer",
+                background: LANDING_CTA_GRAD,
+                color: "#FFFFFF",
+                fontFamily: "system-ui,sans-serif",
+                fontSize: 14,
+                fontWeight: 900,
+                letterSpacing: 1,
+                textTransform: "uppercase",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                boxShadow: "0 12px 32px rgba(0,0,0,0.28)",
+                transition: "transform 120ms ease",
+                boxSizing: "border-box",
+              }}
+            >
+              <span style={{ fontSize: 20, lineHeight: 1 }}>→</span>
+              {es ? "EMPEZAR GRATIS" : "GET STARTED FREE"}
+            </button>
+            <div
+              style={{
+                fontSize: 14,
+                color: "rgba(255,255,255,0.55)",
+                textAlign: "center",
+                marginTop: 18,
+                marginBottom: 10,
+                fontWeight: 600,
+              }}
+            >
+              {es ? "Paso 1 de 4" : "Step 1 of 4"}
+            </div>
+            <LandingStepDots4 />
+            <button
+              type="button"
+              onClick={onYaTengoCuenta}
+              className="mt-3 w-full cursor-pointer border-0 bg-transparent p-0 text-center"
+              style={{
+                fontFamily: "system-ui,sans-serif",
+                fontSize: 15,
+                fontWeight: 600,
+                lineHeight: 1.4,
+                marginTop: 14,
+              }}
+            >
+              <span style={{ color: "rgba(255,255,255,0.55)" }}>
+                {es ? "Ya tengo cuenta — " : "I already have an account — "}
+              </span>
+              <span style={{ color: "#2563EB", fontWeight: 700 }}>{es ? "ingresar" : "sign in"}</span>
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
     </div>
   );
 };
@@ -7890,118 +8266,342 @@ const Step0 = ({onNext, onYaTengoCuenta}) => {
 /* ═══════════════════════════════════════════
    PASO 1 — ROL
 ═══════════════════════════════════════════ */
-const Step1 = ({onNext,onBack,role,setRole}) => {
+const Step1 = ({onNext,onBack,role: activeRole,setRole}) => {
+  const cardPad = "clamp(20px, 2.2vw, 34px)";
   const roles = [
     {
-      id:"entrenador",label:"Entrenador",
-      desc:"Creás rutinas, asignás planes y seguís el progreso de cada alumno.",
-      color:C.blue,selBg:"rgba(37,99,235,0.1)",selBorder:C.blue,
-      chipBg:"rgba(59,130,246,0.12)",chipColor:"#93C5FD",
-      chips:["Rutinas","Alumnos","Progresión","Chat"],
-      icon:(sel)=><CoachSVG color={sel?"#3B82F6":"#64748B"} size={26}/>,
-      preview:(
-        <div style={{marginTop:14,background:"rgba(0,0,0,0.28)",borderRadius:12,padding:"14px"}}>
-          <div style={{fontSize:9,fontWeight:700,letterSpacing:"2px",color:"#3B82F6",textTransform:"uppercase",marginBottom:10}}>Vista previa del panel</div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <span style={{fontSize:12,color:C.sub}}>Alumnos activos</span>
-            <span style={{fontSize:15,fontWeight:900,color:"#3B82F6"}}>—</span>
-          </div>
-          <div style={{height:3,background:"rgba(255,255,255,0.06)",borderRadius:2,marginBottom:10}}/>
-          {[{icon:<CoachSVG color="#3B82F6" size={13}/>,text:"Agregar primer alumno"},{icon:<CalSVG color="#22C55E" size={13}/>,text:"Crear primera rutina"}].map((s,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderBottom:i===0?"1px solid rgba(255,255,255,0.05)":"none"}}>
-              {s.icon}
-              <span style={{fontSize:11,color:C.sub,flex:1}}>{s.text}</span>
-              <div style={{width:6,height:6,borderRadius:"50%",background:"#3B82F6",opacity:.7}}/>
-            </div>
-          ))}
-        </div>
-      ),
+      id: "entrenador",
+      title: "Entrenador",
+      desc: "Creás rutinas, asignás planes y seguís el progreso.",
+      chips: ["Rutinas", "Alumnos", "Progreso", "Chat"],
+      icon: (sel) => <CoachSVG color={sel ? "#2563EB" : "#8B9AB2"} size={28} />,
+      hints: [
+        { t: "+12 alumnos activos", g: (k) => <UserGroupSVG key={k} color="#8B9AB2" size={16} /> },
+        { t: "Seguimiento semanal", g: (k) => <ChartSVG key={k} color="#8B9AB2" size={16} /> },
+        { t: "PRs automáticos", g: (k) => <TrendSVG key={k} color="#8B9AB2" size={16} /> },
+      ],
     },
     {
-      id:"atleta",label:"Atleta",
-      desc:"Seguís el plan de tu entrenador y registrás cada sesión con orden.",
-      color:C.green,selBg:"rgba(34,197,94,0.08)",selBorder:C.green,
-      chipBg:"rgba(34,197,94,0.1)",chipColor:"#86EFAC",
-      chips:["Mi plan","Sesiones","Historial","PRs"],
-      icon:(sel)=><AthleteSVG color={sel?"#22C55E":"#64748B"} size={26}/>,
-      preview:(
-        <div style={{marginTop:14,background:"rgba(0,0,0,0.28)",borderRadius:12,padding:"14px"}}>
-          <div style={{fontSize:9,fontWeight:700,letterSpacing:"2px",color:"#22C55E",textTransform:"uppercase",marginBottom:10}}>Vista previa de tu semana</div>
-          <div style={{display:"flex",gap:6,marginBottom:10}}>
-            {[{d:"LUN",ok:true},{d:"MIÉ",ok:true},{d:"VIE",ok:false}].map(day=>(
-              <div key={day.d} style={{flex:1,background:day.ok?"rgba(34,197,94,0.1)":"rgba(255,255,255,0.03)",borderRadius:8,padding:"8px 4px",textAlign:"center",border:`1px solid ${day.ok?"rgba(34,197,94,0.25)":"rgba(255,255,255,0.05)"}`}}>
-                <div style={{fontSize:9,color:day.ok?"#22C55E":C.muted,fontWeight:700,marginBottom:4}}>{day.d}</div>
-                {day.ok?<CheckSVG color="#22C55E" size={12}/>:<div style={{width:6,height:6,borderRadius:"50%",background:"rgba(255,255,255,0.1)",margin:"0 auto"}}/>}
-              </div>
-            ))}
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div>
-              <div style={{fontSize:10,color:C.muted}}>Próximo entrenamiento</div>
-              <div style={{fontSize:13,fontWeight:700,color:C.text}}>Pierna A — hoy</div>
-            </div>
-            <div style={{background:"rgba(34,197,94,0.12)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:8,padding:"4px 10px",display:"flex",alignItems:"center",gap:5}}>
-              <TrendSVG color="#22C55E" size={12}/>
-              <span style={{fontSize:11,fontWeight:700,color:"#22C55E"}}>PR activo</span>
-            </div>
-          </div>
-        </div>
-      ),
+      id: "atleta",
+      title: "Atleta",
+      desc: "Seguís tu plan y registrás cada sesión.",
+      chips: ["Mi plan", "Sesiones", "Historial", "PRs"],
+      icon: (sel) => <AthleteSVG color={sel ? "#2563EB" : "#8B9AB2"} size={28} />,
+      hints: [
+        { t: "Plan semanal", g: (k) => <CalSVG key={k} color="#8B9AB2" size={16} /> },
+        { t: "Registro de sesiones", g: (k) => <ClipboardSVG key={k} color="#8B9AB2" size={16} /> },
+        { t: "Tus PRs", g: (k) => <ChartSVG key={k} color="#8B9AB2" size={16} /> },
+      ],
     },
   ];
-
   return (
-    <div style={{flex:1,display:"flex",flexDirection:"column",background:C.bg,boxSizing:"border-box",overflow:"hidden"}}>
-      {/* Header fijo */}
-      <div style={{padding:"52px 24px 0",flexShrink:0}}>
-        <Tag>Tu perfil</Tag>
-        <div style={{fontSize:32,fontWeight:900,color:C.text,lineHeight:1.05,letterSpacing:"-0.5px",marginBottom:8}}>¿CÓMO USÁS<br/>LA APP?</div>
-        <div style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:16}}>Elegí tu perfil. Podés cambiarlo después en ajustes.</div>
+    <div
+      style={{
+        flex: 1,
+        width: "100%",
+        minHeight: "100svh",
+        display: "flex",
+        flexDirection: "column",
+        background: ONBOARD_PREMIUM_BG,
+        boxSizing: "border-box",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          ...ONBOARD_PROFILE_WRAP,
+          padding: "clamp(16px, 3.5svh, 32px) " + ONBOARD_PROFILE_H_PAD + "px 0",
+          flexShrink: 0,
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.2em",
+            color: "rgba(96,165,250,0.7)",
+            marginBottom: 8,
+            textTransform: "uppercase",
+            fontFamily: "system-ui,sans-serif",
+          }}
+        >
+          TU PERFIL
+        </div>
+        <h1
+          style={{
+            fontSize: "clamp(34px, 3.2vw, 56px)",
+            fontWeight: 900,
+            color: "#F8FAFC",
+            lineHeight: 1.1,
+            letterSpacing: "-0.5px",
+            margin: "0 0 8px",
+            fontFamily: "system-ui,sans-serif",
+          }}
+        >
+          ¿CÓMO USÁS <span style={{ color: "#2563EB" }}>LA APP?</span>
+        </h1>
+        <p
+          style={{
+            fontSize: "clamp(16px, 1.1vw, 19px)",
+            color: "rgba(255,255,255,0.52)",
+            lineHeight: 1.5,
+            margin: 0,
+            maxWidth: "100%",
+            marginLeft: "auto",
+            marginRight: "auto",
+            fontFamily: "system-ui,sans-serif",
+          }}
+        >
+          Esto cambia tu experiencia en IronTrack.
+        </p>
       </div>
 
-      {/* Cards — scrollable cuando la preview se expande */}
-      <div style={{flex:1,overflowY:"auto",padding:"0 24px",paddingBottom:8}}>
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
-        {roles.map(r=>{
-          const sel=role===r.id;
-          return (
-            <div key={r.id} onClick={()=>setRole(r.id)} style={{
-              background:sel?r.selBg:C.bg2,
-              border:`2px solid ${sel?r.selBorder:C.borderSub}`,
-              borderRadius:18,padding:"16px 18px",cursor:"pointer",
-              transition:"all .25s",boxShadow:sel?`0 0 24px ${r.selBorder}22`:"none",
-            }}>
-              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10}}>
-                <div style={{width:52,height:52,borderRadius:14,flexShrink:0,background:sel?`${r.color}18`:"rgba(255,255,255,0.04)",border:`1px solid ${sel?`${r.color}28`:C.borderSub}`,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .25s"}}>
-                  {r.icon(sel)}
-                </div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:3}}>{r.label}</div>
-                  <div style={{fontSize:12,color:C.sub,lineHeight:1.45}}>{r.desc}</div>
-                </div>
-                <div style={{width:22,height:22,borderRadius:"50%",border:`2px solid ${sel?r.selBorder:C.muted}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>
-                  <div style={{width:10,height:10,borderRadius:"50%",background:r.color,opacity:sel?1:0,transform:sel?"scale(1)":"scale(0)",transition:"all .25s"}}/>
-                </div>
-              </div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {r.chips.map(c=><span key={c} style={{fontSize:11,fontWeight:600,padding:"3px 10px",borderRadius:20,background:r.chipBg,color:r.chipColor}}>{c}</span>)}
-              </div>
-              <div style={{maxHeight:sel?"220px":"0",overflow:"hidden",transition:"max-height .45s cubic-bezier(.16,1,.3,1)"}}>
-                {r.preview}
-              </div>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <div
+          style={{
+            minHeight: "100%",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            boxSizing: "border-box",
+            padding: "12px 0 8px",
+          }}
+        >
+          <div
+            style={{
+              ...ONBOARD_PROFILE_WRAP,
+              padding: "0 " + ONBOARD_PROFILE_H_PAD + "px 8px",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {roles.map((r) => {
+                const sel = activeRole === r.id;
+                return (
+                  <div
+                    key={r.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setRole(r.id)}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setRole(r.id))}
+                    style={{
+                      background: ONBOARD_PREMIUM_CARD,
+                      border: "2px solid " + (sel ? "#2563EB" : "rgba(255,255,255,0.1)"),
+                      borderRadius: 22,
+                      padding: cardPad,
+                      cursor: "pointer",
+                      boxSizing: "border-box",
+                      width: "100%",
+                      opacity: sel ? 1 : 0.78,
+                      transform: sel ? "scale(1.01)" : "scale(1)",
+                      boxShadow: sel ? "0 0 0 1px rgba(37,99,235,0.2),0 0 32px rgba(37,99,235,0.2),0 8px 28px rgba(0,0,0,0.2)" : "none",
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, border-color 0.2s ease",
+                      outline: "none",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 10 }}>
+                      <div
+                        style={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 16,
+                          flexShrink: 0,
+                          background: sel ? "rgba(37,99,235,0.12)" : "rgba(255,255,255,0.04)",
+                          border: "1px solid " + (sel ? "rgba(37,99,235,0.35)" : "rgba(255,255,255,0.08)"),
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {r.icon(sel)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                        <div
+                          style={{
+                            fontSize: "clamp(20px, 1.3vw, 24px)",
+                            fontWeight: 800,
+                            color: "#F8FAFC",
+                            letterSpacing: "0.1px",
+                            marginBottom: 6,
+                            fontFamily: "system-ui,sans-serif",
+                          }}
+                        >
+                          {r.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "clamp(14px, 0.9vw, 16px)",
+                            color: "rgba(255,255,255,0.55)",
+                            lineHeight: 1.5,
+                            fontFamily: "system-ui,sans-serif",
+                          }}
+                        >
+                          {r.desc}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: "50%",
+                          border: "2px solid " + (sel ? "#2563EB" : "rgba(255,255,255,0.2)"),
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          marginTop: 4,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: "#2563EB",
+                            opacity: sel ? 1 : 0,
+                            transform: sel ? "scale(1)" : "scale(0)",
+                            transition: "all 0.2s ease",
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                      {r.chips.map((c) => (
+                        <span
+                          key={c}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            padding: "5px 12px",
+                            borderRadius: 999,
+                            background: sel ? "rgba(37,99,235,0.15)" : "rgba(255,255,255,0.06)",
+                            color: sel ? "#BFDBFE" : "rgba(255,255,255,0.5)",
+                            fontFamily: "system-ui,sans-serif",
+                            border: "1px solid " + (sel ? "rgba(37,99,235,0.35)" : "rgba(255,255,255,0.1)"),
+                          }}
+                        >
+                          {sel && <CheckSVG size={10} color="#93C5FD" />}
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      {r.hints.map((h, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 12,
+                            color: "rgba(255,255,255,0.5)",
+                            lineHeight: 1.35,
+                            fontFamily: "system-ui,sans-serif",
+                          }}
+                        >
+                          {h.g(i)}
+                          <span>{h.t}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
         </div>
       </div>
 
-      {/* Botones — siempre visibles, pegados al fondo */}
-      <BtnRow total={5} current={1}>
-        <BtnBack onClick={onBack}/>
-        <BtnPrimary onClick={onNext} disabled={!role}>
-          {role==="entrenador"?"Soy entrenador":role==="atleta"?"Soy atleta":"Elegí tu perfil"}
-        </BtnPrimary>
-      </BtnRow>
+      <div
+        style={{
+          padding: "0 0 max(6px, env(safe-area-inset-bottom, 0px))",
+          flexShrink: 0,
+          background: ONBOARD_PREMIUM_BG,
+          opacity: activeRole ? 1 : 0.9,
+          transform: activeRole ? "translateY(0)" : "translateY(4px)",
+          transition: "opacity 0.3s ease, transform 0.3s ease",
+        }}
+      >
+        <div style={{ ...ONBOARD_PROFILE_WRAP, padding: "0 " + ONBOARD_PROFILE_H_PAD + "px" }}>
+          <OnboardingProgress3 text="Paso 2 de 3" filled={2} barMaxWidth="100%" progressFontSize={13} />
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 10,
+              minHeight: BTN_H,
+              maxWidth: 520,
+              width: "100%",
+              margin: "0 auto 6px",
+            }}
+          >
+            <BtnBack onClick={onBack} />
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={!activeRole}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                maxWidth: 520,
+                minHeight: BTN_H,
+                border: "none",
+                borderRadius: 16,
+                background: !activeRole ? "rgba(37,99,235,0.15)" : BLUE_GRAD,
+                color: !activeRole ? "rgba(255,255,255,0.4)" : C.text,
+                fontFamily: "system-ui,sans-serif",
+                fontSize: 15,
+                fontWeight: 800,
+                letterSpacing: 0.05,
+                textTransform: "none",
+                cursor: activeRole ? "pointer" : "not-allowed",
+                boxShadow: !activeRole ? "none" : GLOW,
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "0 10px",
+              }}
+            >
+              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {activeRole === "entrenador" ? "Continuar como entrenador" : activeRole === "atleta" ? "Continuar como atleta" : "Elegí un perfil"}
+              </span>
+              <ArrowSVG size={16} />
+            </button>
+          </div>
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: 12,
+              color: "rgba(255,255,255,0.4)",
+              fontWeight: 500,
+              fontFamily: "system-ui,sans-serif",
+              lineHeight: 1.4,
+            }}
+          >
+            Podés cambiarlo después en ajustes.
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -8013,6 +8613,11 @@ const Step2Name = ({onNext,onBack,role,name,setName}) => {
   const isCoach = role==="entrenador";
   const inputRef = React.useRef(null);
   const [vis,setVis] = React.useState(false);
+  const [inputFocus, setInputFocus] = React.useState(false);
+  const nm = typeof name === "string" ? name.trim() : "";
+  const initial = nm ? nm.charAt(0).toUpperCase() : "?";
+  const previewPad = "clamp(20px, 2.2vw, 34px)";
+  const inputH = "clamp(58px, 4.5vw, 72px)";
 
   React.useEffect(()=>{
     const t1=setTimeout(()=>setVis(true),60);
@@ -8020,112 +8625,351 @@ const Step2Name = ({onNext,onBack,role,name,setName}) => {
     return()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
 
-  /* Dots: coach ve 5 pasos, atleta ve 4 */
-  const totalDots = isCoach ? 5 : 4;
-  const currentDot = 2;
-
   return (
-    <div style={{
-      flex:1,display:"flex",flexDirection:"column",
-      padding:"52px 24px 0",background:C.bg,
-      minHeight:780,boxSizing:"border-box",
-      opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(18px)",
-      transition:"all .5s cubic-bezier(.16,1,.3,1)",
-    }}>
-      <Tag>{isCoach?"Tu identidad profesional":"Sobre vos"}</Tag>
-      <div style={{fontSize:32,fontWeight:900,color:C.text,lineHeight:1.05,letterSpacing:"-0.5px",marginBottom:8}}>
-        ¿CÓMO TE<br/>LLAMÁS?
-      </div>
-      <div style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:32}}>
-        {isCoach
-          ?"Tus alumnos van a ver tu nombre en la app."
-          :"Tu coach va a ver tu perfil con este nombre."}
-      </div>
-
-      {/* Input con feedback visual */}
-      <div style={{position:"relative",marginBottom:24}}>
-        <div style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}>
-          <PersonSVG color={name?C.blue:"#4B6480"} size={20}/>
-        </div>
-        <input
-          ref={inputRef}
-          value={name}
-          onChange={e=>setName(e.target.value)}
-          onKeyDown={e=>e.key==="Enter"&&name.trim()&&onNext()}
-          placeholder={isCoach?"ej. Carlos Méndez":"ej. Julieta Ros"}
+    <div
+      style={{
+        flex: 1,
+        width: "100%",
+        minHeight: "100svh",
+        display: "flex",
+        flexDirection: "column",
+        background: ONBOARD_PREMIUM_BG,
+        boxSizing: "border-box",
+        opacity: vis ? 1 : 0,
+        transform: vis ? "translateY(0)" : "translateY(18px)",
+        transition: "all .5s cubic-bezier(.16,1,.3,1)",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <div
           style={{
-            width:"100%",height:60,
-            background:name?"rgba(37,99,235,0.08)":C.bg2,
-            border:`1.5px solid ${name?C.blue:C.borderSub}`,
-            borderRadius:16,color:C.text,fontSize:18,fontWeight:600,
-            padding:"0 52px 0 48px",outline:"none",
-            fontFamily:"system-ui,sans-serif",boxSizing:"border-box",
-            transition:"all .2s",
+            minHeight: "100%",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            boxSizing: "border-box",
+            padding: "clamp(8px, 1.2svh, 20px) 0 12px",
           }}
-        />
-        {/* Check cuando hay nombre */}
-        {name.trim() && (
-          <div style={{
-            position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",
-            width:28,height:28,borderRadius:"50%",background:C.blue,
-            display:"flex",alignItems:"center",justifyContent:"center",
-            boxShadow:"0 0 12px rgba(37,99,235,0.5)",
-          }}>
-            <CheckSVG size={14}/>
+        >
+          <div
+            style={{
+              ...ONBOARD_PROFILE_WRAP,
+              padding: "0 " + ONBOARD_PROFILE_H_PAD + "px",
+            }}
+          >
+        <div
+          style={{
+            textAlign: "center",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.2em",
+            color: "rgba(96,165,250,0.7)",
+            marginBottom: 8,
+            textTransform: "uppercase",
+            fontFamily: "system-ui,sans-serif",
+          }}
+        >
+          {isCoach ? "TU IDENTIDAD PROFESIONAL" : "SOBRE VOS"}
+        </div>
+        <h1
+          style={{
+            fontSize: "clamp(34px, 3.2vw, 56px)",
+            fontWeight: 900,
+            color: "#F8FAFC",
+            lineHeight: 1.1,
+            letterSpacing: "-0.4px",
+            margin: "0 0 10px",
+            fontFamily: "system-ui,sans-serif",
+          }}
+        >
+          {isCoach ? (
+            <>¿CÓMO TE <span style={{ color: "#2563EB" }}>VAN A LLAMAR?</span></>
+          ) : (
+            <>¿CÓMO QUERÉS <span style={{ color: "#2563EB" }}>QUE TE LLAMEMOS?</span></>
+          )}
+        </h1>
+        <p
+          style={{
+            fontSize: "clamp(16px, 1.1vw, 19px)",
+            color: "rgba(255,255,255,0.52)",
+            lineHeight: 1.5,
+            margin: "0 0 16px",
+            fontFamily: "system-ui,sans-serif",
+            maxWidth: "100%",
+            textAlign: "center",
+          }}
+        >
+          {isCoach ? "Este es el nombre que van a ver en la app." : "Así te va a ver tu entrenador en la app."}
+        </p>
+
+        <div style={{ width: "100%", textAlign: "left" }}>
+        <div style={{ position: "relative", marginBottom: 16 }}>
+          <div style={{ position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 1 }}>
+            <PersonSVG color={inputFocus || nm ? "#2563EB" : "#4B6480"} size={25} />
+          </div>
+          <input
+            ref={inputRef}
+            value={name}
+            onChange={e=>setName(e.target.value)}
+            onFocus={()=>setInputFocus(true)}
+            onBlur={()=>setInputFocus(false)}
+            onKeyDown={e=>e.key==="Enter"&&nm&&onNext()}
+            placeholder="Ej: Hernán"
+            style={{
+              width: "100%",
+              height: inputH,
+              minHeight: 58,
+              background: "rgba(13,20,36,0.65)",
+              border: inputFocus ? "1.5px solid #2563EB" : "1.5px solid " + (nm ? "#2563EB" : "rgba(255,255,255,0.1)"),
+              borderRadius: 16,
+              color: "#F8FAFC",
+              fontSize: "clamp(20px, 1.4vw, 24px)",
+              fontWeight: 600,
+              padding: "0 60px 0 54px",
+              outline: "none",
+              fontFamily: "system-ui,sans-serif",
+              boxSizing: "border-box",
+              transition: "border .2s ease, box-shadow .2s ease, background .2s ease",
+              boxShadow: inputFocus ? "0 0 0 3px rgba(37,99,235,0.22), 0 0 20px rgba(37,99,235,0.12)" : "none",
+            }}
+          />
+        {!!nm && (
+          <div
+            key={nm}
+            style={{
+            position: "absolute",
+            right: 12,
+            top: "50%",
+            marginTop: -18,
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            background: "#2563EB",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 4px 16px rgba(37,99,235,0.45)",
+            transition: "transform 0.28s cubic-bezier(0.34,1.4,0.64,1)",
+            transform: "scale(1)",
+            }}
+          >
+            <CheckSVG size={18}/>
           </div>
         )}
-      </div>
-
-      {/* Preview personalizada en tiempo real */}
-      <div style={{
-        background:C.bg2,border:`1px solid ${C.border}`,borderRadius:18,
-        padding:"18px",flex:1,
-        opacity:name.trim()?1:0.25,transition:"opacity .35s",
-      }}>
-        <div style={{fontSize:9,fontWeight:700,letterSpacing:"2px",color:C.muted,textTransform:"uppercase",marginBottom:14}}>
-          Así va a aparecer tu perfil
         </div>
 
-        {/* Header del panel */}
-        <div style={{background:C.bg3,borderRadius:12,padding:"14px",marginBottom:10}}>
-          <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Buenos días,</div>
-          <div style={{fontSize:20,fontWeight:900,color:C.text,marginBottom:10}}>
-            {name.trim()||"Tu nombre"}
-          </div>
-          {isCoach ? (
-            <>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                <span style={{fontSize:11,color:C.sub}}>Alumnos activos</span>
-                <span style={{fontSize:13,fontWeight:900,color:C.blueL}}>0 / 0</span>
+        <div style={{
+          background:ONBOARD_PREMIUM_CARD,
+          border:"1px solid rgba(37,99,235,0.12)",
+          borderRadius:20,
+          padding: previewPad,
+          marginBottom: 0,
+          width: "100%",
+          opacity: nm ? 1 : 0.35, transition: "opacity 0.25s ease",
+        }}>
+          <div style={{fontSize:9,fontWeight:700,letterSpacing:"0.12em",color:"rgba(255,255,255,0.38)",textTransform:"uppercase",marginBottom:12,fontFamily:"system-ui,sans-serif"}}>ASÍ VA A APARECER TU PERFIL</div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 12 }}>
+            <div
+              key={initial + nm}
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #2563EB, #1d4ed8)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "clamp(24px, 1.4vw, 30px)",
+                fontWeight: 900,
+                color: "#fff",
+                flexShrink: 0,
+                fontFamily: "system-ui,sans-serif",
+                transition: "transform 0.2s ease",
+                transform: "scale(1)",
+              }}
+            >
+              {nm ? initial : "?"}
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  fontSize: "clamp(24px, 1.4vw, 32px)",
+                  fontWeight: 900,
+                  color: "#F8FAFC",
+                  lineHeight: 1.1,
+                  letterSpacing: "0.02em",
+                  fontFamily: "system-ui,sans-serif",
+                  transition: "opacity 0.2s ease",
+                  textTransform: isCoach && nm ? "uppercase" : "none",
+                }}
+              >
+                {nm ? (isCoach ? nm.toUpperCase() : nm) : "Tu nombre"}
               </div>
-              <div style={{height:3,background:"rgba(255,255,255,0.07)",borderRadius:2}}/>
-            </>
+              {isCoach ? (
+                <div style={{ fontSize: 13, color: "#60A5FA", marginTop: 5, fontWeight: 700, fontFamily: "system-ui,sans-serif" }}>Alumnos activos: 0</div>
+              ) : (
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginTop: 4, fontWeight: 600, fontFamily: "system-ui,sans-serif" }}>Próxima sesión: —</div>
+              )}
+            </div>
+          </div>
+
+          {isCoach ? (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, width: "100%" }}>
+              <div
+                style={{
+                  padding: "12px 10px",
+                  borderRadius: 12,
+                  background: "rgba(0,0,0,0.2)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(255,255,255,0.5)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: "system-ui,sans-serif",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <span style={{ opacity: 0.6 }}>+</span> <CalSVG color="#8B9AB2" size={16} />
+                <span style={{ textAlign: "center" }}>Crear rutina</span>
+              </div>
+              <div
+                style={{
+                  padding: "12px 10px",
+                  borderRadius: 12,
+                  background: "rgba(0,0,0,0.2)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(255,255,255,0.5)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: "system-ui,sans-serif",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <span style={{ opacity: 0.6 }}>+</span> <CoachSVG color="#8B9AB2" size={16} />
+                <span style={{ textAlign: "center" }}>Agregar alumno</span>
+              </div>
+            </div>
           ) : (
-            <div style={{display:"flex",gap:6}}>
-              {["LUN","MIÉ","VIE"].map((d,i)=>(
-                <div key={d} style={{flex:1,background:"rgba(255,255,255,0.04)",borderRadius:8,padding:"7px 4px",textAlign:"center",border:"1px solid rgba(255,255,255,0.06)"}}>
-                  <div style={{fontSize:9,color:C.muted,fontWeight:700,marginBottom:3}}>{d}</div>
-                  <div style={{width:5,height:5,borderRadius:"50%",background:"rgba(255,255,255,0.1)",margin:"0 auto"}}/>
-                </div>
-              ))}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, width: "100%" }}>
+              <div
+                style={{
+                  padding: "12px 10px",
+                  borderRadius: 12,
+                  background: "rgba(0,0,0,0.2)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(255,255,255,0.5)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: "system-ui,sans-serif",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <span style={{ opacity: 0.6 }}>+</span> <CalSVG color="#8B9AB2" size={16} />
+                <span>Ver mi plan</span>
+              </div>
+              <div
+                style={{
+                  padding: "12px 10px",
+                  borderRadius: 12,
+                  background: "rgba(0,0,0,0.2)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(255,255,255,0.5)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: "system-ui,sans-serif",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <span style={{ opacity: 0.6 }}>+</span> <ChartSVG color="#8B9AB2" size={16} />
+                <span>Registrar sesión</span>
+              </div>
             </div>
           )}
-        </div>
 
-        {/* Confirmación */}
-        <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(34,197,94,0.07)",borderRadius:10,padding:"9px 12px",border:"1px solid rgba(34,197,94,0.14)"}}>
-          <CheckSVG color={C.green} size={12}/>
-          <span style={{fontSize:11,color:"#4ADE80"}}>
-            {isCoach?"Tu cuenta de entrenador está lista.":"Tu perfil de atleta está listo."}
+        <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(22,101,52,0.28)",borderRadius:12,padding:"16px 18px",border:"1px solid rgba(52,211,153,0.35)",marginTop:16,width:"100%",boxSizing:"border-box"}}>
+          <CheckSVG color="#4ADE80" size={20}/>
+          <span style={{fontSize:15,color:"#BBF7D0",fontWeight:700,fontFamily:"system-ui,sans-serif",lineHeight:1.4,flex:1}}>
+            {isCoach ? "Tu cuenta de entrenador está lista." : "Tu perfil de atleta está listo."}
           </span>
+        </div>
+        </div>
+        </div>
+        </div>
         </div>
       </div>
 
-      <BtnRow total={totalDots} current={currentDot}>
+      <BtnRow
+        total={3}
+        current={2}
+        progressLabel="Paso 3 de 3"
+        progressBarFilled={3}
+        footerBg={ONBOARD_PREMIUM_BG}
+        contentWrap={ONBOARD_PROFILE_WRAP}
+        progressBarWidth="100%"
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            gap: 10,
+            width: "100%",
+            maxWidth: 520,
+            margin: "0 auto",
+            minHeight: BTN_H,
+            height: BTN_H,
+            alignItems: "stretch",
+          }}
+        >
         <BtnBack onClick={onBack}/>
-        <BtnPrimary onClick={onNext} disabled={!name.trim()}>
-          {name.trim()?"Continuar":"Ingresá tu nombre"}
-        </BtnPrimary>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!nm}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            minHeight: BTN_H,
+            background: !nm ? "rgba(255,255,255,0.06)" : BLUE_GRAD,
+            border: "none",
+            borderRadius: 16,
+            color: !nm ? C.muted : C.text,
+            fontFamily: "system-ui,sans-serif",
+            fontSize: 16,
+            fontWeight: 800,
+            letterSpacing: 0.2,
+            textTransform: "none",
+            cursor: !nm ? "not-allowed" : "pointer",
+            boxShadow: !nm ? "none" : GLOW,
+            transition: "all 0.25s ease",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+          }}
+        >
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Crear mi perfil</span>
+          <ArrowSVG size={16} />
+        </button>
+        </div>
       </BtnRow>
     </div>
   );
@@ -8146,21 +8990,25 @@ const Step3Alumnos = ({onNext,onBack,alumnosRange,setAlumnosRange}) => {
 
   return (
     <div style={{
-      flex:1,display:"flex",flexDirection:"column",
-      padding:"52px 24px 0",background:C.bg,
-      minHeight:780,boxSizing:"border-box",
+      flex:1,
+      minHeight:0,
+      width:"100%",
+      display:"flex",flexDirection:"column",
+      background:C.bg,
+      boxSizing:"border-box",
       opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(20px)",
       transition:"all .5s cubic-bezier(.16,1,.3,1)",
     }}>
+      <div style={{...ONBOARD_CONTENT_WRAP,padding:"20px 24px 0",flex:"0 1 auto",display:"flex",flexDirection:"column",minHeight:0}}>
       <Tag>Tu situación actual</Tag>
       <div style={{fontSize:32,fontWeight:900,color:C.text,lineHeight:1.05,letterSpacing:"-0.5px",marginBottom:8}}>
         ¿CUÁNTOS ALUMNOS<br/>TENÉS AHORA?
       </div>
-      <div style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:28}}>
+      <div style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>
         Esto nos ayuda a mostrarte las funciones más útiles para tu situación.
       </div>
 
-      <div style={{display:"flex",flexDirection:"column",gap:14,flex:1}}>
+      <div style={{display:"flex",flexDirection:"column",gap:12,flex:"0 0 auto"}}>
         {options.map((opt,i)=>{
           const sel = alumnosRange===opt.id;
           return (
@@ -8212,6 +9060,7 @@ const Step3Alumnos = ({onNext,onBack,alumnosRange,setAlumnosRange}) => {
         <InfoSVG color="#3B82F6" size={13}/>
         <span style={{fontSize:11,color:C.muted,lineHeight:1.45}}>Solo usamos esto para personalizar tu experiencia inicial.</span>
       </div>
+      </div>
 
       <BtnRow total={5} current={3}>
         <BtnBack onClick={onBack}/>
@@ -8248,20 +9097,20 @@ const StepFinal = ({onDone,onBack,role,name,alumnosRange}) => {
       ];
 
   return (
-    <div style={{flex:1,display:"flex",flexDirection:"column",background:C.bg,minHeight:780,boxSizing:"border-box",position:"relative",overflow:"hidden"}}>
+    <div style={{flex:1,minHeight:0,width:"100%",display:"flex",flexDirection:"column",background:C.bg,boxSizing:"border-box",position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",top:-80,left:"50%",transform:"translateX(-50%)",width:420,height:420,borderRadius:"50%",background:done?"radial-gradient(circle,rgba(34,197,94,0.14) 0%,transparent 65%)":"radial-gradient(circle,rgba(37,99,235,0.12) 0%,transparent 65%)",pointerEvents:"none",transition:"background .6s"}}/>
 
-      <div style={{position:"relative",zIndex:5,flex:1,display:"flex",flexDirection:"column",padding:"52px 24px 0"}}>
-
+      <div style={{position:"relative",zIndex:5,flex:1,display:"flex",flexDirection:"column",minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        <div style={{...ONBOARD_CONTENT_WRAP,padding:"24px 24px 0"}}>
         {/* Checkmark */}
-        <div style={{display:"flex",justifyContent:"center",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
           <div style={{width:68,height:68,borderRadius:20,background:done?GREEN_GRAD:BLUE_GRAD,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:done?GLOW_G:GLOW,transition:"all .5s"}}>
             <CheckSVG size={30}/>
           </div>
         </div>
 
-        <div style={{textAlign:"center",marginBottom:22}}>
-          <div style={{fontSize:34,fontWeight:900,color:C.text,lineHeight:1.1,marginBottom:8}}>
+        <div style={{textAlign:"center",marginBottom:16}}>
+          <div style={{fontSize:32,fontWeight:900,color:C.text,lineHeight:1.1,marginBottom:6}}>
             Todo listo,<br/>{name||"Hernan"}
           </div>
           <div style={{fontSize:14,color:C.sub,lineHeight:1.6}}>
@@ -8300,9 +9149,11 @@ const StepFinal = ({onDone,onBack,role,name,alumnosRange}) => {
             <span style={{fontSize:11,color:"#60A5FA"}}>Así va a verse tu panel. Todo listo para empezar.</span>
           </div>
         </div>
+        </div>
       </div>
 
-      <div style={{padding:"0 24px 36px",position:"relative",zIndex:5}}>
+      <div style={{position:"relative",zIndex:5,flexShrink:0,padding:"0 0 18px",background:C.bg}}>
+        <div style={{...ONBOARD_CONTENT_WRAP,padding:"0 24px"}}>
         <Dots total={totalDots} current={currentDot}/>
         <BtnPrimary onClick={finish} done={done}>
           {done?"Redirigiendo...":"Ir a mi panel"}
@@ -8312,6 +9163,7 @@ const StepFinal = ({onDone,onBack,role,name,alumnosRange}) => {
             Atrás
           </button>
         )}
+        </div>
       </div>
     </div>
   );
@@ -8339,7 +9191,7 @@ function OnboardingScreen({es, darkMode, onDone}) {
   const restart = () => { setStep(0); setRole(null); setName(""); setAlumnosRange(null); };
 
   const screens = {
-    0: <Step0        onNext={next}    onYaTengoCuenta={onDone}/>,
+    0: <Step0        es={es} onNext={next}    onYaTengoCuenta={onDone}/>,
     1: <Step1        onNext={next}    onBack={back} role={role} setRole={setRole}/>,
     2: <Step2Name    onNext={next}    onBack={back} role={role} name={name} setName={setName}/>,
     3: <Step3Alumnos onNext={next}    onBack={back} alumnosRange={alumnosRange} setAlumnosRange={setAlumnosRange}/>,
@@ -8347,7 +9199,19 @@ function OnboardingScreen({es, darkMode, onDone}) {
   };
 
   return (
-    <div style={{minHeight:"100dvh",width:"100%",background:"#0A1120",fontFamily:"system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
+    <div
+      style={{
+        minHeight: "100dvh",
+        width: "100%",
+        background: "#0A1120",
+        fontFamily: "system-ui,sans-serif",
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+        boxSizing: "border-box",
+      }}
+    >
       {screens[step]}
     </div>
   );
