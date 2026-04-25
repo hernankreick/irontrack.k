@@ -157,6 +157,11 @@
   pointer-events: auto;
 }
 
+/* Menú de 3 puntos: render fijo (portal) para no quedar bajo overflow de la tarjeta */
+.it-routine-menu-pop--portal {
+  transform-origin: top right;
+}
+
 .it-routine-menu-item {
   transition: background-color 140ms ease, color 140ms ease;
 }

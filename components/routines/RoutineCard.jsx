@@ -49,6 +49,8 @@ export function RoutineCard({
   const [nombreLocal, setNombreLocal] = useState(r.name);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const menuDropdownRef = useRef(null);
+  const [menuPopCoords, setMenuPopCoords] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const assignTriggerRef = useRef(null);
   const assignPopoverRef = useRef(null);
@@ -64,12 +66,56 @@ export function RoutineCard({
     [r.id]
   );
 
+  var updateMenuPopCoords = useCallback(function () {
+    var el = menuRef.current;
+    if (!el) return;
+    var rect = el.getBoundingClientRect();
+    var menuW = 188;
+    var approxH = 148;
+    var gap = 6;
+    var pad = 8;
+    var vh = window.innerHeight;
+    var vw = window.innerWidth;
+    var left = rect.right - menuW;
+    if (left < pad) left = pad;
+    if (left + menuW > vw - pad) left = Math.max(pad, vw - pad - menuW);
+    var top = rect.bottom + gap;
+    if (top + approxH > vh - pad && rect.top - gap - approxH >= pad) {
+      top = rect.top - approxH - gap;
+    } else if (top + approxH > vh - pad) {
+      top = Math.max(pad, vh - pad - approxH);
+    }
+    setMenuPopCoords({ top: top, left: left, width: menuW });
+  }, []);
+
+  useLayoutEffect(
+    function () {
+      if (!menuOpen) {
+        setMenuPopCoords(null);
+        return undefined;
+      }
+      updateMenuPopCoords();
+      var raf = requestAnimationFrame(updateMenuPopCoords);
+      function onWin() {
+        updateMenuPopCoords();
+      }
+      window.addEventListener('resize', onWin);
+      window.addEventListener('scroll', onWin, true);
+      return function () {
+        cancelAnimationFrame(raf);
+        window.removeEventListener('resize', onWin);
+        window.removeEventListener('scroll', onWin, true);
+      };
+    },
+    [menuOpen, updateMenuPopCoords]
+  );
+
   useEffect(() => {
     if (!menuOpen) return undefined;
     function onDoc(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
-      }
+      if (menuRef.current && menuRef.current.contains(e.target)) return;
+      if (menuDropdownRef.current && menuDropdownRef.current.contains(e.target)) return;
+      setMenuOpen(false);
     }
     document.addEventListener('mousedown', onDoc);
     return function () {
@@ -508,21 +554,24 @@ export function RoutineCard({
               >
                 <MoreVertical size={18} color={textMuted} />
               </button>
-              {menuOpen ? (
+            </div>
+            {menuOpen && menuPopCoords && typeof document !== 'undefined' &&
+              createPortal(
                 <div
-                  className="it-routine-menu-pop is-open"
+                  ref={menuDropdownRef}
+                  className="it-routine-menu-pop is-open it-routine-menu-pop--portal"
                   style={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: 0,
-                    marginTop: 6,
-                    minWidth: 188,
+                    position: 'fixed',
+                    top: menuPopCoords.top,
+                    left: menuPopCoords.left,
+                    width: menuPopCoords.width,
+                    minWidth: menuPopCoords.width,
                     background: darkMode ? '#0f172a' : '#fff',
                     border: `1px solid ${border}`,
                     borderRadius: 10,
                     boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
                     padding: 4,
-                    zIndex: 20,
+                    zIndex: 100,
                   }}
                 >
                   <button
@@ -600,9 +649,9 @@ export function RoutineCard({
                     <Ic name="trash-2" size={14} color="#f87171" />
                     {M(lang, 'Eliminar rutina', 'Delete routine', 'Excluir rotina')}
                   </button>
-                </div>
-              ) : null}
-            </div>
+                </div>,
+                document.body
+              )}
 
             <button
               type="button"
