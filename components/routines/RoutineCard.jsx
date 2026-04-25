@@ -164,12 +164,47 @@ export function RoutineCard({
       if (top < pad) top = pad;
     }
     maxH = Math.max(120, maxH);
+    var padRow = 28;
+    var cb = 26;
+    var charPx = 7.1;
+    var measureRow = function (s) {
+      return Math.ceil(String(s || '').length * charPx) + cb + padRow;
+    };
+    var hdr = M(lang, 'Asignar a', 'Assign to', 'Atribuir a');
+    var wPop = Math.ceil(hdr.length * 6) + padRow;
+    if (!alumnos.length) {
+      wPop = Math.max(
+        wPop,
+        measureRow(M(lang, 'No hay alumnos cargados', 'No athletes yet', 'Ainda sem alunos'))
+      );
+    } else {
+      for (var i = 0; i < alumnos.length; i++) {
+        var ax = alumnos[i];
+        var nm = (ax && (ax.nombre || ax.email)) || '';
+        wPop = Math.max(wPop, measureRow(nm));
+      }
+    }
+    var btnLabel = '';
+    if (selectedAlumnoIds.length === 0) {
+      btnLabel = M(lang, 'Elegir alumnos…', 'Choose athletes…', 'Escolher alunos…');
+    } else if (selectedAlumnoIds.length === 1) {
+      var aid0 = selectedAlumnoIds[0];
+      var a0 = alumnos.find(function (x) {
+        return String(x.id) === String(aid0);
+      });
+      btnLabel = (a0 && (a0.nombre || a0.email)) || String(aid0);
+    } else {
+      btnLabel =
+        String(selectedAlumnoIds.length) + ' ' + M(lang, 'alumnos', 'athletes', 'alunos');
+    }
+    wPop = Math.max(wPop, measureRow(btnLabel) + 28, 168);
+    var maxCap = Math.min(420, vw - pad * 2);
+    var width = Math.min(wPop + 10, maxCap);
     var left = rect.left;
-    var width = Math.max(rect.width, 200);
     if (left + width > vw - pad) left = Math.max(pad, vw - pad - width);
     if (left < pad) left = pad;
     setAssignPopCoords({ top: top, left: left, width: width, maxHeight: maxH });
-  }, []);
+  }, [alumnos, lang, selectedAlumnoIds]);
 
   useLayoutEffect(
     function () {
@@ -190,7 +225,7 @@ export function RoutineCard({
         window.removeEventListener('scroll', onWin, true);
       };
     },
-    [assignOpen, updateAssignPopCoords]
+    [assignOpen, updateAssignPopCoords, selectedAlumnoIds]
   );
 
   useEffect(() => {
@@ -777,7 +812,10 @@ export function RoutineCard({
         </div>
 
         <div style={{ display: 'flex', gap: S.gridTight, marginTop: S.blockGap, alignItems: 'stretch' }}>
-          <div ref={assignTriggerRef} style={{ flex: 1, minWidth: 0 }}>
+          <div
+            ref={assignTriggerRef}
+            style={{ flex: '0 1 auto', minWidth: 0, maxWidth: 'calc(100% - 118px)' }}
+          >
             <button
               type="button"
               className="it-routine-btn hov"
@@ -785,7 +823,8 @@ export function RoutineCard({
               aria-expanded={assignOpen}
               aria-haspopup="listbox"
               style={{
-                width: '100%',
+                width: 'max-content',
+                maxWidth: '100%',
                 textAlign: 'left',
                 background: darkMode ? '#0B1220' : '#fff',
                 color: textMain,
@@ -801,7 +840,7 @@ export function RoutineCard({
                 cursor: 'pointer',
               }}
             >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>
                 {assigneeButtonLabel()}
               </span>
               <ChevronDown
@@ -1091,7 +1130,17 @@ export function RoutineCard({
                       onChange={() => toggleAlumnoSelection(a.id)}
                       style={{ width: 16, height: 16, accentColor: '#2563eb', flexShrink: 0, cursor: 'pointer' }}
                     />
-                    <span style={{ flex: 1, minWidth: 0, fontWeight: 600 }}>{a.nombre || a.email}</span>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      {a.nombre || a.email}
+                    </span>
                   </label>
                 );
               })
