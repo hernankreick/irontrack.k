@@ -19,6 +19,7 @@ import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import IronTrackLogo from './components/IronTrackLogo.jsx';
 import IronTrackAppIcon from './components/IronTrackAppIcon.jsx';
+import IronTrackSplash from './components/IronTrackSplash.jsx';
 import StudentProgressSection from './components/student-progress/StudentProgressSection.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
 import { WeeklyPlanDayCard } from './components/student-plan/WeeklyPlanDayCard.jsx';
@@ -920,6 +921,23 @@ function GymApp() {
   const [loginLoading, setLoginLoading] = useState(false);
   /** Evita mostrar onboarding/login hasta leer `it_session` / flags en localStorage (post-login, refresh). */
   const [authLoading, setAuthLoading] = useState(function () { return !sharedParam; });
+  /** Splash de marca: una vez por pestaña (sessionStorage), no en enlaces ?r= */
+  const [brandSplashDismissed, setBrandSplashDismissed] = useState(function () {
+    if (typeof window === "undefined") return true;
+    try {
+      if (new URLSearchParams(window.location.search).get("r")) return true;
+      return !!sessionStorage.getItem("it_splash_shown_v1");
+    } catch (e) {
+      return true;
+    }
+  });
+  var onBrandSplashComplete = useCallback(function () {
+    try {
+      sessionStorage.setItem("it_splash_shown_v1", "1");
+    } catch (e) {}
+    setBrandSplashDismissed(true);
+  }, []);
+  var brandSplashEl = !brandSplashDismissed ? <IronTrackSplash onComplete={onBrandSplashComplete} /> : null;
   const [webAuthnAvail] = useState(()=> typeof window!=="undefined" && !!window.PublicKeyCredential);
   const [savedCredential] = useState(()=>{ try{return localStorage.getItem("it_biometric_cred")}catch(e){return null} });
   const [lang, setLang] = useState(()=>{try{return localStorage.getItem("it_lang")||"es"}catch(e){return "es"}});
@@ -2267,23 +2285,31 @@ function GymApp() {
 
   // ── Onboarding de 3 pasos ─────────────────────────────────────────────
   if (!sharedParam && authLoading) return (
-    <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
-      <IronTrackLogo size={40} color="#2563EB" showBar={false}/>
-      <div style={{marginTop:20,fontSize:14,fontWeight:600,color:textMuted,letterSpacing:0.5}}>{msg("Cargando…", "Loading…")}</div>
-    </div>
+    <>
+      {brandSplashEl}
+      <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
+        <IronTrackAppIcon size={72} animated={false} aria-label={msg("IronTrack", "IronTrack")} />
+        <div style={{marginTop:20,fontSize:14,fontWeight:600,color:textMuted,letterSpacing:0.5}}>{msg("Cargando…", "Loading…")}</div>
+      </div>
+    </>
   );
 
   if (!sharedParam && !hasAppSession && !onboardDone) return (
-    <OnboardingScreen es={es} darkMode={darkMode} onDone={()=>{
-      try{localStorage.setItem('it_onboard_done','1');}catch(e){}
-      setOnboardDone(true);
-    }}/>
+    <>
+      {brandSplashEl}
+      <OnboardingScreen es={es} darkMode={darkMode} onDone={()=>{
+        try{localStorage.setItem('it_onboard_done','1');}catch(e){}
+        setOnboardDone(true);
+      }}/>
+    </>
   );
 
   if (!sharedParam && !hasAppSession && loginScreen) return (
-    <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
+    <>
+      {brandSplashEl}
+      <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
       <div style={{marginBottom:40,textAlign:"center"}}>
-        <IronTrackLogo size={32} color="#2563EB" showBar={false}/>
+        <IronTrackAppIcon size={80} animated={false} aria-label={msg("IronTrack", "IronTrack")} />
         <div style={{fontSize:13,color:textMuted,marginTop:8,letterSpacing:1.5,fontWeight:500}}>
           {msg("ENTRENAMIENTO INTELIGENTE", "INTELLIGENT TRAINING")}
         </div>
@@ -2377,6 +2403,7 @@ function GymApp() {
         {loginEmail.trim().toLowerCase()!=="entrenador@irontrack.app"&&<div style={{fontSize:11,color:textMuted,textAlign:"center",marginTop:12}}>Usa el email y contrasena que te dio tu entrenador</div>}
       </div>
     </div>
+    </>
   );
 
   const alumnoFullScreenShell = !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress"));
@@ -2384,6 +2411,8 @@ function GymApp() {
   const coachDesktopNavHidden = !!(showCoachDesktopShell && coachDesktop1024);
 
   return (
+    <>
+    {brandSplashEl}
     <IronTrackI18nProvider lang={lang}>
     <div style={{
       minHeight:"100dvh",
@@ -5778,6 +5807,7 @@ function GymApp() {
       </div>
     </div>
     </IronTrackI18nProvider>
+    </>
   );
 }
 
@@ -7990,7 +8020,7 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                 marginBottom: 0,
               }}
             >
-              <IronTrackAppIcon style={{ marginBottom: 28 }} />
+              <IronTrackAppIcon size={112} animated={false} style={{ marginBottom: 32 }} />
 
               <div
                 style={{
