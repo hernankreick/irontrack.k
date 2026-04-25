@@ -18,6 +18,7 @@ import CoachDashboard from './components/CoachDashboard';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import IronTrackLogo from './components/IronTrackLogo.jsx';
+import IronTrackAppIcon from './components/IronTrackAppIcon.jsx';
 import StudentProgressSection from './components/student-progress/StudentProgressSection.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
 import { WeeklyPlanDayCard } from './components/student-plan/WeeklyPlanDayCard.jsx';
@@ -7557,12 +7558,6 @@ const C = {
   text:"#FFFFFF", sub:"#94A3B8", muted:"#4B6480",
 };
 const BLUE_GRAD  = "linear-gradient(135deg,#1E40AF 0%,#2563EB 55%,#3B82F6 100%)";
-/** Degradado del isotipo en landing (más luminoso y legible sobre foto oscura). */
-const LANDING_LOGO_GRAD =
-  "linear-gradient(135deg, #3b82f6 0%, #2563eb 60%, #1d4ed8 100%)";
-/** Sombra isotipo — solo Step0 landing */
-const LANDING_LOGO_BOX_SHADOW =
-  "0 0 35px rgba(37,99,235,0.45), 0 18px 40px rgba(0,0,0,0.35)";
 const LANDING_CTA_GRAD = "linear-gradient(135deg, #1D4ED8, #3B82F6)";
 const LANDING_OVERLAY_GRAD =
   "linear-gradient(180deg, rgba(5,12,24,0.55) 0%, rgba(5,12,24,0.2) 38%, rgba(5,12,24,0.88) 100%)";
@@ -7606,22 +7601,6 @@ const GLOW_G     = "0 0 32px rgba(34,197,94,0.4)";
 */
 
 /* ═══════════════════════ SVG ICONS ═══════════════════════ */
-/** Mancuerna blanca simple (solo landing paso 0). */
-const LandingDumbbellMark = ({ size = 52 }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 64 64"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden={true}
-  >
-    <rect x="10" y="24" width="10" height="16" rx="3" fill="white" />
-    <rect x="24" y="29" width="16" height="6" rx="3" fill="white" />
-    <rect x="44" y="24" width="10" height="16" rx="3" fill="white" />
-  </svg>
-);
-
 const CoachSVG = ({color="#64748B",size=26}) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -7892,28 +7871,15 @@ const LandingStepDots4 = () => (
 
 const Step0 = ({es, onNext, onYaTengoCuenta}) => {
   const [vis,setVis] = React.useState(false);
-  const [wide, setWide] = React.useState(
-    () => (typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : false),
-  );
   React.useEffect(() => {
     const t = setTimeout(() => setVis(true), 100);
     return () => clearTimeout(t);
-  }, []);
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    const m = window.matchMedia("(min-width: 768px)");
-    const fn = () => setWide(m.matches);
-    fn();
-    m.addEventListener("change", fn);
-    return () => m.removeEventListener("change", fn);
   }, []);
   const a = (d = 0) => ({
     opacity: vis ? 1 : 0,
     transform: vis ? "translateY(0)" : "translateY(14px)",
     transition: `all .6s cubic-bezier(.16,1,.3,1) ${d}ms`,
   });
-  const logoBox = wide ? 118 : 108;
-  const dumbbellIcon = Math.round(logoBox * 0.86);
   const trackTitlePx = 54;
   const trackBarH = Math.round(trackTitlePx * 0.9);
 
@@ -8005,22 +7971,7 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                 marginBottom: 0,
               }}
             >
-              <div
-                style={{
-                  width: logoBox,
-                  height: logoBox,
-                  borderRadius: 28,
-                  background: LANDING_LOGO_GRAD,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: LANDING_LOGO_BOX_SHADOW,
-                  overflow: "hidden",
-                  marginBottom: 28,
-                }}
-              >
-                <LandingDumbbellMark size={dumbbellIcon} />
-              </div>
+              <IronTrackAppIcon style={{ marginBottom: 28 }} />
 
               <div
                 style={{
