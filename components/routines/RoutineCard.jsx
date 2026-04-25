@@ -620,24 +620,6 @@ export function RoutineCard({
                   {M(lang, 'Escaneada', 'Scanned', 'Digitalizada')}
                 </span>
               )}
-              {r.saved && (
-                <span
-                  style={{
-                    background: '#22C55E15',
-                    color: '#22C55E',
-                    borderRadius: 6,
-                    padding: '2px 8px',
-                    ...T.tableHeader,
-                    letterSpacing: '0.04em',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <Ic name="check" size={11} color="#22C55E" />
-                  {M(lang, 'GUARDADA', 'SAVED', 'SALVA')}
-                </span>
-              )}
             </div>
           </div>
 
