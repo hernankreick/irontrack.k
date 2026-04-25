@@ -41,6 +41,8 @@ export function RoutineCard({
   setEditingExercise,
   onOpenLibrary,
   cardIndex = 0,
+  setRutinasSBEntrenador,
+  rutinasSBEntrenador = [],
 }) {
   const [collapsed, setCollapsed] = useState(!!r.collapsed);
   const [saving, setSaving] = useState(false);
@@ -52,6 +54,7 @@ export function RoutineCard({
   const menuDropdownRef = useRef(null);
   const [menuPopCoords, setMenuPopCoords] = useState(null);
   const [deleteRoutineTarget, setDeleteRoutineTarget] = useState(null);
+  const [deleteRoutineSubmitting, setDeleteRoutineSubmitting] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const assignTriggerRef = useRef(null);
   const assignPopoverRef = useRef(null);
@@ -113,7 +116,7 @@ export function RoutineCard({
 
   useEffect(
     function () {
-      if (!deleteRoutineTarget) return undefined;
+      if (!deleteRoutineTarget || deleteRoutineSubmitting) return undefined;
       function onKey(e) {
         if (e.key === 'Escape') {
           e.preventDefault();
@@ -126,7 +129,7 @@ export function RoutineCard({
         document.removeEventListener('keydown', onKey, true);
       };
     },
-    [deleteRoutineTarget]
+    [deleteRoutineTarget, deleteRoutineSubmitting]
   );
 
   useEffect(() => {
@@ -399,12 +402,54 @@ export function RoutineCard({
     toast2(M(lang, 'Rutina duplicada', 'Routine duplicated', 'Rotina duplicada') + ' ✓');
   };
 
-  const confirmDeleteRoutine = () => {
-    if (!deleteRoutineTarget) return;
+  const confirmDeleteRoutine = async function () {
+    if (!deleteRoutineTarget || deleteRoutineSubmitting) return;
     var id = deleteRoutineTarget.id;
-    setRoutines((p) => p.filter((x) => x.id !== id));
-    toast2(M(lang, 'Rutina eliminada', 'Routine deleted', 'Rotina excluída') + ' ✓');
-    setDeleteRoutineTarget(null);
+    var wasSaved = !!deleteRoutineTarget.saved;
+    setDeleteRoutineSubmitting(true);
+    try {
+      if (wasSaved && sb && typeof sb.deleteRutina === 'function') {
+        await sb.deleteRutina(id);
+        if (typeof setRutinasSBEntrenador === 'function') {
+          try {
+            var fresh = await sb.getRutinasByEntrenador();
+            if (Array.isArray(fresh)) {
+              setRutinasSBEntrenador(fresh);
+            } else {
+              setRutinasSBEntrenador(function (prev) {
+                return (prev || []).filter(function (x) {
+                  return String(x.id) !== String(id);
+                });
+              });
+            }
+          } catch (_syncErr) {
+            setRutinasSBEntrenador(function (prev) {
+              return (prev || []).filter(function (x) {
+                return String(x.id) !== String(id);
+              });
+            });
+          }
+        }
+      }
+      setRoutines(function (p) {
+        return p.filter(function (x) {
+          return String(x.id) !== String(id);
+        });
+      });
+      toast2(M(lang, 'Rutina eliminada', 'Routine deleted', 'Rotina excluída') + ' ✓');
+      setDeleteRoutineTarget(null);
+    } catch (e) {
+      toast2(
+        M(
+          lang,
+          'No se pudo eliminar la rutina. Probá de nuevo.',
+          'Could not delete the routine. Please try again.',
+          'Não foi possível excluir a rotina. Tente novamente.'
+        )
+      );
+    } finally {
+      setDeleteRoutineSubmitting(false);
+    }
   };
 
   const staggerMs = Math.min(cardIndex * 40, 80);
@@ -666,9 +711,16 @@ export function RoutineCard({
                     }}
                     onClick={() => {
                       setMenuOpen(false);
+                      var onServer =
+                        !!r.saved ||
+                        (Array.isArray(rutinasSBEntrenador) &&
+                          rutinasSBEntrenador.some(function (rs) {
+                            return rs && String(rs.id) === String(r.id);
+                          }));
                       setDeleteRoutineTarget({
                         id: r.id,
                         name: String(nombreLocal || r.name || '').trim() || null,
+                        saved: onServer,
                       });
                     }}
                   >
@@ -1065,6 +1117,7 @@ export function RoutineCard({
               WebkitBackdropFilter: 'blur(8px)',
             }}
             onMouseDown={function (e) {
+              if (deleteRoutineSubmitting) return;
               if (e.target === e.currentTarget) setDeleteRoutineTarget(null);
             }}
           >
@@ -1163,7 +1216,9 @@ export function RoutineCard({
               >
                 <button
                   type="button"
+                  disabled={deleteRoutineSubmitting}
                   onClick={function () {
+                    if (deleteRoutineSubmitting) return;
                     setDeleteRoutineTarget(null);
                   }}
                   style={{
@@ -1175,15 +1230,19 @@ export function RoutineCard({
                     color: '#cbd5e1',
                     fontSize: 14,
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    cursor: deleteRoutineSubmitting ? 'default' : 'pointer',
                     fontFamily: 'inherit',
+                    opacity: deleteRoutineSubmitting ? 0.55 : 1,
                   }}
                 >
                   {M(lang, 'Cancelar', 'Cancel', 'Cancelar')}
                 </button>
                 <button
                   type="button"
-                  onClick={confirmDeleteRoutine}
+                  disabled={deleteRoutineSubmitting}
+                  onClick={function () {
+                    confirmDeleteRoutine();
+                  }}
                   style={{
                     flex: '1 1 140px',
                     minHeight: 46,
@@ -1193,12 +1252,15 @@ export function RoutineCard({
                     color: '#fff',
                     fontSize: 14,
                     fontWeight: 800,
-                    cursor: 'pointer',
+                    cursor: deleteRoutineSubmitting ? 'wait' : 'pointer',
                     fontFamily: 'inherit',
                     boxShadow: '0 8px 24px rgba(239,68,68,0.35)',
+                    opacity: deleteRoutineSubmitting ? 0.85 : 1,
                   }}
                 >
-                  {M(lang, 'Eliminar', 'Delete', 'Excluir')}
+                  {deleteRoutineSubmitting
+                    ? M(lang, 'Eliminando…', 'Deleting…', 'Excluindo…')
+                    : M(lang, 'Eliminar', 'Delete', 'Excluir')}
                 </button>
               </div>
             </div>

@@ -375,7 +375,25 @@ const sb = {
   getRutinasByEntrenador: () => sbFetch("rutinas?entrenador_id=eq.entrenador_principal&select=*"),
   createRutina: (data) => sbFetch("rutinas", "POST", data),
   updateRutina: (id, data) => sbFetch("rutinas?id=eq."+id, "PATCH", data),
-  deleteRutina: (id) => sbFetch("rutinas?id=eq."+id, "DELETE"),
+  /** DELETE debe distinguir fallo real: sbFetch devuelve null con !r.ok y no lanza. */
+  deleteRutina: async function (id) {
+    var sid = encodeURIComponent(String(id));
+    var r = await fetch(SB_URL + "/rest/v1/rutinas?id=eq." + sid, {
+      method: "DELETE",
+      headers: {
+        apikey: SB_KEY,
+        Authorization: "Bearer " + SB_KEY,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!r.ok) {
+      var errBody = "";
+      try {
+        errBody = await r.text();
+      } catch (e) {}
+      throw new Error(errBody || "HTTP " + r.status);
+    }
+  },
   getProgreso: (alumnoId) => sbFetch("progreso?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc"),
   addProgreso: (data) => sbFetch("progreso", "POST", data),
   getSesiones: (alumnoId) => sbFetch("sesiones?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=10"),
@@ -3815,6 +3833,7 @@ function GymApp() {
             setAssignRoutineId={setAssignRoutineId}
             desktopCoachStableLayout={coachDesktopNavHidden}
             rutinasSBEntrenador={rutinasSBEntrenador}
+            setRutinasSBEntrenador={setRutinasSBEntrenador}
           />
           </div>
         )}
@@ -4313,7 +4332,7 @@ function GymApp() {
                             )}
                             <div style={{display:"flex",gap:8,marginTop:14}}>
                               <button className="hov" style={{flex:2,padding:"10px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMain,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(msg("¿Editar esta rutina?", "Edit this routine?"))) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(msg("Abierta en RUTINAS", "Opened in ROUTINES"));}}><Ic name="edit-2" size={16} color={textMuted}/>{msg("Editar rutina", "Edit routine")}</button>
-                              <button className="hov" style={{padding:"10px 16px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(msg("¿Quitar rutina?", "Remove?"))) return;await sb.deleteRutina(rutinaActiva.id);setRutinasSB(prev=>prev.filter(x=>x.id!==rutinaActiva.id));toast2(msg("Quitada", "Removed"));}}><Ic name="trash-2" size={15}/></button>
+                              <button className="hov" style={{padding:"10px 16px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(msg("¿Quitar rutina?", "Remove?"))) return;try{await sb.deleteRutina(rutinaActiva.id);var rid=rutinaActiva.id;setRutinasSB(function(prev){return prev.filter(function(x){return String(x.id)!==String(rid);});});setRutinasSBEntrenador(function(prev){return prev.filter(function(x){return String(x.id)!==String(rid);});});try{var fr=await sb.getRutinasByEntrenador();if(Array.isArray(fr))setRutinasSBEntrenador(fr);}catch(e2){}toast2(msg("Quitada", "Removed"));}catch(e){toast2(msg("No se pudo quitar la rutina.","Could not remove the routine."));}}}><Ic name="trash-2" size={15}/></button>
                             </div>
                           </div>
                         </div>
@@ -4327,7 +4346,7 @@ function GymApp() {
                         ? (es?("Ya tiene: "+ex.nombre+"\n¿Reemplazar por: "+rutinaNombre+"?"):("Has: "+ex.nombre+"\nReplace with: "+rutinaNombre+"?"))
                         : (es?("¿Asignar rutina: "+rutinaNombre+" a "+a.nombre+"?"):("Assign routine: "+rutinaNombre+" to "+a.nombre+"?"));
                       if(!confirm(msg)) return;
-                      if(ex){await sb.deleteRutina(ex.id);setRutinasSB(prev=>prev.filter(x=>x.id!==ex.id));}
+                      if(ex){try{await sb.deleteRutina(ex.id);var exid=ex.id;setRutinasSB(function(prev){return prev.filter(function(x){return String(x.id)!==String(exid);});});setRutinasSBEntrenador(function(prev){return prev.filter(function(x){return String(x.id)!==String(exid);});});try{var fr2=await sb.getRutinasByEntrenador();if(Array.isArray(fr2))setRutinasSBEntrenador(fr2);}catch(e3){}}catch(e){toast2(es?"No se pudo quitar la rutina anterior.":"Could not remove the previous routine.");return;}}
                       setLoadingSB(true);
                       const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:sanitizeRoutineDaysForWrite(rutinaLocal.days||[]),alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
                       if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}

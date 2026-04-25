@@ -33,6 +33,7 @@ export function RutinaView(props) {
     desktopCoachStableLayout = false,
     routinesLoading = false,
     rutinasSBEntrenador = [],
+    setRutinasSBEntrenador,
   } = props;
 
   const lang = langProp || (es ? 'es' : 'en');
@@ -383,6 +384,8 @@ export function RutinaView(props) {
               setEditingExercise={setEditingExercise}
               onOpenLibrary={openLibrary}
               cardIndex={idx}
+              setRutinasSBEntrenador={setRutinasSBEntrenador}
+              rutinasSBEntrenador={rutinasSBEntrenador}
             />
           ))
         )}
