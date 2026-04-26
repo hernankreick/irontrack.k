@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Save, Pencil, MoreVertical, ChevronDown, Trash2 } from 'lucide-react';
+import { Save, Pencil, MoreVertical, ChevronDown, Trash2, ClipboardList } from 'lucide-react';
 import { Ic } from '../Ic.jsx';
 import { DaySection } from '../DaySection.jsx';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
@@ -52,6 +52,7 @@ export function RoutineCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const menuDropdownRef = useRef(null);
+  const cardRootRef = useRef(null);
   const [menuPopCoords, setMenuPopCoords] = useState(null);
   const [deleteRoutineTarget, setDeleteRoutineTarget] = useState(null);
   const [deleteRoutineSubmitting, setDeleteRoutineSubmitting] = useState(false);
@@ -74,8 +75,8 @@ export function RoutineCard({
     var el = menuRef.current;
     if (!el) return;
     var rect = el.getBoundingClientRect();
-    var menuW = 188;
-    var approxH = 148;
+    var menuW = 200;
+    var approxH = 200;
     var gap = 6;
     var pad = 8;
     var vh = window.innerHeight;
@@ -418,6 +419,24 @@ export function RoutineCard({
     transition: 'background .15s, border-color .15s, color .15s',
   });
 
+  const openEditRoutine = useCallback(
+    function () {
+      setMenuOpen(false);
+      setCollapsed(false);
+      setRoutines(function (p) {
+        return p.map(function (rr) {
+          return String(rr.id) === String(r.id) ? Object.assign({}, rr, { collapsed: false }) : rr;
+        });
+      });
+      requestAnimationFrame(function () {
+        if (cardRootRef.current) {
+          cardRootRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      });
+    },
+    [r.id, setRoutines]
+  );
+
   const duplicateRoutine = () => {
     setMenuOpen(false);
     const copia = {
@@ -491,6 +510,7 @@ export function RoutineCard({
 
   return (
     <div
+      ref={cardRootRef}
       className="it-routine-card-wrap routines-card-enter"
       style={{
         ...card,
@@ -656,6 +676,30 @@ export function RoutineCard({
                     zIndex: 100,
                   }}
                 >
+                  <button
+                    type="button"
+                    className="it-routine-menu-item hov"
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      border: 'none',
+                      borderRadius: 8,
+                      background: 'transparent',
+                      color: textMain,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                    onClick={openEditRoutine}
+                  >
+                    <ClipboardList size={14} color={textMuted} />
+                    {M(lang, 'Editar rutina', 'Edit routine', 'Editar rotina')}
+                  </button>
                   <button
                     type="button"
                     className="it-routine-menu-item hov"

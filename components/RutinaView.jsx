@@ -1,7 +1,7 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useMemo, useCallback } from 'react';
 import { EditExerciseModal } from './EditExerciseModal.jsx';
 import { emptyDays } from '../lib/routineTemplates.js';
-import { sanitizeExerciseSnapshotForWrite } from '../lib/exerciseResolve.js';
+import { sanitizeExerciseSnapshotForWrite, sanitizeRoutineDaysForWrite } from '../lib/exerciseResolve.js';
 import { coachType as T, coachSpace as S } from './coachUiScale.js';
 import { irontrackMsg as M } from '../lib/irontrackMsg.js';
 import { filterRoutinesByChip } from './routines/RoutineFilters.jsx';
@@ -165,28 +165,39 @@ export function RutinaView(props) {
 
   const handleSaveAll = async () => {
     if (!hasUnsaved) return;
+    if (!sb) {
+      toast2(M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar'));
+      return;
+    }
+    const fechaInicio = new Date().toLocaleDateString('es-AR');
     try {
       for (const r of routines) {
+        const days = sanitizeRoutineDaysForWrite(r.days);
         const payload = {
           nombre: r.name,
           alumno_id: r.alumno_id || null,
-          datos: { days: sanitizeRoutineDaysForWrite(r.days), alumno: r.alumno || '', note: r.note || '' },
+          datos: { days, alumno: r.alumno || '', note: r.note || '' },
           entrenador_id: 'entrenador_principal',
         };
         if (r.saved) {
           await sb.updateRutina(r.id, payload);
         } else {
-          const res = await sb.createRutina(payload);
+          const res = await sb.createRutina(
+            Object.assign({}, payload, { fecha_inicio: fechaInicio })
+          );
           if (res && res[0]) {
             setRoutines((p) =>
               p.map((rr) => (rr.id === r.id ? { ...rr, id: res[0].id, saved: true } : rr))
             );
+          } else {
+            throw new Error('createRutina failed');
           }
         }
       }
       setHasUnsaved(false);
       toast2(M(lang, 'Cambios guardados ✓', 'Changes saved ✓', 'Alterações salvas ✓'));
     } catch (e) {
+      console.error('[RutinaView] handleSaveAll', e);
       toast2(M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar'));
     }
   };
