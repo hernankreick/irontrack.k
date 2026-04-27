@@ -6732,6 +6732,17 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
   const [newYT, setNewYT] = React.useState("");
   const [borrarId, setBorrarId] = React.useState(null);
   const ytOverrides = videoOverrides || {};
+  const [libNarrow, setLibNarrow] = React.useState(function () {
+    return typeof window !== "undefined" && window.innerWidth < 700;
+  });
+  React.useEffect(function () {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    var mq = window.matchMedia("(max-width: 699px)");
+    var onCh = function () { setLibNarrow(mq.matches); };
+    onCh();
+    mq.addEventListener("change", onCh);
+    return function () { mq.removeEventListener("change", onCh); };
+  }, []);
 
   const patrones = ["todos","empuje","traccion","rodilla","bisagra","core","movilidad","cardio","oly"];
   const musculos = ["todos","Cuadriceps","Gluteo","Isquios","Pecho","Dorsal","Hombro","Biceps","Triceps","Core","Pantorrilla"];
@@ -6806,72 +6817,183 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
     setTab(0); toast2(msg("Ejercicio agregado ✓", "Exercise added ✓"));
   };
   const inpS = {background:bg,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",color:textMain,fontSize:15,width:"100%",fontFamily:"inherit",outline:"none",marginBottom:8};
+  const cardBorder = _dm ? "rgba(45, 64, 87, 0.9)" : border;
+  const chipBtnPad = {padding:libNarrow ? "6px 11px" : "7px 13px", borderRadius:18, fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"inherit"};
 
   return (
     <div className="min-w-0 max-w-full">
-      <div style={{display:"flex",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),marginBottom:12,minWidth:0}}>
-        {[msg("GESTIONAR", "MANAGE"), msg("+ NUEVO", "+ NEW")].map((t,i)=>(
-          <button key={i===0?"bib-tab-manage":"bib-tab-new"} onClick={()=>setTab(i)} style={{flex:1,minWidth:0,padding:"12px 8px",border:"none",background:"none",
-            fontFamily:"inherit",fontSize:16,fontWeight:800,cursor:"pointer",
-            color:tab===i?"#2563EB":"#8B9AB2",borderBottom:tab===i?"2px solid #3B82F6":"2px solid transparent"}}>
-            {t}{i===0&&dupCount>0?(
-              <span
-                title={msg(`Hay ${dupCount} nombres de ejercicio duplicados`, `There are ${dupCount} duplicate exercise names`)}
-                style={{marginLeft:8,background:"#2563EB",color:"#fff",borderRadius:12,padding:"1px 7px",fontSize:13,display:"inline-flex",alignItems:"center",justifyContent:"center"}}
-              >
-                <Ic name="alert-triangle" size={12} color="#fff"/>
-              </span>
-            ):null}
-          </button>
-        ))}
-      </div>
-
-      {tab===0&&(
-        <div>
-          <input style={{...inpS,marginBottom:8}} placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")} value={busq} onChange={e=>setBusq(e.target.value)}/>
-
-          <div style={{display:"flex",background:bgSub,border:"1px solid "+border,borderRadius:12,padding:4,gap:4,marginBottom:8}}>
-            {[msg("POR PATRON", "BY PATTERN"), msg("POR MUSCULO", "BY MUSCLE")].map((t,i)=>(
-              <button key={i===0?"bib-filt-patron":"bib-filt-muscle"} onClick={()=>{setModoFiltro(i===0?"patron":"musculo");setFiltPat("todos");setFiltMus("todos");}}
-                style={{flex:1,padding:"8px",border:"none",borderRadius:8,fontFamily:"inherit",fontSize:15,fontWeight:700,cursor:"pointer",
-                  background:modoFiltro===(i===0?"patron":"musculo")?"#2563EB":"transparent",
-                  color:modoFiltro===(i===0?"patron":"musculo")?"#fff":"#8B9AB2"}}>
-                {t}
-              </button>
-            ))}
+      <style dangerouslySetInnerHTML={{__html:(
+        "@media (min-width:769px){.it-bib-ex-card{transition:background .16s ease,border-color .16s ease}"+
+        (_dm?".it-bib-ex-card-d:hover{background:rgba(255,255,255,.04)!important;border-color:rgba(96,165,250,.32)!important}":".it-bib-ex-card-l:hover{background:rgba(37,99,235,.05)!important;border-color:rgba(96,165,250,.4)!important}") +
+        "}"
+      )}} />
+      <div
+        className="min-w-0 max-w-full"
+        style={{
+          display:"flex", flexDirection:"column", gap:libNarrow ? 18 : 20,
+          padding: libNarrow ? "20px 16px 24px" : "30px 20px 28px",
+        }}
+      >
+        <div
+          className="min-w-0"
+          style={{
+            display:"flex",
+            flexDirection: libNarrow ? "column" : "row",
+            alignItems: libNarrow ? "stretch" : "flex-start",
+            justifyContent:"space-between",
+            gap: libNarrow ? 12 : 20,
+            marginBottom: 4,
+          }}
+        >
+          <div className="min-w-0" style={{flex: libNarrow ? "none" : 1, minWidth:0}}>
+            <h2
+              className="min-w-0"
+              style={{fontSize: libNarrow ? 22 : 24, fontWeight: 800, color: textMain, lineHeight: 1.2, margin: 0, marginBottom: 6, letterSpacing: 0.2}}
+            >
+              {msg("Ejercicios", "Exercises", "Exercícios")}
+            </h2>
+            <p style={{fontSize: 14, lineHeight: 1.5, color: textMuted, margin: 0, maxWidth: 480}}>
+              {msg("Gestioná tu biblioteca de movimientos, videos y categorías.", "Manage your library of movements, videos, and categories.", "Gerencie sua biblioteca de movimentos, vídeos e categorias.")}
+            </p>
           </div>
+          <button
+            type="button"
+            onClick={function () { setTab(1); }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "10px 18px",
+              borderRadius: 12,
+              border: "none",
+              background: "#2563EB",
+              color: "#fff",
+              fontFamily: "inherit",
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: "pointer",
+              flexShrink: 0,
+              minHeight: 44,
+              width: libNarrow ? "100%" : "auto",
+            }}
+          >
+            {msg("+ Nuevo ejercicio", "+ New exercise", "+ Novo exercício")}
+          </button>
+        </div>
 
-          {modoFiltro==="patron"&&(
-            <div style={{overflowX:"auto",paddingBottom:8,marginBottom:8}}>
-              <div style={{display:"flex",gap:8,width:"max-content"}}>
+        <div style={{display:"flex",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),minWidth:0, paddingBottom:0}}>
+          {[msg("GESTIONAR", "MANAGE"), msg("+ NUEVO", "+ NEW")].map((t,i)=>(
+            <button key={i===0?"bib-tab-manage":"bib-tab-new"} onClick={()=>setTab(i)} style={{flex:1,minWidth:0,padding:"14px 8px",border:"none",background:"none",
+              fontFamily:"inherit",fontSize:16,fontWeight:800,cursor:"pointer",
+              color:tab===i?"#2563EB":"#8B9AB2",borderBottom:tab===i?"2px solid #3B82F6":"2px solid transparent"}}>
+              {t}{i===0&&dupCount>0?(
+                <span
+                  title={msg(`Hay ${dupCount} nombres de ejercicio duplicados`, `There are ${dupCount} duplicate exercise names`)}
+                  style={{marginLeft:8,background:"#2563EB",color:"#fff",borderRadius:12,padding:"1px 7px",fontSize:13,display:"inline-flex",alignItems:"center",justifyContent:"center"}}
+                >
+                  <Ic name="alert-triangle" size={12} color="#fff"/>
+                </span>
+              ):null}
+            </button>
+          ))}
+        </div>
+
+        {tab===0&&(
+        <div className="min-w-0" style={{ display:"flex", flexDirection:"column", gap: libNarrow ? 16 : 20, marginTop: 0 }}>
+          <div
+            className="min-w-0"
+            style={{
+              borderRadius: 20,
+              padding: libNarrow ? 16 : 22,
+              border: "1px solid " + (_dm ? "rgba(45, 64, 87, 0.65)" : "rgba(226, 232, 240, 0.9)"),
+              background: _dm
+                ? "linear-gradient(165deg, rgba(32, 48, 64, 0.42) 0%, rgba(12, 22, 35, 0.58) 100%)"
+                : "linear-gradient(165deg, rgba(255, 255, 255, 0.96) 0%, rgba(241, 245, 249, 0.9) 100%)",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+              boxShadow: _dm ? "0 4px 24px rgba(0,0,0,0.12)" : "0 2px 12px rgba(15, 23, 42, 0.06)",
+              display: "flex", flexDirection: "column", gap: libNarrow ? 16 : 18, minWidth: 0,
+            }}
+          >
+            <input
+              type="search"
+              style={{...inpS, marginBottom:0}}
+              placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")}
+              value={busq}
+              onChange={e=>setBusq(e.target.value)}
+            />
+            <div
+              className="min-w-0"
+              style={{ display:"flex", background:bgSub, border:"1px solid "+border, borderRadius: 12, padding: 4, gap: 4 }}
+            >
+              {[msg("Por patrón", "By pattern", "Por padrão"), msg("Por músculo", "By muscle", "Por músculo")].map((t,i)=>(
+                <button
+                  type="button"
+                  key={i===0?"bib-filt-patron":"bib-filt-muscle"}
+                  onClick={()=>{setModoFiltro(i===0?"patron":"musculo");setFiltPat("todos");setFiltMus("todos");}}
+                  style={{
+                    flex:1, padding:"9px 8px", border:"none", borderRadius:8, fontFamily:"inherit", fontSize:14, fontWeight:700, cursor:"pointer",
+                    background:modoFiltro===(i===0?"patron":"musculo")?"#2563EB":"transparent",
+                    color:modoFiltro===(i===0?"patron":"musculo")?"#fff":"#8B9AB2",
+                    minWidth:0,
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {modoFiltro==="patron" && (
+              <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
                 {patrones.map(p=>(
-                  <button key={p} onClick={()=>setFiltPat(p)} style={{padding:"8px 16px",borderRadius:20,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit",
-                    border:filtPat===p?"1px solid "+patColors[p]:filtPat==="todos"&&p==="todos"?"1px solid #243040":"1px solid "+border,
-                    background:filtPat===p?patColors[p]+"22":filtPat==="todos"&&p==="todos"?"#2563EB22":"#1E2D40",
-                    color:filtPat===p?patColors[p]:filtPat==="todos"&&p==="todos"?"#2563EB":"#8B9AB2"}}>
+                  <button
+                    type="button"
+                    key={p}
+                    onClick={()=>setFiltPat(p)}
+                    style={{...chipBtnPad,
+                      border: filtPat===p ? "1px solid "+patColors[p] : filtPat==="todos"&&p==="todos" ? "1px solid #243040" : "1px solid "+border,
+                      background: filtPat===p ? patColors[p]+"22" : filtPat==="todos"&&p==="todos" ? "#2563EB22" : _dm ? "#1E2D40" : bgSub,
+                      color: filtPat===p ? patColors[p] : filtPat==="todos"&&p==="todos" ? "#2563EB" : "#8B9AB2",
+                    }}
+                  >
                     {patLabel(p)}
                   </button>
                 ))}
               </div>
-            </div>
-          )}
-          {modoFiltro==="musculo"&&(
-            <div style={{overflowX:"auto",paddingBottom:8,marginBottom:8}}>
-              <div style={{display:"flex",gap:8,width:"max-content"}}>
+            )}
+            {modoFiltro==="musculo" && (
+              <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
                 {musculos.map(m=>(
-                  <button key={m} onClick={()=>setFiltMus(m==="todos"?"todos":m)} style={{padding:"8px 16px",borderRadius:20,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit",
-                    border:filtMus===m?"1px solid #60a5fa":"1px solid "+border,
-                    background:filtMus===m?"#2563EB22":"#1E2D40",
-                    color:filtMus===m?"#2563EB":"#8B9AB2"}}>
+                  <button
+                    type="button"
+                    key={m}
+                    onClick={()=>setFiltMus(m==="todos"?"todos":m)}
+                    style={{...chipBtnPad,
+                      border: filtMus===m ? "1px solid #60a5fa" : "1px solid "+border,
+                      background: filtMus===m ? "#2563EB22" : _dm ? "#1E2D40" : bgSub,
+                      color: filtMus===m ? "#2563EB" : "#8B9AB2",
+                    }}
+                  >
                     {musLabel(m)}
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8,flexWrap:"wrap",minWidth:0}}>
-            <div style={{fontSize:15,color:textMuted,fontWeight:700,flex:"1 1 8rem",minWidth:0,overflowWrap:"anywhere"}}>
+          <div
+            className="min-w-0"
+            style={{
+              display: "flex",
+              flexDirection: libNarrow ? "column" : "row",
+              alignItems: libNarrow ? "stretch" : "center",
+              justifyContent: "space-between",
+              gap: libNarrow ? 10 : 14,
+              minWidth: 0,
+            }}
+          >
+            <div style={{fontSize: 14, color: textMuted, fontWeight: 600, minWidth: 0, lineHeight: 1.4, flex: libNarrow ? "none" : 1, overflowWrap: "anywhere" }}>
               {msg("Mostrando", "Showing")} {exFiltrados.length} {msg("ejercicios de", "exercises of")} {allEx.length}
             </div>
             <button
@@ -6881,9 +7003,10 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
               style={{
                 display: "inline-flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: 6,
-                padding: "8px 12px",
-                borderRadius: 8,
+                padding: "8px 14px",
+                borderRadius: 10,
                 border: "1px solid " + (sortModo === 0 ? border : "#2563EB"),
                 background: sortModo === 0 ? bgSub : "#2563EB22",
                 color: sortModo === 0 ? textMuted : "#2563EB",
@@ -6892,6 +7015,8 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
                 fontWeight: 700,
                 cursor: "pointer",
                 flexShrink: 0,
+                alignSelf: libNarrow ? "stretch" : "auto",
+                width: libNarrow ? "100%" : "auto",
               }}
             >
               <Ic name="arrow-up-down" size={18} color={sortModo === 0 ? "#8B9AB2" : "#2563EB"} />
@@ -6899,40 +7024,104 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
             </button>
           </div>
 
-          <div>
+          <div className="min-w-0" style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 2 }}>
           {exFiltradosSorted.map(e=>{
-            const isDup = counts[e.name.toLowerCase()]>1;
-            const patCol = patColors[e.pattern]||"#8B9AB2";
             const isCustom = !!(customEx||[]).find(c=>c.id===e.id);
             const nombre = pickExerciseName(e, lang);
             const muscleLine = formatBibMuscleDisplay(e.muscle, lang);
             const ytUrl = resolveVideoUrl(e, null, ytOverrides);
             return (
-              <div key={e.id} style={{background:bgCard,border:"1px solid #2D4057",borderRadius:12,padding:"16px",marginBottom:8,minWidth:0}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:8,flexWrap:"wrap"}}>
-                  <div style={{flex:"1 1 140px",minWidth:0}}>
-                    <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:8,lineHeight:1.2,wordBreak:"break-word",overflowWrap:"anywhere"}}>{nombre}</div>
-                    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                      <span style={{background:"#162234",color:"#8B9AB2",padding:"4px 8px",borderRadius:20,fontSize:11,fontWeight:700,border:"1px solid #2D4057",letterSpacing:.5}}>{patLabel(e.pattern)}</span>
-                      {muscleLine ? <span style={{color:textMuted,fontSize:11,fontWeight:600}}>{muscleLine}</span> : null}
+              <div
+                key={e.id}
+                className={"it-bib-ex-card min-w-0 " + (_dm ? "it-bib-ex-card-d" : "it-bib-ex-card-l")}
+                style={{background:bgCard, border: "1px solid "+cardBorder, borderRadius: 17, padding: libNarrow ? "15px" : "17px", minWidth:0}}
+              >
+                <div style={{display:"flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap", flexDirection: libNarrow ? "column" : "row" }}>
+                  <div style={{flex: "1 1 8rem", minWidth:0}}>
+                    <div
+                      className="min-w-0"
+                      style={{fontSize: 17, fontWeight: 800, color: textMain, marginBottom: 7, lineHeight: 1.3, wordBreak: "break-word", overflowWrap: "anywhere"}}
+                    >
+                      {nombre}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      <span
+                        className="inline-flex"
+                        style={{
+                          background: _dm ? "rgba(22, 34, 52, 0.85)" : "rgba(226, 232, 240, 0.85)",
+                          color: textMuted,
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          border: "1px solid " + cardBorder,
+                          letterSpacing: 0.2,
+                        }}
+                      >
+                        {patLabel(e.pattern)}
+                      </span>
+                      {muscleLine && (
+                        <span
+                          className="inline-flex"
+                          style={{
+                            background: _dm ? "rgba(22, 34, 52, 0.5)" : "rgba(37, 99, 235, 0.08)",
+                            color: _dm ? textMuted : "#0F1923",
+                            padding: "2px 7px",
+                            borderRadius: 8,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            border: "1px solid " + (_dm ? "rgba(45, 64, 87, 0.45)" : border),
+                            maxWidth: "100%",
+                          }}
+                        >
+                          {muscleLine}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div style={{display:"flex",gap:8,flexShrink:0,alignItems:"center"}}>
-                    {ytUrl&&(
-                      <a href={ytUrl} target="_blank" rel="noreferrer"
-                        style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",
-                          background:"#162234",color:"#8B9AB2",border:"1px solid #2D4057",
-                          borderRadius:12,textDecoration:"none",fontSize:18,flexShrink:0}}>▶</a>
+                  <div
+                    className="min-w-0"
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      flexShrink: 0,
+                      alignItems: "center",
+                      marginLeft: "auto",
+                      width: libNarrow ? "100%" : "auto",
+                      justifyContent: "flex-end",
+                    }}
+                  >
+                    {ytUrl && (
+                      <a href={ytUrl} target="_blank" rel="noreferrer" aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
+                        style={{
+                          width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center",
+                          background: _dm ? "rgba(22, 34, 52, 0.6)" : bgSub,
+                          color: textMuted, border: "1px solid " + cardBorder, borderRadius: 12, textDecoration: "none", fontSize: 16, flexShrink: 0,
+                        }}>▶</a>
                     )}
-                    <button onClick={()=>{setEditModal(e);setEditNombre(e.name);setEditYT(ytUrl);}}
-                      style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",
-                        background:"#162234",color:"#8B9AB2",border:"1px solid #2D4057",
-                        borderRadius:12,cursor:"pointer",fontSize:15,flexShrink:0}}><Ic name="link" size={15}/></button>
-                    {isCustom&&(
-                      <button onClick={()=>setBorrarId(e.id)}
-                        style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",
-                          background:"#162234",color:"#8B9AB2",border:"1px solid #2D4057",
-                          borderRadius:12,cursor:"pointer",fontSize:15,flexShrink:0}}><Ic name="trash-2" size={15}/></button>
+                    <button
+                      type="button"
+                      onClick={()=>{setEditModal(e);setEditNombre(e.name);setEditYT(ytUrl);}}
+                      style={{
+                        width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center",
+                        background: _dm ? "rgba(22, 34, 52, 0.6)" : bgSub, color: textMuted, border: "1px solid " + cardBorder, borderRadius: 12, cursor: "pointer", fontSize: 15, flexShrink: 0,
+                        fontFamily: "inherit", padding: 0,
+                      }}
+                    >
+                      <Ic name="link" size={15}/>
+                    </button>
+                    {isCustom && (
+                      <button
+                        type="button"
+                        onClick={()=>setBorrarId(e.id)}
+                        style={{
+                          width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center",
+                          background: _dm ? "rgba(22, 34, 52, 0.6)" : bgSub, color: textMuted, border: "1px solid " + cardBorder, borderRadius: 12, cursor: "pointer", fontSize: 15, flexShrink: 0,
+                          fontFamily: "inherit", padding: 0,
+                        }}
+                      >
+                        <Ic name="trash-2" size={15}/>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -6941,7 +7130,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
           })}
           </div>
         </div>
-      )}
+        )}
 
       {tab===1&&(
         <div>
@@ -7021,17 +7210,35 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
         </div>
       )}
 
-
+      </div>
 
       {editModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setEditModal(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",width:"100%",maxHeight:"80dvh",minHeight:0,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
-            <div style={{fontSize:18,fontWeight:800,marginBottom:16}}>{msg("Editar ejercicio", "Edit exercise")}</div>
+          <div
+            style={{background:bgCard,borderRadius:"16px 16px 0 0",width:"100%",maxWidth:560,maxHeight:"80dvh",minHeight:0,display:"flex",flexDirection:"column",boxSizing:"border-box",overflow:"hidden"}}
+            onClick={e=>e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bib-edit-ex-title"
+          >
+            <div
+              style={{
+                flex:1,
+                minHeight:0,
+                maxHeight:"calc(80dvh - 76px)",
+                overflowY:"auto",
+                WebkitOverflowScrolling:"touch",
+                overscrollBehavior:"contain",
+                padding:16,
+                paddingBottom:8,
+              }}
+            >
+              <div id="bib-edit-ex-title" style={{fontSize:18,fontWeight:800,marginBottom:16}}>{msg("Editar ejercicio", "Edit exercise")}</div>
             <div style={{marginBottom:12}}>
               <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{msg("NOMBRE", "NAME")}</div>
               <input style={inpS} value={editNombre} onChange={e=>setEditNombre(e.target.value)}/>
             </div>
-            <div style={{marginBottom:16}}>
+            <div style={{marginBottom:0}}>
               <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>LINK YOUTUBE</div>
               <div style={{fontSize:11,color:"#60A5FA",marginBottom:8}}><Ic name="info" size={14} color="#60a5fa"/> {msg("Ideal: video corto -30 seg (YouTube Shorts)", "Ideal: short video -30 sec (YouTube Shorts)")}</div>
               <input style={inpS} value={editYT} onChange={e=>setEditYT(e.target.value)} placeholder="https://youtube.com/shorts/..."/>
@@ -7046,7 +7253,7 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
                 return (
                   <div style={{marginTop:10}}>
                     <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{msg("PREVIEW", "PREVIEW")}</div>
-                    <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
                       <img loading="lazy" src={"https://img.youtube.com/vi/"+videoId+"/mqdefault.jpg"} style={{width:120,height:68,borderRadius:8,objectFit:"cover",border:"1px solid "+border}} onError={function(e){e.target.style.display="none"}}/>
                       <div>
                         <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✓ {msg("Video detectado", "Video detected")}</div>
@@ -7061,7 +7268,8 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
                 <div style={{marginTop:8,fontSize:12,color:"#F59E0B"}}>⚠ {msg("No parece un link de YouTube", "Doesn't look like a YouTube link")}</div>
               )}
             </div>
-            <div style={{display:"flex",gap:8}}>
+            </div>
+            <div style={{flexShrink:0,display:"flex",gap:8,padding:16,paddingTop:12,borderTop:"1px solid "+border,background:bgCard,borderRadius:"0 0 0 0",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",boxShadow:_dm?"0 -8px 20px rgba(0,0,0,.2)":undefined}}>
               <button onClick={()=>setEditModal(null)} style={{flex:1,padding:12,background:_dm?"#162234":"#E2E8F0",color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("CANCELAR", "CANCEL")}</button>
               <button onClick={guardarEdicion} style={{flex:1,padding:12,background:"#2563EB",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("GUARDAR", "SAVE")}</button>
             </div>
