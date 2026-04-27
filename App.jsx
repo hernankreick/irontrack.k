@@ -1057,6 +1057,8 @@ function GymApp() {
   const [dupDayModal, setDupDayModal] = useState(null); // {rId, dIdx, days}
   const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
   const [videoOverrides, setVideoOverrides] = useState({}); // {ejercicioId: url}
+  /** Claves: id de EX (catálogo); p.ej. { sq: "empuje" } — persiste en localStorage `it_pattern_ov` */
+  const [patternOverrides, setPatternOverrides] = useState({});
   const [videoModal, setVideoModal] = useState(null); // {url, nombre}
   const [expandedPlanDay, setExpandedPlanDay] = useState(null); // "rutId-dayIdx"
   const [editEx, setEditEx] = useState(null);
@@ -1672,6 +1674,11 @@ function GymApp() {
     }
   }, [sessionData?.alumnoId]);
   useEffect(() => { localStorage.setItem("it_cd",JSON.stringify(completedDays)); },[completedDays]);
+  useEffect(function () {
+    try {
+      localStorage.setItem("it_pattern_ov", JSON.stringify(patternOverrides || {}));
+    } catch (e) {}
+  }, [patternOverrides]);
   useEffect(() => {
     try {
       const sanitized = (customEx || []).map(sanitizeExerciseSnapshotForWrite);
@@ -1691,6 +1698,13 @@ function GymApp() {
         setVideoOverrides(map);
       }
     }).catch(function(){});
+    try {
+      var pRaw = localStorage.getItem("it_pattern_ov");
+      if (pRaw) {
+        var pOb = JSON.parse(pRaw);
+        if (pOb && typeof pOb === "object") setPatternOverrides(pOb);
+      }
+    } catch (e) {}
     // Cargar ejercicios custom desde Supabase
     var entId = (()=>{ try{ return JSON.parse(localStorage.getItem("it_session")||"null")?.entrenadorId || "entrenador_principal"; }catch(e){ return "entrenador_principal"; } })();
     sb.getCustomEx(entId).then(function(res){
@@ -1906,10 +1920,17 @@ function GymApp() {
   const tag=(col)=>({background:"#162234",color:"#8B9AB2",border:"1px solid #2D4057",borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700});
 
   const allEx = React.useMemo(function () {
-    var catalog = EX.map(function (e) { return normalizeLibraryExercise(e, { catalog: true }); });
+    var BIB_PAT = { empuje: 1, traccion: 1, rodilla: 1, bisagra: 1, core: 1, movilidad: 1, cardio: 1, oly: 1 };
+    var po = patternOverrides || {};
+    var catalog = EX.map(function (e) {
+      var n = normalizeLibraryExercise(e, { catalog: true });
+      var p = po[n.id];
+      if (p && BIB_PAT[p]) return { ...n, pattern: p };
+      return n;
+    });
     var custom = (customEx || []).map(function (e) { return normalizeLibraryExercise(e, { catalog: false }); });
     return catalog.concat(custom);
-  }, [customEx]);
+  }, [customEx, patternOverrides]);
   const filteredEx = allEx.filter(e=>{
     const q=search.toLowerCase();
     if(filterPat && e.pattern!==filterPat) return false;
@@ -4115,7 +4136,7 @@ function GymApp() {
         {tab==="library"&&(
           <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto"}>
             {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal} msg={msg}/>}
-            {!esAlumno && <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>}
+            {!esAlumno && <GestionBiblioteca allEx={allEx} setPatternOverrides={setPatternOverrides} darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>}
           </div>
         )}
         {tab==="routines"&&!esAlumno&&(
@@ -4160,7 +4181,7 @@ function GymApp() {
         )}
         {tab==="biblioteca"&&!esAlumno&&(
           <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto">
-            <GestionBiblioteca darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
+            <GestionBiblioteca allEx={allEx} setPatternOverrides={setPatternOverrides} darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} setTab={setTab} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} setVideoModal={setVideoModal} openNewExerciseTick={bibOpenNewExerciseTick}/>
           </div>
         )}
         {tab==="progress"&&showAlumnoProgressStack&&(
@@ -6695,7 +6716,7 @@ function FotosProgreso({sharedParam, sb, esEntrenador, darkMode, es, toast2, msg
   );
 }
 
-function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOverrides, setVideoOverrides, setVideoModal, openNewExerciseTick = 0}) {
+function GestionBiblioteca({allEx, setPatternOverrides, sb, customEx, setCustomEx, toast2, darkMode, videoOverrides, setVideoOverrides, setVideoModal, openNewExerciseTick = 0}) {
   const { msg, lang } = useIronTrackI18n();
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
@@ -6705,11 +6726,6 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
   const textMain = _dm?"#FFFFFF":"#0F1923";
   const textMuted = _dm?"#8B9AB2":"#64748B";
 
-  const allEx = React.useMemo(function () {
-    var catalog = EX.map(function (e) { return normalizeLibraryExercise(e, { catalog: true }); });
-    var custom = (customEx || []).map(function (e) { return normalizeLibraryExercise(e, { catalog: false }); });
-    return catalog.concat(custom);
-  }, [customEx]);
   const [tab, setTab] = React.useState(0);
   React.useEffect(
     function () {
@@ -6723,7 +6739,9 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
   const [modoFiltro, setModoFiltro] = React.useState("patron");
   const [editModal, setEditModal] = React.useState(null);
   const [editNombre, setEditNombre] = React.useState("");
+  const [editPat, setEditPat] = React.useState("empuje");
   const [editYT, setEditYT] = React.useState("");
+  const [editSaveLoading, setEditSaveLoading] = React.useState(false);
   const [newNombre, setNewNombre] = React.useState("");
   const [newPat, setNewPat] = React.useState("empuje");
   const [newMusKeys, setNewMusKeys] = React.useState([]);
@@ -6753,6 +6771,9 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
     movilidad:msg("MOVILIDAD", "MOBILITY"), cardio:"CARDIO", oly:msg("OLIMPICO", "OLYMPIC"),
   })[p] || p.toUpperCase();
   const musLabel = m => m==="todos"?(msg("TODOS", "ALL")):m==="Dorsal"?(msg("DORSAL", "BACK")):m==="Gluteo"?(msg("GLUTEO", "GLUTE")):m==="Isquios"?(msg("ISQUIOS", "HAMSTRINGS")):m==="Pecho"?(msg("PECHO", "CHEST")):m==="Hombro"?(msg("HOMBRO", "SHOULDER")):m==="Pantorrilla"?(msg("PANTORRILLA", "CALVES")):m.toUpperCase();
+  const BIB_PATTERN_EDIT_KEYS = { empuje: 1, traccion: 1, rodilla: 1, bisagra: 1, core: 1, movilidad: 1, cardio: 1, oly: 1 };
+  const patKeysEditList = ["empuje", "traccion", "rodilla", "bisagra", "core", "movilidad", "cardio", "oly"];
+  const normalizeEditPattern = function (p) { return p && BIB_PATTERN_EDIT_KEYS[p] ? p : "empuje"; };
 
   const exFiltrados = allEx.filter(e=>{
     const nombre = pickExerciseName(e, lang);
@@ -6780,22 +6801,48 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
   const dupCount = Object.values(counts).filter(v=>v>1).length;
 
   const guardarEdicion = async () => {
-    if(!editNombre.trim()){toast2(msg("Ingresa un nombre", "Enter a name"));return;}
-    const isCustom = !!(customEx||[]).find(c=>c.id===editModal.id);
-    if(isCustom) {
-      const updated = customEx.map(e=>e.id===editModal.id?sanitizeExerciseSnapshotForWrite({...e,name:editNombre,nameEn:editNombre,video_url:(editYT||"").trim()}):sanitizeExerciseSnapshotForWrite(e));
-      setCustomEx(updated);
-      const row = updated.find(c=>c.id===editModal.id);
-      if(row) try { await sb.updateCustomEx(editModal.id, {name:row.name, name_en:row.nameEn, video_url:row.video_url}); } catch(e){}
+    if (!editModal || !editNombre.trim()) { toast2(msg("Ingresa un nombre", "Enter a name")); return; }
+    const canPat = normalizeEditPattern(editPat);
+    setEditSaveLoading(true);
+    try {
+      const isCustom = !!(customEx || []).find(c => c.id === editModal.id);
+      if (isCustom) {
+        const updated = customEx.map(e =>
+          e.id === editModal.id
+            ? sanitizeExerciseSnapshotForWrite({ ...e, name: editNombre, nameEn: editNombre, video_url: (editYT || "").trim(), pattern: canPat })
+            : sanitizeExerciseSnapshotForWrite(e)
+        );
+        setCustomEx(updated);
+        const row = updated.find(c => c.id === editModal.id);
+        if (row) {
+          try {
+            await sb.updateCustomEx(editModal.id, { name: row.name, name_en: row.nameEn, video_url: row.video_url, pattern: canPat });
+          } catch (e) {}
+        }
+      } else if (setPatternOverrides) {
+        const orig = EX.find(function (x) { return x.id === editModal.id; });
+        const basePat = orig && BIB_PATTERN_EDIT_KEYS[orig.pattern] ? orig.pattern : "empuje";
+        if (canPat === basePat) {
+          setPatternOverrides(function (prev) {
+            var n = { ...(prev || {}) };
+            delete n[editModal.id];
+            return n;
+          });
+        } else {
+          setPatternOverrides(function (prev) { return { ...(prev || {}), [editModal.id]: canPat }; });
+        }
+      }
+      if (editYT) {
+        try {
+          await sb.setVideoOverride(editModal.id, editYT);
+          if (setVideoOverrides) setVideoOverrides(function (prev) { return { ...prev, [editModal.id]: editYT }; });
+        } catch (e) { console.error("[videoOverride]", e); }
+      }
+      setEditModal(null);
+      toast2(msg("Ejercicio actualizado ✓", "Exercise updated ✓"));
+    } finally {
+      setEditSaveLoading(false);
     }
-    // Guardar override de youtube en Supabase
-    if(editYT) {
-      try {
-        await sb.setVideoOverride(editModal.id, editYT);
-        if(setVideoOverrides) setVideoOverrides(function(prev){return {...prev, [editModal.id]: editYT}});
-      } catch(e){ console.error("[videoOverride]",e); }
-    }
-    setEditModal(null); toast2(msg("Link actualizado ✓", "Link updated ✓"));
   };
   const borrarEjercicio = async (id) => {
     const updated = customEx.filter(e=>e.id!==id);
@@ -7101,7 +7148,12 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
                     )}
                     <button
                       type="button"
-                      onClick={()=>{setEditModal(e);setEditNombre(e.name);setEditYT(ytUrl);}}
+                      onClick={function () {
+                        setEditModal(e);
+                        setEditNombre(pickExerciseName(e, lang) || e.name || "");
+                        setEditPat(normalizeEditPattern(e.pattern));
+                        setEditYT(ytUrl || "");
+                      }}
                       style={{
                         width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center",
                         background: _dm ? "rgba(22, 34, 52, 0.6)" : bgSub, color: textMuted, border: "1px solid " + cardBorder, borderRadius: 12, cursor: "pointer", fontSize: 15, flexShrink: 0,
@@ -7212,70 +7264,128 @@ function GestionBiblioteca({sb, customEx, setCustomEx, toast2, darkMode, videoOv
 
       </div>
 
-      {editModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setEditModal(null)}>
+      {editModal && typeof document !== "undefined" && createPortal((
+        <div
+          onClick={function () { if (!editSaveLoading) setEditModal(null); }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, boxSizing: "border-box",
+            background: "rgba(2, 6, 23, 0.72)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+          }}
+        >
           <div
-            style={{background:bgCard,borderRadius:"16px 16px 0 0",width:"100%",maxWidth:560,maxHeight:"80dvh",minHeight:0,display:"flex",flexDirection:"column",boxSizing:"border-box",overflow:"hidden"}}
-            onClick={e=>e.stopPropagation()}
+            onClick={function (e) { e.stopPropagation(); }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="bib-edit-ex-title"
+            className="it-bib-edit-card"
+            style={{
+              maxWidth: 560,
+              width: "min(560px, calc(100vw - 32px))",
+              maxHeight: "calc(100dvh - 48px)",
+              overflowY: "auto",
+              boxSizing: "border-box",
+              borderRadius: 22,
+              padding: 24,
+              background: _dm ? "rgba(15, 23, 42, 0.94)" : "#ffffff",
+              border: _dm ? "1px solid rgba(148, 163, 184, 0.24)" : "1px solid " + border,
+              boxShadow: "0 24px 80px rgba(0,0,0,.45)",
+              color: _dm ? "#f1f5f9" : textMain,
+              WebkitOverflowScrolling: "touch",
+              overscrollBehavior: "contain",
+            }}
           >
-            <div
-              style={{
-                flex:1,
-                minHeight:0,
-                maxHeight:"calc(80dvh - 76px)",
-                overflowY:"auto",
-                WebkitOverflowScrolling:"touch",
-                overscrollBehavior:"contain",
-                padding:16,
-                paddingBottom:8,
-              }}
-            >
-              <div id="bib-edit-ex-title" style={{fontSize:18,fontWeight:800,marginBottom:16}}>{msg("Editar ejercicio", "Edit exercise")}</div>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>{msg("NOMBRE", "NAME")}</div>
-              <input style={inpS} value={editNombre} onChange={e=>setEditNombre(e.target.value)}/>
+            <div id="bib-edit-ex-title" style={{ fontSize: 20, fontWeight: 800, marginBottom: 20, lineHeight: 1.2 }}>{msg("Editar ejercicio", "Edit exercise", "Editar exercício")}</div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 8, color: _dm ? "#94a3b8" : textMuted }}>{msg("NOMBRE", "NAME", "NOME")}</label>
+              <input
+                autoComplete="off"
+                style={{
+                  background: _dm ? "rgba(2, 6, 23, 0.5)" : bgSub,
+                  border: "1px solid " + (_dm ? "rgba(148, 163, 184, 0.3)" : border), borderRadius: 10, padding: "10px 12px", color: _dm ? "#f8fafc" : textMain, fontSize: 15, width: "100%", fontFamily: "inherit", outline: "none", boxSizing: "border-box",
+                }}
+                value={editNombre}
+                onChange={e=>setEditNombre(e.target.value)}
+                disabled={editSaveLoading}
+              />
             </div>
-            <div style={{marginBottom:0}}>
-              <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8}}>LINK YOUTUBE</div>
-              <div style={{fontSize:11,color:"#60A5FA",marginBottom:8}}><Ic name="info" size={14} color="#60a5fa"/> {msg("Ideal: video corto -30 seg (YouTube Shorts)", "Ideal: short video -30 sec (YouTube Shorts)")}</div>
-              <input style={inpS} value={editYT} onChange={e=>setEditYT(e.target.value)} placeholder="https://youtube.com/shorts/..."/>
-              {editYT&&(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(()=>{
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 8, color: _dm ? "#94a3b8" : textMuted }} htmlFor="bib-edit-pattern">{msg("PATRÓN", "PATTERN", "PADRÃO")}</label>
+              <select
+                id="bib-edit-pattern"
+                value={editPat}
+                onChange={e=>setEditPat(e.target.value)}
+                disabled={editSaveLoading}
+                style={{
+                  display: "block", width: "100%", minHeight: 44,
+                  background: _dm ? "rgba(2, 6, 23, 0.5)" : bgSub,
+                  border: "1px solid " + (_dm ? "rgba(148, 163, 184, 0.3)" : border), borderRadius: 10, padding: "10px 12px", color: _dm ? "#f8fafc" : textMain, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", cursor: "pointer",
+                }}
+              >
+                {patKeysEditList.map(function (pk) {
+                  return <option key={pk} value={pk}>{patLabel(pk)}</option>;
+                })}
+              </select>
+            </div>
+            <div style={{ marginBottom: 0 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 8, color: _dm ? "#94a3b8" : textMuted }}>{msg("LINK YOUTUBE", "YOUTUBE LINK", "LINK DO YOUTUBE")}</label>
+              <div style={{ fontSize: 12, color: _dm ? "#7dd3fc" : "#2563EB", marginBottom: 8, display: "flex", alignItems: "flex-start", gap: 6, lineHeight: 1.35 }}>
+                <span style={{ flexShrink: 0, marginTop: 1 }}><Ic name="info" size={14} color="currentColor"/></span>
+                <span>{msg("Ideal: video corto -30 seg (YouTube Shorts)", "Ideal: short video -30 sec (YouTube Shorts)", "Ideal: vídeo curto ~30s (YouTube Shorts)")}</span>
+              </div>
+              <input
+                autoComplete="off"
+                style={{
+                  background: _dm ? "rgba(2, 6, 23, 0.5)" : bgSub,
+                  border: "1px solid " + (_dm ? "rgba(148, 163, 184, 0.3)" : border), borderRadius: 10, padding: "10px 12px", color: _dm ? "#f8fafc" : textMain, fontSize: 15, width: "100%", fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 8,
+                }}
+                value={editYT}
+                onChange={e=>setEditYT(e.target.value)}
+                placeholder="https://youtube.com/shorts/..."
+                disabled={editSaveLoading}
+              />
+              {editYT && (editYT.includes("youtube") || editYT.includes("youtu.be")) && (()=>{
                 var videoId = null;
                 try {
-                  if(editYT.includes("shorts/")) videoId = editYT.split("shorts/")[1].split("?")[0].split("&")[0];
-                  else if(editYT.includes("v=")) videoId = editYT.split("v=")[1].split("&")[0];
-                  else if(editYT.includes("youtu.be/")) videoId = editYT.split("youtu.be/")[1].split("?")[0];
-                } catch(e){}
-                if(!videoId) return <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>✓ {msg("Link detectado", "Link detected")}</div>;
+                  if (editYT.includes("shorts/")) videoId = editYT.split("shorts/")[1].split("?")[0].split("&")[0];
+                  else if (editYT.includes("v=")) videoId = editYT.split("v=")[1].split("&")[0];
+                  else if (editYT.includes("youtu.be/")) videoId = editYT.split("youtu.be/")[1].split("?")[0];
+                } catch (e) {}
+                if (!videoId) return <div style={{ marginTop: 8, fontSize: 13, color: "#22C55E", fontWeight: 700 }}>✓ {msg("Link detectado", "Link detected", "Link detectado")}</div>;
                 return (
-                  <div style={{marginTop:10}}>
-                    <div style={{fontSize:11,fontWeight:700,color:textMuted,marginBottom:6}}>{msg("PREVIEW", "PREVIEW")}</div>
-                    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-                      <img loading="lazy" src={"https://img.youtube.com/vi/"+videoId+"/mqdefault.jpg"} style={{width:120,height:68,borderRadius:8,objectFit:"cover",border:"1px solid "+border}} onError={function(e){e.target.style.display="none"}}/>
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: _dm ? "#94a3b8" : textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{msg("PREVIEW", "PREVIEW", "PRÉVIA")}</div>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <img loading="lazy" alt="" src={"https://img.youtube.com/vi/" + videoId + "/mqdefault.jpg"} style={{ width: 120, height: 68, borderRadius: 8, objectFit: "cover", border: "1px solid " + (_dm ? "rgba(148, 163, 184, 0.35)" : border) }} onError={function (e) { e.target.style.display = "none"; }} />
                       <div>
-                        <div style={{fontSize:13,fontWeight:700,color:"#22C55E"}}>✓ {msg("Video detectado", "Video detected")}</div>
-                        <div style={{fontSize:11,color:textMuted,marginTop:2}}>ID: {videoId}</div>
-                        <a href={editYT} target="_blank" rel="noreferrer" style={{fontSize:11,color:"#2563EB",textDecoration:"none",marginTop:4,display:"inline-block"}}>{msg("Abrir en YouTube ↗", "Open in YouTube ↗")}</a>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#22C55E" }}>✓ {msg("Video detectado", "Video detected", "Vídeo detectado")}</div>
+                        <div style={{ fontSize: 11, color: _dm ? "#94a3b8" : textMuted, marginTop: 2 }}>ID: {videoId}</div>
+                        <a href={editYT} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#3b82f6", textDecoration: "none", marginTop: 4, display: "inline-block" }}>{msg("Abrir en YouTube ↗", "Open in YouTube ↗", "Abrir no YouTube ↗")}</a>
                       </div>
                     </div>
                   </div>
                 );
               })()}
-              {editYT&&!(editYT.includes("youtube")||editYT.includes("youtu.be"))&&(
-                <div style={{marginTop:8,fontSize:12,color:"#F59E0B"}}>⚠ {msg("No parece un link de YouTube", "Doesn't look like a YouTube link")}</div>
+              {editYT && !(editYT.includes("youtube") || editYT.includes("youtu.be")) && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "#F59E0B" }}>⚠ {msg("No parece un link de YouTube", "Doesn't look like a YouTube link", "Não parece um link do YouTube")}</div>
               )}
             </div>
-            </div>
-            <div style={{flexShrink:0,display:"flex",gap:8,padding:16,paddingTop:12,borderTop:"1px solid "+border,background:bgCard,borderRadius:"0 0 0 0",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",boxShadow:_dm?"0 -8px 20px rgba(0,0,0,.2)":undefined}}>
-              <button onClick={()=>setEditModal(null)} style={{flex:1,padding:12,background:_dm?"#162234":"#E2E8F0",color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("CANCELAR", "CANCEL")}</button>
-              <button onClick={guardarEdicion} style={{flex:1,padding:12,background:"#2563EB",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("GUARDAR", "SAVE")}</button>
+            <div style={{ display: "flex", gap: 10, marginTop: 24, paddingTop: 4 }}>
+              <button
+                type="button"
+                disabled={editSaveLoading}
+                onClick={function () { setEditModal(null); }}
+                style={{ flex: 1, padding: 12, background: _dm ? "rgba(30, 41, 59, 0.9)" : "#E2E8F0", color: _dm ? "#cbd5e1" : textMain, border: "1px solid " + (_dm ? "rgba(148, 163, 184, 0.25)" : "transparent"), borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: editSaveLoading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: editSaveLoading ? 0.75 : 1 }}
+              >{msg("CANCELAR", "CANCEL", "CANCELAR")}</button>
+              <button
+                type="button"
+                disabled={editSaveLoading}
+                onClick={function () { guardarEdicion(); }}
+                style={{ flex: 1, padding: 12, background: "#2563EB", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: editSaveLoading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: editSaveLoading ? 0.85 : 1 }}
+              >{editSaveLoading ? msg("Guardando...", "Saving...", "Guardando...") : msg("GUARDAR", "SAVE", "GUARDAR")}</button>
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {borrarId&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px"}} onClick={()=>setBorrarId(null)}>
