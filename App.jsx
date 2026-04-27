@@ -8624,26 +8624,33 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
           position: "relative",
           zIndex: 5,
           flex: 1,
-          minHeight: 0,
+          minHeight: "100dvh",
           display: "flex",
           flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "48px 24px 32px",
+          boxSizing: "border-box",
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
         }}
       >
         {/* Bloque central: scroll + centrado vertical */}
         <div
           style={{
-            flex: 1,
+            flex: "0 1 auto",
             minHeight: 0,
-            overflowY: "auto",
+            width: "100%",
+            maxWidth: LANDING_MAX_W,
+            overflowY: "visible",
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            padding: "24px 0",
-            WebkitOverflowScrolling: "touch",
+            transform: "translateY(-4%)",
           }}
         >
           <div
-            style={{ ...ONBOARD_CONTENT_WRAP, padding: "0 24px" }}
+            style={{ ...ONBOARD_CONTENT_WRAP, padding: 0 }}
           >
             <div
               style={{
@@ -8821,16 +8828,15 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
             zIndex: 6,
             flexShrink: 0,
             width: "100%",
+            maxWidth: LANDING_MAX_W,
             paddingTop: 8,
-            paddingBottom: "max(20px, env(safe-area-inset-bottom, 0px))",
-            background:
-              "linear-gradient(0deg, rgba(5,8,16,0.96) 0%, rgba(5,8,16,0.5) 55%, transparent 100%)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
+            paddingBottom: "max(0px, env(safe-area-inset-bottom, 0px))",
+            background: "transparent",
             boxSizing: "border-box",
+            transform: "translateY(-4%)",
           }}
         >
-          <div style={{ ...ONBOARD_CONTENT_WRAP, padding: "12px 24px 8px" }}>
+          <div style={{ ...ONBOARD_CONTENT_WRAP, padding: "12px 0 8px" }}>
             <button
               type="button"
               onClick={onNext}
