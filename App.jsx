@@ -8640,7 +8640,7 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
           style={{
             flex: "0 1 auto",
             minHeight: 0,
-            width: "100%",
+            width: "calc(100vw - 48px)",
             maxWidth: LANDING_MAX_W,
             overflowY: "visible",
             display: "flex",
@@ -8662,7 +8662,7 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                 marginBottom: 0,
               }}
             >
-              <IronTrackAppIcon size={112} animated={false} style={{ marginBottom: 32 }} />
+              <IronTrackAppIcon size="clamp(128px, 34vw, 172px)" animated={false} style={{ marginBottom: 28 }} />
 
               <div
                 style={{
@@ -8827,7 +8827,7 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
             position: "relative",
             zIndex: 6,
             flexShrink: 0,
-            width: "100%",
+            width: "calc(100vw - 48px)",
             maxWidth: LANDING_MAX_W,
             paddingTop: 8,
             paddingBottom: "max(0px, env(safe-area-inset-bottom, 0px))",
