@@ -1439,6 +1439,17 @@ function GymApp() {
           if (row.telefono != null) next.phone = row.telefono;
           else if (row.telefono_comercial != null) next.phone = row.telefono_comercial;
           if (row.avatar_url != null) next.avatarUrl = row.avatar_url;
+          if ((!next.name || String(next.name).trim() === 'Entrenador') && (row.nombre == null || !String(row.nombre).trim())) {
+            try {
+              var cpl2 = localStorage.getItem('it_coach_profile_local');
+              if (cpl2) {
+                var cp2 = JSON.parse(cpl2);
+                if (cp2 && typeof cp2.name === 'string' && cp2.name.trim()) {
+                  next.name = cp2.name.trim();
+                }
+              }
+            } catch (e2) {}
+          }
           try {
             localStorage.setItem('it_session', JSON.stringify(next));
           } catch (e) {
@@ -2333,7 +2344,15 @@ function GymApp() {
             if(isEntrenador){
               if(loginEmail==="entrenador@irontrack.app"&&loginPass===sp){
                 clearIronTrackStorageForNewLogin();
-                const s={role:"entrenador",name:"Entrenador"};
+                var demoName = "Entrenador";
+                try {
+                  var cpl = localStorage.getItem("it_coach_profile_local");
+                  if (cpl) {
+                    var cpj = JSON.parse(cpl);
+                    if (cpj && typeof cpj.name === "string" && cpj.name.trim()) demoName = cpj.name.trim();
+                  }
+                } catch (e) {}
+                const s={role:"entrenador",name: demoName};
                 localStorage.setItem("it_session",JSON.stringify(s));
                 syncStateWithLocalStorage();
                 setLoginEmail("");

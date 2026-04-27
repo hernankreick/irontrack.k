@@ -379,16 +379,45 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
 
   const onSave = async () => {
     const next = { ...coach, name: fullName.trim(), titulo: titulo.trim(), email: email.trim(), phone: phone.trim() };
-    try { localStorage.setItem('it_session', JSON.stringify(next)); } catch(e) {}
+    try { localStorage.setItem('it_session', JSON.stringify(next)); } catch (e) {}
+    try {
+      localStorage.setItem(
+        'it_coach_profile_local',
+        JSON.stringify({ name: fullName.trim(), titulo: titulo.trim() })
+      );
+    } catch (e) {}
     setSessionData(next);
+    if (supabase) {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        const uid = userData && userData.user && userData.user.id;
+        if (uid) {
+          const { error: rowErr } = await supabase
+            .from('entrenadores')
+            .update({
+              nombre: fullName.trim() || null,
+              titulo_profesional: titulo.trim() || null,
+              telefono: phone.trim() || null,
+            })
+            .eq('id', uid);
+          if (rowErr) {
+            console.error('[TabPerfil] entrenadores update', rowErr);
+          }
+        }
+      } catch (e) {
+        console.error('[TabPerfil] supabase', e);
+      }
+    }
     if (passNew && passNew === passConf && passNew.length >= 6 && supabase) {
       const { error } = await supabase.auth.updateUser({ password: passNew });
       if (error) toast2(t.errPassword);
       else { toast2(t.passwordOk); setPassNew(''); setPassConf(''); }
     } else if (passNew && passNew !== passConf) {
-      toast2(t.passwordsMismatch); return;
+      toast2(t.passwordsMismatch);
+      return;
     }
-    setSaved(true); setTimeout(() => setSaved(false), 2200);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2200);
     toast2(t.profileSaved);
   };
 
