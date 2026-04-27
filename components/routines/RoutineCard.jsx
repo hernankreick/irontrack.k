@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Save, Pencil, MoreVertical, ChevronDown, Trash2, ClipboardList } from 'lucide-react';
+import { Save, Pencil, MoreVertical, ChevronDown, ClipboardList } from 'lucide-react';
+import { DeleteConfirmModal } from '../DeleteConfirmModal.jsx';
 import { Ic } from '../Ic.jsx';
 import { DaySection } from '../DaySection.jsx';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
@@ -56,6 +57,7 @@ export function RoutineCard({
   const [menuPopCoords, setMenuPopCoords] = useState(null);
   const [deleteRoutineTarget, setDeleteRoutineTarget] = useState(null);
   const [deleteRoutineSubmitting, setDeleteRoutineSubmitting] = useState(false);
+  const [pendingDeleteDay, setPendingDeleteDay] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const assignTriggerRef = useRef(null);
   const assignPopoverRef = useRef(null);
@@ -113,24 +115,6 @@ export function RoutineCard({
       };
     },
     [menuOpen, updateMenuPopCoords]
-  );
-
-  useEffect(
-    function () {
-      if (!deleteRoutineTarget || deleteRoutineSubmitting) return undefined;
-      function onKey(e) {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          e.stopPropagation();
-          setDeleteRoutineTarget(null);
-        }
-      }
-      document.addEventListener('keydown', onKey, true);
-      return function () {
-        document.removeEventListener('keydown', onKey, true);
-      };
-    },
-    [deleteRoutineTarget, deleteRoutineSubmitting]
   );
 
   useEffect(() => {
@@ -455,6 +439,23 @@ export function RoutineCard({
     setAssignRoutineId(copia.id);
     toast2(M(lang, 'Rutina duplicada', 'Routine duplicated', 'Rotina duplicada') + ' ✓');
   };
+
+  function runDeleteDay() {
+    if (!pendingDeleteDay) return;
+    var di = pendingDeleteDay.di;
+    setPendingDeleteDay(null);
+    setRoutines(function (p) {
+      return p.map(function (rr) {
+        if (rr.id !== r.id) return rr;
+        return Object.assign({}, rr, {
+          days: rr.days.filter(function (_, i) {
+            return i !== di;
+          }),
+        });
+      });
+    });
+    setHasUnsaved(true);
+  }
 
   const confirmDeleteRoutine = async function () {
     if (!deleteRoutineTarget || deleteRoutineSubmitting) return;
@@ -983,29 +984,10 @@ export function RoutineCard({
                   setDupDayModal({ rId: r.id, dIdx: di, days: r.days, selected: [], sourceDay: d });
                 }}
                 onDeleteDay={() => {
-                  if (
-                    !confirm(
-                      M(
-                        lang,
-                        `¿Eliminar "${d.label || `Día ${di + 1}`}"?`,
-                        `Delete "${d.label || `Day ${di + 1}`}"?`,
-                        `Excluir "${d.label || `Dia ${di + 1}`}"?`
-                      )
-                    )
-                  ) {
-                    return;
-                  }
-                  setRoutines((p) =>
-                    p.map((rr) =>
-                      rr.id !== r.id
-                        ? rr
-                        : {
-                            ...rr,
-                            days: rr.days.filter((_, i) => i !== di),
-                          }
-                    )
-                  );
-                  setHasUnsaved(true);
+                  setPendingDeleteDay({
+                    di: di,
+                    dayLabel: String(d.label || M(lang, `Día ${di + 1}`, `Day ${di + 1}`, `Dia ${di + 1}`)),
+                  });
                 }}
                 onAddWarmup={() => onOpenLibrary(r.id, di, 'warmup')}
                 onAddExercise={() => onOpenLibrary(r.id, di, 'exercises')}
@@ -1175,173 +1157,50 @@ export function RoutineCard({
           document.body
         )}
 
-      {deleteRoutineTarget && typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            role="presentation"
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 240,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 16,
-              background: 'rgba(0,0,0,0.65)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-            }}
-            onMouseDown={function (e) {
-              if (deleteRoutineSubmitting) return;
-              if (e.target === e.currentTarget) setDeleteRoutineTarget(null);
-            }}
-          >
-            <div
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="it-delete-routine-title"
-              onMouseDown={function (e) {
-                e.stopPropagation();
-              }}
-              style={{
-                width: 'min(420px, 100%)',
-                maxWidth: '100%',
-                background: '#0d1424',
-                border: '1px solid rgba(255,255,255,0.10)',
-                borderRadius: 22,
-                boxShadow:
-                  '0 24px 64px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)',
-                padding: '26px 24px 22px',
-                fontFamily: 'inherit',
-              }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                <div
-                  style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: '50%',
-                    background: 'rgba(239,68,68,0.14)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 16,
-                  }}
-                  aria-hidden
-                >
-                  <Trash2 size={24} color="#f87171" strokeWidth={2} />
-                </div>
-                <h2
-                  id="it-delete-routine-title"
-                  style={{
-                    margin: 0,
-                    fontSize: 19,
-                    fontWeight: 800,
-                    color: '#f1f5f9',
-                    letterSpacing: '-0.02em',
-                    lineHeight: 1.25,
-                  }}
-                >
-                  {M(lang, 'Eliminar rutina', 'Delete routine', 'Excluir rotina')}
-                </h2>
-                <p
-                  style={{
-                    margin: '12px 0 0',
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: 'rgba(226,232,240,0.82)',
-                    lineHeight: 1.55,
-                    maxWidth: 340,
-                  }}
-                >
-                  {M(
-                    lang,
-                    'Esta acción no se puede deshacer. La rutina se eliminará definitivamente.',
-                    'This action cannot be undone. The routine will be permanently deleted.',
-                    'Esta ação não pode ser desfeita. A rotina será excluída permanentemente.'
-                  )}
-                </p>
-                {deleteRoutineTarget.name ? (
-                  <div
-                    style={{
-                      marginTop: 14,
-                      padding: '10px 14px',
-                      borderRadius: 12,
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: '#e2e8f0',
-                      maxWidth: '100%',
-                      wordBreak: 'break-word',
-                    }}
-                  >
-                    {deleteRoutineTarget.name}
-                  </div>
-                ) : null}
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  gap: 10,
-                  marginTop: 22,
-                }}
-              >
-                <button
-                  type="button"
-                  disabled={deleteRoutineSubmitting}
-                  onClick={function () {
-                    if (deleteRoutineSubmitting) return;
-                    setDeleteRoutineTarget(null);
-                  }}
-                  style={{
-                    flex: '1 1 140px',
-                    minHeight: 46,
-                    borderRadius: 12,
-                    border: '1px solid rgba(255,255,255,0.14)',
-                    background: 'rgba(255,255,255,0.06)',
-                    color: '#cbd5e1',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: deleteRoutineSubmitting ? 'default' : 'pointer',
-                    fontFamily: 'inherit',
-                    opacity: deleteRoutineSubmitting ? 0.55 : 1,
-                  }}
-                >
-                  {M(lang, 'Cancelar', 'Cancel', 'Cancelar')}
-                </button>
-                <button
-                  type="button"
-                  disabled={deleteRoutineSubmitting}
-                  onClick={function () {
-                    confirmDeleteRoutine();
-                  }}
-                  style={{
-                    flex: '1 1 140px',
-                    minHeight: 46,
-                    borderRadius: 12,
-                    border: 'none',
-                    background: '#EF4444',
-                    color: '#fff',
-                    fontSize: 14,
-                    fontWeight: 800,
-                    cursor: deleteRoutineSubmitting ? 'wait' : 'pointer',
-                    fontFamily: 'inherit',
-                    boxShadow: '0 8px 24px rgba(239,68,68,0.35)',
-                    opacity: deleteRoutineSubmitting ? 0.85 : 1,
-                  }}
-                >
-                  {deleteRoutineSubmitting
-                    ? M(lang, 'Eliminando…', 'Deleting…', 'Excluindo…')
-                    : M(lang, 'Eliminar', 'Delete', 'Excluir')}
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
+      <DeleteConfirmModal
+        open={!!deleteRoutineTarget}
+        zIndex={10000}
+        tone="danger"
+        onCancel={function () {
+          if (deleteRoutineSubmitting) return;
+          setDeleteRoutineTarget(null);
+        }}
+        onConfirm={function () {
+          void confirmDeleteRoutine();
+        }}
+        title={M(lang, 'Eliminar rutina', 'Delete routine', 'Excluir rotina')}
+        message={M(
+          lang,
+          'Esta acción no se puede deshacer. La rutina se eliminará definitivamente.',
+          'This action cannot be undone. The routine will be permanently deleted.',
+          'Esta ação não pode ser desfeita. A rotina será excluída permanentemente.'
         )}
+        subjectName={deleteRoutineTarget && deleteRoutineTarget.name}
+        confirmLabel={M(lang, 'Eliminar', 'Delete', 'Excluir')}
+        cancelLabel={M(lang, 'Cancelar', 'Cancel', 'Cancelar')}
+        loading={deleteRoutineSubmitting}
+        loadingLabel={M(lang, 'Eliminando…', 'Deleting…', 'Excluindo…')}
+      />
+
+      <DeleteConfirmModal
+        open={!!pendingDeleteDay}
+        zIndex={10000}
+        tone="danger"
+        onCancel={function () {
+          setPendingDeleteDay(null);
+        }}
+        onConfirm={runDeleteDay}
+        title={M(lang, 'Eliminar día', 'Delete day', 'Excluir dia')}
+        message={M(
+          lang,
+          'Esta acción no se puede deshacer. El día se quitará de la rutina.',
+          'This action cannot be undone. The day will be removed from the routine.',
+          'Esta ação não pode ser desfeita. O dia será removido da rotina.'
+        )}
+        subjectName={pendingDeleteDay ? pendingDeleteDay.dayLabel : ''}
+        confirmLabel={M(lang, 'Eliminar', 'Delete', 'Excluir')}
+        cancelLabel={M(lang, 'Cancelar', 'Cancel', 'Cancelar')}
+      />
     </div>
   );
 }

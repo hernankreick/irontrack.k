@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import { WorkoutExercisePanel } from './WorkoutExercisePanel.jsx';
 import { normalizeFecha } from '../lib/normalizeFecha.js';
 import { resolveExerciseTitle } from '../lib/exerciseResolve.js';
@@ -12,6 +13,7 @@ export function WorkoutScreen(props) {
     onSesionGuardada, sessionPRList, videoOverrides, setVideoModal,
   } = props;
 
+  const [exitWorkoutOpen, setExitWorkoutOpen] = useState(false);
   const _dm   = typeof darkMode !== "undefined" ? darkMode : true;
   const bg      = _dm ? "#0B1220" : "#F0F4F8";
   const bgCard  = _dm ? "#111E33" : "#FFFFFF";
@@ -143,11 +145,7 @@ export function WorkoutScreen(props) {
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
           <button
             className="hov"
-            onClick={() => {
-              if (window.confirm(es ? "¿Salir del entrenamiento? Perderás los sets no guardados." : "Exit workout? Unsaved sets will be lost.")) {
-                setSession(null);
-              }
-            }}
+            onClick={() => setExitWorkoutOpen(true)}
             style={{
               background:"transparent", border:`1px solid ${border2}`,
               borderRadius:10, width:36, height:36,
@@ -343,6 +341,27 @@ export function WorkoutScreen(props) {
           {es ? "FINALIZAR ENTRENAMIENTO" : "FINISH WORKOUT"}
         </button>
       </div>
+      <DeleteConfirmModal
+        zIndex={10000}
+        open={exitWorkoutOpen}
+        tone="caution"
+        onCancel={function () {
+          setExitWorkoutOpen(false);
+        }}
+        onConfirm={function () {
+          setExitWorkoutOpen(false);
+          setSession(null);
+        }}
+        title={es ? 'Salir del entrenamiento' : 'Exit workout'}
+        message={
+          es
+            ? 'Vas a salir sin finalizar. Los sets aún no guardados en almacenamiento local se pueden perder.'
+            : "You'll leave without finishing. Sets not yet stored locally may be lost."
+        }
+        confirmLabel={es ? 'Salir' : 'Exit'}
+        cancelLabel={es ? 'Cancelar' : 'Cancel'}
+        loading={false}
+      />
     </div>
   );
 }

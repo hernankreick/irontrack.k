@@ -9,6 +9,7 @@ import { RoutineSkeleton } from './routines/RoutineSkeleton.jsx';
 import { UnsavedChangesBar } from './routines/UnsavedChangesBar.jsx';
 import { RoutineCard } from './routines/RoutineCard.jsx';
 import { RoutinesTopSection } from './routines/RoutinesTopSection.jsx';
+import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import './routines/routines-ui.css';
 
 // ── SVG: Icono mancuerna para estado vacío ──────────────────────────
@@ -41,6 +42,7 @@ export function RutinaView(props) {
   const [routineSearchQuery, setRoutineSearchQuery] = useState('');
   const [routineSort, setRoutineSort] = useState('recientes');
   const [hasUnsaved, setHasUnsaved] = useState(false);
+  const [discardModalOpen, setDiscardModalOpen] = useState(false);
   const [editingExercise, setEditingExercise] = useState(null);
   const contentRef = useRef(null);
   const baselineRef = useRef(null);
@@ -202,28 +204,31 @@ export function RutinaView(props) {
     }
   };
 
-  const handleDiscardUnsaved = useCallback(() => {
-    if (!hasUnsaved) return;
-    if (
-      !confirm(
-        M(
-          lang,
-          '¿Descartar todos los cambios no guardados?',
-          'Discard all unsaved changes?',
-          'Descartar todas as alterações não salvas?'
-        )
-      )
-    ) {
-      return;
-    }
-    try {
-      const b = baselineRef.current;
-      if (b) {
-        setRoutines(JSON.parse(JSON.stringify(b)));
+  const requestDiscardUnsaved = useCallback(
+    function () {
+      if (!hasUnsaved) return;
+      setDiscardModalOpen(true);
+    },
+    [hasUnsaved]
+  );
+
+  const runDiscardUnsaved = useCallback(
+    function () {
+      if (!hasUnsaved) {
+        setDiscardModalOpen(false);
+        return;
       }
-    } catch {}
-    setHasUnsaved(false);
-  }, [hasUnsaved, lang, setRoutines]);
+      try {
+        const b = baselineRef.current;
+        if (b) {
+          setRoutines(JSON.parse(JSON.stringify(b)));
+        }
+      } catch (_e) {}
+      setHasUnsaved(false);
+      setDiscardModalOpen(false);
+    },
+    [hasUnsaved, setRoutines]
+  );
 
   const closeEditModal = () => setEditingExercise(null);
 
@@ -416,9 +421,28 @@ export function RutinaView(props) {
         lang={lang}
         border={border}
         onSave={handleSaveAll}
-        onDiscard={handleDiscardUnsaved}
+        onDiscard={requestDiscardUnsaved}
         saveBarBox={saveBarBox}
         desktopCoachStableLayout={desktopCoachStableLayout}
+      />
+
+      <DeleteConfirmModal
+        open={discardModalOpen}
+        zIndex={10000}
+        tone="caution"
+        onCancel={function () {
+          setDiscardModalOpen(false);
+        }}
+        onConfirm={runDiscardUnsaved}
+        title={M(lang, 'Descartar cambios', 'Discard changes', 'Descartar alterações')}
+        message={M(
+          lang,
+          'Vas a perder las ediciones y asignaciones no guardadas en las rutinas.',
+          'You will lose unsaved edits and assignments in your routines.',
+          'Você perderá edições e atribuições não salvas nas rotinas.'
+        )}
+        confirmLabel={M(lang, 'Descartar', 'Discard', 'Descartar')}
+        cancelLabel={M(lang, 'Cancelar', 'Cancel', 'Cancelar')}
       />
     </div>
   );

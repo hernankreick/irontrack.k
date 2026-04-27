@@ -29,6 +29,7 @@ import {
   countExercisesWithLogToday,
 } from './components/student-plan/studentPlanHelpers.js';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
+import { DeleteConfirmModal } from './components/DeleteConfirmModal.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
@@ -1106,6 +1107,9 @@ function GymApp() {
   const [showWelcome, setShowWelcome] = useState(()=>{ try{ const v=localStorage.getItem("it_show_welcome"); if(v){localStorage.removeItem("it_show_welcome");return true;} return false; }catch(e){return false;} });
   const [currentWeek, setCurrentWeek] = useState(() => { try{return parseInt(localStorage.getItem("it_week")||"0")}catch(e){return 0} });
   const [completedDays, setCompletedDays] = useState(() => { try{return JSON.parse(localStorage.getItem("it_cd")||"[]")}catch(e){return []} });
+  /** Diálogos reemplazando `confirm` en el panel coach (alumnos / rutinas). */
+  const [coachDialog, setCoachDialog] = useState({ t: 'none' });
+  const [coachDialogLoading, setCoachDialogLoading] = useState(false);
   const [libQ, setLibQ] = useState("");
   const [filtPat, setFiltPat] = useState(null);
   const [editExModal, setEditExModal] = useState(null);
@@ -2290,6 +2294,273 @@ function GymApp() {
     exportRoutinePdfHtml(r, rows, es, toast2, { textMain, bgCard, border, darkMode, textMuted, currentWeek });
   };
 
+  function getCoachDialogModalConfig() {
+    var c = coachDialog;
+    if (c.t === 'none') {
+      return { tone: 'danger', title: '', message: '', subjectName: null, confirmLabel: msg('Aceptar', 'OK', 'OK'), useLogoutIcon: false };
+    }
+    if (c.t === 'deleteAlumno') {
+      return {
+        tone: 'danger',
+        title: msg('Eliminar alumno', 'Delete student', 'Excluir aluno'),
+        message: msg(
+          'Esta acción no se puede deshacer. El alumno se eliminará definitivamente.',
+          'This action cannot be undone. The athlete will be permanently removed.',
+          'Esta ação não pode ser desfeita. O aluno será excluído permanentemente.'
+        ),
+        subjectName: c.a && (c.a.nombre || c.a.email),
+        confirmLabel: msg('Eliminar', 'Delete', 'Excluir'),
+        useLogoutIcon: false,
+        loadingLabel: msg('Eliminando…', 'Removing…', 'Excluindo…'),
+      };
+    }
+    if (c.t === 'quitarRut') {
+      return {
+        tone: 'danger',
+        title: msg('Quitar rutina', 'Remove routine', 'Remover rotina'),
+        message: msg(
+          'Esta acción no se puede deshacer. La rutina se desasignará y se eliminará del registro.',
+          'This action cannot be undone. The routine will be unassigned and removed from the record.',
+          'Esta ação não pode ser desfeita. A rotina será desatribuída e removida do registro.'
+        ),
+        subjectName: c.rutinaActiva && c.rutinaActiva.nombre,
+        confirmLabel: msg('Quitar', 'Remove', 'Remover'),
+        useLogoutIcon: false,
+        loadingLabel: msg('Quitando…', 'Removing…', 'Removendo…'),
+      };
+    }
+    if (c.t === 'resetWeek') {
+      return {
+        tone: 'caution',
+        title: msg('Reiniciar semana', 'Reset week', 'Redefinir semana'),
+        message: es
+          ? '¿Reiniciar la semana actual? El alumno volverá a Día 1 de la semana ' + c.semanaCiclo + '.'
+          : 'Reset the current week? The athlete will restart at Day 1 of week ' + c.semanaCiclo + '.',
+        subjectName: null,
+        confirmLabel: msg('Reiniciar', 'Reset', 'Redefinir'),
+        useLogoutIcon: false,
+        loadingLabel: msg('Aplicando…', 'Applying…', 'Aplicando…'),
+      };
+    }
+    if (c.t === 'resetRoutine') {
+      return {
+        tone: 'caution',
+        title: msg('Reiniciar rutina', 'Reset routine', 'Redefinir rotina'),
+        message: msg(
+          '¿Reiniciar la rutina completa? Volverá a Semana 1, Día 1. El historial de progreso se mantiene.',
+          'Reset the entire routine? It will go back to Week 1, Day 1. Progress history is kept.',
+          'Redefinir a rotina completa? Volta à Semana 1, Dia 1. O histórico de progresso é mantido.'
+        ),
+        subjectName: null,
+        confirmLabel: msg('Reiniciar', 'Reset', 'Redefinir'),
+        useLogoutIcon: false,
+        loadingLabel: msg('Aplicando…', 'Applying…', 'Aplicando…'),
+      };
+    }
+    if (c.t === 'editAlum') {
+      return {
+        tone: 'neutral',
+        title: msg('Editar alumno', 'Edit athlete', 'Editar aluno'),
+        message: msg('Se abrirá el formulario para modificar email y contraseña del alumno.', 'A form will open to edit the athlete’s email and password.', 'O formulário será aberto para editar e-mail e senha do aluno.'),
+        subjectName: c.a && (c.a.nombre || c.a.email),
+        confirmLabel: msg('Continuar', 'Continue', 'Continuar'),
+        useLogoutIcon: false,
+        loadingLabel: msg('…', '…', '…'),
+      };
+    }
+    if (c.t === 'goRoutines') {
+      return {
+        tone: 'neutral',
+        title: msg('Abrir en Rutinas', 'Open in Routines', 'Abrir em Rotinas'),
+        message: msg('Se abrirá la pestaña RUTINAS con esta rutina para editarla.', 'The Routines tab will open with this routine for editing.', 'A aba Rotinas abrirá com esta rotina para edição.'),
+        subjectName: c.rutinaActiva && c.rutinaActiva.nombre,
+        confirmLabel: msg('Abrir', 'Open', 'Abrir'),
+        useLogoutIcon: false,
+        loadingLabel: msg('…', '…', '…'),
+      };
+    }
+    if (c.t === 'assignRut') {
+      return {
+        tone: 'caution',
+        title: c.ex
+          ? msg('Cambiar rutina asignada', 'Change assigned routine', 'Trocar rotina atribuída')
+          : msg('Asignar rutina', 'Assign routine', 'Atribuir rotina'),
+        message: c.assignMsg,
+        subjectName: null,
+        confirmLabel: msg('Confirmar', 'Confirm', 'Confirmar'),
+        useLogoutIcon: false,
+        loadingLabel: msg('Asignando…', 'Assigning…', 'Atribuindo…'),
+      };
+    }
+    if (c.t === 'logout' || c.t === 'logoutSettings') {
+      return {
+        tone: 'neutral',
+        title: msg('¿Cerrar sesión?', 'Log out?', 'Encerrar sessão?'),
+        message: msg('Vas a salir y tendrás que volver a iniciar sesión.', "You'll sign out and will need to sign in again.", 'Você sairá e precisará entrar de novo.'),
+        subjectName: null,
+        confirmLabel: msg('Cerrar sesión', 'Log out', 'Sair'),
+        useLogoutIcon: true,
+        loadingLabel: msg('Cerrando…', 'Signing out…', 'Saindo…'),
+      };
+    }
+    return { tone: 'danger', title: '', message: '', subjectName: null, confirmLabel: 'OK', useLogoutIcon: false, loadingLabel: '…' };
+  }
+
+  async function confirmCoachDialog() {
+    var c = coachDialog;
+    if (c.t === 'none') return;
+    setCoachDialogLoading(c.t === 'deleteAlumno' || c.t === 'quitarRut' || c.t === 'assignRut');
+    try {
+      if (c.t === 'deleteAlumno' && c.a) {
+        if (typeof sb.deleteAlumno === 'function') {
+          await sb.deleteAlumno(c.a.id);
+        }
+        setAlumnos(function (prev) {
+          return prev.filter(function (x) {
+            return x.id !== c.a.id;
+          });
+        });
+        toast2(msg('Alumno eliminado', 'Athlete removed', 'Aluno excluído'));
+        setCoachDialog({ t: 'none' });
+        return;
+      }
+      if (c.t === 'quitarRut' && c.rutinaActiva) {
+        try {
+          await sb.deleteRutina(c.rutinaActiva.id);
+          var ridQ = c.rutinaActiva.id;
+          setRutinasSB(function (prev) {
+            return prev.filter(function (x) {
+              return String(x.id) !== String(ridQ);
+            });
+          });
+          setRutinasSBEntrenador(function (prev) {
+            return prev.filter(function (x) {
+              return String(x.id) !== String(ridQ);
+            });
+          });
+          try {
+            var fr = await sb.getRutinasByEntrenador();
+            if (Array.isArray(fr)) setRutinasSBEntrenador(fr);
+          } catch (e2) {}
+          toast2(msg('Quitada', 'Removed', 'Removida'));
+        } catch (e0) {
+          toast2(msg('No se pudo quitar la rutina.', 'Could not remove the routine.', 'Não foi possível remover a rotina.'));
+        }
+        setCoachDialog({ t: 'none' });
+        return;
+      }
+      if (c.t === 'resetWeek' && c.semanaCiclo != null) {
+        setCompletedDays(function (prev) {
+          return prev.filter(function (k) {
+            return !k.endsWith('-w' + (c.semanaCiclo - 1));
+          });
+        });
+        setCoachRutinaMenuOpen(false);
+        toast2(msg('Semana reiniciada ✓', 'Week reset ✓', 'Semana reiniciada ✓'));
+        setCoachDialog({ t: 'none' });
+        return;
+      }
+      if (c.t === 'resetRoutine') {
+        setCompletedDays([]);
+        setCurrentWeek(0);
+        try {
+          localStorage.removeItem('it_last_week_advance_date');
+        } catch (e) {}
+        setCoachRutinaMenuOpen(false);
+        toast2(msg('Rutina reiniciada ✓', 'Routine reset ✓', 'Rotina reiniciada ✓'));
+        setCoachDialog({ t: 'none' });
+        return;
+      }
+      if (c.t === 'editAlum' && c.a) {
+        setEditAlumnoModal(c.a);
+        setEditAlumnoEmail(c.a.email);
+        setEditAlumnoPass('');
+        setCoachDialog({ t: 'none' });
+        return;
+      }
+      if (c.t === 'goRoutines' && c.rutinaActiva && c.rutina) {
+        setRoutines(function (prev) {
+          var ex = prev.find(function (x) {
+            return x.id === c.rutina.id;
+          });
+          if (ex) {
+            return prev.map(function (x) {
+              return x.id === c.rutina.id ? c.rutina : x;
+            });
+          }
+          return [c.rutina].concat(prev);
+        });
+        setTab('routines');
+        toast2(msg('Abierta en RUTINAS', 'Opened in ROUTINES', 'Aberta em ROTINAS'));
+        setCoachDialog({ t: 'none' });
+        return;
+      }
+      if (c.t === 'assignRut' && c.a && c.rutinaLocal) {
+        setLoadingSB(true);
+        if (c.ex) {
+          try {
+            await sb.deleteRutina(c.ex.id);
+            var exidA = c.ex.id;
+            setRutinasSB(function (prev) {
+              return prev.filter(function (x) {
+                return String(x.id) !== String(exidA);
+              });
+            });
+            setRutinasSBEntrenador(function (prev) {
+              return prev.filter(function (x) {
+                return String(x.id) !== String(exidA);
+              });
+            });
+            try {
+              var fr2 = await sb.getRutinasByEntrenador();
+              if (Array.isArray(fr2)) setRutinasSBEntrenador(fr2);
+            } catch (e3) {}
+          } catch (e) {
+            toast2(
+              msg('No se pudo quitar la rutina anterior.', 'Could not remove the previous routine.', 'Não foi possível remover a rotina anterior.')
+            );
+            setLoadingSB(false);
+            setCoachDialog({ t: 'none' });
+            return;
+          }
+        }
+        var res = await sb.createRutina({
+          alumno_id: c.a.id,
+          entrenador_id: ENTRENADOR_ID,
+          nombre: c.rutinaLocal.name || 'Rutina',
+          datos: {
+            days: sanitizeRoutineDaysForWrite(c.rutinaLocal.days || []),
+            alumno: c.rutinaLocal.alumno || '',
+            note: c.rutinaLocal.note || '',
+          },
+          fecha_inicio: new Date().toLocaleDateString('es-AR'),
+        });
+        if (res && res[0]) {
+          setRutinasSB(function (prev) {
+            return [].concat(prev, [res[0]]);
+          });
+          toast2('Rutina asignada ✓');
+        } else {
+          toast2('Error');
+        }
+        setLoadingSB(false);
+        setCoachDialog({ t: 'none' });
+        return;
+      }
+      if (c.t === 'logout' || c.t === 'logoutSettings') {
+        if (c.t === 'logoutSettings') setSettingsOpen(false);
+        clearAllIronTrackPrefixedKeys();
+        syncStateWithLocalStorage();
+        setCoachDialog({ t: 'none' });
+        return;
+      }
+    } catch (e1) {
+      console.error('[confirmCoachDialog]', e1);
+    } finally {
+      setCoachDialogLoading(false);
+    }
+  }
+
   // Pantalla de login
 
   const hasAppSession = !!(sessionData && (sessionData.role === "entrenador" || sessionData.role === "alumno"));
@@ -2784,10 +3055,7 @@ function GymApp() {
                 style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, fontWeight: 700, color: "#f87171" }}
                 onClick={() => {
                   setUserMenuOpen(false);
-                  if (confirm(msg("¿Cerrar sesión?", "Log out?"))) {
-                    clearAllIronTrackPrefixedKeys();
-                    syncStateWithLocalStorage();
-                  }
+                  setCoachDialog({ t: 'logout' });
                 }}
               >
                 <Ic name="log-out" size={17} color="#f87171" /> {msg("Cerrar sesión", "Log out")}
@@ -4196,7 +4464,10 @@ function GymApp() {
                             type="button"
                             className="hov"
                             style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:textMain,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
-                            onClick={function () { setCoachCardMenuId(null); if (!confirm(msg("¿Editar alumno?", "Edit athlete?"))) return; setEditAlumnoModal(a); setEditAlumnoEmail(a.email); setEditAlumnoPass(""); }}
+                            onClick={function () {
+                              setCoachCardMenuId(null);
+                              setCoachDialog({ t: 'editAlum', a: a });
+                            }}
                           >
                             <Ic name="edit-2" size={16} color={textMuted}/> {msg("Editar", "Edit")}
                           </button>
@@ -4212,10 +4483,9 @@ function GymApp() {
                             type="button"
                             className="hov"
                             style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
-                            onClick={async function () {
+                            onClick={function () {
                               setCoachCardMenuId(null);
-                              if (!confirm((msg("Eliminar a ", "Delete ")) + a.nombre + "?")) return;
-                              await sb.deleteAlumno?.(a.id); setAlumnos(function (prev) { return prev.filter(function (x) { return x.id !== a.id; }); }); toast2(msg("Alumno eliminado", "Athlete removed"));
+                              setCoachDialog({ t: 'deleteAlumno', a: a });
                             }}
                           >
                             <Ic name="trash-2" size={16} color="#f87171"/> {msg("Eliminar", "Delete")}
@@ -4269,18 +4539,12 @@ function GymApp() {
                                 {coachRutinaMenuOpen && (
                                   <div style={{position:"absolute",right:0,top:"100%",marginTop:6,background:coachAluDropdown,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:6,zIndex:40,minWidth:200,boxShadow:coachAluDropdownShadow}} onClick={function(e){e.stopPropagation();}}>
                                     <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#fbbf24",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
-                                      if(!confirm(es?"¿Reiniciar semana actual? El alumno volverá a Día 1 de la semana "+semanaCiclo+".":"Reset current week? Athlete will restart at Day 1 of week "+semanaCiclo+".")) return;
-                                      setCompletedDays(function(prev){return prev.filter(function(k){return !k.endsWith("-w"+(semanaCiclo-1))});});
-                                      setCoachRutinaMenuOpen(false);
-                                      toast2(msg("Semana reiniciada ✓", "Week reset ✓"));
+                                      setCoachDialog({ t: 'resetWeek', semanaCiclo: semanaCiclo });
                                     }}>
                                       <Ic name="refresh-cw" size={15} color="#fbbf24"/> {msg("Reiniciar semana", "Reset week")}
                                     </button>
                                     <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
-                                      if(!confirm(msg("¿Reiniciar rutina completa? Volverá a Semana 1, Día 1. El historial de progreso se mantiene.", "Reset entire routine? Will go back to Week 1, Day 1. Progress history is kept."))) return;
-                                      setCompletedDays([]); setCurrentWeek(0); localStorage.removeItem("it_last_week_advance_date");
-                                      setCoachRutinaMenuOpen(false);
-                                      toast2(msg("Rutina reiniciada ✓", "Routine reset ✓"));
+                                      setCoachDialog({ t: 'resetRoutine' });
                                     }}>
                                       <Ic name="refresh-cw" size={15} color="#f87171"/> {msg("Reiniciar rutina", "Reset routine")}
                                     </button>
@@ -4379,26 +4643,34 @@ function GymApp() {
                               </div>
                             )}
                             <div style={{display:"flex",gap:8,marginTop:14}}>
-                              <button className="hov" style={{flex:2,padding:"10px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMain,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={()=>{if(!confirm(msg("¿Editar esta rutina?", "Edit this routine?"))) return;const rutina={id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};setRoutines(prev=>{const ex=prev.find(x=>x.id===rutinaActiva.id);return ex?prev.map(x=>x.id===rutinaActiva.id?rutina:x):[rutina,...prev]});setTab("routines");toast2(msg("Abierta en RUTINAS", "Opened in ROUTINES"));}}><Ic name="edit-2" size={16} color={textMuted}/>{msg("Editar rutina", "Edit routine")}</button>
-                              <button className="hov" style={{padding:"10px 16px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={async()=>{if(!confirm(msg("¿Quitar rutina?", "Remove?"))) return;try{await sb.deleteRutina(rutinaActiva.id);var rid=rutinaActiva.id;setRutinasSB(function(prev){return prev.filter(function(x){return String(x.id)!==String(rid);});});setRutinasSBEntrenador(function(prev){return prev.filter(function(x){return String(x.id)!==String(rid);});});try{var fr=await sb.getRutinasByEntrenador();if(Array.isArray(fr))setRutinasSBEntrenador(fr);}catch(e2){}toast2(msg("Quitada", "Removed"));}catch(e){toast2(msg("No se pudo quitar la rutina.","Could not remove the routine."));}}}><Ic name="trash-2" size={15}/></button>
+                              <button className="hov" style={{flex:2,padding:"10px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMain,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={function () {
+                                var rut = {id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};
+                                setCoachDialog({ t: 'goRoutines', rutinaActiva: rutinaActiva, a: a, rutina: rut });
+                              }}><Ic name="edit-2" size={16} color={textMuted}/>{msg("Editar rutina", "Edit routine")}</button>
+                              <button className="hov" style={{padding:"10px 16px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={function () {
+                                setCoachDialog({ t: 'quitarRut', rutinaActiva: rutinaActiva, a: a });
+                              }}><Ic name="trash-2" size={15}/></button>
                             </div>
                           </div>
                         </div>
                       );
                     })()}
-                    <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={async()=>{
-                      const rutinaLocal=routineForAssign;if(!rutinaLocal){toast2(msg("Creá una rutina en RUTINAS", "Create a routine in ROUTINES"));return;}
-                      const ex=rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
-                      const rutinaNombre=rutinaLocal.name||"Rutina";
-                      var msg = ex
-                        ? (es?("Ya tiene: "+ex.nombre+"\n¿Reemplazar por: "+rutinaNombre+"?"):("Has: "+ex.nombre+"\nReplace with: "+rutinaNombre+"?"))
-                        : (es?("¿Asignar rutina: "+rutinaNombre+" a "+a.nombre+"?"):("Assign routine: "+rutinaNombre+" to "+a.nombre+"?"));
-                      if(!confirm(msg)) return;
-                      if(ex){try{await sb.deleteRutina(ex.id);var exid=ex.id;setRutinasSB(function(prev){return prev.filter(function(x){return String(x.id)!==String(exid);});});setRutinasSBEntrenador(function(prev){return prev.filter(function(x){return String(x.id)!==String(exid);});});try{var fr2=await sb.getRutinasByEntrenador();if(Array.isArray(fr2))setRutinasSBEntrenador(fr2);}catch(e3){}}catch(e){toast2(es?"No se pudo quitar la rutina anterior.":"Could not remove the previous routine.");return;}}
-                      setLoadingSB(true);
-                      const res=await sb.createRutina({alumno_id:a.id,entrenador_id:ENTRENADOR_ID,nombre:rutinaLocal.name||"Rutina",datos:{days:sanitizeRoutineDaysForWrite(rutinaLocal.days||[]),alumno:rutinaLocal.alumno||"",note:rutinaLocal.note||""},fecha_inicio:new Date().toLocaleDateString("es-AR")});
-                      if(res&&res[0]){setRutinasSB(prev=>[...prev,res[0]]);toast2("Rutina asignada ✓");}else{toast2("Error");}
-                      setLoadingSB(false);
+                    <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={function () {
+                      const rutinaLocal = routineForAssign;
+                      if (!rutinaLocal) {
+                        toast2(msg('Creá una rutina en RUTINAS', 'Create a routine in ROUTINES', 'Crie uma rotina em ROTINAS'));
+                        return;
+                      }
+                      const ex0 = rutinasSB.find((r) => r.alumno_id === a.id) || rutinasSBEntrenador.find((r) => r.alumno_id === a.id);
+                      const rutinaNombre = rutinaLocal.name || 'Rutina';
+                      var assignMsg0 = ex0
+                        ? es
+                          ? 'Ya tiene: ' + ex0.nombre + '\n¿Reemplazar por: ' + rutinaNombre + '?'
+                          : 'Has: ' + ex0.nombre + '\nReplace with: ' + rutinaNombre + '?'
+                        : es
+                          ? '¿Asignar rutina: ' + rutinaNombre + ' a ' + a.nombre + '?'
+                          : 'Assign routine: ' + rutinaNombre + ' to ' + a.nombre + '?';
+                      setCoachDialog({ t: 'assignRut', a: a, ex: ex0 || null, rutinaLocal: rutinaLocal, assignMsg: assignMsg0 });
                     }}>{(rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id))?(<><Ic name="refresh-cw" size={16}/>{msg("Cambiar rutina", "Change routine")}</>):(<><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</>)}</button>
                     {/* ── SUGERENCIAS ── */}
                     {(()=>{
@@ -4845,7 +5117,7 @@ function GymApp() {
               <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid rgba(239,68,68,.25)" }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#f87171", letterSpacing: 1.2, marginBottom: 10 }}>{msg("ZONA DE PELIGRO", "DANGER ZONE")}</div>
                 <button type="button" className="hov" style={{ width: "100%", padding: "14px", background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.35)", borderRadius: 12, color: "#f87171", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-                  onClick={function () { if (confirm(msg("¿Cerrar sesión?", "Log out?"))) { setSettingsOpen(false); clearAllIronTrackPrefixedKeys(); syncStateWithLocalStorage(); } }}>
+                  onClick={function () { setCoachDialog({ t: 'logoutSettings' }); }}>
                   <Ic name="log-out" size={18} color="#f87171" /> {msg("Cerrar sesión", "Log out")}
                 </button>
               </div>
@@ -5825,6 +6097,32 @@ function GymApp() {
       )}
       </div>
     </div>
+    {(() => {
+      var cfg = getCoachDialogModalConfig();
+      return (
+    <DeleteConfirmModal
+      key="it-coach-confirm"
+      zIndex={10000}
+      open={coachDialog.t !== 'none'}
+      onCancel={function () {
+        if (coachDialogLoading) return;
+        setCoachDialog({ t: 'none' });
+      }}
+      onConfirm={function () {
+        void confirmCoachDialog();
+      }}
+      title={cfg.title}
+      message={cfg.message}
+      subjectName={cfg.subjectName}
+      confirmLabel={cfg.confirmLabel}
+      cancelLabel={msg('Cancelar', 'Cancel', 'Cancelar')}
+      tone={cfg.tone}
+      loading={coachDialogLoading}
+      loadingLabel={cfg.loadingLabel}
+      useLogoutIcon={!!cfg.useLogoutIcon}
+    />
+      );
+    })()}
     </IronTrackI18nProvider>
     </>
   );
