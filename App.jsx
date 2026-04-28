@@ -2610,20 +2610,20 @@ function GymApp() {
   if (!sharedParam && !hasAppSession && loginScreen) return (
     <>
       {brandSplashEl}
-      <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
-      <div style={{marginBottom:40,textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center"}}>
+      <div style={{minHeight:"100dvh",width:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"radial-gradient(circle at 50% 25%, rgba(37, 99, 235, 0.18), transparent 32%), radial-gradient(circle at 50% 55%, rgba(34, 211, 238, 0.10), transparent 38%), linear-gradient(180deg, #0A0F1A 0%, #020617 100%)",color:textMain,fontFamily:"Inter,sans-serif",padding:"32px 24px",boxSizing:"border-box"}}>
+      <div style={{textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center"}}>
         <IronTrackAppIcon
-          size="clamp(82px, 22vw, 110px)"
+          size="clamp(90px, 18vw, 120px)"
           animated={false}
           aria-label={msg("IronTrack", "IronTrack")}
-          style={{ margin: "0 auto", background: "transparent", border: 0, boxShadow: "none" }}
+          style={{ margin: "0 auto 16px", background: "transparent", border: "none", boxShadow: "none" }}
         />
-        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontSize:"clamp(34px, 9vw, 54px)",lineHeight:1,marginTop:12,letterSpacing:1.5,fontWeight:900,fontFamily:"Barlow Condensed, Arial Black, sans-serif",textTransform:"uppercase"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:"clamp(24px, 4vw, 32px)",lineHeight:1,textAlign:"center",marginBottom:32,letterSpacing:1.2,fontWeight:800,fontFamily:"Barlow Condensed, Arial Black, sans-serif",textTransform:"uppercase"}}>
           <span style={{color:"#fff"}}>IRON</span>
           <span style={{color:"#2563EB"}}>TRACK</span>
         </div>
       </div>
-      <div style={{width:"100%",background:bgCard,borderRadius:16,padding:"24px",border:"1px solid "+border}}>
+      <div style={{maxWidth:420,width:"100%",background:"rgba(255,255,255,0.04)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:16,padding:"24px",border:"1px solid rgba(255,255,255,0.08)",boxSizing:"border-box"}}>
 
         <div style={{marginBottom:12}}>
           <div style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4}}>EMAIL</div>
