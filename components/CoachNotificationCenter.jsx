@@ -4,14 +4,44 @@ import { Bell, Check, MessageSquare, Target, Trophy, Zap } from "lucide-react";
 import { irontrackMsg as M } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 
-const LS_READ = "it_coach_notif_read_v1";
+const LS_READ_LEGACY = "it_coach_notif_read_v1";
+const LS_READ_PREFIX = "irontrack_coach_notif_read_v2";
 
 /** @typedef {{ key: string, alumnoId?: string, name: string, badge: string, desc: string, severity: number }} CoachAlertRow */
 
-function loadReadIds() {
+function buildReadStorageKey() {
   try {
-    var raw = localStorage.getItem(LS_READ);
-    if (!raw) return [];
+    if (typeof localStorage === "undefined") return LS_READ_PREFIX + "_anon";
+    var raw = localStorage.getItem("it_session");
+    if (!raw) return LS_READ_PREFIX + "_anon";
+    var sess = JSON.parse(raw);
+    if (!sess || typeof sess !== "object") return LS_READ_PREFIX + "_anon";
+    if (sess.role === "entrenador") {
+      var name = typeof sess.name === "string" ? sess.name.trim().toLowerCase() : "";
+      if (!name) return LS_READ_PREFIX + "_coach";
+      return LS_READ_PREFIX + "_coach_" + encodeURIComponent(name);
+    }
+    if (sess.role === "alumno" && sess.alumnoId != null) {
+      return LS_READ_PREFIX + "_student_" + encodeURIComponent(String(sess.alumnoId));
+    }
+    return LS_READ_PREFIX + "_anon";
+  } catch (e) {
+    return LS_READ_PREFIX + "_anon";
+  }
+}
+
+function loadReadIds(storageKey) {
+  try {
+    var raw = localStorage.getItem(storageKey);
+    if (!raw) {
+      // Backward-compat: migrate values from legacy key once.
+      var legacyRaw = localStorage.getItem(LS_READ_LEGACY);
+      if (!legacyRaw) return [];
+      var legacyParsed = JSON.parse(legacyRaw);
+      if (!Array.isArray(legacyParsed)) return [];
+      localStorage.setItem(storageKey, JSON.stringify(legacyParsed));
+      return legacyParsed;
+    }
     var p = JSON.parse(raw);
     return Array.isArray(p) ? p : [];
   } catch (e) {
@@ -19,9 +49,9 @@ function loadReadIds() {
   }
 }
 
-function saveReadIds(ids) {
+function saveReadIds(storageKey, ids) {
   try {
-    localStorage.setItem(LS_READ, JSON.stringify(ids));
+    localStorage.setItem(storageKey, JSON.stringify(ids));
   } catch (e) {}
 }
 
@@ -181,9 +211,19 @@ export default function CoachNotificationCenter({
 
   var [open, setOpen] = React.useState(false);
   var [filter, setFilter] = React.useState("all");
-  var [readIds, setReadIds] = React.useState(loadReadIds);
+  var storageKey = React.useMemo(buildReadStorageKey, []);
+  var [readIds, setReadIds] = React.useState(function () {
+    return loadReadIds(storageKey);
+  });
   var wrapRef = React.useRef(null);
   var panelRef = React.useRef(null);
+
+  React.useEffect(
+    function () {
+      setReadIds(loadReadIds(storageKey));
+    },
+    [storageKey]
+  );
 
   var allItems = React.useMemo(
     function () {
@@ -254,7 +294,7 @@ export default function CoachNotificationCenter({
     setReadIds(function (prev) {
       if (prev.indexOf(id) >= 0) return prev;
       var next = prev.concat([id]);
-      saveReadIds(next);
+      saveReadIds(storageKey, next);
       return next;
     });
   }
@@ -264,7 +304,7 @@ export default function CoachNotificationCenter({
       var next = allItems.map(function (x) {
         return x.id;
       });
-      saveReadIds(next);
+      saveReadIds(storageKey, next);
       return next;
     });
   }
