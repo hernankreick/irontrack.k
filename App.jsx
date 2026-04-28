@@ -2611,10 +2611,16 @@ function GymApp() {
     <>
       {brandSplashEl}
       <div style={{maxWidth:480,margin:"0 auto",height:"100dvh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:bg,color:textMain,fontFamily:"Inter,sans-serif",padding:"0 24px"}}>
-      <div style={{marginBottom:40,textAlign:"center"}}>
-        <IronTrackAppIcon size={80} animated={false} aria-label={msg("IronTrack", "IronTrack")} />
-        <div style={{fontSize:13,color:textMuted,marginTop:8,letterSpacing:1.5,fontWeight:500}}>
-          {msg("ENTRENAMIENTO INTELIGENTE", "INTELLIGENT TRAINING")}
+      <div style={{marginBottom:40,textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center"}}>
+        <IronTrackAppIcon
+          size="clamp(82px, 22vw, 110px)"
+          animated={false}
+          aria-label={msg("IronTrack", "IronTrack")}
+          style={{ margin: "0 auto", background: "transparent", border: 0, boxShadow: "none" }}
+        />
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,fontSize:"clamp(34px, 9vw, 54px)",lineHeight:1,marginTop:12,letterSpacing:1.5,fontWeight:900,fontFamily:"Barlow Condensed, Arial Black, sans-serif",textTransform:"uppercase"}}>
+          <span style={{color:"#fff"}}>IRON</span>
+          <span style={{color:"#2563EB"}}>TRACK</span>
         </div>
       </div>
       <div style={{width:"100%",background:bgCard,borderRadius:16,padding:"24px",border:"1px solid "+border}}>
