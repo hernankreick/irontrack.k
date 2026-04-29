@@ -407,6 +407,24 @@ const sb = {
   updateAlumno: async (id, data) => {
     return sbFetch("alumnos?id=eq."+id, "PATCH", data);
   },
+  deleteAlumno: async function (id) {
+    var sid = encodeURIComponent(String(id));
+    var r = await fetch(SB_URL + "/rest/v1/alumnos?id=eq." + sid, {
+      method: "DELETE",
+      headers: {
+        apikey: SB_KEY,
+        Authorization: "Bearer " + SB_KEY,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!r.ok) {
+      var errBody = "";
+      try {
+        errBody = await r.text();
+      } catch (e) {}
+      throw new Error(errBody || "HTTP " + r.status);
+    }
+  },
   getConfig: () => sbFetch("config?id=eq.pagos&select=*"),
   saveConfig: (data) => sbFetch("config?id=eq.pagos", "PATCH", data),
   getMensajes: (alumnoId) => sbFetch("mensajes?alumno_id=eq."+alumnoId+"&select=*&order=created_at.asc&limit=50"),
@@ -449,6 +467,39 @@ const sb = {
     return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
   },
 };
+
+function isTruthyActiveFlag(v) {
+  if (v == null) return true;
+  if (typeof v === "boolean") return v;
+  var s = String(v).trim().toLowerCase();
+  return !(s === "false" || s === "0" || s === "no" || s === "inactivo" || s === "inactive" || s === "eliminado" || s === "deleted" || s === "borrado");
+}
+
+function isDeletedAlumnoRow(a) {
+  if (!a || typeof a !== "object") return true;
+  if (a.deleted_at || a.deletedAt || a.fecha_eliminacion || a.removed_at) return true;
+  var stateFields = [a.estado, a.status, a.state, a.situacion];
+  for (var i = 0; i < stateFields.length; i++) {
+    if (stateFields[i] == null) continue;
+    var s = String(stateFields[i]).trim().toLowerCase();
+    if (s === "eliminado" || s === "eliminada" || s === "deleted" || s === "borrado" || s === "borrada" || s === "inactive" || s === "inactivo" || s === "inactiva") return true;
+  }
+  if (!isTruthyActiveFlag(a.activo) || !isTruthyActiveFlag(a.active) || !isTruthyActiveFlag(a.is_active)) return true;
+  return false;
+}
+
+function cleanActiveCoachAlumnos(list, entrenadorId) {
+  var seen = {};
+  return (Array.isArray(list) ? list : []).filter(function (a) {
+    if (!a || a.id == null || String(a.id).trim() === "") return false;
+    var id = String(a.id);
+    if (seen[id]) return false;
+    if (isDeletedAlumnoRow(a)) return false;
+    if (entrenadorId && a.entrenador_id != null && String(a.entrenador_id) !== String(entrenadorId)) return false;
+    seen[id] = true;
+    return true;
+  });
+}
 
 
 
@@ -981,16 +1032,51 @@ function GymApp() {
 
   
 
+  const alumnosActivosLimpios = useMemo(function () {
+    return cleanActiveCoachAlumnos(alumnos, ENTRENADOR_ID);
+  }, [alumnos, ENTRENADOR_ID]);
+
+  const alumnosActivosIds = useMemo(function () {
+    var ids = {};
+    alumnosActivosLimpios.forEach(function (a) {
+      ids[String(a.id)] = true;
+    });
+    return ids;
+  }, [alumnosActivosLimpios]);
+
+  const rutinasSBEntrenadorLimpias = useMemo(function () {
+    return (rutinasSBEntrenador || []).filter(function (r) {
+      if (r && r.alumno_id == null) return true;
+      return !!(r && alumnosActivosIds[String(r.alumno_id)]);
+    });
+  }, [rutinasSBEntrenador, alumnosActivosIds]);
+
+  const sesionesGlobalesLimpias = useMemo(function () {
+    return (sesionesGlobales || []).filter(function (s) {
+      return !!(s && alumnosActivosIds[String(s.alumno_id)]);
+    });
+  }, [sesionesGlobales, alumnosActivosIds]);
+
+  const progresoGlobalLimpio = useMemo(function () {
+    var out = {};
+    Object.keys(progresoGlobal || {}).forEach(function (id) {
+      if (alumnosActivosIds[String(id)]) out[id] = progresoGlobal[id];
+    });
+    return out;
+  }, [progresoGlobal, alumnosActivosIds]);
+
   const cargarSesionesGlobales = React.useCallback(async function(alumnosActuales) {
-    var lista = alumnosActuales || alumnos;
+    var lista = alumnosActuales || alumnosActivosLimpios;
     if(!lista || lista.length === 0) {
       try {
         var sbAlumnos = await sb.getAlumnos('entrenador_principal');
-        if(sbAlumnos && sbAlumnos.length > 0) { setAlumnos(sbAlumnos); lista = sbAlumnos; }
+        var clean = cleanActiveCoachAlumnos(sbAlumnos || [], ENTRENADOR_ID);
+        if(clean && clean.length > 0) { setAlumnos(clean); lista = clean; }
         else return;
       } catch(e) { return; }
     }
     try {
+      lista = cleanActiveCoachAlumnos(lista, ENTRENADOR_ID);
       var ids = lista.map(function(a){return a.id}).filter(function(id){return id && typeof id === 'string'});
       if(ids.length === 0) return;
       var idsStr = ids.join(',');
@@ -1008,12 +1094,12 @@ function GymApp() {
         setProgresoGlobal(idx2);
       }
     } catch(e) { console.error('[cargarSesionesGlobales]', e); }
-  }, [alumnos]);
+  }, [alumnosActivosLimpios, ENTRENADOR_ID]);
 
   useEffect(function() {
     if(sessionData && sessionData.role==='entrenador') {
       var init = async function() {
-        var sbAlumnos = await sb.getAlumnos('entrenador_principal') || [];
+        var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos('entrenador_principal') || [], ENTRENADOR_ID);
         setAlumnos(sbAlumnos);
         if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
         try { var rutsDB = await sb.getRutinasByEntrenador(); if(rutsDB && Array.isArray(rutsDB)) setRutinasSBEntrenador(rutsDB); } catch(e) {}
@@ -1762,9 +1848,9 @@ function GymApp() {
   }, []);
 
   const coachAlumnoCategoria = React.useCallback(function (a) {
-    if (!rutinasSBEntrenador.some(function (r) { return r.alumno_id === a.id; })) return "sin_rutina";
+    if (!rutinasSBEntrenadorLimpias.some(function (r) { return r.alumno_id === a.id; })) return "sin_rutina";
     var cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000;
-    var ses = sesionesGlobales || [];
+    var ses = sesionesGlobalesLimpias || [];
     for (var i = 0; i < ses.length; i++) {
       if (ses[i].alumno_id !== a.id) continue;
       var raw = ses[i].created_at || "";
@@ -1772,7 +1858,7 @@ function GymApp() {
       var d = new Date(raw.slice(0, 10));
       if (!isNaN(d.getTime()) && d.getTime() >= cutoff) return "activo";
     }
-    var plist = progresoGlobal[a.id];
+    var plist = progresoGlobalLimpio[a.id];
     if (plist && plist.length) {
       for (var j = 0; j < plist.length; j++) {
         var fecha = plist[j].fecha || "";
@@ -1788,22 +1874,22 @@ function GymApp() {
       }
     }
     return "inactivo";
-  }, [rutinasSBEntrenador, sesionesGlobales, progresoGlobal]);
+  }, [rutinasSBEntrenadorLimpias, sesionesGlobalesLimpias, progresoGlobalLimpio]);
 
   const coachAlumnosCounts = React.useMemo(function () {
-    var c = { todos: alumnos.length, activos: 0, inactivos: 0, sin_rutina: 0 };
-    alumnos.forEach(function (a) {
+    var c = { todos: alumnosActivosLimpios.length, activos: 0, inactivos: 0, sin_rutina: 0 };
+    alumnosActivosLimpios.forEach(function (a) {
       var cat = coachAlumnoCategoria(a);
       if (cat === "sin_rutina") c.sin_rutina++;
       else if (cat === "activo") c.activos++;
       else c.inactivos++;
     });
     return c;
-  }, [alumnos, coachAlumnoCategoria]);
+  }, [alumnosActivosLimpios, coachAlumnoCategoria]);
 
   const coachAlumnosListaFiltrada = React.useMemo(function () {
     var q = coachAlumnosSearch.trim().toLowerCase();
-    return alumnos.filter(function (a) {
+    return alumnosActivosLimpios.filter(function (a) {
       if (q) {
         var hay = ((a.nombre || "") + " " + (a.email || "")).toLowerCase();
         if (!hay.includes(q)) return false;
@@ -1815,7 +1901,7 @@ function GymApp() {
       if (coachAlumnosFilter === "inactivos") return cat === "inactivo";
       return true;
     });
-  }, [alumnos, coachAlumnosSearch, coachAlumnosFilter, coachAlumnoCategoria]);
+  }, [alumnosActivosLimpios, coachAlumnosSearch, coachAlumnosFilter, coachAlumnoCategoria]);
 
   React.useEffect(function () {
     setCoachRoutineDiaIdx(0);
@@ -1949,8 +2035,8 @@ function GymApp() {
       }
       var weekMs = 7 * 24 * 60 * 60 * 1000;
       var weekAgo = Date.now() - weekMs;
-      var sg = sesionesGlobales || [];
-      var alumnosSearch = (alumnos || []).map(function (a) {
+      var sg = sesionesGlobalesLimpias || [];
+      var alumnosSearch = (alumnosActivosLimpios || []).map(function (a) {
         var cat = coachAlumnoCategoria(a);
         var estado = cat === "activo" ? "ok" : cat === "inactivo" ? "inactivo" : "riesgo";
         var sesCount = sg.filter(function (s) {
@@ -1970,12 +2056,12 @@ function GymApp() {
           estado: estado,
         };
       });
-      var rutinasSearch = (rutinasSBEntrenador || []).map(function (rSB) {
+      var rutinasSearch = (rutinasSBEntrenadorLimpias || []).map(function (rSB) {
         var dias = rSB.datos?.days || [];
         var ejCount = dias.reduce(function (acc, d) {
           return acc + (d.warmup || []).length + (d.exercises || []).length;
         }, 0);
-        var alum = alumnos.find(function (al) {
+        var alum = alumnosActivosLimpios.find(function (al) {
           return al.id === rSB.alumno_id;
         });
         return {
@@ -1997,7 +2083,7 @@ function GymApp() {
         };
       });
       var sesionesSearch = sg.slice(0, 150).map(function (s, idx) {
-        var alum = alumnos.find(function (al) {
+        var alum = alumnosActivosLimpios.find(function (al) {
           return al.id === s.alumno_id;
         });
         var raw = s.created_at || s.fecha || "";
@@ -2021,13 +2107,13 @@ function GymApp() {
         sesiones: sesionesSearch,
       };
     },
-    [sessionData, alumnos, sesionesGlobales, rutinasSBEntrenador, allEx, coachAlumnoCategoria]
+    [sessionData, alumnosActivosLimpios, sesionesGlobalesLimpias, rutinasSBEntrenadorLimpias, allEx, coachAlumnoCategoria]
   );
 
   var coachGlobalSearchNavigate = React.useCallback(
     function (seccion, id) {
       if (seccion === "alumnos") {
-        var alum = (alumnos || []).find(function (x) {
+        var alum = (alumnosActivosLimpios || []).find(function (x) {
           return String(x.id) === String(id);
         });
         if (!alum) return;
@@ -2058,7 +2144,7 @@ function GymApp() {
       }
       if (seccion === "sesiones") {
         var aid = id;
-        var alum2 = (alumnos || []).find(function (x) {
+        var alum2 = (alumnosActivosLimpios || []).find(function (x) {
           return String(x.id) === String(aid);
         });
         if (!alum2) return;
@@ -2079,7 +2165,7 @@ function GymApp() {
           });
       }
     },
-    [alumnos, sesionesGlobales, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones]
+    [alumnosActivosLimpios, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones]
   );
 
   const activeR = session ? routines.find(r=>r.id===session.rId) : null;
@@ -3270,10 +3356,10 @@ function GymApp() {
         {(tab==="plan"||tab==="progress")&&!esAlumno&&sessionData?.role==="entrenador"&&(
               <CoachDashboard
                 activeNav={tab==="progress"?"progreso":"dashboard"}
-                alumnos={alumnos}
-                sesionesGlobales={sesionesGlobales}
-                progresoGlobal={progresoGlobal}
-                rutinasSBEntrenador={rutinasSBEntrenador}
+                alumnos={alumnosActivosLimpios}
+                sesionesGlobales={sesionesGlobalesLimpias}
+                progresoGlobal={progresoGlobalLimpio}
+                rutinasSBEntrenador={rutinasSBEntrenadorLimpias}
                 allEx={allEx}
                 lang={lang}
                 darkMode={darkMode}
@@ -3293,7 +3379,7 @@ function GymApp() {
                   setTab("alumnos");
                 }}
                 onRevisar={async function (alumnoId) {
-                  var alum = (alumnos || []).find(function (x) {
+                  var alum = (alumnosActivosLimpios || []).find(function (x) {
                     return String(x.id) === String(alumnoId);
                   });
                   if (!alum) {
@@ -3313,7 +3399,7 @@ function GymApp() {
                   setLoadingSB(false);
                 }}
                 onVerPerfil={async function (alumnoId) {
-                  var alum = (alumnos || []).find(function (x) {
+                  var alum = (alumnosActivosLimpios || []).find(function (x) {
                     return String(x.id) === String(alumnoId);
                   });
                   if (!alum) {
@@ -4242,7 +4328,7 @@ function GymApp() {
             setAddExMuscle={setAddExMuscle}
             setAddExSelectedIds={setAddExSelectedIds}
             setDupDayModal={setDupDayModal}
-            alumnos={alumnos}
+            alumnos={alumnosActivosLimpios}
             sb={sb}
             setAssignRoutineId={setAssignRoutineId}
             desktopCoachStableLayout={coachDesktopNavHidden}
@@ -4253,7 +4339,7 @@ function GymApp() {
         )}
         {tab==="scanner"&&!esAlumno&&(
           <div className="min-w-0 max-w-full">
-            <ScannerRutina darkMode={darkMode} sb={sb} setRoutines={setRoutines} alumnos={alumnos} toast2={toast2} es={es} setTab={setTab} user={user} customEx={customEx}/>
+            <ScannerRutina darkMode={darkMode} sb={sb} setRoutines={setRoutines} alumnos={alumnosActivosLimpios} toast2={toast2} es={es} setTab={setTab} user={user} customEx={customEx}/>
           </div>
         )}
         {tab==="biblioteca"&&!esAlumno&&(
@@ -4455,7 +4541,7 @@ function GymApp() {
                       if(errNom||errEm){setNewAlumnoErrors({nombre:errNom,email:errEm});return;}
                       setLoadingSB(true);
                       const res = await sb.createAlumno({nombre:newAlumnoData.nombre.trim(),email:newAlumnoData.email.trim(),password:newAlumnoData.pass.trim()||"irontrack2024",entrenador_id:ENTRENADOR_ID});
-                      if(res&&res[0]){setAlumnos(prev=>[...prev,res[0]]);toast2(msg("Alumno creado ✓", "Athlete created ✓"));setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}
+                      if(res&&res[0]){setAlumnos(prev=>cleanActiveCoachAlumnos([...prev,res[0]],ENTRENADOR_ID));toast2(msg("Alumno creado ✓", "Athlete created ✓"));setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}
                       else{toast2("Error al crear alumno");}
                       setLoadingSB(false);
                     }}>GUARDAR</button>

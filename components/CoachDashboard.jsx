@@ -3,11 +3,15 @@ import {
   AlertCircle,
   ArrowRight,
   ArrowUp,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
   Eye,
   FilePlus,
   Info,
   MessageSquare,
   Star,
+  Target,
 } from "lucide-react";
 import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import GlobalSearch from "./GlobalSearch.jsx";
@@ -195,6 +199,43 @@ function estadoTextColor(row, lang, muted) {
   return sesionColor(row.ult, lang, muted);
 }
 
+function rowStatusConfig(row, lang, C) {
+  if (row.cat === "sin_rutina") {
+    return {
+      label: M(lang, "Sin rutina", "No routine", "Sem rotina"),
+      color: C.red,
+      bg: C.redDim,
+      action: M(lang, "Asignar rutina", "Assign routine", "Atribuir rotina"),
+      primary: true,
+    };
+  }
+  if (row.cat === "inactivo") {
+    return {
+      label: M(lang, "Sin actividad", "No activity", "Sem atividade"),
+      color: C.red,
+      bg: C.redDim,
+      action: M(lang, "Ver perfil", "View profile", "Ver perfil"),
+      primary: false,
+    };
+  }
+  if (row.pct < 30) {
+    return {
+      label: M(lang, "Baja actividad", "Low activity", "Baixa atividade"),
+      color: C.yel,
+      bg: C.yelDim,
+      action: M(lang, "Ver perfil", "View profile", "Ver perfil"),
+      primary: false,
+    };
+  }
+  return {
+    label: M(lang, "Buen cumplimiento", "Good compliance", "Bom cumprimento"),
+    color: C.green,
+    bg: C.greenDim,
+    action: M(lang, "Ver perfil", "View profile", "Ver perfil"),
+    primary: false,
+  };
+}
+
 function sesionColor(s, lang, muted) {
   var m = muted || "#71717a";
   if (s == null || s === "") return m;
@@ -324,6 +365,31 @@ function computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal) {
   return Math.max(71, Math.min(100, score));
 }
 
+function isCompletedSession(s) {
+  return !(s && (s.estado === "pendiente" || s.completada === false));
+}
+
+function sesionesBetween(sesionesGlobales, fromMs, toMs) {
+  return (sesionesGlobales || []).filter(function (s) {
+    var t = parseDateMs(s.created_at || s.fecha);
+    return t != null && t >= fromMs && t < toMs && isCompletedSession(s);
+  }).length;
+}
+
+function weeklyTargetFromRutinas(alumnos, rutinasSBEntrenador) {
+  var byAlumno = {};
+  (rutinasSBEntrenador || []).forEach(function (r) {
+    if (!r || !r.alumno_id) return;
+    if (!byAlumno[r.alumno_id]) byAlumno[r.alumno_id] = r;
+  });
+  return (alumnos || []).reduce(function (sum, a) {
+    var r = byAlumno[a.id];
+    if (!r) return sum;
+    var days = r.datos && Array.isArray(r.datos.days) ? r.datos.days.length : 0;
+    return sum + Math.max(1, days || 3);
+  }, 0);
+}
+
 /**
  * Alertas derivadas solo de datos reales (sin inventar alumnos).
  * Prioridad: sin rutina > inactivo > poca actividad en la semana (con rutina).
@@ -422,6 +488,15 @@ function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, 
       return !!row.name;
     })
     .sort(function (a, b) {
+      function pr(row) {
+        if (row.cat === "sin_rutina") return 0;
+        if (row.cat === "inactivo") return 1;
+        if (row.pct < 30) return 2;
+        return 3;
+      }
+      var pa = pr(a);
+      var pb = pr(b);
+      if (pa !== pb) return pa - pb;
       if (a.pct !== b.pct) return a.pct - b.pct;
       return String(a.name).localeCompare(String(b.name), localeForSort(lang));
     });
@@ -527,12 +602,31 @@ export default function CoachDashboard({
   );
 
   /** Resumen stats (mock alineado al dashboard) — solo layout mobile vs desktop. */
-  var sesionesCompletadas = 16;
-  var sesionesTotales = 24;
-  var pctSemana =
-    sesionesTotales > 0 ? Math.round((sesionesCompletadas / sesionesTotales) * 100) : 0;
-  var rendimientoScore = 72;
-  var rendimientoDeltaPts = 8;
+  var nowMs = Date.now();
+  var weekStartMs = nowMs - 7 * 86400000;
+  var prevWeekStartMs = nowMs - 14 * 86400000;
+  var sesionesCompletadas = sesionesBetween(sesionesGlobales, weekStartMs, nowMs);
+  var sesionesPrevias = sesionesBetween(sesionesGlobales, prevWeekStartMs, weekStartMs);
+  var sesionesTotales = weeklyTargetFromRutinas(alumnos, rutinasSBEntrenador);
+  if (sesionesTotales <= 0) sesionesTotales = Math.max(sesionesCompletadas, alumnos.length);
+  var pctSemana = sesionesTotales > 0 ? Math.min(100, Math.round((sesionesCompletadas / sesionesTotales) * 100)) : 0;
+  var pctSemanaPrevia = sesionesTotales > 0 ? Math.min(100, Math.round((sesionesPrevias / sesionesTotales) * 100)) : 0;
+  var deltaSemana = pctSemana - pctSemanaPrevia;
+  var objetivoSemanalPct = 80;
+  var objetivoSesiones = sesionesTotales > 0 ? Math.ceil((sesionesTotales * objetivoSemanalPct) / 100) : 0;
+  var faltanObjetivo = Math.max(0, objetivoSesiones - sesionesCompletadas);
+  var sinRutinaCount = coachActiveRows.filter(function (r) { return r.cat === "sin_rutina"; }).length;
+  var inactivosCount = coachActiveRows.filter(function (r) { return r.cat === "inactivo"; }).length;
+  var bajaActividadCount = coachActiveRows.filter(function (r) { return r.cat !== "sin_rutina" && r.cat !== "inactivo" && r.pct < 30; }).length;
+  var buenosCount = coachActiveRows.filter(function (r) { return r.cat === "activo" && r.pct >= 70; }).length;
+  var rendimientoScore = alumnos.length > 0 ? Math.round(pctSemana * 0.7 + (buenosCount / alumnos.length) * 30) : 0;
+  var rendimientoDeltaPts = Math.round(deltaSemana * 0.4);
+  var rachaActual = sesionesCompletadas > 0 ? Math.min(7, Math.max(1, Math.ceil(sesionesCompletadas / Math.max(1, alumnos.length)))) : 0;
+  var dashboardInterpretacion = pctSemana >= objetivoSemanalPct
+    ? M(lang, "Semana en objetivo", "Week on target", "Semana no objetivo")
+    : pctSemana >= 55
+      ? M(lang, "Vas bien, pero podés mejorar", "You're doing well, but can improve", "VocÃª vai bem, mas pode melhorar")
+      : M(lang, "Necesita atención esta semana", "Needs attention this week", "Precisa de atenÃ§Ã£o esta semana");
 
   var _mobile = React.useState(false);
   var isMobile = _mobile[0];
@@ -706,6 +800,85 @@ export default function CoachDashboard({
             padding: S.pagePadding,
           }}
         >
+          <div
+            style={{
+              background: C.card,
+              border: `1px solid ${C.brd}`,
+              borderRadius: 12,
+              padding: isMobile ? 14 : "18px 22px",
+              boxSizing: "border-box",
+            }}
+          >
+            <div style={{ ...T.sectionEyebrow, color: C.t2, marginBottom: 14 }}>
+              {M(lang, "ATENCIÓN HOY", "TODAY'S ATTENTION", "ATENÇÃO HOJE")}
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
+                gap: isMobile ? 10 : 14,
+              }}
+            >
+              {[
+                {
+                  key: "sin-rutina",
+                  Icon: Target,
+                  count: sinRutinaCount,
+                  color: C.red,
+                  bg: C.redDim,
+                  title: M(lang, "alumnos sin rutina", "athletes without routine", "alunos sem rotina"),
+                  sub: M(lang, "Asignales una rutina para que comiencen", "Assign routines so they can start", "Atribua rotinas para começarem"),
+                },
+                {
+                  key: "inactivos",
+                  Icon: Clock3,
+                  count: inactivosCount,
+                  color: C.yel,
+                  bg: C.yelDim,
+                  title: M(lang, "alumnos inactivos", "inactive athletes", "alunos inativos"),
+                  sub: M(lang, "Hace más de 21 días sin actividad", "No activity in over 21 days", "Mais de 21 dias sem atividade"),
+                },
+                {
+                  key: "baja",
+                  Icon: AlertCircle,
+                  count: bajaActividadCount,
+                  color: C.yel,
+                  bg: C.yelDim,
+                  title: M(lang, "alumnos con baja actividad", "athletes with low activity", "alunos com baixa atividade"),
+                  sub: M(lang, "Menos del 30% de cumplimiento", "Under 30% compliance", "Menos de 30% de cumprimento"),
+                },
+              ].map(function (item) {
+                var Icon = item.Icon;
+                return (
+                  <div key={item.key} style={{ display: "flex", gap: 12, alignItems: "center", minWidth: 0 }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        background: item.bg,
+                        color: item.color,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon size={20} color={item.color} strokeWidth={2.25} />
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ ...T.bodyLg, color: C.t, fontWeight: 800 }}>
+                        {item.count} {item.title}
+                      </div>
+                      <div style={{ ...T.body, color: C.t2, marginTop: 3 }}>
+                        {item.sub}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
           {isMobile ? (
             <div
               style={{
@@ -841,7 +1014,7 @@ export default function CoachDashboard({
                   </span>
                 </div>
                 <div style={{ ...T.numberHero, color: C.t }}>
-                  16 / 24
+                  {sesionesCompletadas} / {sesionesTotales}
                 </div>
                 <div style={{ ...T.subtitle, color: C.t2, marginTop: 6 }}>
                   {M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
@@ -857,7 +1030,7 @@ export default function CoachDashboard({
                     ...T.bodySemibold,
                   }}
                 >
-                  {M(lang, "Quedan 2 días para completar", "2 days left to complete", "Faltam 2 dias para concluir")}
+                  {deltaSemana >= 0 ? "+" : ""}{deltaSemana}% {M(lang, "vs semana pasada", "vs last week", "vs semana passada")}
                 </div>
                 <div
                   style={{
@@ -868,56 +1041,28 @@ export default function CoachDashboard({
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {weekBars.map((row) => (
-                      <div
-                        key={row.d}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 6,
-                        }}
-                      >
-                        <span
-                          style={{
-                            ...T.labelMd,
-                            color: C.t2,
-                            width: 15,
-                            fontFamily: "ui-monospace, monospace",
-                          }}
-                        >
-                          {row.d}
-                        </span>
-                        <div
-                          style={{
-                            flex: 1,
-                            height: 7,
-                            background: C.brd,
-                            borderRadius: 3,
-                            overflow: "hidden",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: row.p + "%",
-                              height: "100%",
-                              background: row.p > 0 ? C.blue : C.brd,
-                              borderRadius: 3,
-                            }}
-                          />
-                        </div>
-                        <span
-                          style={{
-                            ...T.labelMd,
-                            color: C.t2,
-                            width: 34,
-                            textAlign: "right",
-                          }}
-                        >
-                          {row.p}%
-                        </span>
+                    <div style={{height:10,background:C.brd,borderRadius:999,overflow:"hidden",marginBottom:14}}>
+                      <div style={{width:pctSemana+"%",height:"100%",background:C.blue,borderRadius:999}} />
+                    </div>
+                    <div style={{background:C.cardDark,border:"1px solid "+C.brd,borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,...T.bodySemibold,color:pctSemana >= objetivoSemanalPct ? C.green : C.yel}}>
+                        <Star size={16} color="currentColor" fill="currentColor" strokeWidth={1.5}/>
+                        {dashboardInterpretacion}
                       </div>
-                    ))}
+                      <div style={{...T.body,color:C.t2,marginTop:6}}>
+                        {faltanObjetivo > 0
+                          ? M(lang, "Te faltan " + faltanObjetivo + " sesiones para el objetivo", faltanObjetivo + " sessions left for the target", "Faltam " + faltanObjetivo + " sessões para o objetivo")
+                          : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcançado")}
+                      </div>
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      <button type="button" onClick={onRevisarAlumnos} style={{background:C.blue,color:"#fff",border:"none",borderRadius:7,padding:"9px 10px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                        {M(lang, "Ver baja actividad", "Low activity", "Baixa atividade")}
+                      </button>
+                      <button type="button" onClick={onCrearRutina} style={{background:"transparent",color:C.t,border:"1px solid "+C.brd,borderRadius:7,padding:"9px 10px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                        {M(lang, "Asignar rutinas", "Assign routines", "Atribuir rotinas")}
+                      </button>
+                    </div>
                   </div>
                   <div style={{ position: "relative", width: 88, height: 88, flexShrink: 0 }}>
                     <svg width={88} height={88} viewBox="0 0 80 80" style={{ display: "block" }}>
@@ -930,7 +1075,7 @@ export default function CoachDashboard({
                         strokeWidth={8}
                         fill="none"
                         strokeDasharray="188.5"
-                        strokeDashoffset={60.32}
+                        strokeDashoffset={188.5 * (1 - pctSemana / 100)}
                         strokeLinecap="round"
                         transform="rotate(-90 40 40)"
                       />
@@ -947,7 +1092,7 @@ export default function CoachDashboard({
                         pointerEvents: "none",
                       }}
                     >
-                      67%
+                      {pctSemana}%
                     </div>
                   </div>
                 </div>
@@ -975,7 +1120,7 @@ export default function CoachDashboard({
                     <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                       <Star size={18} color="#eab308" fill="#eab308" strokeWidth={1.5} />
                       <span style={{ ...T.numberScore, color: C.t }}>
-                        72
+                        {rendimientoScore}
                       </span>
                       <span style={{ ...T.cardTitleSemibold, color: C.t2 }}>/100</span>
                     </div>
@@ -990,7 +1135,7 @@ export default function CoachDashboard({
                       }}
                     >
                       <ArrowUp size={14} strokeWidth={2.5} />
-                      +8 {M(lang, "pts vs semana pasada", "pts vs last week", "pts vs semana passada")}
+                      {rendimientoDeltaPts >= 0 ? "+" : ""}{rendimientoDeltaPts} {M(lang, "pts vs semana pasada", "pts vs last week", "pts vs semana passada")}
                     </div>
                   </div>
                   <div style={{ position: "relative", width: 68, height: 68, flexShrink: 0 }}>
@@ -1004,7 +1149,7 @@ export default function CoachDashboard({
                         strokeWidth={7}
                         fill="none"
                         strokeDasharray="144.51"
-                        strokeDashoffset={40.46}
+                        strokeDashoffset={144.51 * (1 - rendimientoScore / 100)}
                         strokeLinecap="round"
                         transform="rotate(-90 30 30)"
                       />
@@ -1021,9 +1166,23 @@ export default function CoachDashboard({
                         pointerEvents: "none",
                       }}
                     >
-                      72%
+                      {rendimientoScore}%
                     </div>
                   </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginTop:18,borderTop:"1px solid "+C.rowDivider,paddingTop:12}}>
+                  {[
+                    {label:M(lang,"Sesiones esta semana","Sessions this week","Sessões esta semana"), value:sesionesTotales},
+                    {label:M(lang,"Sesiones completadas","Completed sessions","Sessões concluídas"), value:sesionesCompletadas},
+                    {label:M(lang,"Racha actual","Current streak","Sequência atual"), value:rachaActual + " " + M(lang,"días","days","dias")},
+                  ].map(function (m) {
+                    return (
+                      <div key={m.label} style={{display:"flex",justifyContent:"space-between",gap:10,...T.body,color:C.t}}>
+                        <span style={{color:C.t2}}>{m.label}</span>
+                        <strong style={{fontWeight:800}}>{m.value}</strong>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -1031,6 +1190,7 @@ export default function CoachDashboard({
 
           <div
             style={{
+              display: "none",
               background: C.card,
               border: `1px solid ${C.brd}`,
               borderRadius: 12,
@@ -1227,17 +1387,17 @@ export default function CoachDashboard({
                       ["--cd-q-sh-h"]: item.shadowHover,
                       position: "relative",
                       overflow: "hidden",
-                      minHeight: 168,
+                      minHeight: 96,
                       display: "flex",
-                      flexDirection: "column",
-                      alignItems: "stretch",
-                      padding: "22px 20px 18px",
-                      borderRadius: 16,
+                      alignItems: "center",
+                      gap: 14,
+                      padding: "18px 18px",
+                      borderRadius: 14,
                       cursor: "pointer",
                       boxSizing: "border-box",
-                      background: item.gradient,
-                      border: "1px solid " + item.border,
-                      boxShadow: item.shadow,
+                      background: C.card,
+                      border: "1px solid " + C.brd,
+                      boxShadow: "0 10px 28px rgba(0,0,0,0.16)",
                     }}
                     onClick={function () {
                       runQuick(item.action);
@@ -1252,6 +1412,7 @@ export default function CoachDashboard({
                     <div
                       aria-hidden
                       style={{
+                        display: "none",
                         position: "absolute",
                         top: -40,
                         right: -30,
@@ -1266,59 +1427,64 @@ export default function CoachDashboard({
                       style={{
                         width: 52,
                         height: 52,
-                        borderRadius: "50%",
+                        borderRadius: 14,
                         flexShrink: 0,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        background: item.orbBg,
-                        border: "1px solid " + item.orbBorder,
-                        boxShadow: item.orbShadow,
+                        background: item.action === "routine" ? C.blueDim : item.action === "review" ? C.greenDim : C.cardDark,
+                        border: "1px solid " + (item.action === "routine" ? C.blue : item.action === "review" ? C.green : C.brd),
+                        boxShadow: "none",
                       }}
                     >
-                      <Qi size={24} color={item.iconColor} strokeWidth={2.1} />
+                      <Qi size={24} color={item.action === "review" ? C.green : C.blue} strokeWidth={2.1} />
                     </div>
-                    <p
-                      style={{
-                        margin: "16px 0 0 0",
-                        fontSize: 17,
-                        fontWeight: 700,
-                        lineHeight: 1.25,
-                        letterSpacing: -0.02,
-                        color: item.titleColor,
-                      }}
-                    >
-                      {item.title}
-                    </p>
-                    <p
-                      style={{
-                        margin: "8px 0 0 0",
-                        fontSize: 14,
-                        fontWeight: 500,
-                        lineHeight: 1.45,
-                        color: item.subColor,
-                        maxWidth: "100%",
-                      }}
-                    >
-                      {item.sub}
-                    </p>
-                    <div style={{ flex: 1, minHeight: 8 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 15,
+                          fontWeight: 800,
+                          lineHeight: 1.25,
+                          color: C.t,
+                        }}
+                      >
+                        {item.title}
+                      </p>
+                      <p
+                        style={{
+                          margin: "5px 0 0 0",
+                          fontSize: 13,
+                          fontWeight: 500,
+                          lineHeight: 1.35,
+                          color: C.t2,
+                          maxWidth: "100%",
+                        }}
+                      >
+                        {item.sub}
+                      </p>
+                    </div>
                     <div
                       className="cd-quick-cta"
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "space-between",
-                        marginTop: 18,
-                        paddingTop: 14,
-                        borderTop: item.ctaBorder || "1px solid rgba(255,255,255,0.1)",
+                        justifyContent: "center",
+                        width: 34,
+                        height: 34,
+                        borderRadius: "50%",
+                        marginTop: 0,
+                        paddingTop: 0,
+                        borderTop: "none",
                         fontSize: 13,
                         fontWeight: 600,
                         letterSpacing: 0.02,
-                        color: item.ctaColor,
+                        color: C.blue,
+                        background: C.blueDim,
+                        flexShrink: 0,
                       }}
                     >
-                      <span>{cta}</span>
+                      <span style={{ display: "none" }}>{cta}</span>
                       <ArrowRight size={18} color="currentColor" strokeWidth={2.25} style={{ flexShrink: 0 }} />
                     </div>
                   </div>
@@ -1387,6 +1553,7 @@ export default function CoachDashboard({
                 {coachActiveRows.map(function (row, idx) {
                   var br = pctBracketColor(row.pct);
                   var estadoCol = estadoTextColor(row, lang, C.t2);
+                  var status = rowStatusConfig(row, lang, C);
                   return (
                     <div
                       key={String(row.id)}
@@ -1448,6 +1615,24 @@ export default function CoachDashboard({
                         </div>
                         <div
                           style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            width: "fit-content",
+                            marginTop: 6,
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                            background: status.bg,
+                            color: status.color,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            lineHeight: 1.2,
+                            fontFamily: "DM Sans, system-ui, sans-serif",
+                          }}
+                        >
+                          {status.label}
+                        </div>
+                        <div
+                          style={{
                             height: 3,
                             borderRadius: 2,
                             marginTop: 4,
@@ -1487,7 +1672,7 @@ export default function CoachDashboard({
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 165px 132px",
+                    gridTemplateColumns: "1fr 165px 132px 180px",
                     gap: 10,
                     padding: "10px 12px 8px",
                     boxSizing: "border-box",
@@ -1506,15 +1691,25 @@ export default function CoachDashboard({
                       {h}
                     </div>
                   ))}
+                  <div
+                    style={{
+                      ...T.tableHeader,
+                      color: C.t2,
+                      letterSpacing: 0.08,
+                    }}
+                  >
+                    {M(lang, "ESTADO", "STATUS", "ESTADO")}
+                  </div>
                 </div>
                 {coachActiveRows.map(function (row, idx) {
                   var col = pctColor(row.pct);
+                  var status = rowStatusConfig(row, lang, C);
                   return (
                     <div
                       key={String(row.id)}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 165px 132px",
+                        gridTemplateColumns: "1fr 165px 132px 180px",
                         gap: 10,
                         alignItems: "center",
                         padding: NAV_ITEM_PAD,
@@ -1582,6 +1777,49 @@ export default function CoachDashboard({
                       </div>
                       <div style={{ ...T.subtitle, color: sesionColor(row.ult, lang, C.t2) }}>
                         {row.ult}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minWidth: 0 }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            maxWidth: 92,
+                            padding: "4px 8px",
+                            borderRadius: 999,
+                            background: status.bg,
+                            color: status.color,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            lineHeight: 1.2,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {status.label}
+                        </span>
+                        <button
+                          type="button"
+                          style={{
+                            height: 30,
+                            padding: "0 10px",
+                            borderRadius: 8,
+                            border: "1px solid " + (status.primary ? C.blue : C.brd),
+                            background: status.primary ? C.blueDim : "transparent",
+                            color: status.primary ? C.blue : C.t,
+                            fontSize: 12,
+                            fontWeight: 800,
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                          onClick={function (ev) {
+                            ev.stopPropagation();
+                            if (status.primary && typeof onRevisar === "function") onRevisar(row.id);
+                            else if (typeof onVerPerfil === "function") onVerPerfil(row.id);
+                          }}
+                        >
+                          {status.action}
+                        </button>
                       </div>
                     </div>
                   );
