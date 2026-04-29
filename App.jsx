@@ -545,7 +545,7 @@ function PagoAlumno({aliasData, es, toast2, darkMode, msg}) {
             fontFamily: "inherit", fontSize: 13, fontWeight: 700,
             cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-            transition: "all .2s",
+            transition: "background-color .2s ease,border-color .2s ease,color .2s ease,opacity .2s ease,transform .2s ease",
           }}
         >
           {copied
@@ -1192,8 +1192,9 @@ function GymApp() {
         nav.style.transition = planScrollDiag.planHeaderLayerTransitions ? "transform 0.22s ease" : "none";
         var sp = alumnoTopBarSpacerRef.current;
         if (sp) {
-          sp.style.height = hideTop ? "0px" : ctx.alumnoTopBarPx + "px";
-          sp.style.transition = planScrollDiag.planHeaderLayerTransitions ? "height 0.22s ease" : "none";
+          sp.style.height = ctx.alumnoTopBarPx + "px";
+          sp.style.minHeight = ctx.alumnoTopBarPx + "px";
+          sp.style.transition = "none";
         }
       } else if (nav && !ctx.alumnoFixedTabs) {
         nav.style.transform = "";
@@ -1201,6 +1202,7 @@ function GymApp() {
         var sp0 = alumnoTopBarSpacerRef.current;
         if (sp0) {
           sp0.style.height = "";
+          sp0.style.minHeight = "";
           sp0.style.transition = "";
         }
       }
@@ -2203,6 +2205,7 @@ function GymApp() {
       }
       if (sp && alumnoTopBarFixed) {
         sp.style.height = alumnoTopBarHeight + "px";
+        sp.style.minHeight = alumnoTopBarHeight + "px";
         sp.style.transition = "";
       }
     },
@@ -2755,7 +2758,7 @@ function GymApp() {
         ".plan-main-scroll::-webkit-scrollbar{width:14px}" +
         ".plan-main-scroll::-webkit-scrollbar-track{background:"+(darkMode?"rgba(15,23,42,.65)":"#e8edf3")+";border-radius:10px;margin:4px 0}" +
         ".plan-main-scroll::-webkit-scrollbar-thumb{background:"+(darkMode?"#94a3b8":"#64748b")+";border-radius:10px;border:3px solid "+(darkMode?"#0b1120":"#f8fafc")+";background-clip:padding-box;min-height:48px}" +
-        ".hov{transition:all .15s ease;cursor:pointer}.hov:hover{filter:brightness(1.15)}" +
+        ".hov{transition:filter .15s ease,transform .15s ease,background-color .15s ease,border-color .15s ease,color .15s ease,opacity .15s ease;cursor:pointer}.hov:hover{filter:brightness(1.15)}" +
         "@keyframes successPulse{0%{transform:scale(1)}30%{transform:scale(0.94)}60%{transform:scale(1.06)}100%{transform:scale(1)}}" +
         "@keyframes pillBounce{0%{transform:scale(1)}30%{transform:scale(1.25)}50%{transform:scale(0.9)}70%{transform:scale(1.1)}100%{transform:scale(1)}}" +
         "@keyframes greenFlash{0%{filter:brightness(1)}40%{filter:brightness(1.5) saturate(1.3)}100%{filter:brightness(1)}}" +
@@ -2859,6 +2862,9 @@ function GymApp() {
           zIndex: alumnoTopBarFixed ? 80 : undefined,
           paddingLeft: esAlumno ? 20 : 16,
           paddingRight: esAlumno ? 20 : 16,
+          height: alumnoTopBarFixed ? alumnoTopBarHeight : undefined,
+          minHeight: alumnoTopBarFixed ? alumnoTopBarHeight : undefined,
+          boxSizing: "border-box",
           backdropFilter: alumnoTopBarFixed ? "blur(10px)" : undefined,
           WebkitBackdropFilter: alumnoTopBarFixed ? "blur(10px)" : undefined,
           boxShadow: alumnoTopBarFixed ? "0 8px 24px rgba(0,0,0,.18)" : undefined,
@@ -3099,7 +3105,7 @@ function GymApp() {
       </div>
       )}
       {alumnoTopBarFixed && (
-        <div ref={alumnoTopBarSpacerRef} style={{ height: alumnoTopBarHeight, flexShrink: 0 }} aria-hidden />
+        <div ref={alumnoTopBarSpacerRef} style={{ height: alumnoTopBarHeight, minHeight: alumnoTopBarHeight, flexShrink: 0, transition: "none" }} aria-hidden />
       )}
       {sessionData && esAlumno && userMenuOpen && (
         <>
@@ -3784,17 +3790,17 @@ function GymApp() {
                   {/* ESTA SEMANA */}
                   <div style={{background:bgCard,borderRadius:14,padding:"12px 16px 13px",marginBottom:10,border:"1px solid "+border}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:6}}>
-                      <span style={{fontSize:11,fontWeight:700,color:textMuted,letterSpacing:1,textTransform:"uppercase"}}>{msg("Esta semana", "This week")}</span>
-                      <span style={{fontSize:12,fontWeight:700,color:"#2563EB",whiteSpace:"nowrap"}}>{msg("Semana", "Week")} {currentWeek+1}/4</span>
+                      <span style={{fontSize:11,fontWeight:700,color:textMuted,letterSpacing:1,textTransform:"uppercase",lineHeight:1.2}}>{msg("Esta semana", "This week")}</span>
+                      <span style={{fontSize:12,fontWeight:700,color:"#2563EB",whiteSpace:"nowrap",lineHeight:1.2}}>{msg("Semana", "Week")} {currentWeek+1}/4</span>
                     </div>
-                    <div style={{fontSize:12,color:textMuted,fontWeight:600,marginBottom:8}}>
+                    <div style={{fontSize:12,color:textMuted,fontWeight:600,marginBottom:8,lineHeight:1.25}}>
                       {daysCompletedThisWeek} {msg("de", "of")} {totalDays} {msg("días completados", "days completed")}
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:10}}>
                       <div style={{flex:1,height:8,borderRadius:999,overflow:"hidden",background:darkMode?"rgba(148,163,184,.18)":"rgba(15,23,42,.12)"}}>
                         <div style={{height:"100%",width:weeklyPct+"%",borderRadius:999,background:"linear-gradient(90deg,#2563EB,#22D3EE)",transition:"width .25s ease"}}/>
                       </div>
-                      <span style={{minWidth:34,textAlign:"right",fontSize:12,fontWeight:800,color:"#2563EB",fontVariantNumeric:"tabular-nums"}}>
+                      <span style={{minWidth:34,textAlign:"right",fontSize:12,fontWeight:800,color:"#2563EB",fontVariantNumeric:"tabular-nums",lineHeight:1.2}}>
                         {weeklyPct}%
                       </span>
                     </div>
@@ -6171,7 +6177,7 @@ function GymApp() {
                 background:isActive?(darkMode?"rgba(59,130,246,0.2)":"rgba(59,130,246,0.12)"):esAlumno?"transparent":(darkMode?"transparent":"transparent"),
                 borderRadius:esAlumno?8:8,
                 padding:esAlumno?"6px 14px":"4px 12px",
-                transition:"all .2s ease",
+                transition:"background-color .2s ease,border-color .2s ease,color .2s ease,opacity .2s ease,transform .2s ease",
                 display:"flex",alignItems:"center",justifyContent:"center"
               }}>
                 {tb.icon(isActive?activeCol:inactiveCol)}
