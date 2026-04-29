@@ -3696,6 +3696,7 @@ function GymApp() {
                 return streak;
               })();
               const nextDayIdx = daysCompletedThisWeek < totalDays ? daysCompletedThisWeek : null;
+              const weeklyPct = totalDays > 0 ? Math.min(100, Math.round((daysCompletedThisWeek / totalDays) * 100)) : 0;
               const todayDay = nextDayIdx !== null ? r0?.days?.[nextDayIdx] : null;
               const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeek)));
               const totalEjHero = todayDay ? (todayDay.warmup || []).length + (todayDay.exercises || []).length : 0;
@@ -3781,41 +3782,28 @@ function GymApp() {
                     </div>
                   )}
                   {/* ESTA SEMANA */}
-                  <div style={{background:bgCard,borderRadius:14,padding:"20px 22px",marginBottom:12,border:"1px solid "+border}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+                  <div style={{background:bgCard,borderRadius:14,padding:"12px 16px 13px",marginBottom:10,border:"1px solid "+border}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:6}}>
                       <span style={{fontSize:11,fontWeight:700,color:textMuted,letterSpacing:1,textTransform:"uppercase"}}>{msg("Esta semana", "This week")}</span>
-                      <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:12,fontWeight:700,color:"#2563EB"}}>{msg("Semana", "Week")} {currentWeek+1} {msg("de", "of")} 4</div>
-                        <div style={{fontSize:11,color:textMuted}}>{daysCompletedThisWeek}/{totalDays} {msg("días", "days")}</div>
+                      <span style={{fontSize:12,fontWeight:700,color:"#2563EB",whiteSpace:"nowrap"}}>{msg("Semana", "Week")} {currentWeek+1}/4</span>
+                    </div>
+                    <div style={{fontSize:12,color:textMuted,fontWeight:600,marginBottom:8}}>
+                      {daysCompletedThisWeek} {msg("de", "of")} {totalDays} {msg("días completados", "days completed")}
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{flex:1,height:8,borderRadius:999,overflow:"hidden",background:darkMode?"rgba(148,163,184,.18)":"rgba(15,23,42,.12)"}}>
+                        <div style={{height:"100%",width:weeklyPct+"%",borderRadius:999,background:"linear-gradient(90deg,#2563EB,#22D3EE)",transition:"width .25s ease"}}/>
                       </div>
+                      <span style={{minWidth:34,textAlign:"right",fontSize:12,fontWeight:800,color:"#2563EB",fontVariantNumeric:"tabular-nums"}}>
+                        {weeklyPct}%
+                      </span>
                     </div>
-                    <div style={{display:"flex",gap:10}}>
-                      {(r0?.days||[]).map((d,i)=>{
-                        const done = completedDays.includes((r0?.id||"")+"-"+i+"-w"+currentWeek);
-                        const isNext = i===nextDayIdx;
-                        return (
-                          <div key={(r0?.id||"rut")+"-bar-d"+i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
-                            <div style={{width:"100%",height:5,borderRadius:3,overflow:"hidden",background:"rgba(255,255,255,.06)"}}>
-                              <div style={{
-                                height:"100%",borderRadius:3,width:"100%",
-                                background: done?"#22C55E":isNext?"#2563EB":"rgba(255,255,255,.08)",
-                              }}/>
-                            </div>
-                            <div style={{display:"flex",alignItems:"center",gap:3}}>
-                              {done&&(
-                                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                                  <circle cx="7" cy="7" r="6" fill="rgba(34,197,94,.15)"/>
-                                  <path d="M4 7l2.2 2.2L10 5" stroke="#22C55E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              )}
-                              <span style={{fontSize:10,fontWeight:700,color:done?"#22C55E":isNext?"#2563EB":textMuted,textTransform:"uppercase",letterSpacing:.5}}>
-                                {(d.label||("D"+(i+1))).slice(0,6)}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    {nextDayIdx !== null && (
+                      <div style={{fontSize:12,color:textMuted,fontWeight:600,marginTop:8,lineHeight:1.25}}>
+                        {"\u2022"} {msg("Hoy:", "Today:")}{" "}
+                        <span style={{color:"#2563EB",fontWeight:800}}>{msg("Día", "Day")} {nextDayIdx+1}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
