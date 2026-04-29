@@ -1106,6 +1106,7 @@ function GymApp() {
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileEdit, setProfileEdit] = useState({nombre:"",apellido:"",email:"",phone:"",avatarDataUrl:null});
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [pwaInstallTipOpen, setPwaInstallTipOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(()=>{ try{ const v=localStorage.getItem("it_show_welcome"); if(v){localStorage.removeItem("it_show_welcome");return true;} return false; }catch(e){return false;} });
   const [currentWeek, setCurrentWeek] = useState(() => { try{return parseInt(localStorage.getItem("it_week")||"0")}catch(e){return 0} });
   const [completedDays, setCompletedDays] = useState(() => { try{return JSON.parse(localStorage.getItem("it_cd")||"[]")}catch(e){return []} });
@@ -2958,7 +2959,83 @@ function GymApp() {
           {session&&<span style={{...tag("#22C55E"),fontSize:13}}>✓ Sesion activa</span>}
           {esAlumno &&
             (tab === "plan" || tab === "library" || tab === "progress") &&
-            canInstallPWA && (
+            canInstallPWA &&
+            (!coachDesktop1024 ? (
+              <div style={{ position: "relative", flexShrink: 0, zIndex: pwaInstallTipOpen ? 660 : "auto" }}>
+                {pwaInstallTipOpen && (
+                  <div
+                    style={{ position: "fixed", inset: 0, zIndex: 630, background: "transparent" }}
+                    onClick={() => setPwaInstallTipOpen(false)}
+                    aria-hidden
+                  />
+                )}
+                <button
+                  type="button"
+                  className="hov select-none"
+                  onClick={function () {
+                    setPwaInstallTipOpen(function (open) { return !open; });
+                  }}
+                  aria-label={msg("Instalar app", "Install app", "Instalar app")}
+                  aria-expanded={pwaInstallTipOpen}
+                  style={{
+                    position: "relative",
+                    zIndex: 650,
+                    width: 40,
+                    height: 40,
+                    minWidth: 40,
+                    minHeight: 40,
+                    padding: 0,
+                    borderRadius: "50%",
+                    background: "rgba(37, 99, 235, 0.10)",
+                    color: "#2563EB",
+                    border: "1px solid rgba(37, 99, 235, 0.45)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    boxSizing: "border-box",
+                    boxShadow: "0 8px 24px rgba(2, 6, 23, 0.24)",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  <DownloadNavIcon size={20} strokeWidth={2.35} color="#2563EB" aria-hidden />
+                </button>
+                {pwaInstallTipOpen && (
+                  <button
+                    type="button"
+                    onClick={function () {
+                      setPwaInstallTipOpen(false);
+                      void installPWA();
+                    }}
+                    style={{
+                      position: "absolute",
+                      zIndex: 660,
+                      top: "calc(100% + 10px)",
+                      right: 0,
+                      width: 220,
+                      padding: "12px 14px",
+                      borderRadius: 16,
+                      background: "rgba(10, 22, 40, 0.96)",
+                      border: "1px solid rgba(148, 163, 184, 0.18)",
+                      boxShadow: "0 18px 44px rgba(0, 0, 0, 0.46)",
+                      color: "#fff",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      backdropFilter: "blur(12px)",
+                      WebkitBackdropFilter: "blur(12px)",
+                    }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 800, lineHeight: 1.2 }}>
+                      {msg("Instalar app", "Install app", "Instalar app")}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.35, color: "#94a3b8", marginTop: 4 }}>
+                      {msg("Acceso rápido desde tu dispositivo", "Quick access from your device", "Acesso rápido pelo seu dispositivo")}
+                    </div>
+                  </button>
+                )}
+              </div>
+            ) : (
               <button
                 type="button"
                 className="hov select-none"
@@ -3008,7 +3085,7 @@ function GymApp() {
                 <DownloadNavIcon size={20} strokeWidth={2.25} color="#ffffff" aria-hidden />
                 {msg("Instalar app", "Install app", "Instalar app")}
               </button>
-            )}
+            ))}
           <button className="hov" style={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSettingsOpen(true)}><Ic name="settings" size={18} color={textMuted}/></button>
           {sessionData&&esAlumno
             ? <button className="hov" style={{width:36,height:36,background:"linear-gradient(135deg,#1E3A5F,#2563EB)",border:"none",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff"}} onClick={()=>setUserMenuOpen(!userMenuOpen)}>
