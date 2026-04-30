@@ -59,8 +59,8 @@ function metricUnit(mode, es) {
 }
 
 function MiniSpark({ values, accent }) {
-  const h = 16
-  const w = 52
+  const h = 14
+  const w = 40
   const pad = 1
   const vals = (values || []).map((v) => Number(v) || 0)
   if (!vals.length) return <svg width={w} height={h} aria-hidden />
@@ -125,7 +125,14 @@ function DetailChart({
 
   if (sorted.length < 2) {
     return (
-      <div className="py-6 text-center text-[9px]" style={{ color: 'var(--sp-muted)' }}>
+      <div
+        className="rounded-[14px] border px-4 py-6 text-center text-[12px] leading-relaxed"
+        style={{
+          borderColor: 'rgba(74, 101, 133, 0.42)',
+          background: 'rgba(10, 15, 26, 0.32)',
+          color: 'var(--sp-muted)',
+        }}
+      >
         {es ? 'Necesitás al menos 2 registros en este rango' : 'Need at least 2 logs in this range'}
       </div>
     )
@@ -420,7 +427,7 @@ export function ProgressChartsPanel({
   const pctColor = (pct) => {
     if (pct == null) return 'var(--sp-muted)'
     if (pct > 0) return accent
-    if (pct < 0) return 'rgba(243,244,246,0.45)'
+    if (pct < 0) return 'var(--sp-danger)'
     return 'var(--sp-muted)'
   }
 
@@ -559,7 +566,7 @@ export function ProgressChartsPanel({
           return (
             <div
               key={ex.id}
-              className="overflow-hidden rounded-[12px] border transition-colors"
+              className="overflow-hidden rounded-[16px] border transition-colors"
               style={{
                 borderColor: 'var(--sp-stroke)',
                 background: 'var(--sp-surface)',
@@ -567,37 +574,47 @@ export function ProgressChartsPanel({
             >
               <button
                 type="button"
-                className="flex w-full min-h-[52px] items-center gap-3 p-3 text-left"
+                className="grid w-full min-h-[86px] grid-cols-[40px_minmax(0,1fr)_96px] items-center gap-3 px-4 py-4 text-left"
                 style={{ background: 'transparent' }}
                 onClick={() => setExpandedEx(isOpen ? null : ex.id)}
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--sp-stroke)] bg-[var(--sp-surface-high)]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--sp-stroke)] bg-[var(--sp-surface-high)]">
                   {trendGlyph(trend)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="truncate font-semibold text-[14px]" style={{ color: 'var(--sp-fg)' }}>
-                      {name}
-                    </span>
+                  <span
+                    className="block font-semibold text-[14px]"
+                    style={{
+                      color: 'var(--sp-fg)',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      lineHeight: 1.22,
+                    }}
+                  >
+                    {name}
+                  </span>
+                  <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px]" style={{ color: 'var(--sp-muted)' }}>
                     {atPR && (
                       <span
                         className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
                         style={{
-                          background: 'rgba(245, 158, 11, 0.18)',
+                          background: 'rgba(245, 158, 11, 0.16)',
                           color: 'var(--sp-pr)',
-                          border: '1px solid rgba(245, 158, 11, 0.35)',
+                          border: '1px solid rgba(245, 158, 11, 0.42)',
                         }}
                       >
                         PR
                       </span>
                     )}
-                  </div>
-                  <div className="mt-0.5 text-[11px]" style={{ color: 'var(--sp-muted)' }}>
                     {ultimo ? (
                       <>
-                        {ultimo.kg}kg × {ultimo.reps}
+                        <span className="truncate">
+                          {ultimo.kg}kg × {ultimo.reps}
+                        </span>
                         {pct != null && datos.length >= 2 && (
-                          <span className="ml-2 font-semibold tabular-nums" style={{ color: pctColor(pct) }}>
+                          <span className="font-semibold tabular-nums" style={{ color: pctColor(pct) }}>
                             {pct > 0 ? '+' : ''}
                             {pct}%
                           </span>
@@ -608,31 +625,40 @@ export function ProgressChartsPanel({
                     )}
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span
-                    className="num tabular-nums leading-none"
-                    style={{
-                      fontFamily: "'Barlow Condensed',sans-serif",
-                      fontSize: 22,
-                      fontWeight: 800,
-                      letterSpacing: '-0.02em',
-                      color: 'var(--sp-fg)',
-                    }}
-                  >
-                    {ultimo ? `${ultimo.kg}` : '—'}
-                  </span>
-                  <MiniSpark values={kgSeries.slice(-6)} accent={accent} />
+                <div className="grid w-[96px] shrink-0 grid-cols-[1fr_18px] items-center gap-x-2 gap-y-1">
+                  <div className="min-w-0 text-right">
+                    <span
+                      className="num block tabular-nums leading-none"
+                      style={{
+                        fontFamily: "'Barlow Condensed',sans-serif",
+                        fontSize: 24,
+                        fontWeight: 800,
+                        color: 'var(--sp-fg)',
+                      }}
+                    >
+                      {ultimo ? `${ultimo.kg}` : '—'}
+                    </span>
+                    <span className="block text-[10px] font-semibold uppercase leading-none" style={{ color: 'var(--sp-muted)' }}>
+                      kg
+                    </span>
+                  </div>
                   <ChevronDown
-                    className={cn('h-5 w-5 shrink-0 transition-transform', isOpen && 'rotate-180')}
+                    className={cn('h-[18px] w-[18px] justify-self-end transition-transform', isOpen && 'rotate-180')}
                     strokeWidth={2}
-                    style={{ color: 'rgba(243,244,246,0.35)' }}
+                    style={{ color: 'rgba(243,244,246,0.42)' }}
                   />
+                  <div className="col-span-2 flex justify-end pr-6">
+                    <MiniSpark values={kgSeries.slice(-6)} accent={accent} />
+                  </div>
                 </div>
               </button>
 
               {isOpen && (
-                <div className="border-t px-3 pb-4 pt-3" style={{ borderColor: 'var(--sp-stroke)' }}>
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                <div
+                  className="border-t px-4 pb-5 pt-4"
+                  style={{ borderColor: 'var(--sp-stroke)', background: 'rgba(10, 15, 26, 0.26)' }}
+                >
+                  <div className="mb-4 flex flex-wrap items-center gap-2.5">
                     {[
                       { id: 'peso', labEs: 'Peso', labEn: 'Weight' },
                       { id: 'reps', labEs: 'Reps', labEn: 'Reps' },
@@ -641,12 +667,12 @@ export function ProgressChartsPanel({
                       <button
                         key={t.id}
                         type="button"
-                        className="rounded-full px-3 py-1.5 text-[11px] font-semibold"
+                        className="rounded-full px-3.5 py-2 text-[11px] font-semibold transition-colors"
                         style={{
                           background:
-                            metricTab === t.id ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
+                            metricTab === t.id ? 'rgba(37, 99, 235, 0.24)' : 'rgba(255,255,255,0.02)',
                           color: metricTab === t.id ? 'var(--sp-fg)' : 'var(--sp-muted)',
-                          border: '1px solid var(--sp-stroke)',
+                          border: `1px solid ${metricTab === t.id ? 'rgba(37, 99, 235, 0.42)' : 'var(--sp-stroke)'}`,
                         }}
                         onClick={() => setMetricTab(t.id)}
                       >
@@ -658,10 +684,11 @@ export function ProgressChartsPanel({
                         <button
                           key={rk}
                           type="button"
-                          className="rounded-full px-2.5 py-1 text-[10px] font-semibold tabular-nums"
+                          className="rounded-full px-3 py-1.5 text-[10px] font-semibold tabular-nums"
                           style={{
-                            background: rangeKey === rk ? 'rgba(59, 130, 246, 0.14)' : 'transparent',
+                            background: rangeKey === rk ? 'rgba(37, 99, 235, 0.16)' : 'transparent',
                             color: rangeKey === rk ? accent : 'var(--sp-muted)',
+                            border: `1px solid ${rangeKey === rk ? 'rgba(37, 99, 235, 0.35)' : 'transparent'}`,
                           }}
                           onClick={() => setRangeKey(rk)}
                         >
@@ -690,22 +717,27 @@ export function ProgressChartsPanel({
                       {es ? 'Historial' : 'History'} · {hist.length}{' '}
                       {es ? 'sesiones' : 'sessions'}
                     </div>
-                    <div className="flex max-h-[220px] flex-col gap-1 overflow-y-auto pr-1 sp-scroll-hide">
+                    <div className="flex max-h-[240px] flex-col gap-2 overflow-y-auto pr-1 sp-scroll-hide">
                       {hist.slice(0, 24).map((d, i) => {
                         const isRowPR = pr > 0 && Math.abs(d.kg - pr) < 0.05
+                        const prev = hist[i + 1]
+                        const rowPct = prev && prev.kg ? Math.round(((d.kg - prev.kg) / prev.kg) * 100) : null
                         return (
                           <div
                             key={`${ex.id}-h-${i}-${d.fecha}-${d.kg}`}
-                            className="flex items-center justify-between rounded-lg px-2 py-2 text-[11px] tabular-nums"
+                            className="grid min-h-[44px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl px-3 py-2 text-[11px] tabular-nums"
                             style={{
                               borderLeft: isRowPR ? '2px solid var(--sp-pr)' : '2px solid transparent',
-                              background: isRowPR ? 'rgba(245, 158, 11, 0.08)' : 'transparent',
+                              background: isRowPR ? 'rgba(245, 158, 11, 0.09)' : 'rgba(255,255,255,0.025)',
                               color: 'var(--sp-fg)',
                             }}
                           >
-                            <span style={{ color: 'var(--sp-muted)' }}>{d.fecha}</span>
-                            <span className="font-semibold">
+                            <span className="min-w-0 truncate" style={{ color: 'var(--sp-muted)' }}>{d.fecha}</span>
+                            <span className="font-semibold text-right">
                               {d.kg}kg × {d.reps}
+                            </span>
+                            <span className="min-w-[42px] text-right font-semibold" style={{ color: pctColor(rowPct) }}>
+                              {rowPct == null ? '—' : `${rowPct > 0 ? '+' : ''}${rowPct}%`}
                             </span>
                           </div>
                         )

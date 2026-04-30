@@ -11,6 +11,15 @@ import './routines-ui.css';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
+const dayUid = () => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch (e) {}
+  return 'day_' + uid();
+};
+
 function routineDayDisplayName(d, di, lang) {
   var raw = d.label != null ? String(d.label).trim() : '';
   if (!raw) return M(lang, 'Día', 'Day', 'Dia') + ' ' + (di + 1);
@@ -455,6 +464,33 @@ export function RoutineCard({
       });
     });
     setHasUnsaved(true);
+  }
+
+  function addEmptyDay() {
+    setRoutines(function (prev) {
+      return prev.map(function (rr) {
+        if (rr.id !== r.id) return rr;
+        var currentDays = Array.isArray(rr.days) ? rr.days : [];
+        var nextNum = currentDays.length + 1;
+        var dayName = M(lang, 'Día', 'Day', 'Dia') + ' ' + nextNum;
+        return Object.assign({}, rr, {
+          days: currentDays.concat([
+            {
+              id: dayUid(),
+              label: dayName,
+              name: dayName,
+              title: dayName,
+              warmup: [],
+              exercises: [],
+              notes: '',
+              config: {},
+            },
+          ]),
+        });
+      });
+    });
+    setHasUnsaved(true);
+    toast2(M(lang, 'Día agregado', 'Day added', 'Dia adicionado'));
   }
 
   const confirmDeleteRoutine = async function () {
@@ -941,7 +977,7 @@ export function RoutineCard({
 
       {!collapsed && (
         <div style={{ padding: `${S.gridGapTight}px ${S.cardPadding}px ${S.gridGap}px` }}>
-          {r.days.map((d, di) => {
+          {(Array.isArray(r.days) ? r.days : []).map((d, di) => {
             const enrichList = (list) =>
               (list || []).map((ex) => {
                 const lib = allEx.find((e) => e.id === ex.id);
@@ -977,8 +1013,8 @@ export function RoutineCard({
                   exercises: enrichList(d.exercises),
                 }}
                 onCopyDay={() => {
-                  if (r.days.length < 2) {
-                    toast2(M(lang, 'No hay otros días', 'No other days', 'Não há outros dias'));
+                  if (!Array.isArray(r.days) || !r.days[di]) {
+                    toast2(M(lang, 'No se pudo duplicar el día', 'Could not duplicate day', 'Não foi possível duplicar o dia'));
                     return;
                   }
                   setDupDayModal({ rId: r.id, dIdx: di, days: r.days, selected: [], sourceDay: d });
@@ -1069,6 +1105,31 @@ export function RoutineCard({
               />
             );
           })}
+          <button
+            type="button"
+            className="it-routine-btn it-routine-btn--ghost hov"
+            onClick={addEmptyDay}
+            style={{
+              width: '100%',
+              marginTop: S.gridGapTight,
+              border: `1px dashed ${border}`,
+              borderRadius: 10,
+              padding: '12px 14px',
+              background: darkMode ? 'rgba(37,99,235,0.08)' : 'rgba(37,99,235,0.05)',
+              color: '#2563EB',
+              fontFamily: 'inherit',
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <Ic name="plus" size={16} color="#2563EB" />
+            {M(lang, '+ Agregar día', '+ Add day', '+ Adicionar dia')}
+          </button>
         </div>
       )}
 
