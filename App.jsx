@@ -369,6 +369,10 @@ function getStoredEntrenadorId() {
   }
 }
 
+function isValidUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
 async function getActiveSupabaseSession() {
   if (!supabase || !supabase.auth || typeof supabase.auth.getSession !== "function") return null;
   try {
@@ -384,6 +388,16 @@ async function getActiveSupabaseSession() {
   }
 }
 
+function cleanRutinaWriteBody(data) {
+  var src = data || {};
+  return {
+    alumno_id: src.alumno_id || null,
+    entrenador_id: src.entrenador_id != null ? String(src.entrenador_id) : null,
+    nombre: src.nombre || "Rutina",
+    datos: src.datos || {},
+  };
+}
+
 const sbFetch = async (path, method="GET", body=null) => {
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
@@ -395,7 +409,7 @@ const sbFetch = async (path, method="GET", body=null) => {
     try {
       errText = await r.text();
     } catch (e) {}
-    console.error("[Supabase REST error]", {
+    console.error("[Supabase request error]", {
       path: path,
       method: method,
       status: r.status,
@@ -411,30 +425,31 @@ const sbFetch = async (path, method="GET", body=null) => {
 const sb = {
   getAlumnos: (entId) => sbFetch("alumnos?entrenador_id=eq."+entId+"&select=*"),
   createAlumno: (data) => sbFetch("alumnos", "POST", data),
-  getRutinas: (alumnoId) => sbFetch("rutinas?alumno_id=eq."+alumnoId+"&select=*"),
-  getRutinasByEntrenador: (entId) => sbFetch("rutinas?entrenador_id=eq."+encodeURIComponent(entId || getStoredEntrenadorId())+"&select=*"),
-  createRutina: (data) => sbFetch("rutinas", "POST", data),
-  updateRutina: (id, data) => sbFetch("rutinas?id=eq."+id, "PATCH", data),
-  /** DELETE debe distinguir fallo real: sbFetch devuelve null con !r.ok y no lanza. */
+  getRutinas: async (alumnoId) => {
+    const { data, error } = await supabase.from("rutinas").select("*").eq("alumno_id", alumnoId);
+    if (error) { console.error("[rutinas SELECT ERROR]", error); return null; }
+    return data || [];
+  },
+  getRutinasByEntrenador: async (entId) => {
+    const { data, error } = await supabase.from("rutinas").select("*").eq("entrenador_id", String(entId || getStoredEntrenadorId()));
+    if (error) { console.error("[rutinas SELECT ERROR]", error); return null; }
+    return data || [];
+  },
+  createRutina: async (data) => {
+    const body = cleanRutinaWriteBody(data);
+    const { data: created, error } = await supabase.from("rutinas").insert([body]).select();
+    if (error) { console.error("[rutinas INSERT ERROR]", error, { requestBody: body }); return null; }
+    return created || [];
+  },
+  updateRutina: async (id, data) => {
+    const body = cleanRutinaWriteBody(data);
+    const { data: updated, error } = await supabase.from("rutinas").update(body).eq("id", id).select();
+    if (error) { console.error("[rutinas UPDATE ERROR]", error, { requestBody: body, id: id }); return null; }
+    return updated || [];
+  },
   deleteRutina: async function (id) {
-    var sid = encodeURIComponent(String(id));
-    var activeSession = await getActiveSupabaseSession();
-    var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
-    var r = await fetch(SB_URL + "/rest/v1/rutinas?id=eq." + sid, {
-      method: "DELETE",
-      headers: {
-        apikey: SB_KEY,
-        Authorization: "Bearer " + accessToken,
-        "Content-Type": "application/json",
-      },
-    });
-    if (!r.ok) {
-      var errBody = "";
-      try {
-        errBody = await r.text();
-      } catch (e) {}
-      throw new Error(errBody || "HTTP " + r.status);
-    }
+    const { error } = await supabase.from("rutinas").delete().eq("id", id);
+    if (error) throw error;
   },
   getProgreso: (alumnoId) => sbFetch("progreso?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc"),
   addProgreso: (data) => sbFetch("progreso", "POST", data),
@@ -1699,7 +1714,10 @@ function GymApp() {
           const decoded = JSON.parse(atob(sharedParam));
           // Siempre intentar cargar desde Supabase primero (rutina más actualizada)
           if(decoded?.alumnoId) {
-            const ruts = await sbFetch("rutinas?alumno_id=eq."+decoded.alumnoId+"&select=*&order=created_at.desc&limit=1");
+            const rutsRaw = await sb.getRutinas(decoded.alumnoId);
+            const ruts = (rutsRaw || []).slice().sort(function (a, b) {
+              return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+            }).slice(0, 1);
             if(ruts && ruts[0] && ruts[0].datos) {
               setRoutines([{...ruts[0].datos, alumnoId: decoded.alumnoId, id: ruts[0].id}]);
               setSharedLoaded(true);
@@ -1783,7 +1801,10 @@ function GymApp() {
     if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
       (async () => {
         try {
-          const ruts = await sbFetch("rutinas?alumno_id=eq."+sessionData.alumnoId+"&select=*&order=created_at.desc&limit=1");
+          const rutsRaw = await sb.getRutinas(sessionData.alumnoId);
+          const ruts = (rutsRaw || []).slice().sort(function (a, b) {
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+          }).slice(0, 1);
           if(ruts && ruts[0] && ruts[0].datos) {
             const rSB = ruts[0];
             const rutLocal = {
@@ -2665,12 +2686,10 @@ function GymApp() {
           return;
         }
         var alumnoIdAssign = c.a && c.a.id ? String(c.a.id) : "";
-        var rutinaIdAssign = c.rutinaLocal && c.rutinaLocal.id ? String(c.rutinaLocal.id) : "";
-        var entrenadorIdAssign = (sessionData && sessionData.entrenadorId) || authSessionAssign.user?.id || (user && user.id) || getStoredEntrenadorId() || ENTRENADOR_ID;
-        if (!alumnoIdAssign || !rutinaIdAssign || !entrenadorIdAssign) {
+        var entrenadorIdAssign = authSessionAssign.user && authSessionAssign.user.id ? String(authSessionAssign.user.id) : "";
+        if (!alumnoIdAssign || !entrenadorIdAssign || !c.rutinaLocal) {
           console.error('[assignRut] datos invalidos', {
             alumno_id: alumnoIdAssign || null,
-            rutina_id: rutinaIdAssign || null,
             entrenador_id: entrenadorIdAssign || null,
             alumno: c.a,
             rutinaLocal: c.rutinaLocal,
@@ -2680,68 +2699,91 @@ function GymApp() {
           setCoachDialog({ t: 'none' });
           return;
         }
-        if (c.ex) {
-          try {
-            await sb.deleteRutina(c.ex.id);
-            var exidA = c.ex.id;
-            setRutinasSB(function (prev) {
-              return prev.filter(function (x) {
-                return String(x.id) !== String(exidA);
-              });
-            });
-            setRutinasSBEntrenador(function (prev) {
-              return prev.filter(function (x) {
-                return String(x.id) !== String(exidA);
-              });
-            });
-            try {
-              var fr2 = await sb.getRutinasByEntrenador();
-              if (Array.isArray(fr2)) setRutinasSBEntrenador(fr2);
-            } catch (e3) {}
-          } catch (e) {
-            console.error('[assignRut] error al quitar rutina anterior', e);
-            toast2(
-              msg('No se pudo quitar la rutina anterior.', 'Could not remove the previous routine.', 'Não foi possível remover a rotina anterior.')
-            );
-            setLoadingSB(false);
-            setCoachDialog({ t: 'none' });
-            return;
-          }
+        var nombreAssign = c.rutinaLocal?.nombre || c.rutinaLocal?.name || "Rutina";
+        var daysAssign = c.rutinaLocal?.datos?.days || c.rutinaLocal?.days || [];
+        if (!Array.isArray(daysAssign)) {
+          console.error('[assignRut] days no es array', { days: daysAssign, rutinaLocal: c.rutinaLocal });
+          toast2('Error: la rutina no tiene días válidos');
+          setLoadingSB(false);
+          setCoachDialog({ t: 'none' });
+          return;
         }
-        var nombreAlumnoAssign = c.a.nombre || c.a.email || c.rutinaLocal.alumno || '';
-        var payloadAssign = {
+        if (!isValidUuid(alumnoIdAssign)) {
+          console.error('[assignRut] alumno_id no es UUID valido', { alumno_id: alumnoIdAssign, alumno: c.a });
+          toast2('Error: el alumno no tiene un ID válido');
+          setLoadingSB(false);
+          setCoachDialog({ t: 'none' });
+          return;
+        }
+        if (!isValidUuid(entrenadorIdAssign)) {
+          console.error('[assignRut] entrenador_id no es UUID valido', { entrenador_id: entrenadorIdAssign, sessionUserId: authSessionAssign.user?.id });
+          toast2('Error: la sesión del entrenador no es válida');
+          setLoadingSB(false);
+          setCoachDialog({ t: 'none' });
+          return;
+        }
+        var body = {
           alumno_id: alumnoIdAssign,
           entrenador_id: entrenadorIdAssign,
-          nombre: c.rutinaLocal.name || c.rutinaLocal.nombre || 'Rutina',
+          nombre: nombreAssign,
           datos: {
-            days: sanitizeRoutineDaysForWrite(c.rutinaLocal.days || []),
-            alumno: nombreAlumnoAssign,
-            note: c.rutinaLocal.note || '',
+            days: sanitizeRoutineDaysForWrite(daysAssign),
+            alumno: {
+              id: c.a.id,
+              nombre: c.a.nombre || "",
+              email: c.a.email || "",
+            },
+            note: c.rutinaLocal.datos?.note || "",
           },
-          fecha_inicio: new Date().toLocaleDateString('es-AR'),
         };
         console.error("[assignRut DEBUG]", {
           session: authSessionAssign,
           alumnoId: alumnoIdAssign,
           entrenadorId: entrenadorIdAssign,
-          body: payloadAssign,
+          body: body,
         });
         var res = null;
         try {
-          res = await sb.createRutina(payloadAssign);
+          var insertResult = await supabase
+            .from("rutinas")
+            .insert([body])
+            .select()
+            .single();
+          if (insertResult.error) {
+            console.error("[assignRut INSERT ERROR FULL]", insertResult.error);
+            throw insertResult.error;
+          }
+          res = insertResult.data;
         } catch (eCreate) {
-          console.error('[assignRut] error al crear copia de rutina', { error: eCreate, payload: payloadAssign });
+          console.error('[assignRut] error al crear copia de rutina', { error: eCreate, body: body });
         }
-        if (res && res[0]) {
+        if (res) {
+          if (c.ex) {
+            try {
+              await sb.deleteRutina(c.ex.id);
+              var exidA2 = c.ex.id;
+              setRutinasSB(function (prev) {
+                return prev.filter(function (x) {
+                  return String(x.id) !== String(exidA2);
+                });
+              });
+              setRutinasSBEntrenador(function (prev) {
+                return prev.filter(function (x) {
+                  return String(x.id) !== String(exidA2);
+                });
+              });
+            } catch (eOldRutina) {
+              console.error('[assignRut] error al quitar rutina anterior despues del insert', eOldRutina);
+            }
+          }
           setRutinasSB(function (prev) {
-            return [].concat(prev, [res[0]]);
+            return [].concat(prev, [res]);
           });
           setRutinasSBEntrenador(function (prev) {
-            return [].concat(prev, [res[0]]);
+            return [].concat(prev, [res]);
           });
           toast2('Rutina asignada ✓');
         } else {
-          console.error('[assignRut] Supabase no devolvio rutina creada', { payload: payloadAssign, result: res });
           toast2('Error al asignar rutina');
         }
         setLoadingSB(false);
@@ -2836,24 +2878,30 @@ function GymApp() {
                   var authSignup = await supabase.auth.signUp({
                     email: loginEmailNorm,
                     password: loginPass,
+                    options: {
+                      data: { nombre: "Entrenador", role: "entrenador" },
+                    },
                   });
                   if (authSignup.error) {
                     console.error("[AUTH] signUp migracion fallo", authSignup.error);
-                    setLoginError("Tu usuario no existe en Supabase Auth. Crealo desde Authentication > Users o registralo desde la app.");
+                    setLoginError("No se pudo crear tu usuario en Supabase Auth. Revisá la consola para ver el error real.");
                     return;
                   }
                   if (authSignup.data && authSignup.data.session) {
                     authLogin = authSignup;
+                  } else if (authSignup.data && authSignup.data.user && !authSignup.data.session) {
+                    console.error("[AUTH] Usuario creado sin sesión activa; Supabase requiere confirmar email", authSignup.data.user);
+                    setLoginError("El usuario fue creado, pero Supabase requiere confirmar email. Desactivá Confirm email en Supabase Auth o confirmá el usuario manualmente.");
+                    return;
                   } else {
-                    authLogin = await supabase.auth.signInWithPassword({
-                      email: loginEmailNorm,
-                      password: loginPass,
-                    });
+                    console.error("[AUTH] signUp no devolvio usuario ni sesion", authSignup);
+                    setLoginError("No se pudo crear una sesión de Supabase Auth. Revisá la consola para ver el error real.");
+                    return;
                   }
                 }
                 if (!authLogin.data || !authLogin.data.session || !authLogin.data.session.access_token || !authLogin.data.user || !authLogin.data.user.id) {
                   console.error("[AUTH] No hay sesión activa", authLogin.error || authLogin);
-                  setLoginError("Tu usuario no existe en Supabase Auth. Crealo desde Authentication > Users o registralo desde la app.");
+                  setLoginError("No se pudo iniciar sesión con Supabase Auth. Revisá la consola para ver el error real.");
                   return;
                 }
                 clearIronTrackStorageForNewLogin();
@@ -2868,7 +2916,7 @@ function GymApp() {
                 try {
                   var upCoach = await supabase
                     .from('entrenadores')
-                    .upsert({ id: String(authLogin.data.user.id), email: authLogin.data.user.email || loginEmailNorm }, { onConflict: 'id' });
+                    .upsert({ id: String(authLogin.data.user.id), email: authLogin.data.user.email || loginEmailNorm, nombre: demoName }, { onConflict: 'id' });
                   if (upCoach.error) console.error("[AUTH] entrenadores upsert migracion fallo", upCoach.error);
                 } catch (eUpCoach) {
                   console.error("[AUTH] entrenadores upsert migracion exception", eUpCoach);
@@ -2883,7 +2931,8 @@ function GymApp() {
               const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmail)+"&password=eq."+encodeURIComponent(loginPass)+"&select=*");
               if(res&&res.length>0){
                 const alumno=res[0];
-                const ruts=await sbFetch("rutinas?alumno_id=eq."+alumno.id+"&select=*&order=created_at.desc&limit=1");
+                const rutsRaw=await sb.getRutinas(alumno.id);
+                const ruts=(rutsRaw || []).slice().sort(function(a,b){return new Date(b.created_at||0)-new Date(a.created_at||0);}).slice(0,1);
                 clearIronTrackStorageForNewLogin();
                 const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id,entrenadorId:alumno.entrenador_id};
                 localStorage.setItem("it_session",JSON.stringify(s));
@@ -4979,7 +5028,16 @@ function GymApp() {
                         return;
                       }
                       const ex0 = rutinasSB.find((r) => r.alumno_id === a.id) || rutinasSBEntrenador.find((r) => r.alumno_id === a.id);
-                      const rutinaNombre = rutinaLocal.name || 'Rutina';
+                      const rutinaParaAsignar = rutinaLocal.datos
+                        ? rutinaLocal
+                        : {
+                            nombre: rutinaLocal.nombre || rutinaLocal.name || 'Rutina',
+                            datos: {
+                              days: rutinaLocal.days || [],
+                              note: rutinaLocal.note || '',
+                            },
+                          };
+                      const rutinaNombre = rutinaParaAsignar.nombre || 'Rutina';
                       var assignMsg0 = ex0
                         ? es
                           ? 'Ya tiene: ' + ex0.nombre + '\n¿Reemplazar por: ' + rutinaNombre + '?'
@@ -4987,7 +5045,7 @@ function GymApp() {
                         : es
                           ? '¿Asignar rutina: ' + rutinaNombre + ' a ' + a.nombre + '?'
                           : 'Assign routine: ' + rutinaNombre + ' to ' + a.nombre + '?';
-                      setCoachDialog({ t: 'assignRut', a: a, ex: ex0 || null, rutinaLocal: rutinaLocal, assignMsg: assignMsg0 });
+                      setCoachDialog({ t: 'assignRut', a: a, ex: ex0 || null, rutinaLocal: rutinaParaAsignar, assignMsg: assignMsg0 });
                     }}>{(rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id))?(<><Ic name="refresh-cw" size={16}/>{msg("Cambiar rutina", "Change routine")}</>):(<><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</>)}</button>
                     {/* ── SUGERENCIAS ── */}
                     {(()=>{
