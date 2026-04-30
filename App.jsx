@@ -5892,9 +5892,9 @@ function GymApp() {
       )}
 
                   {/* ── Modal duplicar día ── */}
-      {dupDayModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setDupDayModal(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,border:"1px solid "+border}} onClick={e=>e.stopPropagation()}>
+      {dupDayModal&&typeof document!=="undefined"&&createPortal(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={()=>setDupDayModal(null)}>
+          <div style={{background:darkMode?"#0d1424":bgCard,borderRadius:18,padding:20,width:"90%",maxWidth:480,border:"1px solid "+border,boxShadow:"0 24px 80px rgba(0,0,0,.45)",transform:"scale(1)",opacity:1,transition:"opacity .15s ease, transform .15s ease"}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:4}}>
               {msg("Duplicar", "Duplicate")} {dupDayModal.days[dupDayModal.dIdx]?.label||("Día "+(dupDayModal.dIdx+1))}
             </div>
@@ -5939,24 +5939,43 @@ function GymApp() {
             <div style={{display:"flex",gap:8}}>
               <button onClick={()=>setDupDayModal(null)} style={{flex:1,padding:12,background:bgSub,color:textMuted,border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("CANCELAR", "CANCEL")}</button>
               <button onClick={function(){
-                if(dupDayModal.selected.length===0){toast2(msg("Seleccioná al menos un día", "Select at least one day"));return;}
                 var src=dupDayModal.sourceDay;
+                var originalDays = Array.isArray(dupDayModal.days) ? dupDayModal.days : [];
+                if(!src || !Array.isArray(originalDays) || !originalDays[dupDayModal.dIdx]){toast2(msg("No se pudo duplicar el día", "Could not duplicate day"));return;}
+                if(!Array.isArray(src.warmup) && !Array.isArray(src.exercises)){toast2(msg("No se pudo duplicar el día", "Could not duplicate day"));return;}
+                var appendNewDay = dupDayModal.selected.length===0 && originalDays.length===1;
+                if(dupDayModal.selected.length===0 && !appendNewDay){toast2(msg("Seleccioná al menos un día", "Select at least one day"));return;}
                 var sel=dupDayModal.selected;
+                var cloneDay = function(base, label){
+                  try {
+                    var copy = JSON.parse(JSON.stringify(base || {}));
+                    copy.id = uid();
+                    copy.label = label;
+                    copy.warmup = Array.isArray(copy.warmup) ? copy.warmup : [];
+                    copy.exercises = Array.isArray(copy.exercises) ? copy.exercises : [];
+                    return copy;
+                  } catch(e) {
+                    return {id:uid(),label:label,warmup:(base?.warmup||[]).map(function(x){return {...x};}),exercises:(base?.exercises||[]).map(function(x){return {...x};}),note:base?.note||""};
+                  }
+                };
                 setRoutines(function(p){return p.map(function(rr){
                   if(rr.id!==dupDayModal.rId) return rr;
-                  return {...rr,days:rr.days.map(function(dd,ddi){
+                  var rrDays = Array.isArray(rr.days) ? rr.days : [];
+                  if(appendNewDay) return {...rr,days:rrDays.concat([cloneDay(src, "Día "+(rrDays.length+1))])};
+                  return {...rr,days:rrDays.map(function(dd,ddi){
                     if(sel.indexOf(ddi)===-1) return dd;
-                    return {...dd,warmup:(src.warmup||[]).map(function(e){return {...e}}),exercises:(src.exercises||[]).map(function(e){return {...e}})};
+                    return {...cloneDay(src, dd?.label||("Día "+(ddi+1)))};
                   })};
                 })});
-                toast2((msg("Duplicado a ", "Duplicated to "))+sel.map(function(i){return dupDayModal.days[i]?.label||("Día "+(i+1))}).join(", ")+" ✓");
+                toast2(appendNewDay ? msg("Día duplicado ✓", "Day duplicated ✓") : ((msg("Duplicado a ", "Duplicated to "))+sel.map(function(i){return dupDayModal.days[i]?.label||("Día "+(i+1))}).join(", ")+" ✓"));
                 setDupDayModal(null);
-              }} style={{flex:1,padding:12,background:dupDayModal.selected.length>0?"#2563EB":"#2D4057",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
+              }} style={{flex:1,padding:12,background:(dupDayModal.selected.length>0 || (Array.isArray(dupDayModal.days)&&dupDayModal.days.length===1))?"#2563EB":"#2D4057",color:"#fff",border:"none",borderRadius:8,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
                 {msg("DUPLICAR", "DUPLICATE")} {dupDayModal.selected.length>0&&("("+dupDayModal.selected.length+")")}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
             {/* ── Modal chat entrenador ── */}
       {chatModal&&(
