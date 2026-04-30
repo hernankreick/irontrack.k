@@ -665,28 +665,78 @@ export default function CoachDashboard({
     else if (action === "review" && typeof onRevisarAlumnos === "function") onRevisarAlumnos();
   }
 
+  var diagnosticoPrincipal = dashboardInterpretacion;
+  var impactoEstimado =
+    faltanObjetivo > 0
+      ? M(
+          lang,
+          faltanObjetivo + " sesiones para llegar al objetivo semanal",
+          faltanObjetivo + " sessions to reach the weekly target",
+          faltanObjetivo + " sessÃµes para chegar ao objetivo semanal"
+        )
+      : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcanÃ§ado");
+  var accionRecomendada =
+    sinRutinaCount > 0
+      ? M(lang, "Asignar rutinas pendientes", "Assign pending routines", "Atribuir rotinas pendentes")
+      : inactivosCount > 0
+        ? M(lang, "Enviar mensaje a alumnos inactivos", "Message inactive athletes", "Enviar mensagem a alunos inativos")
+        : bajaActividadCount > 0
+          ? M(lang, "Revisar alumnos con baja actividad", "Review low-activity athletes", "Revisar alunos com baixa atividade")
+          : M(lang, "Revisar progreso del equipo", "Review team progress", "Revisar progresso da equipe");
+  var accionPrincipalHandler =
+    sinRutinaCount > 0
+      ? onCrearRutina
+      : inactivosCount > 0
+        ? onEnviarMensaje
+        : onRevisarAlumnos;
+  var dashBg = darkMode ? "#0A0F1A" : C.bg;
+  var dashCard = darkMode ? "#0D1424" : C.card;
+  var dashCardSoft = darkMode ? "#101A2D" : C.cardDark;
+  var dashBorder = darkMode ? "rgba(148,163,184,0.16)" : C.brd;
+  var dashMuted = darkMode ? "#94A3B8" : C.t2;
+
   return (
     <>
       <style>{`
-        .cd-quick-card {
-          --cd-q-sh: 0 6px 28px rgba(0,0,0,0.4);
-          --cd-q-sh-h: 0 16px 40px rgba(0,0,0,0.45);
-          transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+        .cd-card,
+        .cd-quick-card,
+        .cd-attention-block,
+        .cd-row {
+          transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
           transform: translateY(0);
         }
-        .cd-quick-card:hover {
-          transform: translateY(-5px);
-          box-shadow: var(--cd-q-sh-h) !important;
-          border-color: ${darkMode ? "rgba(255,255,255,0.16)" : "rgba(37,99,235,0.28)"} !important;
+        .cd-card {
+          animation: cdIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
-        .cd-quick-card:focus-visible {
+        .cd-card:hover,
+        .cd-quick-card:hover {
+          transform: translateY(-2px);
+          box-shadow: ${darkMode ? "0 18px 42px rgba(0,0,0,0.26)" : "0 16px 34px rgba(15,23,42,0.08)"} !important;
+          border-color: ${darkMode ? "rgba(148,163,184,0.24)" : "rgba(37,99,235,0.22)"} !important;
+        }
+        .cd-attention-block:hover,
+        .cd-row:hover {
+          transform: translateY(-2px);
+          border-color: ${darkMode ? "rgba(148,163,184,0.22)" : "rgba(37,99,235,0.18)"} !important;
+        }
+        .cd-btn {
+          transition: transform 0.16s ease, background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+        }
+        .cd-btn:active {
+          transform: scale(0.97);
+        }
+        .cd-progress-fill {
+          transition: width 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes cdIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .cd-quick-card:focus-visible,
+        .cd-btn:focus-visible {
           outline: 2px solid rgba(59,130,246,0.7);
           outline-offset: 2px;
         }
-        .cd-quick-card .cd-quick-cta { transition: color 0.2s ease; }
-        .cd-quick-card:hover .cd-quick-cta { color: ${darkMode ? "rgba(255,255,255,0.95)" : "rgba(37,99,235,0.95)"} !important; }
-        .cd-quick-card .cd-quick-cta svg { transition: transform 0.2s ease; }
-        .cd-quick-card:hover .cd-quick-cta svg { transform: translateX(3px); }
       `}</style>
       <div
         style={{
@@ -796,20 +846,23 @@ export default function CoachDashboard({
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: S.pageGap,
+            gap: isMobile ? 16 : 22,
             padding: S.pagePadding,
+            background: dashBg,
           }}
         >
           <div
+            className="cd-card"
             style={{
-              background: C.card,
-              border: `1px solid ${C.brd}`,
-              borderRadius: 12,
-              padding: isMobile ? 14 : "18px 22px",
+              background: dashCard,
+              border: `1px solid ${dashBorder}`,
+              borderRadius: 16,
+              padding: isMobile ? 14 : 18,
               boxSizing: "border-box",
+              boxShadow: darkMode ? "0 14px 40px rgba(0,0,0,0.18)" : "0 12px 32px rgba(15,23,42,0.06)",
             }}
           >
-            <div style={{ ...T.sectionEyebrow, color: C.t2, marginBottom: 14 }}>
+            <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 14 }}>
               {M(lang, "ATENCIÓN HOY", "TODAY'S ATTENTION", "ATENÇÃO HOJE")}
             </div>
             <div
@@ -826,6 +879,8 @@ export default function CoachDashboard({
                   count: sinRutinaCount,
                   color: C.red,
                   bg: C.redDim,
+                  cta: M(lang, "Asignar ahora", "Assign now", "Atribuir agora"),
+                  onClick: onCrearRutina,
                   title: M(lang, "alumnos sin rutina", "athletes without routine", "alunos sem rotina"),
                   sub: M(lang, "Asignales una rutina para que comiencen", "Assign routines so they can start", "Atribua rotinas para começarem"),
                 },
@@ -835,6 +890,8 @@ export default function CoachDashboard({
                   count: inactivosCount,
                   color: C.yel,
                   bg: C.yelDim,
+                  cta: M(lang, "Enviar mensaje", "Send message", "Enviar mensagem"),
+                  onClick: onEnviarMensaje,
                   title: M(lang, "alumnos inactivos", "inactive athletes", "alunos inativos"),
                   sub: M(lang, "Hace más de 21 días sin actividad", "No activity in over 21 days", "Mais de 21 dias sem atividade"),
                 },
@@ -844,19 +901,36 @@ export default function CoachDashboard({
                   count: bajaActividadCount,
                   color: C.yel,
                   bg: C.yelDim,
+                  cta: M(lang, "Ver y revisar", "View and review", "Ver e revisar"),
+                  onClick: onRevisarAlumnos,
                   title: M(lang, "alumnos con baja actividad", "athletes with low activity", "alunos com baixa atividade"),
                   sub: M(lang, "Menos del 30% de cumplimiento", "Under 30% compliance", "Menos de 30% de cumprimento"),
                 },
               ].map(function (item) {
                 var Icon = item.Icon;
                 return (
-                  <div key={item.key} style={{ display: "flex", gap: 12, alignItems: "center", minWidth: 0 }}>
+                  <div
+                    key={item.key}
+                    className="cd-attention-block"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "44px minmax(0, 1fr)",
+                      gap: 12,
+                      alignItems: "center",
+                      minWidth: 0,
+                      padding: 12,
+                      borderRadius: 13,
+                      border: "1px solid " + dashBorder,
+                      background: dashCardSoft,
+                    }}
+                  >
                     <div
                       style={{
                         width: 44,
                         height: 44,
                         borderRadius: 12,
-                        background: item.bg,
+                        background: "transparent",
+                        border: "1px solid " + dashBorder,
                         color: item.color,
                         display: "flex",
                         alignItems: "center",
@@ -873,6 +947,27 @@ export default function CoachDashboard({
                       <div style={{ ...T.body, color: C.t2, marginTop: 3 }}>
                         {item.sub}
                       </div>
+                      <button
+                        type="button"
+                        className="cd-btn"
+                        style={{
+                          marginTop: 10,
+                          height: 32,
+                          padding: "0 12px",
+                          borderRadius: 8,
+                          border: "1px solid " + dashBorder,
+                          background: "transparent",
+                          color: C.blue,
+                          fontSize: 12,
+                          fontWeight: 800,
+                          cursor: typeof item.onClick === "function" ? "pointer" : "default",
+                        }}
+                        onClick={function () {
+                          if (typeof item.onClick === "function") item.onClick();
+                        }}
+                      >
+                        {item.cta}
+                      </button>
                     </div>
                   </div>
                 );
@@ -883,11 +978,65 @@ export default function CoachDashboard({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
+                gridTemplateColumns: "1fr",
                 gap: 10,
                 alignItems: "stretch",
               }}
             >
+              <div
+                className="cd-card"
+                style={{
+                  background: dashCard,
+                  border: `1px solid ${dashBorder}`,
+                  borderRadius: 16,
+                  padding: 20,
+                  minWidth: 0,
+                  boxSizing: "border-box",
+                  alignSelf: "stretch",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 14 }}>
+                  {M(lang, "RECOMENDACIÃ“N PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÃ‡ÃƒO PRINCIPAL")}
+                </div>
+                <div style={{ fontSize: 24, lineHeight: 1.12, fontWeight: 850, color: C.t, letterSpacing: -0.2 }}>
+                  {accionRecomendada}
+                </div>
+                <div style={{ ...T.body, color: dashMuted, marginTop: 10, lineHeight: 1.5 }}>
+                  {diagnosticoPrincipal}
+                </div>
+                <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid " + dashBorder }}>
+                  <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 8 }}>
+                    {M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO")}
+                  </div>
+                  <div style={{ ...T.bodySemibold, color: C.t, lineHeight: 1.45 }}>
+                    {impactoEstimado}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="cd-btn"
+                  style={{
+                    width: "100%",
+                    minHeight: 42,
+                    marginTop: "auto",
+                    border: "none",
+                    borderRadius: 10,
+                    background: C.blue,
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 850,
+                    cursor: "pointer",
+                  }}
+                  onClick={function () {
+                    if (typeof accionPrincipalHandler === "function") accionPrincipalHandler();
+                  }}
+                >
+                  {accionRecomendada}
+                </button>
+              </div>
+
               <div
                 style={{
                   background: C.mobileStatBg,
@@ -992,17 +1141,18 @@ export default function CoachDashboard({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 280px)",
+                gridTemplateColumns: "minmax(0, 2fr) minmax(240px, 1fr) minmax(240px, 1fr)",
                 gap: S.gridGap,
                 alignItems: "stretch",
               }}
             >
               <div
+                className="cd-card"
                 style={{
-                  background: C.card,
-                  border: `1px solid ${C.brd}`,
-                  borderRadius: 12,
-                  padding: S.cardPadding,
+                  background: dashCard,
+                  border: `1px solid ${dashBorder}`,
+                  borderRadius: 16,
+                  padding: 22,
                   minWidth: 0,
                   boxSizing: "border-box",
                 }}
@@ -1013,8 +1163,13 @@ export default function CoachDashboard({
                     {M(lang, "Cumplimiento semanal", "Weekly completion", "Cumprimento semanal")}
                   </span>
                 </div>
-                <div style={{ ...T.numberHero, color: C.t }}>
-                  {sesionesCompletadas} / {sesionesTotales}
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 18, flexWrap: "wrap" }}>
+                  <div style={{ ...T.numberHero, color: C.t }}>
+                    {sesionesCompletadas} / {sesionesTotales}
+                  </div>
+                  <div style={{ fontSize: 34, lineHeight: 1, fontWeight: 850, color: C.t }}>
+                    {pctSemana}%
+                  </div>
                 </div>
                 <div style={{ ...T.subtitle, color: C.t2, marginTop: 6 }}>
                   {M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
@@ -1023,8 +1178,8 @@ export default function CoachDashboard({
                   style={{
                     marginTop: S.blockGap,
                     display: "inline-block",
-                    background: C.greenDim,
-                    color: C.green,
+                    background: deltaSemana >= 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+                    color: deltaSemana >= 0 ? C.green : C.red,
                     borderRadius: 99,
                     padding: "5px 12px",
                     ...T.bodySemibold,
@@ -1041,13 +1196,16 @@ export default function CoachDashboard({
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{height:10,background:C.brd,borderRadius:999,overflow:"hidden",marginBottom:14}}>
-                      <div style={{width:pctSemana+"%",height:"100%",background:C.blue,borderRadius:999}} />
+                    <div style={{height:10,background:darkMode ? "rgba(148,163,184,0.14)" : C.brd,borderRadius:999,overflow:"hidden",marginBottom:14}}>
+                      <div className="cd-progress-fill" style={{width:pctSemana+"%",height:"100%",background:C.blue,borderRadius:999}} />
                     </div>
-                    <div style={{background:C.cardDark,border:"1px solid "+C.brd,borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+                    <div style={{background:dashCardSoft,border:"1px solid "+dashBorder,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
+                      <div style={{...T.sectionEyebrow,color:dashMuted,marginBottom:8,letterSpacing:1.4}}>
+                        {M(lang, "Insight del dÃ­a", "Today's insight", "Insight do dia")}
+                      </div>
                       <div style={{display:"flex",alignItems:"center",gap:8,...T.bodySemibold,color:pctSemana >= objetivoSemanalPct ? C.green : C.yel}}>
-                        <Star size={16} color="currentColor" fill="currentColor" strokeWidth={1.5}/>
-                        {dashboardInterpretacion}
+                        <Star size={16} color={C.blue} strokeWidth={2}/>
+                        {diagnosticoPrincipal}
                       </div>
                       <div style={{...T.body,color:C.t2,marginTop:6}}>
                         {faltanObjetivo > 0
@@ -1056,11 +1214,11 @@ export default function CoachDashboard({
                       </div>
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                      <button type="button" onClick={onRevisarAlumnos} style={{background:C.blue,color:"#fff",border:"none",borderRadius:7,padding:"9px 10px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                        {M(lang, "Ver baja actividad", "Low activity", "Baixa atividade")}
+                      <button className="cd-btn" type="button" onClick={accionPrincipalHandler} style={{background:C.blue,color:"#fff",border:"none",borderRadius:8,padding:"10px 12px",fontSize:13,fontWeight:800,cursor:"pointer"}}>
+                        {M(lang, "AcciÃ³n recomendada", "Recommended action", "AÃ§Ã£o recomendada")}
                       </button>
-                      <button type="button" onClick={onCrearRutina} style={{background:"transparent",color:C.t,border:"1px solid "+C.brd,borderRadius:7,padding:"9px 10px",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-                        {M(lang, "Asignar rutinas", "Assign routines", "Atribuir rotinas")}
+                      <button className="cd-btn" type="button" onClick={onRevisarAlumnos} style={{background:"transparent",color:C.t,border:"1px solid "+dashBorder,borderRadius:8,padding:"10px 12px",fontSize:13,fontWeight:800,cursor:"pointer"}}>
+                        {M(lang, "Ver equipo", "View team", "Ver equipe")}
                       </button>
                     </div>
                   </div>
@@ -1099,11 +1257,66 @@ export default function CoachDashboard({
               </div>
 
               <div
+                className="cd-card"
                 style={{
-                  background: C.card,
-                  border: `1px solid ${C.brd}`,
-                  borderRadius: 12,
-                  padding: S.cardPadding,
+                  background: dashCard,
+                  border: `1px solid ${dashBorder}`,
+                  borderRadius: 16,
+                  padding: 20,
+                  minWidth: 0,
+                  boxSizing: "border-box",
+                  alignSelf: "stretch",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 14 }}>
+                  {M(lang, "RECOMENDACIÃ“N PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÃ‡ÃƒO PRINCIPAL")}
+                </div>
+                <div style={{ fontSize: 24, lineHeight: 1.12, fontWeight: 850, color: C.t, letterSpacing: -0.2 }}>
+                  {accionRecomendada}
+                </div>
+                <div style={{ ...T.body, color: dashMuted, marginTop: 10, lineHeight: 1.5 }}>
+                  {diagnosticoPrincipal}
+                </div>
+                <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid " + dashBorder }}>
+                  <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 8 }}>
+                    {M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO")}
+                  </div>
+                  <div style={{ ...T.bodySemibold, color: C.t, lineHeight: 1.45 }}>
+                    {impactoEstimado}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="cd-btn"
+                  style={{
+                    width: "100%",
+                    minHeight: 42,
+                    marginTop: "auto",
+                    border: "none",
+                    borderRadius: 10,
+                    background: C.blue,
+                    color: "#fff",
+                    fontSize: 14,
+                    fontWeight: 850,
+                    cursor: "pointer",
+                  }}
+                  onClick={function () {
+                    if (typeof accionPrincipalHandler === "function") accionPrincipalHandler();
+                  }}
+                >
+                  {accionRecomendada}
+                </button>
+              </div>
+
+              <div
+                className="cd-card"
+                style={{
+                  background: dashCard,
+                  border: `1px solid ${dashBorder}`,
+                  borderRadius: 16,
+                  padding: 20,
                   minWidth: 0,
                   boxSizing: "border-box",
                   alignSelf: "stretch",
@@ -1360,7 +1573,7 @@ export default function CoachDashboard({
             <div
               style={{
                 ...T.sectionEyebrow,
-                color: C.t2,
+                color: dashMuted,
                 marginBottom: S.blockGap,
               }}
             >
@@ -1395,9 +1608,9 @@ export default function CoachDashboard({
                       borderRadius: 14,
                       cursor: "pointer",
                       boxSizing: "border-box",
-                      background: C.card,
-                      border: "1px solid " + C.brd,
-                      boxShadow: "0 10px 28px rgba(0,0,0,0.16)",
+                      background: dashCard,
+                      border: "1px solid " + dashBorder,
+                      boxShadow: "none",
                     }}
                     onClick={function () {
                       runQuick(item.action);
@@ -1432,12 +1645,12 @@ export default function CoachDashboard({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        background: item.action === "routine" ? C.blueDim : item.action === "review" ? C.greenDim : C.cardDark,
-                        border: "1px solid " + (item.action === "routine" ? C.blue : item.action === "review" ? C.green : C.brd),
+                        background: dashCardSoft,
+                        border: "1px solid " + dashBorder,
                         boxShadow: "none",
                       }}
                     >
-                      <Qi size={24} color={item.action === "review" ? C.green : C.blue} strokeWidth={2.1} />
+                      <Qi size={24} color={C.blue} strokeWidth={2.1} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p
@@ -1494,10 +1707,11 @@ export default function CoachDashboard({
           </div>
 
           <div
+            className="cd-card"
             style={{
-              background: C.card,
-              border: `1px solid ${C.brd}`,
-              borderRadius: 12,
+              background: dashCard,
+              border: `1px solid ${dashBorder}`,
+              borderRadius: 16,
               padding: S.cardPadding,
             }}
           >
@@ -1672,7 +1886,7 @@ export default function CoachDashboard({
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 165px 132px 180px",
+                    gridTemplateColumns: "minmax(180px,1.2fr) 150px 150px 150px 230px",
                     gap: 10,
                     padding: "10px 12px 8px",
                     boxSizing: "border-box",
@@ -1700,6 +1914,15 @@ export default function CoachDashboard({
                   >
                     {M(lang, "ESTADO", "STATUS", "ESTADO")}
                   </div>
+                  <div
+                    style={{
+                      ...T.tableHeader,
+                      color: C.t2,
+                      letterSpacing: 0.08,
+                    }}
+                  >
+                    {M(lang, "ACCIÃ“N", "ACTION", "AÃ‡ÃƒO")}
+                  </div>
                 </div>
                 {coachActiveRows.map(function (row, idx) {
                   var col = pctColor(row.pct);
@@ -1709,12 +1932,12 @@ export default function CoachDashboard({
                       key={String(row.id)}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 165px 132px 180px",
+                        gridTemplateColumns: "minmax(180px,1.2fr) 150px 150px 150px 230px",
                         gap: 10,
                         alignItems: "center",
                         padding: NAV_ITEM_PAD,
                         boxSizing: "border-box",
-                        borderBottom: idx < coachActiveRows.length - 1 ? "1px solid " + C.rowDivider : "none",
+                        borderBottom: idx < coachActiveRows.length - 1 ? "1px solid " + dashBorder : "none",
                         cursor: typeof onVerPerfil === "function" ? "pointer" : "default",
                       }}
                       onClick={function () {
@@ -1778,7 +2001,7 @@ export default function CoachDashboard({
                       <div style={{ ...T.subtitle, color: sesionColor(row.ult, lang, C.t2) }}>
                         {row.ult}
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                         <span
                           style={{
                             display: "inline-flex",
@@ -1798,28 +2021,39 @@ export default function CoachDashboard({
                         >
                           {status.label}
                         </span>
-                        <button
-                          type="button"
-                          style={{
-                            height: 30,
-                            padding: "0 10px",
-                            borderRadius: 8,
-                            border: "1px solid " + (status.primary ? C.blue : C.brd),
-                            background: status.primary ? C.blueDim : "transparent",
-                            color: status.primary ? C.blue : C.t,
-                            fontSize: 12,
-                            fontWeight: 800,
-                            cursor: "pointer",
-                            whiteSpace: "nowrap",
-                          }}
-                          onClick={function (ev) {
-                            ev.stopPropagation();
-                            if (status.primary && typeof onRevisar === "function") onRevisar(row.id);
-                            else if (typeof onVerPerfil === "function") onVerPerfil(row.id);
-                          }}
-                        >
-                          {status.action}
-                        </button>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                        {[
+                          { key: "assign", label: M(lang, "Asignar", "Assign", "Atribuir"), onClick: onRevisar, primary: status.primary },
+                          { key: "profile", label: M(lang, "Perfil", "Profile", "Perfil"), onClick: onVerPerfil },
+                          { key: "message", label: M(lang, "Mensaje", "Message", "Mensagem"), onClick: onAbrirChatAlumno },
+                        ].map(function (action) {
+                          return (
+                            <button
+                              key={action.key}
+                              type="button"
+                              className="cd-btn"
+                              style={{
+                                height: 30,
+                                padding: "0 8px",
+                                borderRadius: 8,
+                                border: "1px solid " + (action.primary ? C.blue : dashBorder),
+                                background: action.primary ? C.blue : "transparent",
+                                color: action.primary ? "#fff" : C.t,
+                                fontSize: 11,
+                                fontWeight: 800,
+                                cursor: typeof action.onClick === "function" ? "pointer" : "default",
+                                whiteSpace: "nowrap",
+                              }}
+                              onClick={function (ev) {
+                                ev.stopPropagation();
+                                if (typeof action.onClick === "function") action.onClick(row.id);
+                              }}
+                            >
+                              {action.label}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   );
