@@ -369,8 +369,25 @@ function getStoredEntrenadorId() {
   }
 }
 
+async function getActiveSupabaseSession() {
+  if (!supabase || !supabase.auth || typeof supabase.auth.getSession !== "function") return null;
+  try {
+    var result = await supabase.auth.getSession();
+    if (result && result.error) {
+      console.error("[AUTH] getSession error", result.error);
+      return null;
+    }
+    return result && result.data ? result.data.session : null;
+  } catch (e) {
+    console.error("[AUTH] getSession exception", e);
+    return null;
+  }
+}
+
 const sbFetch = async (path, method="GET", body=null) => {
-  const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+SB_KEY, "Content-Type": "application/json", "Prefer": "return=representation" } };
+  var activeSession = await getActiveSupabaseSession();
+  var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
+  const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json", "Prefer": "return=representation" } };
   if(body) opts.body = JSON.stringify(body);
   const r = await fetch(SB_URL+"/rest/v1/"+path, opts);
   if(!r.ok) {
@@ -401,11 +418,13 @@ const sb = {
   /** DELETE debe distinguir fallo real: sbFetch devuelve null con !r.ok y no lanza. */
   deleteRutina: async function (id) {
     var sid = encodeURIComponent(String(id));
+    var activeSession = await getActiveSupabaseSession();
+    var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
     var r = await fetch(SB_URL + "/rest/v1/rutinas?id=eq." + sid, {
       method: "DELETE",
       headers: {
         apikey: SB_KEY,
-        Authorization: "Bearer " + SB_KEY,
+        Authorization: "Bearer " + accessToken,
         "Content-Type": "application/json",
       },
     });
@@ -430,11 +449,13 @@ const sb = {
   },
   deleteAlumno: async function (id) {
     var sid = encodeURIComponent(String(id));
+    var activeSession = await getActiveSupabaseSession();
+    var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
     var r = await fetch(SB_URL + "/rest/v1/alumnos?id=eq." + sid, {
       method: "DELETE",
       headers: {
         apikey: SB_KEY,
-        Authorization: "Bearer " + SB_KEY,
+        Authorization: "Bearer " + accessToken,
         "Content-Type": "application/json",
       },
     });
@@ -453,11 +474,13 @@ const sb = {
   marcarMensajesLeidos: async (alumnoId, esEntrenador) => {
   const deQuien = esEntrenador ? "false" : "true";
   const url = "mensajes?alumno_id=eq."+alumnoId+"&de_entrenador=eq."+deQuien+"&leido=eq.false";
+  const activeSession = await getActiveSupabaseSession();
+  const accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
   const r = await fetch(SB_URL+"/rest/v1/"+url, {
     method: "PATCH",
     headers: {
       "apikey": SB_KEY,
-      "Authorization": "Bearer "+SB_KEY,
+      "Authorization": "Bearer "+accessToken,
       "Content-Type": "application/json",
       "Prefer": "return=minimal"
     },
@@ -1496,13 +1519,15 @@ function GymApp() {
         });
     }
 
-    supabase.auth.getUser().then(function (result) {
+    supabase.auth.getSession().then(function (sessionResult) {
       if (cancelled) return;
-      if (result.error) {
-        console.error('[supabase.auth.getUser]', result.error);
+      if (sessionResult.error) {
+        console.error('[supabase.auth.getSession]', sessionResult.error);
         return;
       }
-      if (result.data && result.data.user) upsertEntrenador(result.data.user);
+      var session = sessionResult.data && sessionResult.data.session;
+      if (!session || !session.user) return;
+      upsertEntrenador(session.user);
     });
 
     var sub = supabase.auth.onAuthStateChange(function (event, session) {
@@ -1526,12 +1551,14 @@ function GymApp() {
 
     (async function () {
       try {
-        var authRes = await supabase.auth.getUser();
-        if (authRes.error) {
-          console.error('[App] coach entrenadores getUser', authRes.error);
+        var sessionRes = await supabase.auth.getSession();
+        if (sessionRes.error) {
+          console.error('[App] coach entrenadores getSession', sessionRes.error);
           return;
         }
-        var u = authRes.data && authRes.data.user;
+        var activeSession = sessionRes.data && sessionRes.data.session;
+        if (!activeSession || !activeSession.user) return;
+        var u = activeSession.user;
         if (!u || !u.id) return;
 
         var q = await supabase.from('entrenadores').select('*').eq('id', u.id).maybeSingle();
@@ -2629,9 +2656,17 @@ function GymApp() {
       }
       if (c.t === 'assignRut' && c.a && c.rutinaLocal) {
         setLoadingSB(true);
+        var authSessionAssign = await getActiveSupabaseSession();
+        if (!authSessionAssign) {
+          console.error("[AUTH] No hay sesión activa");
+          toast2('Iniciá sesión nuevamente para asignar rutinas');
+          setLoadingSB(false);
+          setCoachDialog({ t: 'none' });
+          return;
+        }
         var alumnoIdAssign = c.a && c.a.id ? String(c.a.id) : "";
         var rutinaIdAssign = c.rutinaLocal && c.rutinaLocal.id ? String(c.rutinaLocal.id) : "";
-        var entrenadorIdAssign = (sessionData && sessionData.entrenadorId) || (user && user.id) || getStoredEntrenadorId() || ENTRENADOR_ID;
+        var entrenadorIdAssign = (sessionData && sessionData.entrenadorId) || authSessionAssign.user?.id || (user && user.id) || getStoredEntrenadorId() || ENTRENADOR_ID;
         if (!alumnoIdAssign || !rutinaIdAssign || !entrenadorIdAssign) {
           console.error('[assignRut] datos invalidos', {
             alumno_id: alumnoIdAssign || null,
@@ -2685,6 +2720,12 @@ function GymApp() {
           },
           fecha_inicio: new Date().toLocaleDateString('es-AR'),
         };
+        console.error("[assignRut DEBUG]", {
+          session: authSessionAssign,
+          alumnoId: alumnoIdAssign,
+          entrenadorId: entrenadorIdAssign,
+          body: payloadAssign,
+        });
         var res = null;
         try {
           res = await sb.createRutina(payloadAssign);
@@ -2780,6 +2821,20 @@ function GymApp() {
             const isEntrenador = loginEmail.trim().toLowerCase()==="entrenador@irontrack.app";
             if(isEntrenador){
               if(loginEmail==="entrenador@irontrack.app"&&loginPass===sp){
+                if (!supabase) {
+                  console.error("[AUTH] Supabase client no inicializado");
+                  setLoginError("No se pudo iniciar sesión con Supabase");
+                  return;
+                }
+                var authLogin = await supabase.auth.signInWithPassword({
+                  email: loginEmail.trim(),
+                  password: loginPass,
+                });
+                if (authLogin.error || !authLogin.data || !authLogin.data.session) {
+                  console.error("[AUTH] No hay sesión activa", authLogin.error || authLogin);
+                  setLoginError("No se pudo iniciar sesión con Supabase");
+                  return;
+                }
                 clearIronTrackStorageForNewLogin();
                 var demoName = "Entrenador";
                 try {
@@ -2789,7 +2844,7 @@ function GymApp() {
                     if (cpj && typeof cpj.name === "string" && cpj.name.trim()) demoName = cpj.name.trim();
                   }
                 } catch (e) {}
-                const s={role:"entrenador",name: demoName};
+                const s={role:"entrenador",name: demoName,email:authLogin.data.user?.email||loginEmail.trim(),entrenadorId:authLogin.data.user?.id};
                 localStorage.setItem("it_session",JSON.stringify(s));
                 syncStateWithLocalStorage();
                 setLoginEmail("");
