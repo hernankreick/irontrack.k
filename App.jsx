@@ -2818,21 +2818,42 @@ function GymApp() {
           setLoginLoading(true); setLoginError("");
           try {
             const sp = typeof window!=="undefined"?(localStorage.getItem("it_tpass")||"irontrack2024"):"irontrack2024";
-            const isEntrenador = loginEmail.trim().toLowerCase()==="entrenador@irontrack.app";
+            const loginEmailNorm = loginEmail.trim().toLowerCase();
+            const isEntrenador = loginEmailNorm==="entrenador@irontrack.app";
             if(isEntrenador){
-              if(loginEmail==="entrenador@irontrack.app"&&loginPass===sp){
+              if(loginEmailNorm==="entrenador@irontrack.app"&&loginPass===sp){
                 if (!supabase) {
                   console.error("[AUTH] Supabase client no inicializado");
                   setLoginError("No se pudo iniciar sesión con Supabase");
                   return;
                 }
                 var authLogin = await supabase.auth.signInWithPassword({
-                  email: loginEmail.trim(),
+                  email: loginEmailNorm,
                   password: loginPass,
                 });
                 if (authLogin.error || !authLogin.data || !authLogin.data.session) {
+                  console.error("[AUTH] signInWithPassword fallo; intentando migracion segura", authLogin.error || authLogin);
+                  var authSignup = await supabase.auth.signUp({
+                    email: loginEmailNorm,
+                    password: loginPass,
+                  });
+                  if (authSignup.error) {
+                    console.error("[AUTH] signUp migracion fallo", authSignup.error);
+                    setLoginError("Tu usuario no existe en Supabase Auth. Crealo desde Authentication > Users o registralo desde la app.");
+                    return;
+                  }
+                  if (authSignup.data && authSignup.data.session) {
+                    authLogin = authSignup;
+                  } else {
+                    authLogin = await supabase.auth.signInWithPassword({
+                      email: loginEmailNorm,
+                      password: loginPass,
+                    });
+                  }
+                }
+                if (!authLogin.data || !authLogin.data.session || !authLogin.data.session.access_token || !authLogin.data.user || !authLogin.data.user.id) {
                   console.error("[AUTH] No hay sesión activa", authLogin.error || authLogin);
-                  setLoginError("No se pudo iniciar sesión con Supabase");
+                  setLoginError("Tu usuario no existe en Supabase Auth. Crealo desde Authentication > Users o registralo desde la app.");
                   return;
                 }
                 clearIronTrackStorageForNewLogin();
@@ -2844,7 +2865,15 @@ function GymApp() {
                     if (cpj && typeof cpj.name === "string" && cpj.name.trim()) demoName = cpj.name.trim();
                   }
                 } catch (e) {}
-                const s={role:"entrenador",name: demoName,email:authLogin.data.user?.email||loginEmail.trim(),entrenadorId:authLogin.data.user?.id};
+                try {
+                  var upCoach = await supabase
+                    .from('entrenadores')
+                    .upsert({ id: String(authLogin.data.user.id), email: authLogin.data.user.email || loginEmailNorm }, { onConflict: 'id' });
+                  if (upCoach.error) console.error("[AUTH] entrenadores upsert migracion fallo", upCoach.error);
+                } catch (eUpCoach) {
+                  console.error("[AUTH] entrenadores upsert migracion exception", eUpCoach);
+                }
+                const s={role:"entrenador",name: demoName,email:authLogin.data.user.email||loginEmailNorm,entrenadorId:String(authLogin.data.user.id)};
                 localStorage.setItem("it_session",JSON.stringify(s));
                 syncStateWithLocalStorage();
                 setLoginEmail("");
