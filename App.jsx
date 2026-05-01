@@ -1012,10 +1012,11 @@ function readPlanScrollDiag() {
 function mergeRutinasAsignadas(primary, secondary, alumnosIds) {
   var out = [];
   var seen = {};
+  var shouldFilterByAlumno = !!(alumnosIds && Object.keys(alumnosIds).length > 0);
   [primary || [], secondary || []].forEach(function (list) {
     list.forEach(function (r, idx) {
       if (!r) return;
-      if (r.alumno_id != null && alumnosIds && !alumnosIds[String(r.alumno_id)]) return;
+      if (r.alumno_id != null && shouldFilterByAlumno && !alumnosIds[String(r.alumno_id)]) return;
       var key = r.id != null ? "id:" + String(r.id) : "row:" + String(r.alumno_id || "") + ":" + idx;
       if (seen[key]) return;
       seen[key] = true;
@@ -1142,6 +1143,29 @@ function GymApp() {
     return findRutinaForAlumno(rutinasUnificadas, alumnoId);
   }, [rutinasUnificadas]);
 
+  const cargarRutinasEntrenador = React.useCallback(async function () {
+    try {
+      var activeSession = await getActiveSupabaseSession();
+      var entrenadorId = activeSession?.user?.id ? String(activeSession.user.id) : "";
+      if (!entrenadorId) {
+        console.error("[rutinas entrenador] sin session.user.id");
+        return null;
+      }
+      var rutsDB = await sb.getRutinasByEntrenador(entrenadorId);
+      if (Array.isArray(rutsDB)) {
+        setRutinasSBEntrenador(function (prev) {
+          return mergeRutinasAsignadas(rutsDB, prev);
+        });
+        return rutsDB;
+      }
+      console.error("[rutinas entrenador] respuesta invalida", rutsDB);
+      return null;
+    } catch (e) {
+      console.error("[rutinas entrenador] error", e);
+      return null;
+    }
+  }, []);
+
   const sesionesGlobalesLimpias = useMemo(function () {
     return (sesionesGlobales || []).filter(function (s) {
       return !!(s && alumnosActivosIds[String(s.alumno_id)]);
@@ -1190,16 +1214,22 @@ function GymApp() {
   useEffect(function() {
     if(sessionData && sessionData.role==='entrenador') {
       var init = async function() {
+        var rutinasPromise = cargarRutinasEntrenador();
         var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos('entrenador_principal') || [], ENTRENADOR_ID);
         setAlumnos(sbAlumnos);
         if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
-        try { var rutsDB = await sb.getRutinasByEntrenador(); if(rutsDB && Array.isArray(rutsDB)) setRutinasSBEntrenador(rutsDB); } catch(e) {}
+        await rutinasPromise;
       };
       init();
       var intervalo = setInterval(function() { cargarSesionesGlobales(); }, 30000);
       return function() { clearInterval(intervalo); };
     }
-  }, [sessionData]);
+  }, [sessionData?.role, cargarRutinasEntrenador]);
+
+  useEffect(function () {
+    if (sessionData?.role !== "entrenador" || tab !== "alumnos") return;
+    cargarRutinasEntrenador();
+  }, [sessionData?.role, tab, cargarRutinasEntrenador]);
 
   const es = lang==="es";
   const msg = useCallback(function (esStr, enStr, ptStr) {
@@ -2672,10 +2702,7 @@ function GymApp() {
               return String(x.id) !== String(ridQ);
             });
           });
-          try {
-            var fr = await sb.getRutinasByEntrenador();
-            if (Array.isArray(fr)) setRutinasSBEntrenador(fr);
-          } catch (e2) {}
+          await cargarRutinasEntrenador();
           toast2(msg('Quitada', 'Removed', 'Removida'));
         } catch (e0) {
           toast2(msg('No se pudo quitar la rutina.', 'Could not remove the routine.', 'Não foi possível remover a rotina.'));
@@ -4822,16 +4849,6 @@ function GymApp() {
 
             {coachAlumnosListaFiltrada.map(a=>{
               const rutinaAsignada = getRutinaAsignadaAlumno(a);
-              if (String(a.nombre || a.name || "").toLowerCase().includes("hern")) {
-                console.log("[ALUMNO CARD DEBUG]", {
-                  alumnoNombre: a.nombre || a.name,
-                  alumnoId: a.id,
-                  rutinasSB: rutinasSB?.map(r => ({ id: r.id, nombre: r.nombre, alumno_id: r.alumno_id })),
-                  rutinasSBEntrenador: rutinasSBEntrenador?.map(r => ({ id: r.id, nombre: r.nombre, alumno_id: r.alumno_id })),
-                  rutinasUnificadas: rutinasUnificadas?.map(r => ({ id: r.id, nombre: r.nombre, alumno_id: r.alumno_id })),
-                  rutinaDetectada: getRutinaAsignadaAlumno?.(a)
-                });
-              }
               return (
               <div key={a.id} style={{position:"relative",background:coachAluSurface,borderRadius:12,padding:"14px 14px 12px",marginBottom:10,border:alumnoActivo?.id===a.id?"1px solid #2563eb":"1px solid "+coachAluBorderSoft,boxShadow:darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.08)"}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
