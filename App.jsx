@@ -1009,6 +1009,29 @@ function readPlanScrollDiag() {
   }
 }
 
+function mergeRutinasAsignadas(primary, secondary, alumnosIds) {
+  var out = [];
+  var seen = {};
+  [primary || [], secondary || []].forEach(function (list) {
+    list.forEach(function (r, idx) {
+      if (!r) return;
+      if (r.alumno_id != null && alumnosIds && !alumnosIds[String(r.alumno_id)]) return;
+      var key = r.id != null ? "id:" + String(r.id) : "row:" + String(r.alumno_id || "") + ":" + idx;
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push(r);
+    });
+  });
+  return out;
+}
+
+function findRutinaForAlumno(rutinas, alumnoId) {
+  var aid = String(alumnoId);
+  return (rutinas || []).find(function (r) {
+    return r && String(r.alumno_id) === aid;
+  }) || null;
+}
+
 function GymApp() {
   /** Flags de diagnóstico (lectura única; recargar tras editar localStorage). */
   const planScrollDiag = useMemo(function () { return readPlanScrollDiag(); }, []);
@@ -1109,6 +1132,15 @@ function GymApp() {
       return !!(r && alumnosActivosIds[String(r.alumno_id)]);
     });
   }, [rutinasSBEntrenador, alumnosActivosIds]);
+
+  const rutinasUnificadas = useMemo(function () {
+    return mergeRutinasAsignadas(rutinasSBEntrenadorLimpias, rutinasSB, alumnosActivosIds);
+  }, [rutinasSBEntrenadorLimpias, rutinasSB, alumnosActivosIds]);
+
+  const getRutinaAsignadaAlumno = React.useCallback(function (alumnoOrId) {
+    var alumnoId = alumnoOrId && typeof alumnoOrId === "object" ? alumnoOrId.id : alumnoOrId;
+    return findRutinaForAlumno(rutinasUnificadas, alumnoId);
+  }, [rutinasUnificadas]);
 
   const sesionesGlobalesLimpias = useMemo(function () {
     return (sesionesGlobales || []).filter(function (s) {
@@ -1939,7 +1971,7 @@ function GymApp() {
   }, []);
 
   const coachAlumnoCategoria = React.useCallback(function (a) {
-    if (!rutinasSBEntrenadorLimpias.some(function (r) { return r.alumno_id === a.id; })) return "sin_rutina";
+    if (!getRutinaAsignadaAlumno(a.id)) return "sin_rutina";
     var cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000;
     var ses = sesionesGlobalesLimpias || [];
     for (var i = 0; i < ses.length; i++) {
@@ -1965,7 +1997,7 @@ function GymApp() {
       }
     }
     return "inactivo";
-  }, [rutinasSBEntrenadorLimpias, sesionesGlobalesLimpias, progresoGlobalLimpio]);
+  }, [getRutinaAsignadaAlumno, sesionesGlobalesLimpias, progresoGlobalLimpio]);
 
   const coachAlumnosCounts = React.useMemo(function () {
     var c = { todos: alumnosActivosLimpios.length, activos: 0, inactivos: 0, sin_rutina: 0 };
@@ -2799,10 +2831,10 @@ function GymApp() {
             }
           }
           setRutinasSB(function (prev) {
-            return [].concat(prev, [res]);
+            return mergeRutinasAsignadas([res], prev);
           });
           setRutinasSBEntrenador(function (prev) {
-            return [].concat(prev, [res]);
+            return mergeRutinasAsignadas([res], prev);
           });
           toast2('Rutina asignada ✓');
         } else {
@@ -4787,7 +4819,19 @@ function GymApp() {
               </div>
             )}
 
-            {coachAlumnosListaFiltrada.map(a=>(
+            {coachAlumnosListaFiltrada.map(a=>{
+              const rutinaAsignada = getRutinaAsignadaAlumno(a);
+              if (String(a.nombre || a.name || "").toLowerCase().includes("hern")) {
+                console.log("[ALUMNO CARD DEBUG]", {
+                  alumnoNombre: a.nombre || a.name,
+                  alumnoId: a.id,
+                  rutinasSB: rutinasSB?.map(r => ({ id: r.id, nombre: r.nombre, alumno_id: r.alumno_id })),
+                  rutinasSBEntrenador: rutinasSBEntrenador?.map(r => ({ id: r.id, nombre: r.nombre, alumno_id: r.alumno_id })),
+                  rutinasUnificadas: rutinasUnificadas?.map(r => ({ id: r.id, nombre: r.nombre, alumno_id: r.alumno_id })),
+                  rutinaDetectada: getRutinaAsignadaAlumno?.(a)
+                });
+              }
+              return (
               <div key={a.id} style={{position:"relative",background:coachAluSurface,borderRadius:12,padding:"14px 14px 12px",marginBottom:10,border:alumnoActivo?.id===a.id?"1px solid #2563eb":"1px solid "+coachAluBorderSoft,boxShadow:darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.08)"}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
                   <div style={{width:48,height:48,borderRadius:"50%",background:"#2563eb",color:"#fff",fontSize:20,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}>
@@ -4797,14 +4841,15 @@ function GymApp() {
                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                       <span style={{fontSize:17,fontWeight:800,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
                       {(() => {
-                        var cat = coachAlumnoCategoria(a);
-                        var cfg = cat === "activo" ? { bg: darkMode ? "#14532d" : "#dcfce7", color: darkMode ? "#4ade80" : "#15803d", t: msg("Activo", "Active") } : cat === "inactivo" ? { bg: darkMode ? "#422006" : "#fef3c7", color: darkMode ? "#fbbf24" : "#b45309", t: msg("Inactivo", "Inactive") } : { bg: darkMode ? "#1e293b" : "#f1f5f9", color: darkMode ? "#94a3b8" : "#475569", t: msg("Sin rutina", "No routine") };
+                        var cfg = rutinaAsignada
+                          ? { bg: darkMode ? "#14532d" : "#dcfce7", color: darkMode ? "#4ade80" : "#15803d", t: rutinaAsignada.nombre || msg("Con rutina", "Has routine") }
+                          : { bg: darkMode ? "#1e293b" : "#f1f5f9", color: darkMode ? "#94a3b8" : "#475569", t: msg("Sin rutina", "No routine") };
                         return <span style={{fontSize:11,fontWeight:800,padding:"2px 8px",borderRadius:6,background:cfg.bg,color:cfg.color}}>{cfg.t}</span>;
                       })()}
                     </div>
                     <div style={{fontSize:13,color:textMuted,lineHeight:1.4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
                     {(() => {
-                      var rA = rutinasSBEntrenador.find(function (r) { return r.alumno_id === a.id; });
+                      var rA = rutinaAsignada;
                       var nD = rA ? (rA.datos?.days || []).length : 0;
                       var done = rA ? completedDays.filter(function (k) { return k.startsWith(rA.id + "-") && k.endsWith("-w" + currentWeek); }).length : 0;
                       if (!nD) return null;
@@ -4828,6 +4873,13 @@ function GymApp() {
                         if (alumnoActivo?.id === a.id) { setAlumnoActivo(null); return; }
                         setAlumnoActivo(a); setRegistrosSubTab(0); setLoadingSB(true);
                         const ruts = await sb.getRutinas(a.id); setRutinasSB(ruts || []);
+                        setRutinasSBEntrenador(function (prev) {
+                          var fresh = Array.isArray(ruts) ? ruts : [];
+                          return mergeRutinasAsignadas(
+                            fresh,
+                            (prev || []).filter(function (r) { return String(r.alumno_id) !== String(a.id); })
+                          );
+                        });
                         const prog = await sb.getProgreso(a.id); setAlumnoProgreso(prog || []);
                         const ses = await sb.getSesiones(a.id); setAlumnoSesiones(ses || []);
                         setLoadingSB(false);
@@ -4886,7 +4938,7 @@ function GymApp() {
                 {alumnoActivo?.id===a.id&&(
                   <div>
                     {(()=>{
-                      const rutinaActiva=rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
+                      const rutinaActiva = getRutinaAsignadaAlumno(a.id);
                       if(!rutinaActiva) return <div style={{background:coachAluSurface,borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid "+coachAluBorderSoft}}><div style={{fontSize:13,color:textMuted}}>{msg("Sin rutina asignada", "No routine assigned")}</div></div>;
                       const dias=rutinaActiva.datos?.days||[];
                       const semanaCiclo = currentWeek + 1;
@@ -5049,7 +5101,7 @@ function GymApp() {
                         toast2(msg('Creá una rutina en RUTINAS', 'Create a routine in ROUTINES', 'Crie uma rotina em ROTINAS'));
                         return;
                       }
-                      const ex0 = rutinasSB.find((r) => r.alumno_id === a.id) || rutinasSBEntrenador.find((r) => r.alumno_id === a.id);
+                      const ex0 = getRutinaAsignadaAlumno(a.id);
                       const rutinaParaAsignar = rutinaLocal.datos
                         ? rutinaLocal
                         : {
@@ -5068,10 +5120,10 @@ function GymApp() {
                           ? '¿Asignar rutina: ' + rutinaNombre + ' a ' + a.nombre + '?'
                           : 'Assign routine: ' + rutinaNombre + ' to ' + a.nombre + '?';
                       setCoachDialog({ t: 'assignRut', a: a, ex: ex0 || null, rutinaLocal: rutinaParaAsignar, assignMsg: assignMsg0 });
-                    }}>{(rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id))?(<><Ic name="refresh-cw" size={16}/>{msg("Cambiar rutina", "Change routine")}</>):(<><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</>)}</button>
+                    }}>{getRutinaAsignadaAlumno(a.id)?(<><Ic name="refresh-cw" size={16}/>{msg("Cambiar rutina", "Change routine")}</>):(<><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</>)}</button>
                     {/* ── SUGERENCIAS ── */}
                     {(()=>{
-                      const rutSB = rutinasSB.find(r=>r.alumno_id===a.id) || rutinasSBEntrenador.find(r=>r.alumno_id===a.id);
+                      const rutSB = getRutinaAsignadaAlumno(a.id);
                       const regsAlu = alumnoProgreso || [];
                       if(!rutSB || regsAlu.length < 2) return null;
                       const sugs = generarSugerenciasAlumno(regsAlu, rutSB.datos, EX);
@@ -5192,7 +5244,7 @@ function GymApp() {
                   </div>
                 )}
               </div>
-            ))}
+            )})}
           </div>
         )}
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
@@ -8174,7 +8226,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
       nombre: a.nombre || a.email,
       diasSinEntrenar,
       pagoVencidoDias: pagosEstado[a.id] === "vencido" ? 5 : 0,
-      tieneRutina: routines?.some(r => r.alumno_id === a.id) ?? true,
+      tieneRutina: routines?.some(r => String(r.alumno_id) === String(a.id)) ?? true,
       tieneNuevoPR: false,
       descripcion: diasSinEntrenar >= 5 ? `${diasSinEntrenar} días sin entrenar` : "",
     };
@@ -8286,7 +8338,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                 .slice(0,3)
                 .map(function(entry){
                   var inf = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
-                  var rutA = rutinasSB.find(function(r){return r.alumno_id===a.id;});
+                  var rutA = findRutinaForAlumno(rutinasSB, a.id);
                   var exR = rutA && rutA.datos && rutA.datos.days ? rutA.datos.days.flatMap(function(d){return [...(d.warmup||[]),...(d.exercises||[])]}).find(function(e){return e.id===entry[0];}) : null;
                   var nombre = resolveExerciseTitle(inf || null, exR || null, es);
                   return {id:entry[0], nombre:nombre, kg:entry[1].kg};
@@ -8502,7 +8554,7 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
                         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                           {Object.entries(ultimosPesos).slice(0,4).map(function(entry){
                             var inf = [...EX,...(customEx||[])].find(function(e){return e.id===entry[0]});
-                            var rutA = rutinasSB.find(function(r){return r.alumno_id===a.id;});
+                            var rutA = findRutinaForAlumno(rutinasSB, a.id);
                             var exR = rutA && rutA.datos && rutA.datos.days ? rutA.datos.days.flatMap(function(d){return [...(d.warmup||[]),...(d.exercises||[])]}).find(function(e){return e.id===entry[0];}) : null;
                             var nombre = resolveExerciseTitle(inf || null, exR || null, es);
                             return(
