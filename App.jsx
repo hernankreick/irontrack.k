@@ -1391,8 +1391,8 @@ function GymApp() {
         nav.style.transition = planScrollDiag.planHeaderLayerTransitions ? "transform 0.22s ease" : "none";
         var sp = alumnoTopBarSpacerRef.current;
         if (sp) {
-          sp.style.height = ctx.alumnoTopBarPx + "px";
-          sp.style.minHeight = ctx.alumnoTopBarPx + "px";
+          sp.style.height = ctx.alumnoTopBarPx;
+          sp.style.minHeight = ctx.alumnoTopBarPx;
           sp.style.transition = "none";
         }
       } else if (nav && !ctx.alumnoFixedTabs) {
@@ -2394,7 +2394,7 @@ function GymApp() {
   const hideGlobalBottomNavCoachDash =
     !esAlumno && sessionData?.role === "entrenador" && coachDesktopBleedTab && coachDesktop1024;
   const alumnoTopBarFixed = !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress"));
-  const alumnoTopBarHeight = alumnoTopBarFixed ? 74 : 0;
+  const alumnoTopBarHeight = alumnoTopBarFixed ? "calc(env(safe-area-inset-top, 0px) + 96px)" : "0px";
 
   planScrollCtxRef.current = {
     alumnoPlan: !!(esAlumno && tab === "plan"),
@@ -2413,8 +2413,8 @@ function GymApp() {
         nav.style.transition = "";
       }
       if (sp && alumnoTopBarFixed) {
-        sp.style.height = alumnoTopBarHeight + "px";
-        sp.style.minHeight = alumnoTopBarHeight + "px";
+        sp.style.height = alumnoTopBarHeight;
+        sp.style.minHeight = alumnoTopBarHeight;
         sp.style.transition = "";
       }
     },
@@ -3184,7 +3184,8 @@ function GymApp() {
           zIndex: alumnoTopBarFixed ? 80 : undefined,
           paddingLeft: esAlumno ? 20 : 16,
           paddingRight: esAlumno ? 20 : 16,
-          height: alumnoTopBarFixed ? alumnoTopBarHeight : undefined,
+          paddingTop: alumnoTopBarFixed ? "calc(env(safe-area-inset-top, 0px) + 10px)" : undefined,
+          height: undefined,
           minHeight: alumnoTopBarFixed ? alumnoTopBarHeight : undefined,
           boxSizing: "border-box",
           backdropFilter: alumnoTopBarFixed ? "blur(10px)" : undefined,
@@ -3436,7 +3437,7 @@ function GymApp() {
             style={{
               position: "fixed",
               zIndex: 610,
-              top: "calc(env(safe-area-inset-top, 0px) + " + (alumnoTopBarFixed ? "78px" : "56px") + ")",
+              top: alumnoTopBarFixed ? "calc(env(safe-area-inset-top, 0px) + 104px)" : "calc(env(safe-area-inset-top, 0px) + 56px)",
               right: 16,
               background: "#0a1628",
               border: "1px solid rgba(59,130,246,.25)",
