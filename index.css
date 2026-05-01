@@ -5,6 +5,12 @@ html,
 body,
 #root {
   min-height: 100%;
+  background: #0a0f1a;
+}
+
+body {
+  margin: 0;
+  background: #0a0f1a;
 }
 
 /* Progreso (alumno): animaciones y utilidades del diseño Iron Track */

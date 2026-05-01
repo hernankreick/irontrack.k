@@ -226,7 +226,7 @@ export default function StudentProgressSection({
   const shellStyle = {
     fontFamily: "Inter, sans-serif",
     boxSizing: 'border-box',
-    ['--sp-bg']: '#06111F',
+    ['--sp-bg']: '#0B1220',
     ['--sp-surface']: '#14243A',
     ['--sp-surface-high']: '#1B314B',
     ['--sp-stroke']: 'rgba(91, 121, 160, 0.56)',
@@ -248,7 +248,7 @@ export default function StudentProgressSection({
       }}
     >
       <div
-        className="relative z-0 mx-auto flex w-full max-w-[32rem] flex-col gap-9 pb-44 pt-5"
+        className="relative z-0 mx-auto flex w-full max-w-[32rem] flex-col gap-9 pb-[max(11rem,calc(env(safe-area-inset-bottom, 0px) + 148px))] pt-5"
         style={{ paddingInline: 'var(--page-gutter)', boxSizing: 'border-box' }}
       >
         {subView !== 'main' && (
@@ -281,32 +281,45 @@ export default function StudentProgressSection({
           <>
             {!loadingSb && !hasData ? (
               <div
-                className="rounded-[14px] border p-5"
+                className="rounded-[24px] border"
                 style={{
+                  padding: '20px 18px',
                   borderColor: 'var(--sp-stroke)',
+                  boxSizing: 'border-box',
+                  overflow: 'visible',
+                  wordBreak: 'normal',
                   background:
                     'linear-gradient(145deg, rgba(59, 130, 246, 0.12), var(--sp-surface))',
                 }}
               >
                 <div
-                  className="leading-tight"
                   style={{
                     fontFamily: "Inter, sans-serif",
                     fontSize: 20,
                     fontWeight: 700,
+                    lineHeight: 1.15,
+                    marginBottom: 10,
+                    wordBreak: 'normal',
                   }}
                 >
                   {es ? `Empecemos fuerte, ${displayName}.` : `Let's start strong, ${displayName}.`}
                 </div>
-                <p className="mt-2 text-[13px] leading-relaxed" style={{ color: 'var(--sp-muted)' }}>
+                <p className="text-[13px]" style={{ color: 'var(--sp-muted)', lineHeight: 1.45, margin: 0 }}>
                   {es
                     ? 'Tu volumen y tus PRs aparecerán acá cuando registres entrenos. Empezá por una sesión completa.'
                     : 'Volume and PRs show up here once you log workouts. Start with one full session.'}
                 </p>
                 <button
                   type="button"
-                  className="mt-4 min-h-[44px] w-full rounded-full px-4 py-2.5 text-[13px] font-semibold transition-colors"
+                  className="mt-4 w-full rounded-full text-[13px] font-semibold transition-colors"
                   style={{
+                    minHeight: 52,
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    whiteSpace: 'normal',
+                    boxSizing: 'border-box',
                     background: 'rgba(59, 130, 246, 0.18)',
                     color: 'var(--sp-accent)',
                     border: '1px solid rgba(59, 130, 246, 0.35)',
@@ -416,25 +429,29 @@ export default function StudentProgressSection({
 
             {/* KPI strip */}
             <div
-              className="grid grid-cols-4 rounded-[16px] border"
+              className="grid grid-cols-4 rounded-[24px] border"
               style={{
                 borderColor: 'rgba(90,121,160,0.48)',
                 background: 'linear-gradient(135deg, rgba(28,47,72,0.9), rgba(11,22,36,0.94))',
-                minHeight: 78,
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+                minHeight: 0,
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
               }}
             >
               {kpiRows.map((k, idx) => (
                 <div
                   key={k.id}
-                  className="flex flex-col justify-center px-2 py-2.5 text-center"
+                  className="flex min-h-0 flex-col justify-center text-center"
                   style={{
+                    boxSizing: 'border-box',
+                    padding: '16px 8px',
                     borderLeft: idx > 0 ? '1px solid var(--sp-stroke)' : undefined,
                   }}
                 >
                   <div
                     className="text-[9px] font-semibold uppercase tracking-[0.12em]"
-                    style={{ color: 'var(--sp-muted)' }}
+                    style={{ color: 'var(--sp-muted)', lineHeight: 1.35, wordBreak: 'normal' }}
                   >
                     {k.label}
                   </div>
@@ -450,7 +467,7 @@ export default function StudentProgressSection({
                   >
                     {k.val == null || k.val === '' ? '—' : k.val}
                   </div>
-                  <div className="mt-1 text-[9.5px] leading-tight" style={{ color: 'var(--sp-muted)' }}>
+                  <div className="mt-1 text-[9.5px]" style={{ color: 'var(--sp-muted)', lineHeight: 1.45, wordBreak: 'normal' }}>
                     {k.sub}
                   </div>
                 </div>
@@ -480,8 +497,11 @@ export default function StudentProgressSection({
                     <button
                       key={a.id}
                       type="button"
-                      className="relative flex min-h-[132px] w-[250px] shrink-0 flex-col justify-between gap-4 rounded-[18px] border p-5 text-left transition-opacity"
+                      className="relative flex min-h-[132px] w-[250px] shrink-0 flex-col justify-between gap-4 rounded-[24px] border text-left transition-opacity"
                       style={{
+                        boxSizing: 'border-box',
+                        padding: '20px 18px',
+                        wordBreak: 'normal',
                         borderColor: locked ? 'rgba(111,143,184,0.44)' : 'rgba(245,158,11,0.72)',
                         borderStyle: 'solid',
                         background: locked
@@ -517,10 +537,10 @@ export default function StudentProgressSection({
                           />
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-[15px] font-semibold leading-snug" style={{ color: 'var(--sp-fg)' }}>
+                          <div className="text-[15px] font-semibold" style={{ color: 'var(--sp-fg)', lineHeight: 1.15, marginBottom: 6, wordBreak: 'normal' }}>
                             {a.title}
                           </div>
-                          <div className="mt-1.5 text-[13px] leading-[1.35]" style={{ color: locked ? 'var(--sp-muted)' : 'rgba(226,232,240,0.82)' }}>
+                          <div className="mt-1.5 text-[13px]" style={{ color: locked ? 'var(--sp-muted)' : 'rgba(226,232,240,0.82)', lineHeight: 1.45 }}>
                             {locked ? a.sub : es ? 'Desbloqueado' : 'Unlocked'}
                           </div>
                         </div>

@@ -1483,15 +1483,11 @@ function GymApp() {
         return;
       }
       var ctx = planScrollCtxRef.current;
-      /** Ocultar header global del alumno al final del scroll (Plan / Ejercicios / Progreso). */
+      /** Modo alumno: header superior siempre visible (sin translate fuera del viewport). */
       var nav = alumnoAppHeaderRef.current;
       if (nav && ctx.alumnoFixedTabs) {
-        var scrollable = attachedEl.scrollHeight > attachedEl.clientHeight + 40;
-        var fromBottom = attachedEl.scrollHeight - attachedEl.clientHeight - attachedEl.scrollTop;
-        var hideTop = scrollable && fromBottom <= 40;
-        var tr = hideTop ? "translate3d(0,-110%,0)" : "translate3d(0,0,0)";
-        nav.style.transform = tr;
-        nav.style.transition = planScrollDiag.planHeaderLayerTransitions ? "transform 0.22s ease" : "none";
+        nav.style.transform = "";
+        nav.style.transition = "";
         var sp = alumnoTopBarSpacerRef.current;
         if (sp) {
           sp.style.height = ctx.alumnoTopBarPx;
@@ -1564,6 +1560,16 @@ function GymApp() {
       tickingRef.current = false;
     };
   }, []);
+
+  /** Alumno / pestaña plan: fuerza expansión visible (sin capa mini por scroll/refs viejos). */
+  useLayoutEffect(
+    function () {
+      if (!esAlumno || tab !== "plan") return;
+      headerCollapsedRef.current = false;
+      applyAlumnoHeaderLayerStyles(false);
+    },
+    [esAlumno, tab]
+  );
 
   /** Después de login/logout (localStorage ya actualizado): sincroniza sesión y datos persistidos sin recargar. */
   function syncStateWithLocalStorage() {
@@ -2509,7 +2515,9 @@ function GymApp() {
 
   planScrollCtxRef.current = {
     alumnoPlan: !!(esAlumno && tab === "plan"),
-    headerCollapse: !!planScrollDiag.headerCollapseOnScroll,
+    /** Modo alumno: nunca colapsar el bloque HOY/expandido por gesto scroll. */
+    headerCollapse:
+      !!(planScrollDiag.headerCollapseOnScroll && !esAlumno),
     alumnoFixedTabs: !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress")),
     alumnoTopBarPx: alumnoTopBarHeight,
   };
@@ -3394,23 +3402,31 @@ function GymApp() {
       <div
         ref={alumnoAppHeaderRef}
         className={
-          "relative z-50 flex w-full min-w-0 items-center justify-between gap-1 pb-3 pt-4 " +
-          (darkMode ? "border-b border-[#2D4057] bg-[#0F1923]" : showCoachDesktopShell && !esAlumno ? "border-b border-slate-200 bg-white" : "border-b border-[#2D4057] bg-[#F0F4F8]")
+          (alumnoTopBarFixed ? "relative flex w-full min-w-0 items-center justify-between gap-1 pb-3 pt-3 " : "relative z-50 flex w-full min-w-0 items-center justify-between gap-1 pb-3 pt-4 ") +
+          (alumnoTopBarFixed
+            ? ""
+            : darkMode
+              ? "border-b border-[#2D4057] bg-[#0F1923]"
+              : showCoachDesktopShell && !esAlumno
+                ? "border-b border-slate-200 bg-white"
+                : "border-b border-[#2D4057] bg-[#F0F4F8]")
         }
         style={{
           position: alumnoTopBarFixed ? "fixed" : "relative",
           top: alumnoTopBarFixed ? 0 : undefined,
           left: alumnoTopBarFixed ? 0 : undefined,
           right: alumnoTopBarFixed ? 0 : undefined,
-          zIndex: alumnoTopBarFixed ? 80 : undefined,
+          zIndex: alumnoTopBarFixed ? 95 : undefined,
           paddingLeft: esAlumno ? 20 : 16,
           paddingRight: esAlumno ? 20 : 16,
-          paddingTop: alumnoTopBarFixed ? "calc(env(safe-area-inset-top, 0px) + 10px)" : undefined,
+          paddingTop: alumnoTopBarFixed ? "env(safe-area-inset-top, 0px)" : undefined,
           height: undefined,
           minHeight: alumnoTopBarFixed ? alumnoTopBarHeight : undefined,
           boxSizing: "border-box",
-          backdropFilter: alumnoTopBarFixed ? "blur(10px)" : undefined,
-          WebkitBackdropFilter: alumnoTopBarFixed ? "blur(10px)" : undefined,
+          background: alumnoTopBarFixed ? "#0A0F1A" : undefined,
+          borderBottom: alumnoTopBarFixed ? "1px solid #2d4057" : undefined,
+          backdropFilter: alumnoTopBarFixed ? "none" : undefined,
+          WebkitBackdropFilter: alumnoTopBarFixed ? "none" : undefined,
           boxShadow: alumnoTopBarFixed ? "0 8px 24px rgba(0,0,0,.18)" : undefined,
         }}
       >
@@ -3774,7 +3790,7 @@ function GymApp() {
                 : "block",
           flexDirection: showCoachDesktopShell && !esAlumno && !(session && activeDay) ? "column" : undefined,
           paddingBottom: esAlumno
-            ? "calc(8.5rem + env(safe-area-inset-bottom, 0px))"
+            ? "calc(150px + env(safe-area-inset-bottom, 0px))"
             : showCoachDesktopShell
               ? coachDesktop1024
                 ? "calc(1rem + env(safe-area-inset-bottom, 0px))"
@@ -3797,7 +3813,10 @@ function GymApp() {
           overflowAnchor: "none",
           overscrollBehavior: "contain",
           background: darkMode
-            ? "#0B1120"
+            ? esAlumno &&
+                (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
+              ? "#0B1220"
+              : "#0B1120"
             : showCoachDesktopShell && !esAlumno
               ? "#ffffff"
               : "#F1F5F9",

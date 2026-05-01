@@ -381,23 +381,24 @@ export function ProgressChartsPanel({
 
   if (loadingSb) {
     return (
-      <div className="flex flex-col gap-4 py-2">
-        <div className="h-[96px] rounded-[12px] border border-[var(--sp-stroke)] bg-[var(--sp-surface)]" />
-        <div className="h-[96px] rounded-[12px] border border-[var(--sp-stroke)] bg-[var(--sp-surface)]" />
+      <div className="my-3 flex flex-col gap-5 py-3">
+        <div className="min-h-[96px] rounded-[24px] border border-[var(--sp-stroke)] bg-[var(--sp-surface)]" />
+        <div className="min-h-[96px] rounded-[24px] border border-[var(--sp-stroke)] bg-[var(--sp-surface)]" />
       </div>
     )
   }
 
   if (emptySkeleton) {
     return (
-      <div className="flex flex-col gap-3">
+      <div className="my-3 flex flex-col gap-5 pb-2 pt-1">
         {[0, 1, 2].map((i) => (
           <div
             key={`sk-${i}`}
-            className="h-[96px] rounded-[12px] border border-dashed border-[var(--sp-stroke)] bg-[var(--sp-surface)]/40"
+            className="box-border min-h-[96px] rounded-[24px] border border-dashed border-[var(--sp-stroke)] bg-[var(--sp-surface)]/40"
+            style={{ marginTop: i === 0 ? 4 : undefined, marginBottom: i === 2 ? 4 : undefined }}
           />
         ))}
-        <p className="text-center text-[12px] leading-relaxed" style={{ color: 'var(--sp-muted)' }}>
+        <p className="mt-6 text-center text-[12px] leading-relaxed" style={{ color: 'var(--sp-muted)' }}>
           {es
             ? 'Tus ejercicios aparecerán aquí en cuanto registres tu primera sesión.'
             : 'Your exercises will show up here after you log your first session.'}
@@ -568,11 +569,12 @@ export function ProgressChartsPanel({
           return (
             <div
               key={ex.id}
-              className="overflow-hidden rounded-[18px] border transition-colors"
+              className="overflow-hidden rounded-[24px] border transition-colors"
               style={{
                 borderColor: isOpen ? 'rgba(111, 143, 184, 0.72)' : 'rgba(90, 121, 160, 0.56)',
                 background:
                   'linear-gradient(135deg, rgba(28, 47, 72, 0.95), rgba(12, 23, 37, 0.96))',
+                boxSizing: 'border-box',
                 boxShadow: isOpen
                   ? '0 18px 42px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.08)'
                   : '0 10px 24px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255,255,255,0.06)',
@@ -580,8 +582,13 @@ export function ProgressChartsPanel({
             >
               <button
                 type="button"
-                className="flex w-full min-h-[144px] flex-col gap-4 px-5 py-5 text-left sm:min-h-[132px]"
-                style={{ background: 'transparent' }}
+                className="flex w-full flex-col gap-4 text-left"
+                style={{
+                  background: 'transparent',
+                  padding: '20px 18px',
+                  boxSizing: 'border-box',
+                  minHeight: 120,
+                }}
                 onClick={() => setExpandedEx(isOpen ? null : ex.id)}
               >
                 <div className="flex min-w-0 items-start gap-3">
@@ -604,7 +611,9 @@ export function ProgressChartsPanel({
                       WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical',
                       overflow: 'hidden',
-                      lineHeight: 1.22,
+                      wordBreak: 'normal',
+                      lineHeight: 1.15,
+                      marginBottom: 4,
                     }}
                   >
                     {name}
@@ -679,10 +688,11 @@ export function ProgressChartsPanel({
 
               {isOpen && (
                 <div
-                  className="mx-4 mb-4 rounded-[17px] border px-4 pb-5 pt-4"
+                  className="mx-[18px] mb-5 rounded-[22px] border px-[18px] pb-6 pt-[18px]"
                   style={{
                     borderColor: 'rgba(90, 121, 160, 0.5)',
                     background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.64), rgba(10, 18, 30, 0.42))',
+                    boxSizing: 'border-box',
                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
                   }}
                 >
@@ -695,8 +705,15 @@ export function ProgressChartsPanel({
                       <button
                         key={t.id}
                         type="button"
-                        className="min-h-[42px] rounded-[11px] px-4 py-2 text-[13px] font-semibold transition-colors"
+                        className="rounded-[11px] text-[13px] font-semibold transition-colors"
                         style={{
+                          minHeight: 52,
+                          padding: '14px 16px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          whiteSpace: 'normal',
+                          boxSizing: 'border-box',
                           background:
                             metricTab === t.id
                               ? 'linear-gradient(180deg, rgba(37,99,235,0.86), rgba(29,78,216,0.62))'
@@ -714,8 +731,15 @@ export function ProgressChartsPanel({
                         <button
                           key={rk}
                           type="button"
-                          className="min-h-[38px] rounded-[10px] px-3.5 py-1.5 text-[12px] font-semibold tabular-nums"
+                          className="rounded-[10px] text-[12px] font-semibold tabular-nums"
                           style={{
+                            minHeight: 44,
+                            padding: '10px 14px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            whiteSpace: 'normal',
+                            boxSizing: 'border-box',
                             background: rangeKey === rk ? 'rgba(37, 99, 235, 0.24)' : 'rgba(7,16,28,0.22)',
                             color: rangeKey === rk ? accent : 'var(--sp-muted)',
                             border: `1px solid ${rangeKey === rk ? 'rgba(37, 99, 235, 0.35)' : 'transparent'}`,

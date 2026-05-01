@@ -43,10 +43,14 @@ export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode
 
   if(!alumnoId) return null;
 
+  const fabBottom = "calc(env(safe-area-inset-bottom, 0px) + 112px)";
+  const panelBottom = "calc(env(safe-area-inset-bottom, 0px) + 118px)";
+  /** Por encima del bottom nav alumno (z-index 40) y debajo de modales (600+). */
+
   return (
     <div>
       {abierto&&(
-        <div style={{position:"fixed",bottom:76,right:14,width:290,maxWidth:"calc(100vw - 28px)",background:bgCard,borderRadius:16,border:"1px solid "+border,zIndex:150,padding:16,boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
+        <div style={{position:"fixed",bottom:panelBottom,right:16,width:290,maxWidth:"calc(100vw - 32px)",background:bgCard,borderRadius:16,border:"1px solid "+border,zIndex:165,padding:16,boxSizing:"border-box",boxShadow:"0 8px 32px rgba(0,0,0,0.5)"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
             <div style={{fontSize:15,fontWeight:800,color:textMain}}><Ic name="message-circle" size={18}/> Chat con Entrenador</div>
             <button onClick={()=>setAbierto(false)} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer"}}><Ic name="x" size={16}/></button>
@@ -54,7 +58,7 @@ export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode
           <Chat darkMode={darkMode} _dm={_dm} alumnoId={alumnoId} alumnoNombre={alumnoNombre} esEntrenador={esEntrenador} sb={sb} es={es}/>
         </div>
       )}
-      <button onClick={toggleChat} style={{position:"fixed",bottom:86,right:14,background:"#2563EB",color:"#fff",border:"none",borderRadius:"50%",width:40,height:40,fontSize:15,cursor:"pointer",zIndex:149,boxShadow:"0 4px 12px rgba(239,68,68,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <button type="button" onClick={toggleChat} style={{position:"fixed",bottom:fabBottom,right:16,background:"#2563EB",color:"#fff",border:"none",borderRadius:"50%",width:40,height:40,fontSize:15,cursor:"pointer",zIndex:155,boxShadow:"0 4px 12px rgba(239,68,68,0.4)",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent",boxSizing:"border-box"}}>
         💬
         {unread>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#22C55E",color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{unread}</span>}
       </button>
