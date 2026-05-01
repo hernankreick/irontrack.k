@@ -22,9 +22,12 @@ export function DeleteConfirmModal({
   loading = false,
   /** Texto mientras loading (ej. "Eliminando…") */
   loadingLabel = 'Eliminando…',
+  requireAcknowledge = false,
+  acknowledgeLabel = 'Entiendo que esta acción no se puede deshacer',
   zIndex = 10000,
 }) {
   const cancelRef = useRef(null);
+  const [acknowledged, setAcknowledged] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const titleId = useId();
   const descId = useId();
@@ -48,6 +51,13 @@ export function DeleteConfirmModal({
       };
     },
     [updateNarrow]
+  );
+
+  useEffect(
+    function () {
+      if (open) setAcknowledged(false);
+    },
+    [open, title, message]
   );
 
   useEffect(
@@ -131,6 +141,7 @@ export function DeleteConfirmModal({
   var titleFont = narrow ? 21 : 24;
   var py = narrow ? 24 : 32;
   var maxW = 520;
+  var confirmDisabled = loading || (requireAcknowledge && !acknowledged);
 
   return createPortal(
     <div
@@ -234,6 +245,42 @@ export function DeleteConfirmModal({
               {subjectName}
             </div>
           ) : null}
+          {requireAcknowledge ? (
+            <label
+              style={{
+                marginTop: 18,
+                width: '100%',
+                maxWidth: 440,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                textAlign: 'left',
+                color: 'rgba(241, 245, 249, 0.92)',
+                fontSize: 14,
+                fontWeight: 700,
+                lineHeight: 1.4,
+                cursor: loading ? 'default' : 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                disabled={loading}
+                onChange={function (e) {
+                  setAcknowledged(e.target.checked);
+                }}
+                style={{
+                  width: 18,
+                  height: 18,
+                  marginTop: 1,
+                  accentColor: '#ef4444',
+                  flexShrink: 0,
+                  cursor: loading ? 'default' : 'pointer',
+                }}
+              />
+              <span>{acknowledgeLabel}</span>
+            </label>
+          ) : null}
         </div>
         <div
           style={{
@@ -267,7 +314,7 @@ export function DeleteConfirmModal({
           </button>
           <button
             type="button"
-            disabled={loading}
+            disabled={confirmDisabled}
             onClick={onConfirm}
             style={{
               flex: '1 1 160px',
@@ -275,10 +322,10 @@ export function DeleteConfirmModal({
               borderRadius: 16,
               fontSize: 15,
               fontWeight: 800,
-              cursor: loading ? 'wait' : 'pointer',
+              cursor: loading ? 'wait' : confirmDisabled ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
               ...confirmStyle,
-              opacity: loading ? 0.8 : 1,
+              opacity: confirmDisabled ? 0.55 : 1,
             }}
           >
             {loading ? loadingLabel : confirmLabel}

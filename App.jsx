@@ -460,8 +460,18 @@ const sb = {
   },
   getProgreso: (alumnoId) => sbFetch("progreso?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc"),
   addProgreso: (data) => sbFetch("progreso", "POST", data),
+  deleteProgresoByAlumno: async (alumnoId) => {
+    const { error } = await supabase.from("progreso").delete().eq("alumno_id", String(alumnoId));
+    if (error) throw error;
+    return true;
+  },
   getSesiones: (alumnoId) => sbFetch("sesiones?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=10"),
   addSesion: (data) => sbFetch("sesiones", "POST", data),
+  deleteSesionesByAlumno: async (alumnoId) => {
+    const { error } = await supabase.from("sesiones").delete().eq("alumno_id", String(alumnoId));
+    if (error) throw error;
+    return true;
+  },
   getUltimaSesion: (alumnoId) => sbFetch("sesiones?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   getFotos: (alumnoId) => sbFetch("fotos?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc"),
   deleteFoto: (id) => sbFetch("fotos?id=eq."+id, "DELETE"),
@@ -2649,6 +2659,27 @@ function GymApp() {
         loadingLabel: msg('Eliminando…', 'Removing…', 'Excluindo…'),
       };
     }
+    if (c.t === 'clearProgress' && c.a) {
+      return {
+        tone: 'danger',
+        title: msg('Limpiar historial de progreso', 'Clear progress history', 'Limpar histórico de progresso'),
+        message: msg(
+          'Esta acción eliminará los PRs, sesiones completadas, volumen, tonelaje y métricas de progreso de este alumno. La rutina asignada y los datos personales se mantendrán. Esta acción no se puede deshacer.',
+          'This action will delete this athlete’s PRs, completed sessions, volume, tonnage, and progress metrics. The assigned routine and personal data will be kept. This action cannot be undone.',
+          'Esta ação eliminará os PRs, sessões concluídas, volume, tonelagem e métricas de progresso deste aluno. A rotina atribuída e os dados pessoais serão mantidos. Esta ação não pode ser desfeita.'
+        ),
+        subjectName: c.a && (c.a.nombre || c.a.email),
+        confirmLabel: msg('Limpiar historial', 'Clear history', 'Limpar histórico'),
+        useLogoutIcon: false,
+        loadingLabel: msg('Limpiando…', 'Clearing…', 'Limpando…'),
+        requireAcknowledge: true,
+        acknowledgeLabel: msg(
+          'Entiendo que esta acción no se puede deshacer',
+          'I understand this action cannot be undone',
+          'Entendo que esta ação não pode ser desfeita'
+        ),
+      };
+    }
     if (c.t === 'quitarRut') {
       return {
         tone: 'danger',
@@ -2741,10 +2772,93 @@ function GymApp() {
     return { tone: 'danger', title: '', message: '', subjectName: null, confirmLabel: 'OK', useLogoutIcon: false, loadingLabel: '…' };
   }
 
+  async function clearAlumnoProgressHistory(alumnoId) {
+    var aid = alumnoId != null ? String(alumnoId) : "";
+    if (!aid) throw new Error("alumnoId requerido");
+
+    await Promise.all([
+      sb.deleteProgresoByAlumno(aid),
+      sb.deleteSesionesByAlumno(aid),
+    ]);
+
+    setAlumnoProgreso(function (prev) {
+      if (!alumnoActivo || String(alumnoActivo.id) === aid) return [];
+      return prev || [];
+    });
+    setAlumnoSesiones(function (prev) {
+      if (!alumnoActivo || String(alumnoActivo.id) === aid) return [];
+      return prev || [];
+    });
+    setSesionesGlobales(function (prev) {
+      return (prev || []).filter(function (s) {
+        return String(s && s.alumno_id) !== aid;
+      });
+    });
+    setProgresoGlobal(function (prev) {
+      var next = Object.assign({}, prev || {});
+      delete next[aid];
+      return next;
+    });
+    setSesiones(function (prev) {
+      if (!Array.isArray(prev)) return prev;
+      return prev.filter(function (s) {
+        return String(s && s.alumno_id) !== aid;
+      });
+    });
+    setSugerencias(function (prev) {
+      if (!prev || typeof prev !== "object") return prev;
+      var next = Object.assign({}, prev);
+      delete next[aid];
+      return next;
+    });
+
+    var rutinaIdsAlumno = {};
+    mergeRutinasAsignadas(rutinasUnificadas, rutinasSBEntrenador, alumnosActivosIds).concat(rutinasSB || []).forEach(function (r) {
+      if (r && String(r.alumno_id) === aid && r.id != null) rutinaIdsAlumno[String(r.id)] = true;
+    });
+    setCompletedDays(function (prev) {
+      return (prev || []).filter(function (k) {
+        var key = String(k);
+        return !Object.keys(rutinaIdsAlumno).some(function (rid) {
+          return key.startsWith(rid + "-");
+        });
+      });
+    });
+
+    try {
+      var sessRaw = localStorage.getItem("it_session");
+      var sess = sessRaw ? JSON.parse(sessRaw) : null;
+      if (sess && sess.alumnoId != null && String(sess.alumnoId) === aid) {
+        localStorage.setItem("it_pg", JSON.stringify({}));
+        setProgress({});
+      }
+    } catch (e) {}
+
+    setPendingSync(function (prev) {
+      var next = (prev || []).filter(function (item) {
+        if (!item || item.alumno_id == null) return true;
+        return String(item.alumno_id) !== aid;
+      });
+      try { localStorage.setItem("it_pending_sync", JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    if (alumnoActivo && String(alumnoActivo.id) === aid) {
+      setRegistrosSubTab(0);
+      try {
+        var freshRutinas = await sb.getRutinas(aid);
+        setRutinasSB(freshRutinas || []);
+      } catch (e) {}
+    }
+
+    cargarSesionesGlobales();
+    return true;
+  }
+
   async function confirmCoachDialog() {
     var c = coachDialog;
     if (c.t === 'none') return;
-    setCoachDialogLoading(c.t === 'deleteAlumno' || c.t === 'quitarRut' || c.t === 'assignRut');
+    setCoachDialogLoading(c.t === 'deleteAlumno' || c.t === 'quitarRut' || c.t === 'assignRut' || c.t === 'clearProgress');
     try {
       if (c.t === 'deleteAlumno' && c.a) {
         if (typeof sb.deleteAlumno === 'function') {
@@ -2756,6 +2870,12 @@ function GymApp() {
           });
         });
         toast2(msg('Alumno eliminado', 'Athlete removed', 'Aluno excluído'));
+        setCoachDialog({ t: 'none' });
+        return;
+      }
+      if (c.t === 'clearProgress' && c.a) {
+        await clearAlumnoProgressHistory(c.a.id);
+        toast2(msg('Historial de progreso limpiado', 'Progress history cleared', 'Histórico de progresso limpo'));
         setCoachDialog({ t: 'none' });
         return;
       }
@@ -2951,6 +3071,9 @@ function GymApp() {
       }
     } catch (e1) {
       console.error('[confirmCoachDialog]', e1);
+      if (c.t === 'clearProgress') {
+        toast2(msg('No se pudo limpiar el historial.', 'Could not clear the history.', 'Não foi possível limpar o histórico.'));
+      }
     } finally {
       setCoachDialogLoading(false);
     }
@@ -5027,6 +5150,17 @@ function GymApp() {
                           <button
                             type="button"
                             className="hov"
+                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f59e0b",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
+                            onClick={function () {
+                              setCoachCardMenuId(null);
+                              setCoachDialog({ t: 'clearProgress', a: a });
+                            }}
+                          >
+                            <Ic name="refresh-cw" size={16} color="#f59e0b"/> {msg("Limpiar historial de progreso", "Clear progress history")}
+                          </button>
+                          <button
+                            type="button"
+                            className="hov"
                             style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
                             onClick={function () {
                               setCoachCardMenuId(null);
@@ -6693,6 +6827,8 @@ function GymApp() {
       loading={coachDialogLoading}
       loadingLabel={cfg.loadingLabel}
       useLogoutIcon={!!cfg.useLogoutIcon}
+      requireAcknowledge={!!cfg.requireAcknowledge}
+      acknowledgeLabel={cfg.acknowledgeLabel}
     />
       );
     })()}
