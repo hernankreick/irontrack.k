@@ -42,7 +42,7 @@ export function navItemStyle(isActive, palette) {
   };
 }
 
-/** Barras semana demo: letras según locale (LMXJVSD / MTWTFSS / STQQSSD). */
+/** Barras de semana: letras según locale (LMXJVSD / MTWTFSS / STQQSSD). */
 function weekBarsForLang(lang) {
   var letters =
     lang === "en"
@@ -280,7 +280,7 @@ function coachInitials(a) {
 
 /** Espejo de coachAlumnoCategoria en App.jsx (fallback si no se pasa getAlumnoCategoria). */
 function defaultCoachAlumnoCategoria(a, rutinasSBEntrenador, sesionesGlobales, progresoGlobal) {
-  if (!rutinasSBEntrenador.some(function (r) { return r.alumno_id === a.id; })) return "sin_rutina";
+  if (!rutinasSBEntrenador.some(function (r) { return String(r.alumno_id) === String(a.id); })) return "sin_rutina";
   var cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000;
   var ses = sesionesGlobales || [];
   for (var i = 0; i < ses.length; i++) {
@@ -601,7 +601,7 @@ export default function CoachDashboard({
     [lang, coachName]
   );
 
-  /** Resumen stats (mock alineado al dashboard) — solo layout mobile vs desktop. */
+  /** Resumen de stats derivado del estado actual del dashboard. */
   var nowMs = Date.now();
   var weekStartMs = nowMs - 7 * 86400000;
   var prevWeekStartMs = nowMs - 14 * 86400000;
@@ -625,8 +625,8 @@ export default function CoachDashboard({
   var dashboardInterpretacion = pctSemana >= objetivoSemanalPct
     ? M(lang, "Semana en objetivo", "Week on target", "Semana no objetivo")
     : pctSemana >= 55
-      ? M(lang, "Vas bien, pero podés mejorar", "You're doing well, but can improve", "VocÃª vai bem, mas pode melhorar")
-      : M(lang, "Necesita atención esta semana", "Needs attention this week", "Precisa de atenÃ§Ã£o esta semana");
+      ? M(lang, "Vas bien, pero podés mejorar", "You're doing well, but can improve", "Você vai bem, mas pode melhorar")
+      : M(lang, "Necesita atención esta semana", "Needs attention this week", "Precisa de atenção esta semana");
 
   var _mobile = React.useState(false);
   var isMobile = _mobile[0];
@@ -672,9 +672,9 @@ export default function CoachDashboard({
           lang,
           faltanObjetivo + " sesiones para llegar al objetivo semanal",
           faltanObjetivo + " sessions to reach the weekly target",
-          faltanObjetivo + " sessÃµes para chegar ao objetivo semanal"
+          faltanObjetivo + " sessões para chegar ao objetivo semanal"
         )
-      : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcanÃ§ado");
+      : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcançado");
   var accionRecomendada =
     sinRutinaCount > 0
       ? M(lang, "Asignar rutinas pendientes", "Assign pending routines", "Atribuir rotinas pendentes")
@@ -800,7 +800,6 @@ export default function CoachDashboard({
             <CoachNotificationCenter
               lang={lang}
               alertRows={coachAlertsReal}
-              alumnos={alumnos}
               onRevisarAlumno={onRevisar}
               onIrAlumnos={onRevisarAlumnos}
               onIrProgreso={onIrProgreso}
@@ -998,7 +997,7 @@ export default function CoachDashboard({
                 }}
               >
                 <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 14 }}>
-                  {M(lang, "RECOMENDACIÃ“N PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÃ‡ÃƒO PRINCIPAL")}
+                  {M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL")}
                 </div>
                 <div style={{ fontSize: 24, lineHeight: 1.12, fontWeight: 850, color: C.t, letterSpacing: -0.2 }}>
                   {accionRecomendada}
@@ -1201,7 +1200,7 @@ export default function CoachDashboard({
                     </div>
                     <div style={{background:dashCardSoft,border:"1px solid "+dashBorder,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
                       <div style={{...T.sectionEyebrow,color:dashMuted,marginBottom:8,letterSpacing:1.4}}>
-                        {M(lang, "Insight del dÃ­a", "Today's insight", "Insight do dia")}
+                        {M(lang, "Insight del día", "Today's insight", "Insight do dia")}
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8,...T.bodySemibold,color:pctSemana >= objetivoSemanalPct ? C.green : C.yel}}>
                         <Star size={16} color={C.blue} strokeWidth={2}/>
@@ -1215,7 +1214,7 @@ export default function CoachDashboard({
                     </div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                       <button className="cd-btn" type="button" onClick={accionPrincipalHandler} style={{background:C.blue,color:"#fff",border:"none",borderRadius:8,padding:"10px 12px",fontSize:13,fontWeight:800,cursor:"pointer"}}>
-                        {M(lang, "AcciÃ³n recomendada", "Recommended action", "AÃ§Ã£o recomendada")}
+                        {M(lang, "Acción recomendada", "Recommended action", "Ação recomendada")}
                       </button>
                       <button className="cd-btn" type="button" onClick={onRevisarAlumnos} style={{background:"transparent",color:C.t,border:"1px solid "+dashBorder,borderRadius:8,padding:"10px 12px",fontSize:13,fontWeight:800,cursor:"pointer"}}>
                         {M(lang, "Ver equipo", "View team", "Ver equipe")}
@@ -1271,7 +1270,7 @@ export default function CoachDashboard({
                 }}
               >
                 <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 14 }}>
-                  {M(lang, "RECOMENDACIÃ“N PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÃ‡ÃƒO PRINCIPAL")}
+                  {M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL")}
                 </div>
                 <div style={{ fontSize: 24, lineHeight: 1.12, fontWeight: 850, color: C.t, letterSpacing: -0.2 }}>
                   {accionRecomendada}
@@ -1921,7 +1920,7 @@ export default function CoachDashboard({
                       letterSpacing: 0.08,
                     }}
                   >
-                    {M(lang, "ACCIÃ“N", "ACTION", "AÃ‡ÃƒO")}
+                    {M(lang, "ACCIÓN", "ACTION", "AÇÃO")}
                   </div>
                 </div>
                 {coachActiveRows.map(function (row, idx) {
