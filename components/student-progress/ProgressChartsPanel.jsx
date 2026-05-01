@@ -59,9 +59,9 @@ function metricUnit(mode, es) {
 }
 
 function MiniSpark({ values, accent }) {
-  const h = 14
-  const w = 40
-  const pad = 1
+  const h = 22
+  const w = 58
+  const pad = 2
   const vals = (values || []).map((v) => Number(v) || 0)
   if (!vals.length) return <svg width={w} height={h} aria-hidden />
   const mx = Math.max(...vals, 1e-6)
@@ -72,11 +72,11 @@ function MiniSpark({ values, accent }) {
     return `${x},${y}`
   })
   return (
-    <svg width={w} height={h} className="shrink-0 overflow-visible" aria-hidden>
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0 overflow-visible" aria-hidden>
       <polyline
         fill="none"
         stroke={accent}
-        strokeWidth={1.25}
+        strokeWidth={2.1}
         strokeLinecap="round"
         strokeLinejoin="round"
         points={pts.join(' ')}
@@ -126,7 +126,7 @@ function DetailChart({
   if (sorted.length < 2) {
     return (
       <div
-        className="rounded-[14px] border px-4 py-6 text-center text-[12px] leading-relaxed"
+        className="rounded-[14px] border px-5 py-8 text-center text-[12px] leading-relaxed"
         style={{
           borderColor: 'rgba(74, 101, 133, 0.42)',
           background: 'rgba(10, 15, 26, 0.32)',
@@ -382,8 +382,8 @@ export function ProgressChartsPanel({
   if (loadingSb) {
     return (
       <div className="flex flex-col gap-4 py-2">
-        <div className="h-[72px] rounded-[12px] border border-[var(--sp-stroke)] bg-[var(--sp-surface)]" />
-        <div className="h-[72px] rounded-[12px] border border-[var(--sp-stroke)] bg-[var(--sp-surface)]" />
+        <div className="h-[96px] rounded-[12px] border border-[var(--sp-stroke)] bg-[var(--sp-surface)]" />
+        <div className="h-[96px] rounded-[12px] border border-[var(--sp-stroke)] bg-[var(--sp-surface)]" />
       </div>
     )
   }
@@ -394,7 +394,7 @@ export function ProgressChartsPanel({
         {[0, 1, 2].map((i) => (
           <div
             key={`sk-${i}`}
-            className="h-[72px] rounded-[12px] border border-dashed border-[var(--sp-stroke)] bg-[var(--sp-surface)]/40"
+            className="h-[96px] rounded-[12px] border border-dashed border-[var(--sp-stroke)] bg-[var(--sp-surface)]/40"
           />
         ))}
         <p className="text-center text-[12px] leading-relaxed" style={{ color: 'var(--sp-muted)' }}>
@@ -408,8 +408,8 @@ export function ProgressChartsPanel({
 
   if (items.length === 0) {
     return (
-      <div className="px-1 py-8 text-center">
-        <p className="text-[13px]" style={{ color: 'var(--sp-muted)' }}>
+      <div className="px-4 py-12 text-center">
+        <p className="text-[13px] leading-relaxed" style={{ color: 'var(--sp-muted)' }}>
           {es ? 'Registrá sets con peso para ver tu progreso por ejercicio.' : 'Log weighted sets to see progress per exercise.'}
         </p>
       </div>
@@ -432,17 +432,17 @@ export function ProgressChartsPanel({
   }
 
   return (
-    <div className="flex flex-col gap-4 px-0 pt-2">
+    <div className="flex flex-col gap-5 px-0 pt-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-2">
             <h2
-              className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em]"
-              style={{ color: 'rgba(243,244,246,0.65)' }}
+              className="m-0 text-[12px] font-semibold uppercase tracking-[0.2em]"
+              style={{ color: 'rgba(203,213,225,0.78)' }}
             >
               {es ? 'Progreso por ejercicio' : 'Progress by exercise'}
             </h2>
-            <span className="text-[11px] tabular-nums" style={{ color: 'var(--sp-muted)' }}>
+            <span className="text-[12px] tabular-nums" style={{ color: 'var(--sp-muted)' }}>
               · {activeCount} {es ? 'activos' : 'active'}
             </span>
           </div>
@@ -450,7 +450,7 @@ export function ProgressChartsPanel({
         {items.length > 10 && (
           <button
             type="button"
-            className="shrink-0 border-0 bg-transparent p-0 text-[12px] font-semibold"
+            className="shrink-0 border-0 bg-transparent p-0 text-[13px] font-semibold"
             style={{ color: accent }}
             onClick={() => setShowAll(true)}
           >
@@ -459,15 +459,16 @@ export function ProgressChartsPanel({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-3">
         <div className="relative">
           <button
             type="button"
-            className="inline-flex min-h-[36px] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium"
             style={{
-              borderColor: 'var(--sp-stroke)',
-              background: 'var(--sp-surface)',
+              borderColor: 'rgba(111, 143, 184, 0.52)',
+              background: 'linear-gradient(180deg, rgba(36, 55, 82, 0.92), rgba(19, 33, 52, 0.92))',
               color: 'var(--sp-fg)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
             }}
             onClick={(e) => {
               e.stopPropagation()
@@ -511,11 +512,12 @@ export function ProgressChartsPanel({
         <div className="relative">
           <button
             type="button"
-            className="inline-flex min-h-[36px] items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-medium"
+            className="inline-flex min-h-[42px] items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium"
             style={{
-              borderColor: 'var(--sp-stroke)',
-              background: 'var(--sp-surface)',
+              borderColor: 'rgba(111, 143, 184, 0.52)',
+              background: 'linear-gradient(180deg, rgba(36, 55, 82, 0.92), rgba(19, 33, 52, 0.92))',
               color: 'var(--sp-fg)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
             }}
             onClick={(e) => {
               e.stopPropagation()
@@ -558,7 +560,7 @@ export function ProgressChartsPanel({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         {limited.map(({ ex, datos, datosAsc, pr, ultimo, pct, trend, name, kgSeries, atPR }) => {
           const isOpen = expandedEx === ex.id
           const hist = [...datos].reverse()
@@ -566,24 +568,36 @@ export function ProgressChartsPanel({
           return (
             <div
               key={ex.id}
-              className="overflow-hidden rounded-[16px] border transition-colors"
+              className="overflow-hidden rounded-[18px] border transition-colors"
               style={{
-                borderColor: 'var(--sp-stroke)',
-                background: 'var(--sp-surface)',
+                borderColor: isOpen ? 'rgba(111, 143, 184, 0.72)' : 'rgba(90, 121, 160, 0.56)',
+                background:
+                  'linear-gradient(135deg, rgba(28, 47, 72, 0.95), rgba(12, 23, 37, 0.96))',
+                boxShadow: isOpen
+                  ? '0 18px 42px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.08)'
+                  : '0 10px 24px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255,255,255,0.06)',
               }}
             >
               <button
                 type="button"
-                className="grid w-full min-h-[86px] grid-cols-[40px_minmax(0,1fr)_96px] items-center gap-3 px-4 py-4 text-left"
+                className="flex w-full min-h-[144px] flex-col gap-4 px-5 py-5 text-left sm:min-h-[132px]"
                 style={{ background: 'transparent' }}
                 onClick={() => setExpandedEx(isOpen ? null : ex.id)}
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--sp-stroke)] bg-[var(--sp-surface-high)]">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border"
+                    style={{
+                      borderColor: 'rgba(111,143,184,0.54)',
+                      background: 'rgba(7, 16, 28, 0.56)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
+                    }}
+                  >
                   {trendGlyph(trend)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <span
-                    className="block font-semibold text-[14px]"
+                    className="block font-semibold text-[16px]"
                     style={{
                       color: 'var(--sp-fg)',
                       display: '-webkit-box',
@@ -595,14 +609,24 @@ export function ProgressChartsPanel({
                   >
                     {name}
                   </span>
-                  <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px]" style={{ color: 'var(--sp-muted)' }}>
+                </div>
+                  <ChevronDown
+                    className={cn('mt-0.5 h-9 w-9 shrink-0 rounded-full p-2 transition-transform', isOpen && 'rotate-180')}
+                    strokeWidth={2}
+                    style={{
+                      color: 'rgba(226,232,240,0.82)',
+                      background: 'rgba(74,101,133,0.28)',
+                    }}
+                  />
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 text-[12px]" style={{ color: 'var(--sp-muted)' }}>
                     {atPR && (
                       <span
-                        className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+                        className="shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide"
                         style={{
-                          background: 'rgba(245, 158, 11, 0.16)',
-                          color: 'var(--sp-pr)',
-                          border: '1px solid rgba(245, 158, 11, 0.42)',
+                          background: 'linear-gradient(180deg, #FBBF24, #F59E0B)',
+                          color: '#07111f',
+                          border: '1px solid rgba(255, 214, 102, 0.55)',
                         }}
                       >
                         PR
@@ -610,44 +634,44 @@ export function ProgressChartsPanel({
                     )}
                     {ultimo ? (
                       <>
-                        <span className="truncate">
+                        <span className="min-w-0 break-words text-[13px] leading-snug">
                           {ultimo.kg}kg × {ultimo.reps}
                         </span>
-                        {pct != null && datos.length >= 2 && (
-                          <span className="font-semibold tabular-nums" style={{ color: pctColor(pct) }}>
-                            {pct > 0 ? '+' : ''}
-                            {pct}%
-                          </span>
-                        )}
                       </>
                     ) : (
                       '—'
                     )}
-                  </div>
                 </div>
-                <div className="grid w-[96px] shrink-0 grid-cols-[1fr_18px] items-center gap-x-2 gap-y-1">
-                  <div className="min-w-0 text-right">
+                <div className="flex min-w-0 flex-wrap items-end gap-3">
+                  <div className="min-w-0">
                     <span
                       className="num block tabular-nums leading-none"
                       style={{
                         fontFamily: "'Barlow Condensed',sans-serif",
-                        fontSize: 24,
+                        fontSize: 38,
                         fontWeight: 800,
                         color: 'var(--sp-fg)',
                       }}
                     >
                       {ultimo ? `${ultimo.kg}` : '—'}
                     </span>
-                    <span className="block text-[10px] font-semibold uppercase leading-none" style={{ color: 'var(--sp-muted)' }}>
+                    <span className="block text-[11px] font-semibold uppercase leading-none" style={{ color: 'var(--sp-muted)' }}>
                       kg
                     </span>
                   </div>
-                  <ChevronDown
-                    className={cn('h-[18px] w-[18px] justify-self-end transition-transform', isOpen && 'rotate-180')}
-                    strokeWidth={2}
-                    style={{ color: 'rgba(243,244,246,0.42)' }}
-                  />
-                  <div className="col-span-2 flex justify-end pr-6">
+                  {pct != null && datos.length >= 2 && (
+                    <span
+                      className="mb-1 rounded-full px-2.5 py-1 text-[11px] font-semibold tabular-nums"
+                      style={{
+                        color: pctColor(pct),
+                        background: pct > 0 ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255,255,255,0.04)',
+                      }}
+                    >
+                      {pct > 0 ? '+' : ''}
+                      {pct}%
+                    </span>
+                  )}
+                  <div className="ml-auto flex min-w-[72px] justify-end pb-1">
                     <MiniSpark values={kgSeries.slice(-6)} accent={accent} />
                   </div>
                 </div>
@@ -655,10 +679,14 @@ export function ProgressChartsPanel({
 
               {isOpen && (
                 <div
-                  className="border-t px-4 pb-5 pt-4"
-                  style={{ borderColor: 'var(--sp-stroke)', background: 'rgba(10, 15, 26, 0.26)' }}
+                  className="mx-4 mb-4 rounded-[17px] border px-4 pb-5 pt-4"
+                  style={{
+                    borderColor: 'rgba(90, 121, 160, 0.5)',
+                    background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.64), rgba(10, 18, 30, 0.42))',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+                  }}
                 >
-                  <div className="mb-4 flex flex-wrap items-center gap-2.5">
+                  <div className="mb-5 flex flex-wrap items-center gap-3">
                     {[
                       { id: 'peso', labEs: 'Peso', labEn: 'Weight' },
                       { id: 'reps', labEs: 'Reps', labEn: 'Reps' },
@@ -667,26 +695,28 @@ export function ProgressChartsPanel({
                       <button
                         key={t.id}
                         type="button"
-                        className="rounded-full px-3.5 py-2 text-[11px] font-semibold transition-colors"
+                        className="min-h-[42px] rounded-[11px] px-4 py-2 text-[13px] font-semibold transition-colors"
                         style={{
                           background:
-                            metricTab === t.id ? 'rgba(37, 99, 235, 0.24)' : 'rgba(255,255,255,0.02)',
+                            metricTab === t.id
+                              ? 'linear-gradient(180deg, rgba(37,99,235,0.86), rgba(29,78,216,0.62))'
+                              : 'rgba(7,16,28,0.42)',
                           color: metricTab === t.id ? 'var(--sp-fg)' : 'var(--sp-muted)',
-                          border: `1px solid ${metricTab === t.id ? 'rgba(37, 99, 235, 0.42)' : 'var(--sp-stroke)'}`,
+                          border: `1px solid ${metricTab === t.id ? 'rgba(96, 165, 250, 0.46)' : 'rgba(90, 121, 160, 0.34)'}`,
                         }}
                         onClick={() => setMetricTab(t.id)}
                       >
                         {es ? t.labEs : t.labEn}
                       </button>
                     ))}
-                    <div className="ml-auto flex flex-wrap gap-1">
+                    <div className="ml-auto flex flex-wrap gap-2">
                       {['1M', '3M', '6M', '1A'].map((rk) => (
                         <button
                           key={rk}
                           type="button"
-                          className="rounded-full px-3 py-1.5 text-[10px] font-semibold tabular-nums"
+                          className="min-h-[38px] rounded-[10px] px-3.5 py-1.5 text-[12px] font-semibold tabular-nums"
                           style={{
-                            background: rangeKey === rk ? 'rgba(37, 99, 235, 0.16)' : 'transparent',
+                            background: rangeKey === rk ? 'rgba(37, 99, 235, 0.24)' : 'rgba(7,16,28,0.22)',
                             color: rangeKey === rk ? accent : 'var(--sp-muted)',
                             border: `1px solid ${rangeKey === rk ? 'rgba(37, 99, 235, 0.35)' : 'transparent'}`,
                           }}
@@ -709,7 +739,7 @@ export function ProgressChartsPanel({
                     es={es}
                   />
 
-                  <div className="mt-5">
+                  <div className="mt-6">
                     <div
                       className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em]"
                       style={{ color: 'rgba(243,244,246,0.5)' }}
@@ -717,7 +747,7 @@ export function ProgressChartsPanel({
                       {es ? 'Historial' : 'History'} · {hist.length}{' '}
                       {es ? 'sesiones' : 'sessions'}
                     </div>
-                    <div className="flex max-h-[240px] flex-col gap-2 overflow-y-auto pr-1 sp-scroll-hide">
+                    <div className="flex max-h-[264px] flex-col gap-2.5 overflow-y-auto pr-1 sp-scroll-hide">
                       {hist.slice(0, 24).map((d, i) => {
                         const isRowPR = pr > 0 && Math.abs(d.kg - pr) < 0.05
                         const prev = hist[i + 1]
@@ -725,10 +755,10 @@ export function ProgressChartsPanel({
                         return (
                           <div
                             key={`${ex.id}-h-${i}-${d.fecha}-${d.kg}`}
-                            className="grid min-h-[44px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl px-3 py-2 text-[11px] tabular-nums"
+                            className="grid min-h-[58px] grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-[13px] px-4 py-3 text-[13px] tabular-nums"
                             style={{
                               borderLeft: isRowPR ? '2px solid var(--sp-pr)' : '2px solid transparent',
-                              background: isRowPR ? 'rgba(245, 158, 11, 0.09)' : 'rgba(255,255,255,0.025)',
+                              background: isRowPR ? 'rgba(245, 158, 11, 0.09)' : 'rgba(36,55,82,0.45)',
                               color: 'var(--sp-fg)',
                             }}
                           >

@@ -226,10 +226,10 @@ export default function StudentProgressSection({
   const shellStyle = {
     fontFamily: "Inter, sans-serif",
     boxSizing: 'border-box',
-    ['--sp-bg']: '#0A0F1A',
-    ['--sp-surface']: '#162438',
-    ['--sp-surface-high']: '#1B2D44',
-    ['--sp-stroke']: 'rgba(74, 101, 133, 0.58)',
+    ['--sp-bg']: '#06111F',
+    ['--sp-surface']: '#14243A',
+    ['--sp-surface-high']: '#1B314B',
+    ['--sp-stroke']: 'rgba(91, 121, 160, 0.56)',
     ['--sp-fg']: '#ffffff',
     ['--sp-muted']: '#94A3B8',
     ['--sp-accent']: '#2563EB',
@@ -248,7 +248,7 @@ export default function StudentProgressSection({
       }}
     >
       <div
-        className="relative z-0 mx-auto flex w-full max-w-[32rem] flex-col gap-7 pb-28 pt-5"
+        className="relative z-0 mx-auto flex w-full max-w-[32rem] flex-col gap-9 pb-44 pt-5"
         style={{ paddingInline: 'var(--page-gutter)', boxSizing: 'border-box' }}
       >
         {subView !== 'main' && (
@@ -416,11 +416,12 @@ export default function StudentProgressSection({
 
             {/* KPI strip */}
             <div
-              className="grid grid-cols-4 rounded-[14px] border"
+              className="grid grid-cols-4 rounded-[16px] border"
               style={{
-                borderColor: 'var(--sp-stroke)',
-                background: 'var(--sp-surface)',
-                minHeight: 70,
+                borderColor: 'rgba(90,121,160,0.48)',
+                background: 'linear-gradient(135deg, rgba(28,47,72,0.9), rgba(11,22,36,0.94))',
+                minHeight: 78,
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
               }}
             >
               {kpiRows.map((k, idx) => (
@@ -456,12 +457,22 @@ export default function StudentProgressSection({
               ))}
             </div>
 
+            <ProgressChartsPanel
+              progress={progress}
+              EX={EX}
+              allEx={allEx}
+              es={es}
+              sbData={sbData}
+              loadingSb={loadingSb}
+              emptySkeleton={!loadingSb && !hasData}
+            />
+
             {/* Achievements */}
-            <div className="mt-1">
-              <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--sp-muted)' }}>
+            <div className="mt-5">
+              <div className="mb-4 text-[12px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'rgba(203,213,225,0.78)' }}>
                 {es ? 'Logros' : 'Achievements'}
               </div>
-              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-3 sp-scroll-hide">
+              <div className="-mx-2 flex gap-4 overflow-x-auto px-2 pb-5 sp-scroll-hide">
                 {achievements.map((a) => {
                   const locked = !a.unlocked
                   const showDot = a.unlocked && !seenAch.has(a.id)
@@ -469,14 +480,17 @@ export default function StudentProgressSection({
                     <button
                       key={a.id}
                       type="button"
-                      className="relative flex min-h-[118px] w-[232px] shrink-0 items-start gap-3 rounded-[16px] border p-4 text-left transition-opacity"
+                      className="relative flex min-h-[132px] w-[250px] shrink-0 flex-col justify-between gap-4 rounded-[18px] border p-5 text-left transition-opacity"
                       style={{
-                        borderColor: locked ? 'rgba(148,163,184,0.28)' : 'rgba(245,158,11,0.62)',
-                        borderStyle: locked ? 'dashed' : 'solid',
+                        borderColor: locked ? 'rgba(111,143,184,0.44)' : 'rgba(245,158,11,0.72)',
+                        borderStyle: 'solid',
                         background: locked
-                          ? 'rgba(27,45,68,0.48)'
-                          : 'linear-gradient(145deg, rgba(245,158,11,0.12), var(--sp-surface-high))',
-                        opacity: locked ? 0.72 : 1,
+                          ? 'linear-gradient(135deg, rgba(28,47,72,0.82), rgba(11,22,36,0.88))'
+                          : 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(22,35,52,0.94))',
+                        opacity: locked ? 0.82 : 1,
+                        boxShadow: locked
+                          ? 'inset 0 1px 0 rgba(255,255,255,0.06)'
+                          : '0 12px 28px rgba(245,158,11,0.08), inset 0 1px 0 rgba(255,255,255,0.08)',
                       }}
                       onClick={() => {
                         if (a.unlocked) markAchSeen(a.id)
@@ -484,36 +498,43 @@ export default function StudentProgressSection({
                     >
                       {showDot ? (
                         <span
-                          className="absolute right-3 top-3 h-2 w-2 rounded-full"
+                          className="absolute right-4 top-4 h-2.5 w-2.5 rounded-full"
                           style={{ background: 'var(--sp-pr)' }}
                         />
                       ) : null}
-                      <span
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
-                        style={{
-                          borderColor: locked ? 'rgba(148,163,184,0.22)' : 'rgba(245,158,11,0.42)',
-                          background: locked ? 'rgba(15,23,42,0.36)' : 'rgba(245,158,11,0.16)',
-                        }}
-                      >
-                        <Medal
-                          className="h-5 w-5"
-                          strokeWidth={2}
-                          style={{ color: locked ? 'var(--sp-muted)' : 'var(--sp-pr)' }}
-                        />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px] font-semibold leading-snug" style={{ color: 'var(--sp-fg)' }}>
-                          {a.title}
+                      <div className="flex min-w-0 items-center gap-4">
+                        <span
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border"
+                          style={{
+                            borderColor: locked ? 'rgba(148,163,184,0.24)' : 'rgba(245,158,11,0.5)',
+                            background: locked ? 'rgba(7,16,28,0.48)' : 'rgba(245,158,11,0.16)',
+                          }}
+                        >
+                          <Medal
+                            className="h-5 w-5"
+                            strokeWidth={2}
+                            style={{ color: locked ? 'var(--sp-muted)' : 'var(--sp-pr)' }}
+                          />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[15px] font-semibold leading-snug" style={{ color: 'var(--sp-fg)' }}>
+                            {a.title}
+                          </div>
+                          <div className="mt-1.5 text-[13px] leading-[1.35]" style={{ color: locked ? 'var(--sp-muted)' : 'rgba(226,232,240,0.82)' }}>
+                            {locked ? a.sub : es ? 'Desbloqueado' : 'Unlocked'}
+                          </div>
                         </div>
-                        <div className="mt-1.5 text-[11px] leading-[1.45]" style={{ color: 'var(--sp-muted)' }}>
-                          {locked ? a.sub : es ? 'Desbloqueado' : 'Unlocked'}
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: locked ? 'var(--sp-muted)' : 'var(--sp-pr)' }}>
+                          {locked ? (es ? 'En progreso' : 'In progress') : es ? 'Logro activo' : 'Active'}
                         </div>
                         <div
-                          className="mt-3 inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold tabular-nums"
+                          className="inline-flex shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold tabular-nums"
                           style={{
                             color: locked ? 'var(--sp-muted)' : 'var(--sp-pr)',
-                            background: locked ? 'rgba(148,163,184,0.08)' : 'rgba(245,158,11,0.13)',
-                            border: `1px solid ${locked ? 'rgba(148,163,184,0.14)' : 'rgba(245,158,11,0.25)'}`,
+                            background: locked ? 'rgba(148,163,184,0.09)' : 'rgba(245,158,11,0.14)',
+                            border: `1px solid ${locked ? 'rgba(148,163,184,0.16)' : 'rgba(245,158,11,0.28)'}`,
                           }}
                         >
                           {a.unlocked ? (es ? 'Listo' : 'Done') : a.progress}
@@ -526,7 +547,7 @@ export default function StudentProgressSection({
             </div>
 
             {/* Links sesiones / fotos */}
-            <div className="flex flex-wrap items-center gap-3 border-t pt-4 text-[12px] font-semibold" style={{ borderColor: 'var(--sp-stroke)' }}>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 border-t pt-6 text-[13px] font-semibold" style={{ borderColor: 'rgba(90,121,160,0.42)' }}>
               <button
                 type="button"
                 className="border-0 bg-transparent p-0"
@@ -546,15 +567,6 @@ export default function StudentProgressSection({
               </button>
             </div>
 
-            <ProgressChartsPanel
-              progress={progress}
-              EX={EX}
-              allEx={allEx}
-              es={es}
-              sbData={sbData}
-              loadingSb={loadingSb}
-              emptySkeleton={!loadingSb && !hasData}
-            />
           </>
         )}
       </div>
