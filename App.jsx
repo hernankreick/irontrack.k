@@ -1065,6 +1065,7 @@ function GymApp() {
   const [sharedLoaded, setSharedLoaded] = useState(false);
   // Login
   const [sessionData, setSessionData] = useState(()=>{ try{return JSON.parse(localStorage.getItem("it_session")||"null")}catch(e){return null} });
+  const esAlumno = readOnly || sessionData?.role==="alumno";
   const [supabaseSessionUserId, setSupabaseSessionUserId] = useState(null);
   const [loginScreen, setLoginScreen] = useState(()=>{ try{return !localStorage.getItem("it_session")}catch(e){return true} });
   const [loginRole, setLoginRole] = useState("entrenador");
@@ -1423,7 +1424,10 @@ function GymApp() {
   const [timer, setTimer] = useState(null);
   const timerRef = useRef(null);
   const mobileDrawerRef = useRef(null);
-
+  const toast2 = useCallback((msg, type) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  }, []);
   var ALUMNO_HEADER_MINI_PX = 56;
   /** Colapso visual únicamente: NO quitar nodos ni height:0. La caja real la fija studentHeaderShellRef (altura monótona). */
   function applyAlumnoHeaderLayerStyles(collapsed) {
@@ -2065,11 +2069,6 @@ function GymApp() {
     }).catch(function(){});
   }, []);
 
-  const toast2 = useCallback((msg, type) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2200);
-  }, []);
-
   /** Recordatorios de entrenamiento (alumno): comprobar hora mientras la app está abierta. */
   React.useEffect(function () {
     if (typeof window === "undefined") return;
@@ -2410,7 +2409,6 @@ function GymApp() {
 
   const activeR = session ? routines.find(r=>r.id===session.rId) : null;
   const activeDay = activeR ? activeR.days[session.dIdx] : null;
-  const esAlumno = readOnly || sessionData?.role==="alumno";
   const alumnoPlanHeaderDayNum = useMemo(
     function () {
       if (!esAlumno || tab !== "plan" || !routines[0]) return null;
