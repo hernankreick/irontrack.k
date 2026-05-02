@@ -1350,6 +1350,122 @@ function GymApp() {
     });
     return out;
   }, [rutinasUnificadas, routines]);
+
+  const assignRoutineToAlumno = React.useCallback(async function ({ alumno, rutina, fecha, previousRoutine }) {
+    var authSessionAssign = await getActiveSupabaseSession();
+    if (!authSessionAssign) {
+      throw new Error("Inicia sesion nuevamente para asignar rutinas");
+    }
+
+    var alumnoIdAssign = alumno && alumno.id ? String(alumno.id) : "";
+    var entrenadorIdAssign = authSessionAssign.user && authSessionAssign.user.id ? String(authSessionAssign.user.id) : "";
+    if (!alumnoIdAssign || !entrenadorIdAssign || !rutina) {
+      console.error("[assignRut] datos invalidos", {
+        alumno_id: alumnoIdAssign || null,
+        entrenador_id: entrenadorIdAssign || null,
+        alumno: alumno,
+        rutinaLocal: rutina,
+        fecha: fecha || null,
+      });
+      throw new Error("Datos invalidos para asignar rutina");
+    }
+    if (!isValidUuid(alumnoIdAssign)) {
+      console.error("[assignRut] alumno_id no es UUID valido", { alumno_id: alumnoIdAssign, alumno: alumno });
+      throw new Error("El alumno no tiene un ID valido");
+    }
+    if (!isValidUuid(entrenadorIdAssign)) {
+      console.error("[assignRut] entrenador_id no es UUID valido", { entrenador_id: entrenadorIdAssign, sessionUserId: authSessionAssign.user?.id });
+      throw new Error("La sesion del entrenador no es valida");
+    }
+
+    var nombreAssign = rutina?.nombre || rutina?.name || "Rutina";
+    var daysAssign = rutina?.datos?.days || rutina?.days || [];
+    if (!Array.isArray(daysAssign)) {
+      console.error("[assignRut] days no es array", { days: daysAssign, rutinaLocal: rutina });
+      throw new Error("La rutina no tiene dias validos");
+    }
+
+    var body = {
+      alumno_id: alumnoIdAssign,
+      entrenador_id: entrenadorIdAssign,
+      nombre: nombreAssign,
+      datos: {
+        days: sanitizeRoutineDaysForWrite(daysAssign),
+        alumno: {
+          id: alumno.id,
+          nombre: alumno.nombre || "",
+          email: alumno.email || "",
+        },
+        note: rutina?.datos?.note || rutina?.note || "",
+      },
+    };
+
+    var insertResult = await supabase
+      .from("rutinas")
+      .insert([body])
+      .select()
+      .single();
+    if (insertResult.error || !insertResult.data) {
+      console.error("[assignRut INSERT ERROR FULL]", insertResult.error || insertResult);
+      throw insertResult.error || new Error("No se pudo crear la rutina asignada");
+    }
+
+    var res = insertResult.data;
+    var oldRutina = previousRoutine || getRutinaAsignadaAlumno(alumnoIdAssign);
+    if (oldRutina && oldRutina.id != null && String(oldRutina.id) !== String(res.id)) {
+      try {
+        await sb.deleteRutina(oldRutina.id);
+        var oldId = String(oldRutina.id);
+        setRutinasSB(function (prev) {
+          return (prev || []).filter(function (x) {
+            return String(x.id) !== oldId;
+          });
+        });
+        setRutinasSBEntrenador(function (prev) {
+          return (prev || []).filter(function (x) {
+            return String(x.id) !== oldId;
+          });
+        });
+      } catch (eOldRutina) {
+        console.error("[assignRut] error al quitar rutina anterior despues del insert", eOldRutina);
+      }
+    }
+
+    setRutinasSB(function (prev) {
+      return mergeRutinasAsignadas([res], prev);
+    });
+    setRutinasSBEntrenador(function (prev) {
+      return mergeRutinasAsignadas([res], prev);
+    });
+    setRoutines(function (prev) {
+      var prevList = Array.isArray(prev) ? prev : [];
+      var localRutina = {
+        id: res.id,
+        name: res.nombre || nombreAssign,
+        days: res.datos?.days || [],
+        alumno_id: res.alumno_id,
+        alumno: alumno.nombre || alumno.email || "",
+        note: res.datos?.note || "",
+        saved: true,
+        collapsed: true,
+      };
+      var replaced = false;
+      var next = prevList
+        .filter(function (r) {
+          return !oldRutina || String(r.id) !== String(oldRutina.id);
+        })
+        .map(function (r) {
+          if (String(r.id) === String(res.id)) {
+            replaced = true;
+            return Object.assign({}, r, localRutina);
+          }
+          return r;
+        });
+      return replaced ? next : [localRutina].concat(next);
+    });
+
+    return { ok: true, rutina: res };
+  }, [getRutinaAsignadaAlumno, setRoutines]);
   const [dupDayModal, setDupDayModal] = useState(null); // {rId, dIdx, days}
   const [dupDayClosing, setDupDayClosing] = useState(false);
   const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
@@ -2971,6 +3087,17 @@ function GymApp() {
       }
       if (c.t === 'assignRut' && c.a && c.rutinaLocal) {
         setLoadingSB(true);
+        try {
+          await assignRoutineToAlumno({ alumno: c.a, rutina: c.rutinaLocal, previousRoutine: c.ex || null });
+          toast2('Rutina asignada ✓');
+        } catch (eAssignRut) {
+          console.error('[assignRut] error al asignar rutina', eAssignRut);
+          toast2('Error al asignar rutina');
+        }
+        setLoadingSB(false);
+        setCoachDialog({ t: 'none' });
+        return;
+        /*
         var authSessionAssign = await getActiveSupabaseSession();
         if (!authSessionAssign) {
           console.error("[AUTH] No hay sesión activa");
@@ -3083,6 +3210,7 @@ function GymApp() {
         setLoadingSB(false);
         setCoachDialog({ t: 'none' });
         return;
+        */
       }
       if (c.t === 'logout' || c.t === 'logoutSettings') {
         if (c.t === 'logoutSettings') setSettingsOpen(false);
@@ -3951,6 +4079,9 @@ function GymApp() {
               rutinas={rutinasCalendarioEntrenador}
               lang={lang}
               dark={darkMode}
+              supabase={supabase}
+              entrenadorId={supabaseSessionUserId || null}
+              onAssignRoutineToAlumno={assignRoutineToAlumno}
             />
           </div>
         )}

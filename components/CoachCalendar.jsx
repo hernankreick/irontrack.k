@@ -47,6 +47,24 @@ function writeAssignments(next) {
   } catch (e) {}
 }
 
+function groupRows(rows) {
+  var out = {};
+  (rows || []).forEach(function (row) {
+    if (!row || !row.fecha) return;
+    var key = String(row.fecha).slice(0, 10);
+    if (!out[key]) out[key] = [];
+    out[key].push({
+      id: row.id,
+      alumno_id: row.alumno_id,
+      alumno_nombre: row.alumno_nombre,
+      rutina_id: row.rutina_id,
+      rutina_nombre: row.rutina_nombre,
+      created_at: row.created_at,
+    });
+  });
+  return out;
+}
+
 function routineName(r) {
   return r?.nombre || r?.name || r?.datos?.name || "Rutina";
 }
@@ -67,7 +85,15 @@ function dayNames(lang) {
   return DOW_ES;
 }
 
-export default function CoachCalendar({ alumnos = [], rutinas = [], lang = "es", dark = true }) {
+export default function CoachCalendar({
+  alumnos = [],
+  rutinas = [],
+  lang = "es",
+  dark = true,
+  supabase = null,
+  entrenadorId = null,
+  onAssignRoutineToAlumno = null,
+}) {
   var now = React.useMemo(function () { return new Date(); }, []);
   var year = now.getFullYear();
   var currentMonth = now.getMonth();
@@ -96,11 +122,44 @@ export default function CoachCalendar({ alumnos = [], rutinas = [], lang = "es",
   const [selectedRutina, setSelectedRutina] = React.useState(null);
   const [alumnoQuery, setAlumnoQuery] = React.useState("");
   const [rutinaQuery, setRutinaQuery] = React.useState("");
-  const [savedNotice, setSavedNotice] = React.useState(false);
+  const [savedNotice, setSavedNotice] = React.useState("");
+  const [usingRemote, setUsingRemote] = React.useState(false);
+  const [calendarError, setCalendarError] = React.useState("");
 
   React.useEffect(function () {
-    writeAssignments(assignments);
-  }, [assignments]);
+    if (!usingRemote) writeAssignments(assignments);
+  }, [assignments, usingRemote]);
+
+  React.useEffect(function () {
+    var cancelled = false;
+    if (!supabase || !entrenadorId) {
+      setUsingRemote(false);
+      return undefined;
+    }
+    (async function () {
+      try {
+        var res = await supabase
+          .from("coach_calendar_assignments")
+          .select("id, alumno_id, alumno_nombre, rutina_id, rutina_nombre, fecha, created_at")
+          .eq("entrenador_id", entrenadorId)
+          .order("fecha", { ascending: true })
+          .order("created_at", { ascending: true });
+        if (cancelled) return;
+        if (res.error) throw res.error;
+        setAssignments(groupRows(res.data || []));
+        setUsingRemote(true);
+        setCalendarError("");
+      } catch (e) {
+        if (cancelled) return;
+        console.warn("[CoachCalendar] Supabase load failed, using localStorage fallback", e);
+        setUsingRemote(false);
+        setAssignments(readAssignments());
+      }
+    })();
+    return function () {
+      cancelled = true;
+    };
+  }, [supabase, entrenadorId]);
 
   var selectedAssignments = selectedDate ? assignments[selectedDate] || [] : [];
   var filteredAlumnos = (alumnos || []).filter(function (a) {
@@ -121,7 +180,7 @@ export default function CoachCalendar({ alumnos = [], rutinas = [], lang = "es",
     setSelectedRutina(null);
     setAlumnoQuery("");
     setRutinaQuery("");
-    setSavedNotice(false);
+    setSavedNotice("");
   }
 
   function closeModal() {
@@ -129,11 +188,13 @@ export default function CoachCalendar({ alumnos = [], rutinas = [], lang = "es",
     setStep("alumno");
     setSelectedAlumno(null);
     setSelectedRutina(null);
-    setSavedNotice(false);
+    setSavedNotice("");
   }
 
-  function confirmAssignment() {
+  async function confirmAssignment() {
     if (!selectedDate || !selectedAlumno || !selectedRutina) return;
+    setSavedNotice("");
+    setCalendarError("");
     var item = {
       id: uid(),
       alumno_id: selectedAlumno.id,
@@ -142,18 +203,86 @@ export default function CoachCalendar({ alumnos = [], rutinas = [], lang = "es",
       rutina_nombre: routineName(selectedRutina),
       created_at: new Date().toISOString(),
     };
+    var calendarSavedRemotely = false;
+    if (supabase && entrenadorId) {
+      try {
+        var res = await supabase
+          .from("coach_calendar_assignments")
+          .insert({
+            entrenador_id: entrenadorId,
+            alumno_id: String(item.alumno_id),
+            alumno_nombre: item.alumno_nombre,
+            rutina_id: String(item.rutina_id),
+            rutina_nombre: item.rutina_nombre,
+            fecha: selectedDate,
+          })
+          .select("id, alumno_id, alumno_nombre, rutina_id, rutina_nombre, fecha, created_at")
+          .single();
+        if (res.error) throw res.error;
+        item = groupRows([res.data])[selectedDate][0];
+        setUsingRemote(true);
+        calendarSavedRemotely = true;
+        setCalendarError("");
+      } catch (e) {
+        console.warn("[CoachCalendar] Supabase insert failed, saving local fallback", e);
+        setUsingRemote(false);
+        setCalendarError(M(lang, "No se pudo guardar en Supabase. Se guardo localmente.", "Could not save to Supabase. Saved locally.", "Nao foi possivel salvar no Supabase. Salvo localmente."));
+      }
+    }
     setAssignments(function (prev) {
       var list = Array.isArray(prev[selectedDate]) ? prev[selectedDate] : [];
       return Object.assign({}, prev, { [selectedDate]: list.concat(item) });
     });
-    setSavedNotice(true);
+    if (typeof onAssignRoutineToAlumno === "function") {
+      try {
+        var activeResult = await onAssignRoutineToAlumno({
+          alumno: selectedAlumno,
+          rutina: selectedRutina,
+          fecha: selectedDate,
+        });
+        if (!activeResult || activeResult.ok === false) {
+          throw new Error(activeResult && activeResult.error ? activeResult.error : "active routine assignment failed");
+        }
+      } catch (eAssign) {
+        console.error("[CoachCalendar] active routine assignment failed", eAssign);
+        setCalendarError(M(
+          lang,
+          "La rutina se programo, pero no se pudo actualizar la rutina activa del alumno.",
+          "The routine was scheduled, but the athlete's active routine could not be updated.",
+          "A rotina foi programada, mas nao foi possivel atualizar a rotina ativa do aluno."
+        ));
+        return;
+      }
+    }
+    setSavedNotice(
+      calendarSavedRemotely || !supabase || !entrenadorId
+        ? M(lang, "Rutina asignada y programada correctamente.", "Routine assigned and scheduled successfully.", "Rotina atribuida e programada corretamente.")
+        : M(lang, "Rutina asignada. La programacion quedo guardada localmente.", "Routine assigned. The schedule was saved locally.", "Rotina atribuida. A programacao foi salva localmente.")
+    );
     window.setTimeout(function () {
       closeModal();
-    }, 450);
+    }, 700);
   }
 
-  function deleteAssignment(itemId) {
+  async function deleteAssignment(itemId) {
     if (!window.confirm(M(lang, "Eliminar esta asignacion local?", "Delete this local assignment?", "Excluir esta atribuicao local?"))) return;
+    var item = (assignments[selectedDate] || []).find(function (x) { return x.id === itemId; });
+    var isLocal = String(itemId || "").indexOf("cal-") === 0;
+    if (supabase && entrenadorId && item && !isLocal) {
+      try {
+        var res = await supabase
+          .from("coach_calendar_assignments")
+          .delete()
+          .eq("id", itemId)
+          .eq("entrenador_id", entrenadorId);
+        if (res.error) throw res.error;
+        setCalendarError("");
+      } catch (e) {
+        console.error("[CoachCalendar] Supabase delete failed", e);
+        setCalendarError(M(lang, "No se pudo eliminar la asignacion en Supabase.", "Could not delete the assignment in Supabase.", "Nao foi possivel excluir no Supabase."));
+        return;
+      }
+    }
     setAssignments(function (prev) {
       var list = (prev[selectedDate] || []).filter(function (x) { return x.id !== itemId; });
       var next = Object.assign({}, prev);
@@ -301,7 +430,12 @@ export default function CoachCalendar({ alumnos = [], rutinas = [], lang = "es",
 
               {savedNotice ? (
                 <div style={{ background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.35)", borderRadius: 16, padding: 14, color: P.success, fontWeight: 900, marginBottom: 16 }}>
-                  {M(lang, "Rutina asignada", "Routine assigned", "Rotina atribuida")}
+                  {savedNotice}
+                </div>
+              ) : null}
+              {calendarError ? (
+                <div style={{ background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.28)", borderRadius: 16, padding: 14, color: P.danger, fontWeight: 800, marginBottom: 16 }}>
+                  {calendarError}
                 </div>
               ) : null}
 
