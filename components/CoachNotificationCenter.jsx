@@ -442,6 +442,7 @@ export default function CoachNotificationCenter({
     <div ref={wrapRef} style={{ position: "relative", flexShrink: 0 }}>
       <button
         type="button"
+        className="hov"
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={M(lang, "Notificaciones", "Notifications", "Notificações")}
@@ -451,20 +452,22 @@ export default function CoachNotificationCenter({
           });
         }}
         style={{
-          width: 36,
-          height: 36,
-          background: C.card,
-          border: "1px solid " + C.brd,
-          borderRadius: 7,
-          cursor: "pointer",
+          background: "#0D1424",
+          border: "none",
+          borderRadius: 14,
+          padding: 10,
+          minWidth: 40,
+          minHeight: 40,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: 0,
+          boxSizing: "border-box",
           position: "relative",
+          cursor: "pointer",
+          transition: "transform 0.15s ease, background 0.2s ease",
         }}
       >
-        <Bell size={17} color={C.t2} strokeWidth={2} />
+        <Bell size={20} color={unreadCount > 0 ? "#2563EB" : "#64748b"} strokeWidth={2} />
         {unreadCount > 0 ? (
           <span
             style={{
