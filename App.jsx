@@ -15,6 +15,7 @@ import { exportRoutinePdfHtml } from './lib/routinePdfExport.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboard from './components/CoachDashboard';
+import CoachCalendar from './components/CoachCalendar.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import IronTrackLogo from './components/IronTrackLogo.jsx';
@@ -35,7 +36,7 @@ import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
-import { Calendar as CalNavIcon, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
+import { Calendar as CalNavIcon, CalendarDays, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
 
 
@@ -1335,6 +1336,20 @@ function GymApp() {
     var id = assignRoutineId && routines.some(function(r){return r.id===assignRoutineId;}) ? assignRoutineId : routines[routines.length-1].id;
     return routines.find(function(r){return r.id===id;}) || null;
   }, [routines, assignRoutineId]);
+  const rutinasCalendarioEntrenador = useMemo(function () {
+    var seen = {};
+    var out = [];
+    [rutinasUnificadas || [], routines || []].forEach(function (list) {
+      (list || []).forEach(function (r) {
+        if (!r) return;
+        var id = r.id != null ? String(r.id) : "";
+        if (!id || seen[id]) return;
+        seen[id] = true;
+        out.push(r);
+      });
+    });
+    return out;
+  }, [rutinasUnificadas, routines]);
   const [dupDayModal, setDupDayModal] = useState(null); // {rId, dIdx, days}
   const [dupDayClosing, setDupDayClosing] = useState(false);
   const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
@@ -2429,13 +2444,13 @@ function GymApp() {
   const showCoachDesktopShell = !esAlumno && sessionData?.role === "entrenador";
   /** Tabs coach desktop sin barra superior global (misma envolvente que plan / progreso). */
   const coachDesktopBleedTab =
-    tab === "plan" || tab === "progress" || tab === "settings" || tab === "perfil";
+    tab === "plan" || tab === "calendar" || tab === "progress" || tab === "settings" || tab === "perfil";
   /** Coach: ocultar header global (logo + settings + salir) cuando la sidebar ya concentra esa navegación. En desktop, Alumnos/Rutinas/Ejercicios se alinean con Plan (sin barra duplicada). En móvil siguen mostrando el header en esas tabs (sidebar no visible). */
   const coachSuppressTopNav =
     showCoachDesktopShell &&
     !esAlumno &&
     (coachDesktopBleedTab ||
-      (coachDesktop1024 && (tab === "alumnos" || tab === "routines" || tab === "biblioteca")));
+      (coachDesktop1024 && (tab === "alumnos" || tab === "calendar" || tab === "routines" || tab === "biblioteca")));
   useEffect(() => {
     if (coachDesktop1024) return; // solo mobile
     const appEl = document.getElementById("app-root") || document.body;
@@ -2500,6 +2515,7 @@ function GymApp() {
       ]
     : [
         {k:"plan",      icon:(c)=><Ic name="bar-chart-2" size={20} color={c}/>, lbl:msg("DASHBOARD", "DASHBOARD")},
+        {k:"calendar",  icon:(c)=><CalendarDays size={20} color={c} strokeWidth={2}/>, lbl:msg("CALENDARIO", "CALENDAR")},
         {k:"routines",  icon:(c)=><Ic name="file-text" size={20} color={c}/>,  lbl:msg("RUTINAS", "ROUTINES")},
         {k:"biblioteca",icon:(c)=><Ic name="activity" size={20} color={c}/>, lbl:msg("EJERCICIOS", "EXERCISES")},
         {k:"alumnos",   icon:(c)=><Ic name="users" size={20} color={c}/>,  lbl:msg("ALUMNOS", "ATHLETES")}
@@ -3928,6 +3944,16 @@ function GymApp() {
               />
         )}
         {/* ── MOBILE DRAWER (solo entrenador, solo mobile) ── */}
+        {tab==="calendar"&&!esAlumno&&sessionData?.role==="entrenador"&&(
+          <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto">
+            <CoachCalendar
+              alumnos={alumnosActivosLimpios}
+              rutinas={rutinasCalendarioEntrenador}
+              lang={lang}
+              dark={darkMode}
+            />
+          </div>
+        )}
         {showCoachDesktopShell && !coachDesktop1024 && (
           <>
             {/* Overlay */}
@@ -4032,6 +4058,7 @@ function GymApp() {
 
                 {[
                   { k: "plan", icon: "calendar", label: msg("Dashboard", "Dashboard"), sub: null },
+                  { k: "calendar", icon: "calendar", label: msg("Calendario", "Calendar"), sub: msg("Programar rutinas", "Schedule routines") },
                   { k: "alumnos", icon: "users", label: msg("Alumnos", "Athletes"), sub: msg("Gestionar equipo", "Manage team") },
                   { k: "routines", icon: "file-text", label: msg("Rutinas", "Routines"), sub: null },
                   { k: "biblioteca", icon: "activity", label: msg("Ejercicios", "Exercises"), sub: null },

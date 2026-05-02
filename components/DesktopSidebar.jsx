@@ -3,6 +3,7 @@ import { useIronTrackI18n } from "../contexts/IronTrackI18nContext.jsx";
 import { irontrackMsg as M } from "../lib/irontrackMsg.js";
 import {
   BarChart3,
+  CalendarDays,
   ClipboardList,
   Dumbbell,
   LayoutDashboard,
@@ -151,6 +152,7 @@ export default function DesktopSidebar({
     function () {
       return [
         { id: "plan", label: M(lang, "Dashboard", "Dashboard", "Painel"), icon: LayoutDashboard },
+        { id: "calendar", label: M(lang, "Calendario", "Calendar", "Calendario"), icon: CalendarDays },
         { id: "alumnos", label: M(lang, "Alumnos", "Athletes", "Alunos"), icon: Users },
         { id: "routines", label: M(lang, "Rutinas", "Routines", "Rotinas"), icon: ClipboardList },
         { id: "biblioteca", label: M(lang, "Ejercicios", "Exercises", "Exercícios"), icon: Dumbbell },
