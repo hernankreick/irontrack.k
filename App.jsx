@@ -22,6 +22,23 @@ import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVi
 import { fmt, fmtP } from './lib/timeFormat.js';
 import { exportRoutinePdfHtml } from './lib/routinePdfExport.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
+import {
+  BLUE_GRAD,
+  BTN_H,
+  C,
+  GLOW,
+  GLOW_G,
+  GREEN_GRAD,
+  LANDING_CTA_GRAD,
+  LANDING_GYM_URL,
+  LANDING_MAX_W,
+  LANDING_OVERLAY_GRAD,
+  ONBOARD_CONTENT_WRAP,
+  ONBOARD_PREMIUM_BG,
+  ONBOARD_PREMIUM_CARD,
+  ONBOARD_PROFILE_H_PAD,
+  ONBOARD_PROFILE_WRAP,
+} from './lib/onboardingTokens.js';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboard from './components/CoachDashboard';
 import CoachCalendar from './components/CoachCalendar.jsx';
@@ -8779,44 +8796,6 @@ const LibraryAlumno = React.memo(function LibraryAlumno({allEx, es, darkMode, ro
 
 
 
-/* ─── TOKENS ─────────────────────────────────────────────── */
-const C = {
-  blue:"#2563EB", blueL:"#3B82F6", blueD:"#1E40AF",
-  green:"#22C55E", greenD:"#16A34A",
-  bg:"#0A1120", bg2:"#0F1A2E", bg3:"#162035",
-  border:"rgba(59,130,246,0.15)", borderSub:"rgba(255,255,255,0.06)",
-  text:"#FFFFFF", sub:"#94A3B8", muted:"#4B6480",
-};
-const BLUE_GRAD  = "linear-gradient(135deg,#1E40AF 0%,#2563EB 55%,#3B82F6 100%)";
-const LANDING_CTA_GRAD = "linear-gradient(135deg, #1D4ED8, #3B82F6)";
-const LANDING_OVERLAY_GRAD =
-  "linear-gradient(180deg, rgba(5,12,24,0.55) 0%, rgba(5,12,24,0.2) 38%, rgba(5,12,24,0.88) 100%)";
-/** Misma columna que el landing: contenido centrado, no full-bleed en desktop. */
-const LANDING_MAX_W = 430;
-const ONBOARD_CONTENT_WRAP = {
-  width: "min(100%, " + LANDING_MAX_W + "px)",
-  minWidth: 0,
-  marginLeft: "auto",
-  marginRight: "auto",
-  boxSizing: "border-box",
-};
-/** Onboarding — selección de rol (paso 2) y nombre (paso 3); ancho generoso en desktop. */
-const ONBOARD_PROFILE_MAX_W = 720;
-const ONBOARD_PROFILE_WRAP = {
-  width: "min(100%, " + ONBOARD_PROFILE_MAX_W + "px)",
-  minWidth: 0,
-  marginLeft: "auto",
-  marginRight: "auto",
-  boxSizing: "border-box",
-};
-const ONBOARD_PROFILE_H_PAD = 24; /* 20–24px en mobile, fijo 24 pide spec */
-/** Onboarding pasos 1–2 (perfil + nombre) — fondo / card premium */
-const ONBOARD_PREMIUM_BG = "#0a0f1a";
-const ONBOARD_PREMIUM_CARD = "#0d1424";
-const GREEN_GRAD = "linear-gradient(135deg,#16A34A,#22C55E)";
-const GLOW       = "0 0 36px rgba(37,99,235,0.5),0 8px 24px rgba(0,0,0,0.4)";
-const GLOW_G     = "0 0 32px rgba(34,197,94,0.4)";
-
 /*
   FLUJO COMPLETO:
   ─────────────────────────────────────────────────
@@ -8958,9 +8937,6 @@ const Tag = ({children,color}) => (
   </div>
 );
 
-/* Altura fija compartida — única fuente de verdad */
-const BTN_H = 58;
-
 const BtnPrimary = ({children,onClick,done=false,disabled=false}) => (
   <button onClick={onClick} disabled={disabled} style={{
     flex:1,                       /* ocupa el espacio restante */
@@ -9072,9 +9048,6 @@ const BtnRow = ({ total, current, children, progressLabel, footerBg, progressBar
 /* ═══════════════════════════════════════════
    PASO 0 — LANDING
 ═══════════════════════════════════════════ */
-const LANDING_GYM_URL =
-  "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1200&q=80";
-
 const LandingStepDots4 = () => (
   <div
     style={{
