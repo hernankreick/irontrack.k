@@ -7,6 +7,14 @@ import { WorkoutScreen } from './components/WorkoutScreen.jsx';
 import { Chat } from './components/Chat.jsx';
 import { ChatFlotante } from './components/ChatFlotante.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
+import {
+  BIB_MUSCLE_OPTIONS,
+  BIB_MUSCLE_ORDER,
+  bibMuscleFilterHaystack,
+  cleanActiveCoachAlumnos,
+  formatBibMuscleDisplay,
+  isValidUuid,
+} from './lib/appHelpers.js';
 import { ROUTINE_TEMPLATES, instantiateTemplate, emptyDays, getTemplateById } from './lib/routineTemplates.js';
 import { getYTVideoId, getYoutubeEmbedSrc } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
@@ -73,55 +81,6 @@ const AlumnoRestTimerBar = memo(function AlumnoRestTimerBar({ timer, onCancel, b
 
 
 
-// Biblioteca entrenador: músculos multi-select (JSON en campo `muscle`) + texto legacy
-const BIB_MUSCLE_OPTIONS = [
-  { k: "pecho", chipEs: "PECHO", chipEn: "CHEST", selEs: "Pecho", selEn: "Chest" },
-  { k: "espalda", chipEs: "ESPALDA", chipEn: "BACK", selEs: "Espalda", selEn: "Back" },
-  { k: "hombros", chipEs: "HOMBROS", chipEn: "SHOULDERS", selEs: "Hombros", selEn: "Shoulders" },
-  { k: "biceps", chipEs: "BICEPS", chipEn: "BICEPS", selEs: "Bíceps", selEn: "Biceps" },
-  { k: "triceps", chipEs: "TRICEPS", chipEn: "TRICEPS", selEs: "Tríceps", selEn: "Triceps" },
-  { k: "cuadriceps", chipEs: "CUADRICEPS", chipEn: "QUADS", selEs: "Cuádriceps", selEn: "Quads" },
-  { k: "isquios", chipEs: "ISQUIOS", chipEn: "HAMSTRINGS", selEs: "Isquios", selEn: "Hamstrings" },
-  { k: "gluteos", chipEs: "GLUTEOS", chipEn: "GLUTES", selEs: "Glúteos", selEn: "Glutes" },
-  { k: "core", chipEs: "CORE", chipEn: "CORE", selEs: "Core", selEn: "Core" },
-  { k: "pantorrillas", chipEs: "PANTORRILLAS", chipEn: "CALVES", selEs: "Pantorrillas", selEn: "Calves" },
-  { k: "antebrazos", chipEs: "ANTEBRAZOS", chipEn: "FOREARMS", selEs: "Antebrazos", selEn: "Forearms" },
-];
-const BIB_MUSCLE_ORDER = BIB_MUSCLE_OPTIONS.map(function (o) { return o.k; });
-
-function parseBibMuscleJson(raw) {
-  if (raw == null || raw === "") return null;
-  var s = String(raw).trim();
-  if (s.charAt(0) !== "[") return null;
-  try {
-    var a = JSON.parse(s);
-    if (Array.isArray(a) && a.every(function (x) { return typeof x === "string"; })) return a;
-  } catch (e) {}
-  return null;
-}
-
-function formatBibMuscleDisplay(raw, lang) {
-  var arr = parseBibMuscleJson(raw);
-  if (arr) {
-    if (arr.length === 0) return "";
-    var ordered = BIB_MUSCLE_ORDER.filter(function (k) { return arr.indexOf(k) >= 0; });
-    return ordered.map(function (k) {
-      var o = BIB_MUSCLE_OPTIONS.find(function (x) { return x.k === k; });
-      return o ? irontrackMsg(lang, o.selEs, o.selEn, o.selPt) : k;
-    }).join(", ");
-  }
-  return raw ? String(raw) : "";
-}
-
-function bibMuscleFilterHaystack(raw) {
-  var base = formatBibMuscleDisplay(raw, "es") + " " + formatBibMuscleDisplay(raw, "en") + " " + String(raw || "");
-  var arr = parseBibMuscleJson(raw);
-  if (arr && arr.length) base += " " + arr.join(" ");
-  return base.toLowerCase();
-}
-
-
-
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -131,10 +90,6 @@ function getStoredEntrenadorId() {
   } catch (e) {
     return "entrenador_principal";
   }
-}
-
-function isValidUuid(value) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
 }
 
 async function getActiveSupabaseSession() {
@@ -307,41 +262,6 @@ const sb = {
     return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
   },
 };
-
-function isTruthyActiveFlag(v) {
-  if (v == null) return true;
-  if (typeof v === "boolean") return v;
-  var s = String(v).trim().toLowerCase();
-  return !(s === "false" || s === "0" || s === "no" || s === "inactivo" || s === "inactive" || s === "eliminado" || s === "deleted" || s === "borrado");
-}
-
-function isDeletedAlumnoRow(a) {
-  if (!a || typeof a !== "object") return true;
-  if (a.deleted_at || a.deletedAt || a.fecha_eliminacion || a.removed_at) return true;
-  var stateFields = [a.estado, a.status, a.state, a.situacion];
-  for (var i = 0; i < stateFields.length; i++) {
-    if (stateFields[i] == null) continue;
-    var s = String(stateFields[i]).trim().toLowerCase();
-    if (s === "eliminado" || s === "eliminada" || s === "deleted" || s === "borrado" || s === "borrada" || s === "inactive" || s === "inactivo" || s === "inactiva") return true;
-  }
-  if (!isTruthyActiveFlag(a.activo) || !isTruthyActiveFlag(a.active) || !isTruthyActiveFlag(a.is_active)) return true;
-  return false;
-}
-
-function cleanActiveCoachAlumnos(list, entrenadorId) {
-  var seen = {};
-  return (Array.isArray(list) ? list : []).filter(function (a) {
-    if (!a || a.id == null || String(a.id).trim() === "") return false;
-    var id = String(a.id);
-    if (seen[id]) return false;
-    if (isDeletedAlumnoRow(a)) return false;
-    if (entrenadorId && a.entrenador_id != null && String(a.entrenador_id) !== String(entrenadorId)) return false;
-    seen[id] = true;
-    return true;
-  });
-}
-
-
 
 const uid = () => Math.random().toString(36).slice(2,9);
 
