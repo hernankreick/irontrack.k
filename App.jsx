@@ -54,11 +54,7 @@ import {
   UserOneSVG,
   UserTeamSVG,
 } from './components/onboarding/OnboardingPrimitives.jsx';
-import Step0 from './components/onboarding/OnboardingStep0.jsx';
-import StepFinal from './components/onboarding/OnboardingStepFinal.jsx';
-import Step3Alumnos from './components/onboarding/OnboardingStep3Alumnos.jsx';
-import Step1 from './components/onboarding/OnboardingStep1.jsx';
-import Step2Name from './components/onboarding/OnboardingStep2Name.jsx';
+import OnboardingScreen from './components/onboarding/OnboardingScreen.jsx';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboard from './components/CoachDashboard';
 import CoachCalendar from './components/CoachCalendar.jsx';
@@ -8714,54 +8710,6 @@ function DashboardEntrenador({alumnos, sesiones, es, onVerAlumno, onChatAlumno, 
   Entrenador: 0 → 1 → 2 → 3 → 4
   Atleta:     0 → 1 → 2 → 4  (salta paso 3)
 */
-
-function OnboardingScreen({es, darkMode, onDone}) {
-
-  const [step, setStep]                 = React.useState(0);
-  const [role, setRole]                 = React.useState(null);
-  const [name, setName]                 = React.useState("");
-  const [alumnosRange, setAlumnosRange] = React.useState(null);
-
-  const isCoach = role === "entrenador";
-
-  const next = () => {
-    if (step === 2 && !isCoach) setStep(4);
-    else setStep(s => s + 1);
-  };
-
-  const back = () => {
-    if (step === 4 && !isCoach) setStep(2);
-    else setStep(s => s - 1);
-  };
-
-  const restart = () => { setStep(0); setRole(null); setName(""); setAlumnosRange(null); };
-
-  const screens = {
-    0: <Step0        es={es} onNext={next}    onYaTengoCuenta={onDone}/>,
-    1: <Step1        onNext={next}    onBack={back} role={role} setRole={setRole}/>,
-    2: <Step2Name    onNext={next}    onBack={back} role={role} name={name} setName={setName}/>,
-    3: <Step3Alumnos onNext={next}    onBack={back} alumnosRange={alumnosRange} setAlumnosRange={setAlumnosRange}/>,
-    4: <StepFinal    onDone={onDone}  onBack={back} role={role} name={name} alumnosRange={alumnosRange}/>,
-  };
-
-  return (
-    <div
-      style={{
-        minHeight: "100dvh",
-        width: "100%",
-        background: "#0A1120",
-        fontFamily: "system-ui,sans-serif",
-        display: "flex",
-        flexDirection: "column",
-        overflowY: "auto",
-        WebkitOverflowScrolling: "touch",
-        boxSizing: "border-box",
-      }}
-    >
-      {screens[step]}
-    </div>
-  );
-}
 
 function LoginForm({es, btn, inp, lbl, onLogin, onClose, darkMode}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
