@@ -2950,6 +2950,7 @@ function GymApp() {
   );
 
   const alumnoFullScreenShell = !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress"));
+  const alumnoFullScreenBg = darkMode ? "#0B1220" : "#F1F5F9";
   /** Coach ≥1024: nav inferior global oculta — no reservar 72px extra (dejaba franja vacía bajo el shell). */
   const coachDesktopNavHidden = !!(showCoachDesktopShell && coachDesktop1024);
 
@@ -2961,7 +2962,7 @@ function GymApp() {
       minHeight:"100dvh",
       height: alumnoFullScreenShell ? "100svh" : undefined,
       overflow: alumnoFullScreenShell ? "hidden" : undefined,
-      background:bg,
+      background:alumnoFullScreenShell ? alumnoFullScreenBg : bg,
       color:textMain,
       fontFamily:"Inter,sans-serif",
       "--sk1":darkMode?"#1E2D40":"#E8EEF4",
@@ -3336,7 +3337,7 @@ function GymApp() {
       </div>
       )}
       {alumnoTopBarFixed && (
-        <div ref={alumnoTopBarSpacerRef} style={{ height: alumnoTopBarHeight, minHeight: alumnoTopBarHeight, flexShrink: 0, transition: "none" }} aria-hidden />
+        <div ref={alumnoTopBarSpacerRef} style={{ height: alumnoTopBarHeight, minHeight: alumnoTopBarHeight, flexShrink: 0, transition: "none", background: alumnoFullScreenBg, border: "none", boxShadow: "none" }} aria-hidden />
       )}
       {sessionData && esAlumno && userMenuOpen && (
         <>
