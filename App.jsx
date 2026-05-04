@@ -17,7 +17,7 @@ import {
   isValidUuid,
 } from './lib/appHelpers.js';
 import { ROUTINE_TEMPLATES, instantiateTemplate, emptyDays, getTemplateById } from './lib/routineTemplates.js';
-import { getYTVideoId, getYoutubeEmbedSrc } from './lib/getYTVideoId.js';
+import { getYTVideoId } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
 import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVideoUrl, isValidHttpUrlString, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from './lib/exerciseResolve.js';
 import { fmt, fmtP } from './lib/timeFormat.js';
@@ -80,6 +80,7 @@ import {
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal.jsx';
 import LoginForm from './components/auth/LoginForm.jsx';
+import VideoModal from './components/ui/VideoModal.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
@@ -6381,51 +6382,8 @@ function GymApp() {
         </div>
       </div>
       </div>
-      {/* Modal video: fuera del scroll (display:none con sesión ocultaba el overlay) + portal a body */}
-      {videoModal &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,.95)",
-              zIndex: 10000,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-            }}
-            onClick={() => setVideoModal(null)}
-            role="presentation"
-          >
-            <div style={{ width: "100%", maxWidth: 480, padding: "0 16px" }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{videoModal.nombre || ""}</div>
-                <button
-                  type="button"
-                  onClick={() => setVideoModal(null)}
-                  style={{ background: "none", border: "none", color: "#8B9AB2", fontSize: 24, cursor: "pointer" }}
-                >
-                  ✕
-                </button>
-              </div>
-              <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 12, overflow: "hidden", background: "#000" }}>
-                {videoModal.videoId ? (
-                  <iframe
-                    key={videoModal.videoId}
-                    title={videoModal.nombre || "YouTube"}
-                    src={getYoutubeEmbedSrc(videoModal.videoId)}
-                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                ) : null}
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      {/* Modal video: fuera del scroll (display:none con sesi?n ocultaba el overlay) + portal a body */}
+      <VideoModal videoModal={videoModal} setVideoModal={setVideoModal} />
       {session&&activeDay&&(
         <WorkoutScreen
           session={session}
