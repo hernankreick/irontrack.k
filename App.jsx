@@ -72,6 +72,7 @@ import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
 import { WeeklyPlanDayCard } from './components/student-plan/WeeklyPlanDayCard.jsx';
 import CompletedTodayBanner from './components/student-plan/CompletedTodayBanner.jsx';
+import StudentNoRoutinesEmptyState from './components/student-plan/StudentNoRoutinesEmptyState.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import EditExModal from './components/routines/EditExModal.jsx';
 import {
@@ -4116,11 +4117,7 @@ function GymApp() {
             })()}
 
             {esAlumno&&routines.length===0&&(
-              <div style={{textAlign:"center",padding:"60px 0",color:textMuted}}>
-                <div style={{fontSize:48,marginBottom:12}}>📋</div>
-                <div style={{fontSize:22,fontWeight:700,letterSpacing:1,marginBottom:8}}>{msg("Sin rutinas aun", "No routines yet")}</div>
-                <div style={{fontSize:15}}>{msg("Crea tu primera rutina en RUTINAS", "Create your first routine in ROUTINES")}</div>
-              </div>
+              <StudentNoRoutinesEmptyState msg={msg} textMuted={textMuted} />
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
               const hoyStr = new Date().toLocaleDateString("es-AR");
