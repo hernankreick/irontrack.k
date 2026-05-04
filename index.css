@@ -64,6 +64,30 @@ body {
   }
 }
 
+@keyframes it-workout-exit-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.it-workout-exit-confirm:hover:not(:disabled) {
+  background: #ea580c !important;
+  transform: scale(0.98);
+}
+
+.it-workout-exit-confirm:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.it-workout-exit-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
 .student-progress-scope .sp-fade-in {
   animation: sp-fade-in 0.25s ease-out;
 }

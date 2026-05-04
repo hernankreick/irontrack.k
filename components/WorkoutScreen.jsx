@@ -14,6 +14,10 @@ export function WorkoutScreen(props) {
   } = props;
 
   const [exitWorkoutOpen, setExitWorkoutOpen] = useState(false);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [showHeader, setShowHeader] = useState(true);
+  const [isCompact, setIsCompact] = useState(false);
+  const scrollFrame = React.useRef(null);
   const _dm   = typeof darkMode !== "undefined" ? darkMode : true;
   const bg      = _dm ? "#0B1220" : "#F0F4F8";
   const bgCard  = _dm ? "#111E33" : "#FFFFFF";
@@ -59,6 +63,33 @@ export function WorkoutScreen(props) {
   const restRemaining = timer?.endAt
     ? Math.max(0, Math.round((timer.endAt - Date.now()) / 1000))
     : 0;
+
+  React.useEffect(() => {
+    return function () {
+      if (scrollFrame.current != null && typeof cancelAnimationFrame !== "undefined") {
+        cancelAnimationFrame(scrollFrame.current);
+      }
+    };
+  }, []);
+
+  const handleWorkoutScroll = (e) => {
+    const nextY = e.currentTarget.scrollTop || 0;
+    if (scrollFrame.current != null) return;
+    scrollFrame.current = requestAnimationFrame(function () {
+      scrollFrame.current = null;
+      setLastScrollY(function (prevY) {
+        const scrollingDown = nextY > prevY;
+        const delta = Math.abs(nextY - prevY);
+        setIsCompact(nextY > 40);
+        if (nextY < 12) {
+          setShowHeader(true);
+        } else if (delta > 8) {
+          setShowHeader(!scrollingDown || nextY < 120);
+        }
+        return nextY;
+      });
+    });
+  };
 
   // ── Finalizar (sin cambios de lógica) ─────────────────────────────
   const finalizarSesion = async () => {
@@ -141,14 +172,24 @@ export function WorkoutScreen(props) {
     <div style={{ position:"fixed", inset:0, background:bg, zIndex:80, display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
       {/* ── Header ── */}
-      <div style={{ background:bgCard, borderBottom:`2px solid ${blue}`, padding:"10px 16px 10px", flexShrink:0 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:8 }}>
+      <div style={{
+        background:bgCard,
+        borderBottom:`2px solid ${blue}`,
+        padding:isCompact ? "7px 16px 7px" : "10px 16px 10px",
+        flexShrink:0,
+        transform:showHeader ? "translateY(0)" : "translateY(-100%)",
+        opacity:showHeader ? 1 : 0,
+        boxShadow:lastScrollY > 0 ? "0 10px 28px rgba(2,6,23,.18)" : "none",
+        transition:"transform 0.25s ease, opacity 0.2s ease",
+        willChange:"transform, opacity",
+      }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:isCompact ? 6 : 8 }}>
           <button
             className="hov"
             onClick={() => setExitWorkoutOpen(true)}
             style={{
               background:"transparent", border:`1px solid ${border2}`,
-              borderRadius:10, width:36, height:36,
+              borderRadius:10, width:isCompact ? 32 : 36, height:isCompact ? 32 : 36,
               display:"flex", alignItems:"center", justifyContent:"center",
               cursor:"pointer", color:textMuted, flexShrink:0,
             }}
@@ -159,25 +200,25 @@ export function WorkoutScreen(props) {
           </button>
 
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:10, fontWeight:700, color:blue, letterSpacing:1.5, textTransform:"uppercase" }}>
+            <div style={{ fontSize:isCompact ? 9 : 10, fontWeight:700, color:blue, letterSpacing:1.5, textTransform:"uppercase" }}>
               {es ? "Entrenando" : "Training"}
             </div>
-            <div style={{ fontSize:15, fontWeight:900, color:textMain }}>
+            <div style={{ fontSize:isCompact ? 13 : 15, fontWeight:900, color:textMain, lineHeight:1.15 }}>
               {activeR?.name} — {activeDay.label || ("Día " + (session.dIdx+1))}
             </div>
           </div>
 
           <div style={{
-            fontSize:13, fontWeight:800, color:blue,
+            fontSize:isCompact ? 12 : 13, fontWeight:800, color:blue,
             background:"rgba(37,99,235,.12)", border:`1px solid rgba(37,99,235,.2)`,
-            borderRadius:20, padding:"4px 12px",
+            borderRadius:20, padding:isCompact ? "3px 10px" : "4px 12px",
           }}>
             {totalExDone}/{exercises.length}
           </div>
         </div>
 
         {/* Barra de progreso */}
-        <div style={{ height:4, background:_dm?"rgba(45,64,87,.6)":"#E2E8F0", borderRadius:2, overflow:"hidden" }}>
+        <div style={{ height:isCompact ? 3 : 4, background:_dm?"rgba(45,64,87,.6)":"#E2E8F0", borderRadius:2, overflow:"hidden" }}>
           <div style={{ height:"100%", width:pct+"%", background:blue, borderRadius:2, transition:"width .5s ease" }}/>
         </div>
       </div>
@@ -268,7 +309,7 @@ export function WorkoutScreen(props) {
       </div>
 
       {/* ── Contenido scrollable ── */}
-      <div style={{ flex:1, overflowY:"auto", padding:"10px 16px 0", WebkitOverflowScrolling:"touch" }}>
+      <div onScroll={handleWorkoutScroll} style={{ flex:1, overflowY:"auto", padding:"10px 16px 0", WebkitOverflowScrolling:"touch" }}>
 
         {ex && (
           <WorkoutExercisePanel
@@ -360,6 +401,7 @@ export function WorkoutScreen(props) {
         }
         confirmLabel={es ? 'Salir' : 'Exit'}
         cancelLabel={es ? 'Cancelar' : 'Cancel'}
+        variant="workoutExit"
         loading={false}
       />
     </div>
