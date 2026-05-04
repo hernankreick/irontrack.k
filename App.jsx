@@ -6005,24 +6005,37 @@ function GymApp() {
           onSave={async(updatedRaw)=>{
             const updated = sanitizeExerciseSnapshotForWrite(updatedRaw);
             const blq = editEx.bloque||"exercises";
+            const replaceExerciseInDays = function(days){
+              return (days||[]).map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
+            };
+            const updateRutinaRowsLocal = function(rowId, days){
+              if(!rowId) return;
+              const diasActualizados = sanitizeRoutineDaysForWrite(days);
+              const updateRow = function(r){
+                return String(r.id)===String(rowId)?{...r,datos:{...(r.datos||{}),days:diasActualizados}}:r;
+              };
+              setRutinasSB(prev=>(prev||[]).map(updateRow));
+              setRutinasSBEntrenador(prev=>(prev||[]).map(updateRow));
+            };
             // Actualizar routines locales
-            setRoutines(p=>p.map(r=>r.id===editEx.rId?{...r,days:r.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d)}:r));
+            setRoutines(p=>(p||[]).map(r=>r.id===editEx.rId?{...r,days:replaceExerciseInDays(r.days)}:r));
             // Auto-guardar en Supabase inmediatamente
             try {
               const rActual = routines.find(x=>x.id===editEx.rId);
               if(rActual) {
-                const updatedDays = sanitizeRoutineDaysForWrite(rActual.days.map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d));
+                const updatedDays = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rActual.days));
+                updateRutinaRowsLocal(rActual.id, updatedDays);
                 const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
                 else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
               } else {
                 // Buscar en rutinasSB (edición desde vista alumno)
-                const rSB = rutinasSB.find(x=>x.id===editEx.rId);
+                const rSB = (rutinasSBEntrenador||[]).find(x=>String(x.id)===String(editEx.rId)) || (rutinasSB||[]).find(x=>String(x.id)===String(editEx.rId));
                 if(rSB) {
-                  const diasActualizados = sanitizeRoutineDaysForWrite((rSB.datos?.days||[]).map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d));
+                  const diasActualizados = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rSB.datos?.days||[]));
                   const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:"entrenador_principal"};
+                  updateRutinaRowsLocal(rSB.id, diasActualizados);
                   await sb.updateRutina(rSB.id, payloadSB);
-                  setRutinasSB(prev=>prev.map(r=>r.id===rSB.id?{...r,datos:{...r.datos,days:diasActualizados}}:r));
                 }
               }
             } catch(e){ console.error("Auto-save error:",e); }
