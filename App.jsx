@@ -5415,8 +5415,8 @@ function GymApp() {
       )}
       <PRCelebrationOverlay prCelebration={prCelebration} setPrCelebration={setPrCelebration} msg={msg} />
       {resumenSesion&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"calc(env(safe-area-inset-top, 0px) + 12px) 16px calc(env(safe-area-inset-bottom, 0px) + 12px)",boxSizing:"border-box",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
-          <div style={{background:bgCard,borderRadius:20,padding:"28px 20px",paddingBottom:"calc(28px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:420,maxHeight:"calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px)",overflowY:"auto",WebkitOverflowScrolling:"touch",border:"1px solid "+border,textAlign:"center",animation:"fadeIn 0.25s ease"}}>
+        <div style={{position:"fixed",inset:0,top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.92)",zIndex:10000,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:"calc(env(safe-area-inset-top, 0px) + 12px)",paddingRight:16,paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 24px)",paddingLeft:16,boxSizing:"border-box",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+          <div style={{background:bgCard,borderRadius:20,padding:"28px 20px",paddingBottom:"calc(28px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:420,maxHeight:"calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 36px)",overflowY:"auto",WebkitOverflowScrolling:"touch",border:"1px solid "+border,textAlign:"center",animation:"fadeIn 0.25s ease"}}>
             <SessionSummaryStatsPanel
               resumenSesion={resumenSesion}
               sessionPRList={sessionPRList}
