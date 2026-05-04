@@ -2145,7 +2145,8 @@ function GymApp() {
   /** En desktop el coach usa sidebar App; en móvil necesita la bottom nav también en Dashboard. */
   const hideGlobalBottomNavCoachDash =
     !esAlumno && sessionData?.role === "entrenador" && coachDesktopBleedTab && coachDesktop1024;
-  const alumnoTopBarFixed = !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress"));
+  const hideAlumnoTopBarForSession = !!(esAlumno && session);
+  const alumnoTopBarFixed = !!(esAlumno && !hideAlumnoTopBarForSession && (tab === "plan" || tab === "library" || tab === "progress"));
   const alumnoTopBarHeight = alumnoTopBarFixed ? "calc(env(safe-area-inset-top, 0px) + 96px)" : "0px";
 
   planScrollCtxRef.current = {
@@ -3045,7 +3046,7 @@ function GymApp() {
           className={showCoachDesktopShell ? "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden" : undefined}
           style={showCoachDesktopShell ? undefined : { display: "contents" }}
         >
-      {!coachSuppressTopNav && (
+      {!coachSuppressTopNav && !hideAlumnoTopBarForSession && (
       <div
         ref={alumnoAppHeaderRef}
         className={
@@ -5414,7 +5415,7 @@ function GymApp() {
       )}
       <PRCelebrationOverlay prCelebration={prCelebration} setPrCelebration={setPrCelebration} msg={msg} />
       {resumenSesion&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"calc(env(safe-area-inset-top, 0px) + 12px) 16px calc(env(safe-area-inset-bottom, 0px) + 12px)",boxSizing:"border-box",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
           <div style={{background:bgCard,borderRadius:20,padding:"28px 20px",paddingBottom:"calc(28px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:420,maxHeight:"calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px)",overflowY:"auto",WebkitOverflowScrolling:"touch",border:"1px solid "+border,textAlign:"center",animation:"fadeIn 0.25s ease"}}>
             <SessionSummaryStatsPanel
               resumenSesion={resumenSesion}
@@ -6228,7 +6229,7 @@ function GymApp() {
           setVideoModal={setVideoModal}
         />
       )}
-      {!hideGlobalBottomNavCoachDash && !(showCoachDesktopShell && coachDesktop1024) && (
+      {!resumenSesion && !hideGlobalBottomNavCoachDash && !(showCoachDesktopShell && coachDesktop1024) && (
       <nav style={{
         position:"fixed",bottom:0,left:0,right:0,
         background: darkMode ? "rgba(15,25,35,0.96)" : "rgba(255,255,255,0.96)",
