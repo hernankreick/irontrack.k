@@ -79,6 +79,7 @@ import {
 } from './components/student-plan/studentPlanHelpers.js';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal.jsx';
+import LoginForm from './components/auth/LoginForm.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
@@ -6057,7 +6058,7 @@ function GymApp() {
                 <button className="hov" style={{...btn("#2563EB22"),color:"#2563EB",width:"100%",padding:"8px"}} onClick={()=>{localStorage.removeItem("it_u");setUser(null);setLoginModal(false);toast2("Sesion cerrada");}}>SALIR</button>
               </div>
             ):(
-              <LoginForm darkMode={darkMode} es={es} btn={btn} inp={inp} lbl={lbl} onLogin={u=>{setUser(u);localStorage.setItem("it_u",JSON.stringify(u));setLoginModal(false);toast2("Bienvenido/a "+u.name+"!");}} onClose={()=>setLoginModal(false)}/>
+              <LoginForm darkMode={darkMode} es={es} btn={btn} inp={inp} lbl={lbl} msg={msg} onLogin={u=>{setUser(u);localStorage.setItem("it_u",JSON.stringify(u));setLoginModal(false);toast2("Bienvenido/a "+u.name+"!");}} onClose={()=>setLoginModal(false)}/>
             )}
           </div>
         </div>
@@ -7525,42 +7526,5 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
   Entrenador: 0 → 1 → 2 → 3 → 4
   Atleta:     0 → 1 → 2 → 4  (salta paso 3)
 */
-
-function LoginForm({es, btn, inp, lbl, onLogin, onClose, darkMode}) {
-  const _dm = typeof darkMode !== "undefined" ? darkMode : true;
-  const bg = _dm?"#0F1923":"#F0F4F8";
-  const bgCard = _dm?"#162234":"#FFFFFF";
-  const bgSub = _dm?"#162234":"#EEF2F7";
-  const border = _dm?"#2D4057":"#E2E8F0";
-  const textMain = _dm?"#FFFFFF":"#0F1923";
-  const textMuted = _dm?"#8B9AB2":"#64748B";
-
-  const [mode,setMode]=useState("login");
-  const [name,setName]=useState("");
-  const [email,setEmail]=useState("");
-  const [pass,setPass]=useState("");
-  const [errors,setErrors]=useState({email:false,pass:false,name:false});
-  const emailOk = /^[^@]+@[^@]+\.[^@]+$/.test(email);
-  const passOk = pass.length >= 6;
-  return(
-    <div>
-      <div style={{fontSize:28,fontWeight:800,letterSpacing:2,marginBottom:12,textAlign:"center"}}>{mode==="login"?(msg("INICIAR SESION", "LOG IN")):(msg("REGISTRO", "REGISTER"))}</div>
-      {mode==="register"&&<div style={{marginBottom:8}}><span style={lbl}>{es?msg("NOMBRE", "NAME"):"NAME"}</span><input style={inp} value={name} onChange={e=>setName(e.target.value)} placeholder="Tu nombre"/></div>}
-      <div style={{marginBottom:8}}><span style={lbl}>EMAIL</span><input style={inp} type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="email@ejemplo.com"/></div>
-      <div style={{marginBottom:12}}><span style={lbl}>{msg("CONTRASENA", "PASSWORD")}</span><input style={inp} type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="*****"/></div>
-      <button className="hov" style={{...btn("#2563EB"),width:"100%",padding:"8px",fontSize:18,marginBottom:8}} onClick={()=>{
-          const eErr=!emailOk;
-          const pErr=!passOk;
-          const nErr=mode==="register"&&!name.trim();
-          if(eErr||pErr||nErr){setErrors({email:eErr,pass:pErr,name:nErr});return;}
-          onLogin({name:mode==="register"?name:email.split("@")[0],email,id:email});
-        }}>ENTRAR</button>
-      <div style={{textAlign:"center",fontSize:15,color:textMuted,cursor:"pointer",marginBottom:8}} onClick={()=>setMode(m=>m==="login"?"register":"login")}>
-        {mode==="login"?(msg("No tenes cuenta? Registrate", "No account? Register")):(msg("Ya tenes cuenta? Iniciá sesion", "Already have an account? Log in"))}
-      </div>
-      <button className="hov" style={{...btn(),width:"100%",padding:"8px",fontSize:15}} onClick={onClose}>CANCELAR</button>
-    </div>
-  );
-}
 
 export default GymApp;
