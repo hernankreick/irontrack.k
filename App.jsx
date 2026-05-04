@@ -3945,6 +3945,7 @@ function GymApp() {
                     usa transform/opacity en las capas internas; este contenedor NO debe encogerse al
                     hacer scroll — si encoge, Full body / Día 1 suben (CLS). Ver studentHeaderShellLockedHeightPxRef.
                   */}
+                  {!session&&(
                   <div
                     ref={function (el) {
                       studentHeaderShellRef.current = el;
@@ -4079,6 +4080,7 @@ function GymApp() {
                     layerTransitionsEnabled={planScrollDiag.planHeaderLayerTransitions}
                   />
                   </div>
+                  )}
                 </div>
               );
             })()}
@@ -5413,7 +5415,7 @@ function GymApp() {
       <PRCelebrationOverlay prCelebration={prCelebration} setPrCelebration={setPrCelebration} msg={msg} />
       {resumenSesion&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:150,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px"}}>
-          <div style={{background:bgCard,borderRadius:20,padding:"28px 20px",width:"100%",maxWidth:420,border:"1px solid "+border,textAlign:"center",animation:"fadeIn 0.25s ease"}}>
+          <div style={{background:bgCard,borderRadius:20,padding:"28px 20px",paddingBottom:"calc(28px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:420,maxHeight:"calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px)",overflowY:"auto",WebkitOverflowScrolling:"touch",border:"1px solid "+border,textAlign:"center",animation:"fadeIn 0.25s ease"}}>
             <SessionSummaryStatsPanel
               resumenSesion={resumenSesion}
               sessionPRList={sessionPRList}
