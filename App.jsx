@@ -76,6 +76,7 @@ import StudentNoRoutinesEmptyState from './components/student-plan/StudentNoRout
 import RoutinePdfDownloadButton from './components/student-plan/RoutinePdfDownloadButton.jsx';
 import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyProgressCard.jsx';
 import SessionSummaryStatsPanel from './components/student-plan/SessionSummaryStatsPanel.jsx';
+import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import EditExModal from './components/routines/EditExModal.jsx';
 import {
@@ -4058,51 +4059,25 @@ function GymApp() {
                     <CompletedTodayBanner msg={msg} textMuted={textMuted} />
                   )}
                   </div>
-                  <div
-                    ref={function (el) {
+                  <StudentPlanMiniHeader
+                    msg={msg}
+                    textMain={textMain}
+                    ALUMNO_HEADER_MINI_PX={ALUMNO_HEADER_MINI_PX}
+                    firstName={sessionData?.name?.split(" ")[0]||"Atleta"}
+                    showTrainButton={todayDay&&!yaEntrenoHoy&&!session}
+                    onTrainToday={()=>{
+                      const snap={};
+                      [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
+                      setPreSessionPRs({...snap});
+                      setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
+                    }}
+                    showCompletedToday={yaEntrenoHoy}
+                    headerRef={function (el) {
                       studentHeaderMiniRef.current = el;
                       if (el) applyAlumnoHeaderLayerStyles(headerCollapsedRef.current);
                     }}
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: ALUMNO_HEADER_MINI_PX,
-                      boxSizing: "border-box",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      paddingLeft: 16,
-                      paddingRight: 16,
-                      paddingBottom: 8,
-                      zIndex: 1,
-                      backfaceVisibility: "hidden",
-                      WebkitBackfaceVisibility: "hidden",
-                      transition: planScrollDiag.planHeaderLayerTransitions
-                        ? "transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease"
-                        : "none",
-                    }}
-                  >
-                      <div style={{fontSize:15,fontWeight:700,color:textMain}}>
-                        {sessionData?.name?.split(" ")[0]||"Atleta"}
-                      </div>
-                      {todayDay&&!yaEntrenoHoy&&!session&&(
-                        <button className="hov"
-                          style={{background:"#2563EB",color:"#fff",border:"none",
-                            borderRadius:8,padding:"8px 14px",fontSize:13,
-                            fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
-                          onClick={()=>{
-                            const snap={};
-                            [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
-                            setPreSessionPRs({...snap});
-                            setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
-                          }}>
-                          ⚡ {msg("Entrenar", "Train")}
-                        </button>
-                      )}
-                      {yaEntrenoHoy&&<span style={{fontSize:13,color:"#22C55E",fontWeight:600}}>✅ {msg("Listo hoy", "Done today")}</span>}
-                    </div>
+                    layerTransitionsEnabled={planScrollDiag.planHeaderLayerTransitions}
+                  />
                   </div>
                 </div>
               );
