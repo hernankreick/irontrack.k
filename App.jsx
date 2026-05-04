@@ -1123,11 +1123,31 @@ function GymApp() {
         return;
       }
       var ctx = planScrollCtxRef.current;
-      /** Modo alumno: header superior siempre visible (sin translate fuera del viewport). */
+      var y = attachedEl.scrollTop;
+      var dir = y > lastScrollY.current;
+      var delta = Math.abs(y - lastScrollY.current);
       var nav = alumnoAppHeaderRef.current;
       if (nav && ctx.alumnoFixedTabs) {
-        nav.style.transform = "";
-        nav.style.transition = "";
+        if (ctx.alumnoPlan) {
+          var compact = y > 40;
+          var hide = y > 120 && dir && delta > 6;
+          var show = !dir && delta > 6;
+          if (y < 12 || show) hide = false;
+          nav.style.transform = hide ? "translateY(-100%)" : "translateY(0)";
+          nav.style.opacity = hide ? "0" : "1";
+          nav.style.transition = "transform 0.25s ease, opacity 0.2s ease";
+          nav.style.willChange = "transform, opacity";
+          nav.style.minHeight = compact ? "calc(env(safe-area-inset-top, 0px) + 76px)" : ctx.alumnoTopBarPx;
+          nav.style.paddingBottom = compact ? "8px" : "";
+          nav.style.boxShadow = compact ? "0 8px 24px rgba(0,0,0,.14)" : "0 8px 24px rgba(0,0,0,.18)";
+        } else {
+          nav.style.transform = "";
+          nav.style.opacity = "";
+          nav.style.transition = "";
+          nav.style.willChange = "";
+          nav.style.minHeight = ctx.alumnoTopBarPx;
+          nav.style.paddingBottom = "";
+        }
         var sp = alumnoTopBarSpacerRef.current;
         if (sp) {
           sp.style.height = ctx.alumnoTopBarPx;
@@ -1148,8 +1168,6 @@ function GymApp() {
         tickingRef.current = false;
         return;
       }
-      var y = attachedEl.scrollTop;
-      var dir = y > lastScrollY.current;
       lastScrollY.current = y;
       var nextCollapsed = headerCollapsedRef.current;
       /** Umbrales por encima del tramo HOY→Día 1 (~60–100px) para no colapsar el header justo al cruzar esa unión. */
@@ -2165,7 +2183,12 @@ function GymApp() {
       var sp = alumnoTopBarSpacerRef.current;
       if (nav) {
         nav.style.transform = "";
+        nav.style.opacity = "";
         nav.style.transition = "";
+        nav.style.willChange = "";
+        nav.style.paddingBottom = "";
+        nav.style.minHeight = alumnoTopBarFixed ? alumnoTopBarHeight : "";
+        nav.style.boxShadow = alumnoTopBarFixed ? "0 8px 24px rgba(0,0,0,.18)" : "";
       }
       if (sp && alumnoTopBarFixed) {
         sp.style.height = alumnoTopBarHeight;

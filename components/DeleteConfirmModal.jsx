@@ -152,9 +152,9 @@ export function DeleteConfirmModal({
     };
   }
 
-  var titleFont = isWorkoutExit ? 20 : narrow ? 21 : 24;
-  var py = isWorkoutExit ? 22 : narrow ? 24 : 32;
-  var maxW = isWorkoutExit ? 360 : 520;
+  var titleFont = isWorkoutExit ? 18 : narrow ? 21 : 24;
+  var py = isWorkoutExit ? 18 : narrow ? 24 : 32;
+  var maxW = isWorkoutExit ? 320 : 520;
   var confirmDisabled = loading || (requireAcknowledge && !acknowledged);
 
   return createPortal(
@@ -186,8 +186,8 @@ export function DeleteConfirmModal({
           e.stopPropagation();
         }}
         style={{
-          width: 'min(' + maxW + 'px, calc(100vw - 32px))',
-          maxWidth: 'min(' + maxW + 'px, calc(100vw - 32px))',
+          width: 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
+          maxWidth: 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
           background: 'rgba(15, 23, 42, 0.92)',
           border: '1px solid rgba(148, 163, 184, 0.28)',
           borderRadius: isWorkoutExit ? 22 : 24,
@@ -197,18 +197,18 @@ export function DeleteConfirmModal({
           animation: isWorkoutExit ? 'it-workout-exit-card-in 200ms ease-out both' : undefined,
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isWorkoutExit ? 12 : 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isWorkoutExit ? 8 : 0 }}>
           <div
             style={{
-              width: isWorkoutExit ? 50 : 64,
-              height: isWorkoutExit ? 50 : 64,
+              width: isWorkoutExit ? 44 : 64,
+              height: isWorkoutExit ? 44 : 64,
               borderRadius: '50%',
               background: iconWrap.bg,
               border: iconWrap.border || 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: isWorkoutExit ? 2 : 20,
+              marginBottom: isWorkoutExit ? 0 : 20,
             }}
             aria-hidden
           >
@@ -301,10 +301,10 @@ export function DeleteConfirmModal({
         <div
           style={{
             display: 'flex',
-            flexDirection: narrow ? 'column-reverse' : 'row',
+            flexDirection: isWorkoutExit ? 'column-reverse' : narrow ? 'column-reverse' : 'row',
             flexWrap: 'wrap',
-            gap: isWorkoutExit ? 10 : 12,
-            marginTop: isWorkoutExit ? 22 : 28,
+            gap: isWorkoutExit ? 8 : 12,
+            marginTop: isWorkoutExit ? 18 : 28,
           }}
         >
           <button
@@ -314,7 +314,8 @@ export function DeleteConfirmModal({
             onClick={onCancel}
             className={isWorkoutExit ? 'it-workout-exit-cancel' : undefined}
             style={{
-              flex: '1 1 160px',
+              flex: isWorkoutExit ? '0 0 auto' : '1 1 160px',
+              width: isWorkoutExit ? '100%' : undefined,
               minHeight: isWorkoutExit ? 44 : 52,
               borderRadius: isWorkoutExit ? 14 : 16,
               border: isWorkoutExit ? '1px solid rgb(71, 85, 105)' : '1px solid rgba(148, 163, 184, 0.32)',
@@ -336,7 +337,8 @@ export function DeleteConfirmModal({
             onClick={onConfirm}
             className={isWorkoutExit ? 'it-workout-exit-confirm' : undefined}
             style={{
-              flex: '1 1 160px',
+              flex: isWorkoutExit ? '0 0 auto' : '1 1 160px',
+              width: isWorkoutExit ? '100%' : undefined,
               minHeight: isWorkoutExit ? 48 : 52,
               borderRadius: isWorkoutExit ? 14 : 16,
               fontSize: isWorkoutExit ? 18 : 15,
