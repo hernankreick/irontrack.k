@@ -118,11 +118,100 @@ export function patternToMovementKey(pat) {
 }
 
 export function getRoutineForAlumno(rutinasSBEntrenador, alumnoId) {
-  var list = rutinasSBEntrenador || [];
-  for (var i = 0; i < list.length; i++) {
-    if (String(list[i].alumno_id) === String(alumnoId)) return list[i];
+  var list = (rutinasSBEntrenador || [])
+    .filter(function (rut) {
+      return String(rut.alumno_id) === String(alumnoId);
+    })
+    .sort(function (a, b) {
+      var ta = new Date(a.created_at || a.updated_at || 0).getTime() || 0;
+      var tb = new Date(b.created_at || b.updated_at || 0).getTime() || 0;
+      return tb - ta;
+    });
+  return list[0] || null;
+}
+
+function routineExerciseIdSet(rut) {
+  var ids = {};
+  var days = rut && rut.datos ? rut.datos.days || [] : [];
+  days.forEach(function (day) {
+    function collect(list) {
+      (list || []).forEach(function (ex) {
+        if (ex && ex.id != null) ids[String(ex.id)] = true;
+      });
+    }
+    collect(day.warmup);
+    collect(day.exercises);
+  });
+  return ids;
+}
+
+function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackStartMs, fallbackEndMs) {
+  if (!row) return false;
+  if (routineId && row.rutina_id != null && row.rutina_id !== "") {
+    return String(row.rutina_id) === String(routineId);
   }
-  return null;
+  if (row.ejercicio_id == null) return false;
+  if (!routineExerciseIds[String(row.ejercicio_id)]) return false;
+  var d = parseProgresoDate(row.fecha);
+  var t = d ? d.getTime() : 0;
+  return t >= fallbackStartMs && t < fallbackEndMs;
+}
+
+function sessionMatchesRoutine(ses, routineId, fallbackStartMs, fallbackEndMs) {
+  if (!ses) return false;
+  if (routineId && ses.rutina_id != null && ses.rutina_id !== "") {
+    return String(ses.rutina_id) === String(routineId);
+  }
+  var d = parseSessionDate(ses);
+  var t = d ? d.getTime() : 0;
+  return t >= fallbackStartMs && t < fallbackEndMs;
+}
+
+function buildRoutineWeekContext(progressRows, sessions, now) {
+  var anchors = [];
+  var latestSessionWeek = null;
+  (progressRows || []).forEach(function (row) {
+    var d = parseProgresoDate(row.fecha);
+    if (d) anchors.push(d.getTime());
+  });
+  (sessions || []).forEach(function (ses) {
+    var d = parseSessionDate(ses);
+    if (d) {
+      var t = d.getTime();
+      anchors.push(t);
+      var semana = parseInt(ses.semana, 10);
+      if (semana > 0 && (!latestSessionWeek || t >= latestSessionWeek.timeMs)) {
+        latestSessionWeek = { semana: semana, timeMs: t };
+      }
+    }
+  });
+
+  var currentMondayMs = weekKeyMon(now);
+  var routineStartMs;
+  var semanaDetectada;
+  if (latestSessionWeek) {
+    semanaDetectada = Math.max(1, latestSessionWeek.semana);
+    routineStartMs = weekKeyMon(new Date(latestSessionWeek.timeMs)) - (semanaDetectada - 1) * 7 * DAY_MS;
+  } else {
+    var firstActivityMs = anchors.length > 0 ? Math.min.apply(null, anchors) : currentMondayMs;
+    routineStartMs = weekKeyMon(new Date(firstActivityMs));
+    var rawWeek = Math.floor((currentMondayMs - routineStartMs) / (7 * DAY_MS)) + 1;
+    semanaDetectada = Math.max(1, rawWeek || 1);
+  }
+  var currentRoutineWeekIndex = Math.min(3, semanaDetectada - 1);
+  var weekStarts = [];
+  for (var i = 0; i < 4; i++) {
+    weekStarts.push(routineStartMs + i * 7 * DAY_MS);
+  }
+
+  return {
+    routineStartMs: routineStartMs,
+    semanaDetectada: semanaDetectada,
+    currentRoutineWeekIndex: currentRoutineWeekIndex,
+    currentWeekStartMs: weekStarts[currentRoutineWeekIndex],
+    currentWeekEndMs: weekStarts[currentRoutineWeekIndex] + 7 * DAY_MS,
+    weekStarts: weekStarts,
+  };
 }
 
 /**
@@ -184,6 +273,21 @@ export function buildCoachProgresoModel(params) {
   var end = bounds.end;
   var pStart = bounds.prevStart;
   var pEnd = bounds.prevEnd;
+  var now = new Date();
+  var fallbackWeekStartMs = weekKeyMon(now);
+  var fallbackWeekEndMs = fallbackWeekStartMs + 7 * DAY_MS;
+  var routineForSelected = getRoutineForAlumno(rutinasSBEntrenador, alumnoSel);
+  var routineForSelectedId = routineForSelected && routineForSelected.id != null ? String(routineForSelected.id) : null;
+  var routineExerciseIds = routineExerciseIdSet(routineForSelected);
+  var selectedProgressRows = alumnoSel
+    ? (progresoGlobal[alumnoSel] || []).filter(function (row) {
+        return progressRowMatchesRoutine(row, routineForSelectedId, routineExerciseIds, fallbackWeekStartMs, fallbackWeekEndMs);
+      })
+    : [];
+  var selectedSessions = (sesionesGlobales || []).filter(function (ses) {
+    return String(ses.alumno_id) === String(alumnoSel) && sessionMatchesRoutine(ses, routineForSelectedId, fallbackWeekStartMs, fallbackWeekEndMs);
+  });
+  var routineWeekContext = buildRoutineWeekContext(selectedProgressRows, selectedSessions, now);
 
   var alumnoRows = alumnos.map(function (a, idx) {
     return {
@@ -279,19 +383,16 @@ export function buildCoachProgresoModel(params) {
   /** Volumen total kg*reps en período */
   function volumeBetween(t0, t1) {
     var vol = 0;
-    Object.keys(progresoGlobal).forEach(function (aid) {
-      var rows = progresoGlobal[aid] || [];
-      for (var j = 0; j < rows.length; j++) {
-        var r = rows[j];
-        var d = parseProgresoDate(r.fecha);
-        if (!d) continue;
-        var tt = d.getTime();
-        if (tt < t0 || tt > t1) continue;
-        var kg = parseFloat(r.kg) || 0;
-        var reps = parseInt(r.reps, 10) || 0;
-        vol += kg * Math.max(1, reps);
-      }
-    });
+    for (var j = 0; j < selectedProgressRows.length; j++) {
+      var r = selectedProgressRows[j];
+      var d = parseProgresoDate(r.fecha);
+      if (!d) continue;
+      var tt = d.getTime();
+      if (tt < t0 || tt > t1) continue;
+      var kg = parseFloat(r.kg) || 0;
+      var reps = parseInt(r.reps, 10) || 0;
+      vol += kg * Math.max(1, reps);
+    }
     return vol;
   }
 
@@ -389,23 +490,17 @@ export function buildCoachProgresoModel(params) {
     if (countPRsForAlumnoBetween(a.id, cutoffStall, end) === 0) stalled++;
   });
 
-  /**
-   * Evolución de carga: bloque actual de 4 semanas (lunes a domingo), alineado a la semana calendario.
-   * Semana 1 = más antigua del bloque; Semana 4 = semana calendario actual (incluye hoy).
-   */
+  /** Evolución de carga: semanas de la rutina activa del alumno seleccionado. */
   var LOAD_BLOCK_WEEKS = 4;
-  var now = new Date();
-  var currentMondayMs = weekKeyMon(now);
   var series = [];
   var weekLabels = [];
   for (var wi = 0; wi < LOAD_BLOCK_WEEKS; wi++) {
-    var offsetWeeks = wi - (LOAD_BLOCK_WEEKS - 1);
-    var wkStartMs = currentMondayMs + offsetWeeks * 7 * DAY_MS;
+    var wkStartMs = routineWeekContext.weekStarts[wi];
     var wkEndMs = wkStartMs + 7 * DAY_MS;
     weekLabels.push(M(lang, "Semana " + (wi + 1), "Week " + (wi + 1), "Semana " + (wi + 1)));
     var maxKg = null;
     if (alumnoSel && ejercicioSelId) {
-      var rows = progresoGlobal[alumnoSel] || [];
+      var rows = selectedProgressRows;
       for (var ri = 0; ri < rows.length; ri++) {
         var rr = rows[ri];
         if (String(rr.ejercicio_id) !== String(ejercicioSelId)) continue;
@@ -500,28 +595,22 @@ export function buildCoachProgresoModel(params) {
     };
   });
 
-  /**
-   * Volumen semanal (equipo): mismo bloque actual de 4 semanas que Evolución de carga
-   * (lunes–dom, Semana 1 = más antigua, Semana 4 = actual). Suma kg×reps de todos los alumnos.
-   */
+  /** Volumen semanal: alumno seleccionado + rutina activa. */
   var volBars = [];
   var maxVol = 0;
   for (var wv = 0; wv < LOAD_BLOCK_WEEKS; wv++) {
-    var offV = wv - (LOAD_BLOCK_WEEKS - 1);
-    var wkStartMsV = currentMondayMs + offV * 7 * DAY_MS;
+    var wkStartMsV = routineWeekContext.weekStarts[wv];
     var wkEndMsV = wkStartMsV + 7 * DAY_MS;
     var vsum = 0;
-    Object.keys(progresoGlobal).forEach(function (aid) {
-      (progresoGlobal[aid] || []).forEach(function (r) {
-        var d = parseProgresoDate(r.fecha);
-        if (!d) return;
-        var t = d.getTime();
-        if (t >= wkStartMsV && t < wkEndMsV) {
-          var kg = parseFloat(r.kg) || 0;
-          var reps = parseInt(r.reps, 10) || 0;
-          vsum += kg * Math.max(1, reps);
-        }
-      });
+    selectedProgressRows.forEach(function (r) {
+      var d = parseProgresoDate(r.fecha);
+      if (!d) return;
+      var t = d.getTime();
+      if (t >= wkStartMsV && t < wkEndMsV) {
+        var kg = parseFloat(r.kg) || 0;
+        var reps = parseInt(r.reps, 10) || 0;
+        vsum += kg * Math.max(1, reps);
+      }
     });
     volBars.push({
       v: vsum,
@@ -546,8 +635,9 @@ export function buildCoachProgresoModel(params) {
     };
   });
 
-  /** Volumen por patrón (5 claves) + series por ejercicio: bloque 4 semanas; 1 fila progreso = 1 serie */
-  var gStart = Date.now() - 28 * DAY_MS;
+  /** Volumen por patrón: semana actual de la rutina activa; 1 fila progreso = 1 serie. */
+  var gStart = routineWeekContext.currentWeekStartMs;
+  var gEnd = routineWeekContext.currentWeekEndMs;
   var volByKey = { empuje: 0, traccion: 0, rodilla: 0, bisagra: 0, core: 0 };
   /** @type {Record<string, Record<string, number>>} patternKey -> ejercicio_id -> series */
   var seriesByPatternAndEx = {
@@ -557,22 +647,22 @@ export function buildCoachProgresoModel(params) {
     bisagra: {},
     core: {},
   };
-  Object.keys(progresoGlobal).forEach(function (aid) {
-    (progresoGlobal[aid] || []).forEach(function (r) {
-      var d = parseProgresoDate(r.fecha);
-      if (!d || d.getTime() < gStart) return;
-      var ex = exMap[r.ejercicio_id];
-      var mk = patternToMovementKey(ex ? ex.pattern : "");
-      if (!mk) return;
-      var kg = parseFloat(r.kg) || 0;
-      var reps = parseInt(r.reps, 10) || 0;
-      volByKey[mk] += kg * Math.max(1, reps);
-      var ejId = r.ejercicio_id;
-      if (ejId == null) return;
-      var sid = String(ejId);
-      var bag = seriesByPatternAndEx[mk];
-      bag[sid] = (bag[sid] || 0) + 1;
-    });
+  selectedProgressRows.forEach(function (r) {
+    var d = parseProgresoDate(r.fecha);
+    if (!d) return;
+    var t = d.getTime();
+    if (t < gStart || t >= gEnd) return;
+    var ex = exMap[r.ejercicio_id];
+    var mk = patternToMovementKey(ex ? ex.pattern : "");
+    if (!mk) return;
+    var kg = parseFloat(r.kg) || 0;
+    var reps = parseInt(r.reps, 10) || 0;
+    volByKey[mk] += kg * Math.max(1, reps);
+    var ejId = r.ejercicio_id;
+    if (ejId == null) return;
+    var sid = String(ejId);
+    var bag = seriesByPatternAndEx[mk];
+    bag[sid] = (bag[sid] || 0) + 1;
   });
   var patronTotalVol = MOVEMENT_PATTERN_DEF.reduce(function (acc, def) {
     return acc + (volByKey[def.key] || 0);
@@ -653,6 +743,17 @@ export function buildCoachProgresoModel(params) {
 
   var exerciseOptions = exercisesForRoutineDay(rutinasSBEntrenador, alumnoSel, diaIdx, exMap, lang);
 
+  if (import.meta.env && import.meta.env.DEV) {
+    console.log("[PROGRESS DEBUG]", {
+      alumnoId: alumnoSel || null,
+      rutinaId: routineForSelectedId,
+      semanaDetectada: routineWeekContext.semanaDetectada,
+      sesionesFiltradas: selectedSessions.length,
+      ejerciciosIncluidos: Object.keys(routineExerciseIds),
+      volumenPorCategoria: volByKey,
+    });
+  }
+
   return {
     alumnoRows: alumnoRows,
     exerciseOptions: exerciseOptions,
@@ -666,6 +767,8 @@ export function buildCoachProgresoModel(params) {
     summaryChips: summaryChips,
     chartSeries: series,
     chartWeekLabels: weekLabels,
+    currentRoutineWeekIndex: routineWeekContext.currentRoutineWeekIndex,
+    semanaDetectada: routineWeekContext.semanaDetectada,
     hasChartData: series.some(function (v) {
       return v != null;
     }),

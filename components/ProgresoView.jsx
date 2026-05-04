@@ -901,9 +901,9 @@ export default function ProgresoView({
               <p style={{ ...T.subtitle, color: C.t2, margin: "8px 0 0 0" }}>
                 {M(
                   lang,
-                  "Bloque actual (4 semanas, lun–dom) · todos los alumnos",
-                  "Current block (4 weeks, Mon–Sun) · all athletes",
-                  "Bloco atual (4 semanas, seg–dom) · todos os alunos"
+                  "Rutina activa del alumno seleccionado · semana actual",
+                  "Selected athlete active plan · current week",
+                  "Rotina ativa do aluno selecionado · semana atual"
                 )}
               </p>
             </div>
@@ -938,7 +938,11 @@ export default function ProgresoView({
                   } else if (maxV <= 0) {
                     h = 4;
                   }
-                  var isCurrentWeek = vidx === 3;
+                  var currentRoutineWeekIndex =
+                    model.currentRoutineWeekIndex != null
+                      ? model.currentRoutineWeekIndex
+                      : 0;
+                  var isCurrentWeek = vidx === currentRoutineWeekIndex;
                   var barOpacity = isCurrentWeek ? 1 : 0.42;
                   var volLabel =
                     bar.v > 0 ? formatWeeklyVolKgAbbrev(bar.v) : "0";
