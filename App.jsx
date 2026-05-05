@@ -1015,6 +1015,9 @@ function GymApp() {
   const lastScrollY = useRef(0);
   const tickingRef = useRef(false);
   const scrollRafIdRef = useRef(null);
+  const lastAppliedHeaderStateRef = useRef(null);
+  const lastAppliedSpacerHeightRef = useRef(null);
+  const pendingHeaderShowRafRef = useRef(null);
   /** Actualizado cada render tras conocer tab/esAlumno: el scroll handler no debe depender de closure viejo. */
   const planScrollCtxRef = useRef({ alumnoPlan: false, headerCollapse: true });
   const [resumenSesion, setResumenSesion] = useState(null);
@@ -1133,13 +1136,23 @@ function GymApp() {
           var hide = y > 120 && dir && delta > 6;
           var show = !dir && delta > 6;
           if (y < 12 || show) hide = false;
-          nav.style.transform = hide ? "translateY(-100%)" : "translateY(0)";
-          nav.style.opacity = hide ? "0" : "1";
-          nav.style.transition = "transform 0.25s ease, opacity 0.2s ease";
-          nav.style.willChange = "transform, opacity";
-          nav.style.minHeight = compact ? "calc(env(safe-area-inset-top, 0px) + 76px)" : ctx.alumnoTopBarPx;
-          nav.style.paddingBottom = compact ? "8px" : "";
-          nav.style.boxShadow = compact ? "0 8px 24px rgba(0,0,0,.14)" : "0 8px 24px rgba(0,0,0,.18)";
+          var headerState = hide ? "hidden" : compact ? "compact" : "full";
+          var wasHidden = lastAppliedHeaderStateRef.current === "hidden";
+          var applyHeaderState = function () {
+            if (lastAppliedHeaderStateRef.current === headerState) return;
+            nav.style.transform = hide ? "translateY(-100%)" : "translateY(0)";
+            nav.style.opacity = hide ? "0" : "1";
+            nav.style.transition = "transform 0.25s ease, opacity 0.2s ease";
+            nav.style.willChange = "transform";
+            nav.style.minHeight = compact ? "calc(env(safe-area-inset-top, 0px) + 76px)" : ctx.alumnoTopBarPx;
+            nav.style.paddingBottom = compact ? "8px" : "";
+            nav.style.boxShadow = compact ? "0 8px 24px rgba(0,0,0,.14)" : "0 8px 24px rgba(0,0,0,.18)";
+            lastAppliedHeaderStateRef.current = headerState;
+          };
+          if (hide && pendingHeaderShowRafRef.current != null) {
+            cancelAnimationFrame(pendingHeaderShowRafRef.current);
+            pendingHeaderShowRafRef.current = null;
+          }
         } else {
           nav.style.transform = "";
           nav.style.opacity = "";
@@ -1147,6 +1160,7 @@ function GymApp() {
           nav.style.willChange = "";
           nav.style.minHeight = ctx.alumnoTopBarPx;
           nav.style.paddingBottom = "";
+          lastAppliedHeaderStateRef.current = "fixed";
         }
         var sp = alumnoTopBarSpacerRef.current;
         if (sp) {
@@ -1155,20 +1169,41 @@ function GymApp() {
             : ctx.alumnoPlan && compact
               ? "calc(env(safe-area-inset-top, 0px) + 76px)"
               : ctx.alumnoTopBarPx;
-          sp.style.height = spacerHeight;
-          sp.style.minHeight = spacerHeight;
-          sp.style.overflow = "hidden";
-          sp.style.transition = "height 0.2s ease";
+          if (lastAppliedSpacerHeightRef.current !== spacerHeight) {
+            sp.style.height = spacerHeight;
+            sp.style.minHeight = spacerHeight;
+            sp.style.overflow = "hidden";
+            sp.style.transition = "height 0.2s ease";
+            sp.style.willChange = "height";
+            lastAppliedSpacerHeightRef.current = spacerHeight;
+          }
+        }
+        if (ctx.alumnoPlan) {
+          if (wasHidden && !hide) {
+            if (pendingHeaderShowRafRef.current != null) {
+              cancelAnimationFrame(pendingHeaderShowRafRef.current);
+            }
+            pendingHeaderShowRafRef.current = requestAnimationFrame(function () {
+              pendingHeaderShowRafRef.current = null;
+              if (cancelled) return;
+              applyHeaderState();
+            });
+          } else {
+            applyHeaderState();
+          }
         }
       } else if (nav && !ctx.alumnoFixedTabs) {
         nav.style.transform = "";
         nav.style.transition = "";
+        lastAppliedHeaderStateRef.current = null;
         var sp0 = alumnoTopBarSpacerRef.current;
         if (sp0) {
           sp0.style.height = "";
           sp0.style.minHeight = "";
           sp0.style.overflow = "";
           sp0.style.transition = "";
+          sp0.style.willChange = "";
+          lastAppliedSpacerHeightRef.current = null;
         }
       }
       if (!ctx.headerCollapse || !ctx.alumnoPlan) {
@@ -1221,6 +1256,10 @@ function GymApp() {
       if (scrollRafIdRef.current != null) {
         cancelAnimationFrame(scrollRafIdRef.current);
         scrollRafIdRef.current = null;
+      }
+      if (pendingHeaderShowRafRef.current != null) {
+        cancelAnimationFrame(pendingHeaderShowRafRef.current);
+        pendingHeaderShowRafRef.current = null;
       }
       tickingRef.current = false;
     };
@@ -2196,12 +2235,15 @@ function GymApp() {
         nav.style.paddingBottom = "";
         nav.style.minHeight = alumnoTopBarFixed ? alumnoTopBarHeight : "";
         nav.style.boxShadow = alumnoTopBarFixed ? "0 8px 24px rgba(0,0,0,.18)" : "";
+        lastAppliedHeaderStateRef.current = alumnoTopBarFixed ? "full" : null;
       }
       if (sp && alumnoTopBarFixed) {
         sp.style.height = alumnoTopBarHeight;
         sp.style.minHeight = alumnoTopBarHeight;
         sp.style.overflow = "hidden";
         sp.style.transition = "height 0.2s ease";
+        sp.style.willChange = "height";
+        lastAppliedSpacerHeightRef.current = alumnoTopBarHeight;
       }
     },
     [tab, alumnoTopBarFixed, alumnoTopBarHeight]
