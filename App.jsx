@@ -1016,8 +1016,6 @@ function GymApp() {
   const tickingRef = useRef(false);
   const scrollRafIdRef = useRef(null);
   const lastAppliedHeaderStateRef = useRef(null);
-  const lastAppliedSpacerHeightRef = useRef(null);
-  const pendingHeaderShowRafRef = useRef(null);
   /** Actualizado cada render tras conocer tab/esAlumno: el scroll handler no debe depender de closure viejo. */
   const planScrollCtxRef = useRef({ alumnoPlan: false, headerCollapse: true });
   const [resumenSesion, setResumenSesion] = useState(null);
@@ -1137,9 +1135,7 @@ function GymApp() {
           var show = !dir && delta > 6;
           if (y < 12 || show) hide = false;
           var headerState = hide ? "hidden" : compact ? "compact" : "full";
-          var wasHidden = lastAppliedHeaderStateRef.current === "hidden";
-          var applyHeaderState = function () {
-            if (lastAppliedHeaderStateRef.current === headerState) return;
+          if (lastAppliedHeaderStateRef.current !== headerState) {
             nav.style.transform = hide ? "translateY(-100%)" : "translateY(0)";
             nav.style.opacity = hide ? "0" : "1";
             nav.style.transition = "transform 0.25s ease, opacity 0.2s ease";
@@ -1148,10 +1144,6 @@ function GymApp() {
             nav.style.paddingBottom = compact ? "8px" : "";
             nav.style.boxShadow = compact ? "0 8px 24px rgba(0,0,0,.14)" : "0 8px 24px rgba(0,0,0,.18)";
             lastAppliedHeaderStateRef.current = headerState;
-          };
-          if (hide && pendingHeaderShowRafRef.current != null) {
-            cancelAnimationFrame(pendingHeaderShowRafRef.current);
-            pendingHeaderShowRafRef.current = null;
           }
         } else {
           nav.style.transform = "";
@@ -1164,33 +1156,11 @@ function GymApp() {
         }
         var sp = alumnoTopBarSpacerRef.current;
         if (sp) {
-          var spacerHeight = ctx.alumnoPlan && hide
-            ? "0px"
-            : ctx.alumnoPlan && compact
-              ? "calc(env(safe-area-inset-top, 0px) + 76px)"
-              : ctx.alumnoTopBarPx;
-          if (lastAppliedSpacerHeightRef.current !== spacerHeight) {
-            sp.style.height = spacerHeight;
-            sp.style.minHeight = spacerHeight;
-            sp.style.overflow = "hidden";
-            sp.style.transition = "height 0.2s ease";
-            sp.style.willChange = "height";
-            lastAppliedSpacerHeightRef.current = spacerHeight;
-          }
-        }
-        if (ctx.alumnoPlan) {
-          if (wasHidden && !hide) {
-            if (pendingHeaderShowRafRef.current != null) {
-              cancelAnimationFrame(pendingHeaderShowRafRef.current);
-            }
-            pendingHeaderShowRafRef.current = requestAnimationFrame(function () {
-              pendingHeaderShowRafRef.current = null;
-              if (cancelled) return;
-              applyHeaderState();
-            });
-          } else {
-            applyHeaderState();
-          }
+          sp.style.height = "0px";
+          sp.style.minHeight = "0px";
+          sp.style.overflow = "hidden";
+          sp.style.transition = "none";
+          sp.style.willChange = "";
         }
       } else if (nav && !ctx.alumnoFixedTabs) {
         nav.style.transform = "";
@@ -1203,7 +1173,6 @@ function GymApp() {
           sp0.style.overflow = "";
           sp0.style.transition = "";
           sp0.style.willChange = "";
-          lastAppliedSpacerHeightRef.current = null;
         }
       }
       if (!ctx.headerCollapse || !ctx.alumnoPlan) {
@@ -1256,10 +1225,6 @@ function GymApp() {
       if (scrollRafIdRef.current != null) {
         cancelAnimationFrame(scrollRafIdRef.current);
         scrollRafIdRef.current = null;
-      }
-      if (pendingHeaderShowRafRef.current != null) {
-        cancelAnimationFrame(pendingHeaderShowRafRef.current);
-        pendingHeaderShowRafRef.current = null;
       }
       tickingRef.current = false;
     };
@@ -2238,12 +2203,11 @@ function GymApp() {
         lastAppliedHeaderStateRef.current = alumnoTopBarFixed ? "full" : null;
       }
       if (sp && alumnoTopBarFixed) {
-        sp.style.height = alumnoTopBarHeight;
-        sp.style.minHeight = alumnoTopBarHeight;
+        sp.style.height = "0px";
+        sp.style.minHeight = "0px";
         sp.style.overflow = "hidden";
-        sp.style.transition = "height 0.2s ease";
-        sp.style.willChange = "height";
-        lastAppliedSpacerHeightRef.current = alumnoTopBarHeight;
+        sp.style.transition = "none";
+        sp.style.willChange = "";
       }
     },
     [tab, alumnoTopBarFixed, alumnoTopBarHeight]
@@ -3387,7 +3351,7 @@ function GymApp() {
       </div>
       )}
       {alumnoTopBarFixed && (
-        <div ref={alumnoTopBarSpacerRef} style={{ height: alumnoTopBarHeight, minHeight: alumnoTopBarHeight, flexShrink: 0, overflow: "hidden", transition: "height 0.2s ease", background: alumnoFullScreenBg, border: "none", boxShadow: "none" }} aria-hidden />
+        <div ref={alumnoTopBarSpacerRef} style={{ height: 0, minHeight: 0, flexShrink: 0, overflow: "hidden", transition: "none", background: alumnoFullScreenBg, border: "none", boxShadow: "none" }} aria-hidden />
       )}
       {sessionData && esAlumno && userMenuOpen && (
         <>
@@ -3499,7 +3463,7 @@ function GymApp() {
             showCoachDesktopShell && !esAlumno
               ? undefined
               : alumnoTopBarFixed
-                ? "calc(100svh - 204px)"
+                ? "100svh"
                 : "calc(100svh - 130px)",
           flex: alumnoFullScreenShell ? 1 : showCoachDesktopShell && !esAlumno ? 1 : undefined,
           minHeight: alumnoFullScreenShell ? 0 : showCoachDesktopShell && !esAlumno ? 0 : undefined,
@@ -3528,7 +3492,9 @@ function GymApp() {
               : undefined,
           paddingTop:
             esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
-              ? 32
+              ? alumnoTopBarFixed
+                ? "calc(env(safe-area-inset-top, 0px) + 128px)"
+                : 32
               : undefined,
           WebkitOverflowScrolling: "touch",
           scrollBehavior: "auto",
