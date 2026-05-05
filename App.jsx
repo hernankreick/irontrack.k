@@ -1150,9 +1150,15 @@ function GymApp() {
         }
         var sp = alumnoTopBarSpacerRef.current;
         if (sp) {
-          sp.style.height = ctx.alumnoTopBarPx;
-          sp.style.minHeight = ctx.alumnoTopBarPx;
-          sp.style.transition = "none";
+          var spacerHeight = ctx.alumnoPlan && hide
+            ? "0px"
+            : ctx.alumnoPlan && compact
+              ? "calc(env(safe-area-inset-top, 0px) + 76px)"
+              : ctx.alumnoTopBarPx;
+          sp.style.height = spacerHeight;
+          sp.style.minHeight = spacerHeight;
+          sp.style.overflow = "hidden";
+          sp.style.transition = "height 0.2s ease";
         }
       } else if (nav && !ctx.alumnoFixedTabs) {
         nav.style.transform = "";
@@ -1161,6 +1167,7 @@ function GymApp() {
         if (sp0) {
           sp0.style.height = "";
           sp0.style.minHeight = "";
+          sp0.style.overflow = "";
           sp0.style.transition = "";
         }
       }
@@ -2193,7 +2200,8 @@ function GymApp() {
       if (sp && alumnoTopBarFixed) {
         sp.style.height = alumnoTopBarHeight;
         sp.style.minHeight = alumnoTopBarHeight;
-        sp.style.transition = "";
+        sp.style.overflow = "hidden";
+        sp.style.transition = "height 0.2s ease";
       }
     },
     [tab, alumnoTopBarFixed, alumnoTopBarHeight]
@@ -3337,7 +3345,7 @@ function GymApp() {
       </div>
       )}
       {alumnoTopBarFixed && (
-        <div ref={alumnoTopBarSpacerRef} style={{ height: alumnoTopBarHeight, minHeight: alumnoTopBarHeight, flexShrink: 0, transition: "none", background: alumnoFullScreenBg, border: "none", boxShadow: "none" }} aria-hidden />
+        <div ref={alumnoTopBarSpacerRef} style={{ height: alumnoTopBarHeight, minHeight: alumnoTopBarHeight, flexShrink: 0, overflow: "hidden", transition: "height 0.2s ease", background: alumnoFullScreenBg, border: "none", boxShadow: "none" }} aria-hidden />
       )}
       {sessionData && esAlumno && userMenuOpen && (
         <>
