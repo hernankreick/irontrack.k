@@ -79,6 +79,7 @@ import SessionSummaryStatsPanel from './components/student-plan/SessionSummarySt
 import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import EditExModal from './components/routines/EditExModal.jsx';
+import BaseModal from './components/modals/BaseModal.jsx';
 import {
   estimateDayMinutes,
   countExercisesWithLogToday,
@@ -1051,18 +1052,6 @@ function GymApp() {
       setDupDayClosing(false);
     }, 200);
   }
-
-  useEffect(function () {
-    if (!dupDayModal) return undefined;
-    setDupDayClosing(false);
-    function onKeyDown(e) {
-      if (e.key === "Escape") closeDupDayModalAnimated();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return function () {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [dupDayModal, dupDayClosing]);
 
   /** Plan alumno: scroll vía requestAnimationFrame + listener pasivo (sin setState en el hilo de scroll). */
   useLayoutEffect(function () {
@@ -5719,9 +5708,8 @@ function GymApp() {
       )}
 
                   {/* ── Modal duplicar día ── */}
-      {dupDayModal&&typeof document!=="undefined"&&createPortal(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center",padding:16,opacity:dupDayClosing?0:1,transition:"opacity 200ms cubic-bezier(0.16, 1, 0.3, 1)",animation:dupDayClosing?"none":"it-dup-day-overlay-in 200ms cubic-bezier(0.16, 1, 0.3, 1)"}} onClick={closeDupDayModalAnimated}>
-          <div style={{background:darkMode?"#0d1424":bgCard,borderRadius:18,padding:20,width:"90%",maxWidth:480,border:"1px solid "+border,boxShadow:"0 24px 80px rgba(0,0,0,.45)",transform:dupDayClosing?"scale(0.96) translateY(10px)":"scale(1) translateY(0)",opacity:dupDayClosing?0:1,transition:"opacity 200ms cubic-bezier(0.16, 1, 0.3, 1), transform 200ms cubic-bezier(0.16, 1, 0.3, 1)",animation:dupDayClosing?"none":"it-dup-day-card-in 200ms cubic-bezier(0.16, 1, 0.3, 1)"}} onClick={e=>e.stopPropagation()}>
+      {dupDayModal&&(
+        <BaseModal open={!!dupDayModal&&!dupDayClosing} onClose={closeDupDayModalAnimated} maxWidth={480}>
             <div style={{fontSize:18,fontWeight:800,color:textMain,marginBottom:4}}>
               {msg("Duplicar", "Duplicate")} {dupDayModal.days[dupDayModal.dIdx]?.label||("Día "+(dupDayModal.dIdx+1))}
             </div>
@@ -5800,9 +5788,7 @@ function GymApp() {
                 {msg("DUPLICAR", "DUPLICATE")} {dupDayModal.selected.length>0&&("("+dupDayModal.selected.length+")")}
               </button>
             </div>
-          </div>
-        </div>,
-        document.body
+        </BaseModal>
       )}
             {/* ── Modal chat entrenador ── */}
       {chatModal&&(
