@@ -10,6 +10,10 @@ export default function BaseModal({
   children,
   maxWidth = 480,
   closeOnOutside = true,
+  zIndex = 9999,
+  overlayStyle,
+  contentStyle,
+  contentProps,
 }) {
   const [shouldRender, setShouldRender] = useState(!!open);
 
@@ -66,7 +70,7 @@ export default function BaseModal({
         position: 'fixed',
         inset: 0,
         background: 'rgba(0,0,0,0.5)',
-        zIndex: 9999,
+        zIndex: zIndex,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -74,12 +78,14 @@ export default function BaseModal({
         opacity: isClosing ? 0 : 1,
         transition: 'opacity ' + MODAL_TRANSITION_MS + 'ms ' + MODAL_EASE,
         animation: isClosing ? 'none' : 'it-dup-day-overlay-in ' + MODAL_TRANSITION_MS + 'ms ' + MODAL_EASE,
+        ...(overlayStyle || {}),
       }}
       onClick={function () {
         if (closeOnOutside !== false && typeof onClose === 'function') onClose();
       }}
     >
       <div
+        {...(contentProps || {})}
         style={{
           background: modalBg,
           borderRadius: 18,
@@ -94,6 +100,7 @@ export default function BaseModal({
             'opacity ' + MODAL_TRANSITION_MS + 'ms ' + MODAL_EASE + ', transform ' +
             MODAL_TRANSITION_MS + 'ms ' + MODAL_EASE,
           animation: isClosing ? 'none' : 'it-dup-day-card-in ' + MODAL_TRANSITION_MS + 'ms ' + MODAL_EASE,
+          ...(contentStyle || {}),
         }}
         onClick={function (e) { e.stopPropagation(); }}
       >

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { AlertTriangle, HelpCircle, LogOut, Trash2 } from 'lucide-react';
+import BaseModal from './modals/BaseModal.jsx';
 
 /**
  * Diálogo modal propio (sin window.confirm) para acciones destructivas o confirmación.
@@ -64,23 +64,6 @@ export function DeleteConfirmModal({
   useEffect(
     function () {
       if (!open) return undefined;
-      function onKey(e) {
-        if (e.key === 'Escape' && !loading) {
-          e.preventDefault();
-          onCancel();
-        }
-      }
-      document.addEventListener('keydown', onKey);
-      return function () {
-        document.removeEventListener('keydown', onKey);
-      };
-    },
-    [open, loading, onCancel]
-  );
-
-  useEffect(
-    function () {
-      if (!open) return undefined;
       var t = setTimeout(function () {
         if (cancelRef.current && !loading) {
           try {
@@ -94,8 +77,6 @@ export function DeleteConfirmModal({
     },
     [open, loading]
   );
-
-  if (!open || typeof document === 'undefined') return null;
 
   var isDanger = tone === 'danger';
   var isCaution = tone === 'caution';
@@ -157,35 +138,28 @@ export function DeleteConfirmModal({
   var maxW = isWorkoutExit ? 320 : 520;
   var confirmDisabled = loading || (requireAcknowledge && !acknowledged);
 
-  return createPortal(
-    <div
-      role="presentation"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: zIndex,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+  return (
+    <BaseModal
+      open={open}
+      onClose={function () {
+        if (!loading) onCancel();
+      }}
+      maxWidth={maxW}
+      closeOnOutside={!loading}
+      zIndex={zIndex}
+      overlayStyle={{
         padding: narrow ? 16 : 24,
         background: isWorkoutExit ? 'rgba(2, 6, 23, 0.62)' : 'rgba(2, 6, 23, 0.72)',
         backdropFilter: isWorkoutExit ? 'blur(4px)' : 'blur(8px)',
         WebkitBackdropFilter: isWorkoutExit ? 'blur(4px)' : 'blur(8px)',
       }}
-      onMouseDown={function (e) {
-        if (loading) return;
-        if (e.target === e.currentTarget) onCancel();
+      contentProps={{
+        role: 'alertdialog',
+        'aria-modal': 'true',
+        'aria-labelledby': titleId,
+        'aria-describedby': message ? descId : undefined,
       }}
-    >
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={message ? descId : undefined}
-        onMouseDown={function (e) {
-          e.stopPropagation();
-        }}
-        style={{
+      contentStyle={{
           width: 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
           maxWidth: 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
           background: 'rgba(15, 23, 42, 0.92)',
@@ -194,9 +168,9 @@ export function DeleteConfirmModal({
           boxShadow: isWorkoutExit ? '0 18px 60px rgba(0,0,0,.38)' : '0 24px 80px rgba(0,0,0,.45)',
           padding: py,
           fontFamily: 'Inter, system-ui, sans-serif',
-          animation: isWorkoutExit ? 'it-workout-exit-card-in 200ms ease-out both' : undefined,
-        }}
-      >
+          ...(isWorkoutExit ? { animation: 'it-workout-exit-card-in 200ms ease-out both' } : {}),
+      }}
+    >
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isWorkoutExit ? 8 : 0 }}>
           <div
             style={{
@@ -353,8 +327,6 @@ export function DeleteConfirmModal({
             {loading ? loadingLabel : confirmLabel}
           </button>
         </div>
-      </div>
-    </div>,
-    document.body
+    </BaseModal>
   );
 }
