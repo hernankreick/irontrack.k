@@ -93,6 +93,15 @@ import SettingsPage, { applyItPrefsToDocument } from './components/settings/Sett
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
+import {
+  buildRutinaInsertBody,
+  cleanRutinaWriteBody,
+  findRutinaForAlumno,
+  getAssignmentRoutineParts,
+  getRutinaAlumnoId,
+  mergeRutinasAsignadas,
+  normalizeRutinaLocalForAssignment,
+} from './lib/routineAssignment.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { Calendar as CalNavIcon, CalendarDays, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
@@ -122,16 +131,6 @@ async function getActiveSupabaseSession() {
     console.error("[AUTH] getSession exception", e);
     return null;
   }
-}
-
-function cleanRutinaWriteBody(data) {
-  var src = data || {};
-  return {
-    alumno_id: src.alumno_id || null,
-    entrenador_id: src.entrenador_id != null ? String(src.entrenador_id) : null,
-    nombre: src.nombre || "Rutina",
-    datos: src.datos || {},
-  };
 }
 
 const sbFetch = async (path, method="GET", body=null) => {
@@ -518,43 +517,6 @@ function readPlanScrollDiag() {
   }
 }
 
-function mergeRutinasAsignadas(primary, secondary, alumnosIds) {
-  var out = [];
-  var seen = {};
-  var shouldFilterByAlumno = !!(alumnosIds && Object.keys(alumnosIds).length > 0);
-  [primary || [], secondary || []].forEach(function (list) {
-    list.forEach(function (r, idx) {
-      if (!r) return;
-      var alumnoRutinaId = getRutinaAlumnoId(r);
-      if (alumnoRutinaId != null && shouldFilterByAlumno && !alumnosIds[String(alumnoRutinaId)]) return;
-      var key = r.id != null ? "id:" + String(r.id) : "row:" + String(alumnoRutinaId || "") + ":" + idx;
-      if (seen[key]) return;
-      seen[key] = true;
-      out.push(r);
-    });
-  });
-  return out;
-}
-
-function getRutinaAlumnoId(r) {
-  if (!r) return null;
-  if (r.alumno_id != null && r.alumno_id !== "") return r.alumno_id;
-  if (r.assigned_to != null && r.assigned_to !== "") return r.assigned_to;
-  if (r.atleta_id != null && r.atleta_id !== "") return r.atleta_id;
-  if (r.alumnoId != null && r.alumnoId !== "") return r.alumnoId;
-  if (r.datos && r.datos.alumno && r.datos.alumno.id != null && r.datos.alumno.id !== "") return r.datos.alumno.id;
-  if (r.datos && r.datos.alumnoId != null && r.datos.alumnoId !== "") return r.datos.alumnoId;
-  return null;
-}
-
-function findRutinaForAlumno(rutinas, alumnoId) {
-  var aid = String(alumnoId);
-  return (rutinas || []).find(function (r) {
-    var rid = getRutinaAlumnoId(r);
-    return rid != null && String(rid) === aid;
-  }) || null;
-}
-
 function GymApp() {
   /** Flags de diagnóstico (lectura única; recargar tras editar localStorage). */
   const planScrollDiag = useMemo(function () { return readPlanScrollDiag(); }, []);
@@ -883,27 +845,20 @@ function GymApp() {
       throw new Error("La sesion del entrenador no es valida");
     }
 
-    var nombreAssign = rutina?.nombre || rutina?.name || "Rutina";
-    var daysAssign = rutina?.datos?.days || rutina?.days || [];
+    var routinePartsAssign = getAssignmentRoutineParts(rutina);
+    var nombreAssign = routinePartsAssign.nombre;
+    var daysAssign = routinePartsAssign.days;
     if (!Array.isArray(daysAssign)) {
       console.error("[assignRut] days no es array", { days: daysAssign, rutinaLocal: rutina });
       throw new Error("La rutina no tiene dias validos");
     }
 
-    var body = {
-      alumno_id: alumnoIdAssign,
-      entrenador_id: entrenadorIdAssign,
-      nombre: nombreAssign,
-      datos: {
-        days: sanitizeRoutineDaysForWrite(daysAssign),
-        alumno: {
-          id: alumno.id,
-          nombre: alumno.nombre || "",
-          email: alumno.email || "",
-        },
-        note: rutina?.datos?.note || rutina?.note || "",
-      },
-    };
+    var body = buildRutinaInsertBody({
+      alumno: alumno,
+      alumnoId: alumnoIdAssign,
+      entrenadorId: entrenadorIdAssign,
+      rutina: rutina,
+    });
 
     var insertResult = await supabase
       .from("rutinas")
@@ -944,16 +899,11 @@ function GymApp() {
     });
     setRoutines(function (prev) {
       var prevList = Array.isArray(prev) ? prev : [];
-      var localRutina = {
-        id: res.id,
-        name: res.nombre || nombreAssign,
-        days: res.datos?.days || [],
-        alumno_id: res.alumno_id,
-        alumno: alumno.nombre || alumno.email || "",
-        note: res.datos?.note || "",
-        saved: true,
-        collapsed: true,
-      };
+      var localRutina = normalizeRutinaLocalForAssignment({
+        rutinaDb: res,
+        alumno: alumno,
+        fallbackNombre: nombreAssign,
+      });
       var replaced = false;
       var next = prevList
         .filter(function (r) {
