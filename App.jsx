@@ -102,6 +102,7 @@ import {
   mergeRutinasAsignadas,
   normalizeRutinaLocalForAssignment,
 } from './lib/routineAssignment.js';
+import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { Calendar as CalNavIcon, CalendarDays, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
@@ -633,18 +634,22 @@ function GymApp() {
 
   const cargarRutinasEntrenador = React.useCallback(async function (alumnosScope) {
     try {
-      var sessionResult = await supabase.auth.getSession();
-      if (sessionResult.error) {
-        console.error("[RUTINAS INIT] getSession error", sessionResult.error);
+      var loadedRutinas = await loadCoachRutinas({
+        supabaseClient: supabase,
+        sb: sb,
+        alumnosScope: alumnosScope,
+      });
+      if (loadedRutinas.sessionError) {
+        console.error("[RUTINAS INIT] getSession error", loadedRutinas.sessionError);
         return null;
       }
-      var session = sessionResult.data && sessionResult.data.session;
-      var entrenadorId = session?.user?.id ? String(session.user.id) : "";
+      var session = loadedRutinas.session;
+      var entrenadorId = loadedRutinas.entrenadorId;
       if (!entrenadorId) {
         console.warn("[RUTINAS INIT] sin session.user.id, reintentando luego");
         return null;
       }
-      var result = await sb.getRutinasByEntrenador(entrenadorId);
+      var result = loadedRutinas.result;
       console.log("[RUTINAS INIT DEBUG]", {
         sessionUserId: session?.user?.id,
         entrenadorId,
@@ -658,11 +663,9 @@ function GymApp() {
           };
         })
       });
-      var listaAlumnos = Array.isArray(alumnosScope) && alumnosScope.length > 0 ? alumnosScope : [];
-      var alumnoIds = (listaAlumnos || []).map(function (a) { return a && a.id; }).filter(Boolean);
-      var fallbackResult = null;
+      var alumnoIds = loadedRutinas.alumnoIds || [];
+      var fallbackResult = loadedRutinas.fallbackResult;
       if (alumnoIds.length > 0) {
-        fallbackResult = await sb.getRutinasByAlumnoIds(alumnoIds);
         console.log("[RUTINAS INIT FALLBACK DEBUG]", {
           alumnoIds: alumnoIds.map(function (id) { return String(id); }),
           resultCount: Array.isArray(fallbackResult) ? fallbackResult.length : null,
@@ -681,7 +684,7 @@ function GymApp() {
           })
         });
       }
-      var mergedResult = mergeRutinasAsignadas(result || [], Array.isArray(fallbackResult) ? fallbackResult : []);
+      var mergedResult = loadedRutinas.mergedResult;
       if (Array.isArray(mergedResult) && mergedResult.length > 0) {
         setRutinasSBEntrenador(function (prev) {
           return mergeRutinasAsignadas(mergedResult, prev);
