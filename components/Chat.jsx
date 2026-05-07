@@ -36,9 +36,6 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es}) {
 
   useEffect(()=>{ endRef.current?.scrollIntoView({behavior:"smooth"}); },[mensajes]);
 
-  console.log("SB:", sb);
-console.log("marcarMensajesLeidos:", sb.marcarMensajesLeidos);
-
   const enviar = async () => {
     if(!texto.trim() || enviando) return;
     setEnviando(true);

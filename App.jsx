@@ -181,19 +181,19 @@ const sb = {
     var ids = (alumnoIds || []).map(function (id) { return String(id); }).filter(Boolean);
     if (ids.length === 0) return [];
     const { data, error } = await supabase.from("rutinas").select("*").in("alumno_id", ids);
-    if (error) { console.error("[rutinas SELECT BY ALUMNOS ERROR]", error, { alumnoIds: ids }); return null; }
+    if (error) { console.error("[rutinas SELECT BY ALUMNOS ERROR]", error); return null; }
     return data || [];
   },
   createRutina: async (data) => {
     const body = cleanRutinaWriteBody(data);
     const { data: created, error } = await supabase.from("rutinas").insert([body]).select();
-    if (error) { console.error("[rutinas INSERT ERROR]", error, { requestBody: body }); return null; }
+    if (error) { console.error("[rutinas INSERT ERROR]", error); return null; }
     return created || [];
   },
   updateRutina: async (id, data) => {
     const body = cleanRutinaWriteBody(data);
     const { data: updated, error } = await supabase.from("rutinas").update(body).eq("id", id).select();
-    if (error) { console.error("[rutinas UPDATE ERROR]", error, { requestBody: body, id: id }); return null; }
+    if (error) { console.error("[rutinas UPDATE ERROR]", error); return null; }
     return updated || [];
   },
   deleteRutina: async function (id) {
@@ -648,47 +648,13 @@ function GymApp() {
         console.error("[RUTINAS INIT] getSession error", loadedRutinas.sessionError);
         return null;
       }
-      var session = loadedRutinas.session;
       var entrenadorId = loadedRutinas.entrenadorId;
       if (!entrenadorId) {
         console.warn("[RUTINAS INIT] sin session.user.id, reintentando luego");
         return null;
       }
       var result = loadedRutinas.result;
-      console.log("[RUTINAS INIT DEBUG]", {
-        sessionUserId: session?.user?.id,
-        entrenadorId,
-        resultCount: Array.isArray(result) ? result.length : null,
-        result: result?.map?.(function (r) {
-          return {
-            id: r.id,
-            nombre: r.nombre,
-            alumno_id: r.alumno_id,
-            entrenador_id: r.entrenador_id
-          };
-        })
-      });
       var alumnoIds = loadedRutinas.alumnoIds || [];
-      var fallbackResult = loadedRutinas.fallbackResult;
-      if (alumnoIds.length > 0) {
-        console.log("[RUTINAS INIT FALLBACK DEBUG]", {
-          alumnoIds: alumnoIds.map(function (id) { return String(id); }),
-          resultCount: Array.isArray(fallbackResult) ? fallbackResult.length : null,
-          result: fallbackResult?.map?.(function (r) {
-            return {
-              id: r.id,
-              nombre: r.nombre,
-              alumno_id: r.alumno_id,
-              assigned_to: r.assigned_to,
-              atleta_id: r.atleta_id,
-              alumnoId: r.alumnoId,
-              datos_alumno_id: r.datos?.alumno?.id,
-              datos_alumnoId: r.datos?.alumnoId,
-              entrenador_id: r.entrenador_id
-            };
-          })
-        });
-      }
       var mergedResult = loadedRutinas.mergedResult;
       if (Array.isArray(mergedResult) && mergedResult.length > 0) {
         setRutinasSBEntrenador(function (prev) {
@@ -698,16 +664,13 @@ function GymApp() {
         return mergedResult;
       }
       if (Array.isArray(result)) {
-        console.warn("[RUTINAS INIT] query sin resultados", {
-          query: 'rutinas.select("*").eq("entrenador_id", String(entrenadorId))',
-          entrenadorId
-        });
+        console.warn("[RUTINAS INIT] query sin resultados");
         if (alumnoIds.length > 0 || Array.isArray(alumnosScope)) {
           setRutinasLoaded(true);
         }
         return result;
       }
-      console.error("[rutinas entrenador] respuesta invalida", result);
+      console.error("[rutinas entrenador] respuesta invalida");
       return null;
     } catch (e) {
       console.error("[rutinas entrenador] error", e);
@@ -824,21 +787,15 @@ function GymApp() {
     var alumnoIdAssign = resolveAlumnoId(alumno);
     var entrenadorIdAssign = resolveEntrenadorId(authSessionAssign);
     if (!alumnoIdAssign || !entrenadorIdAssign || !rutina) {
-      console.error("[assignRut] datos invalidos", {
-        alumno_id: alumnoIdAssign || null,
-        entrenador_id: entrenadorIdAssign || null,
-        alumno: alumno,
-        rutinaLocal: rutina,
-        fecha: fecha || null,
-      });
+      console.error("[assignRut] datos invalidos");
       throw new Error("Datos invalidos para asignar rutina");
     }
     if (!isValidUuid(alumnoIdAssign)) {
-      console.error("[assignRut] alumno_id no es UUID valido", { alumno_id: alumnoIdAssign, alumno: alumno });
+      console.error("[assignRut] alumno_id no es UUID valido");
       throw new Error("El alumno no tiene un ID valido");
     }
     if (!isValidUuid(entrenadorIdAssign)) {
-      console.error("[assignRut] entrenador_id no es UUID valido", { entrenador_id: entrenadorIdAssign, sessionUserId: authSessionAssign.user?.id });
+      console.error("[assignRut] entrenador_id no es UUID valido");
       throw new Error("La sesion del entrenador no es valida");
     }
 
@@ -846,7 +803,7 @@ function GymApp() {
     var nombreAssign = routinePartsAssign.nombre;
     var daysAssign = routinePartsAssign.days;
     if (!Array.isArray(daysAssign)) {
-      console.error("[assignRut] days no es array", { days: daysAssign, rutinaLocal: rutina });
+      console.error("[assignRut] days no es array");
       throw new Error("La rutina no tiene dias validos");
     }
 
@@ -863,7 +820,7 @@ function GymApp() {
       .select()
       .single();
     if (insertResult.error || !insertResult.data) {
-      console.error("[assignRut INSERT ERROR FULL]", insertResult.error || insertResult);
+      console.error("[assignRut INSERT ERROR]", insertResult.error || new Error("No se pudo crear la rutina asignada"));
       throw insertResult.error || new Error("No se pudo crear la rutina asignada");
     }
 
@@ -1438,7 +1395,7 @@ function GymApp() {
       if(!alumnoIdSync) return;
       pending.forEach(item => {
         try {
-          console.log("[PROGRESO] enviando a supabase...");sb.addProgreso({
+          sb.addProgreso({
             alumno_id: alumnoIdSync,
             ejercicio_id: item.exId,
             kg: item.kg, reps: item.reps,
@@ -1464,8 +1421,7 @@ function GymApp() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
-          .then(reg => console.log('SW registrado:', reg.scope))
-          .catch(err => console.log('SW error:', err));
+          .catch(err => console.error('SW error:', err));
       });
     }
   }, []);
@@ -1788,7 +1744,7 @@ function GymApp() {
           reps: parseInt(reps)||0,
           nota: note||"",
           fecha: d
-        }).then(function(r){console.log("[PROGRESO] OK",r)}).catch(function(e){console.error("[PROGRESO] ERR",e)});
+        }).catch(function(e){console.error("[PROGRESO] ERR",e)});
       }
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
@@ -2635,7 +2591,7 @@ function GymApp() {
             note: c.rutinaLocal.datos?.note || "",
           },
         };
-        console.error("[assignRut DEBUG]", {
+        console.error("[assignRut legacy error]", {
           session: authSessionAssign,
           alumnoId: alumnoIdAssign,
           entrenadorId: entrenadorIdAssign,
@@ -2649,7 +2605,7 @@ function GymApp() {
             .select()
             .single();
           if (insertResult.error) {
-            console.error("[assignRut INSERT ERROR FULL]", insertResult.error);
+            console.error("[assignRut INSERT ERROR]", insertResult.error);
             throw insertResult.error;
           }
           res = insertResult.data;
@@ -4591,36 +4547,6 @@ function GymApp() {
 
             {coachAlumnosListaFiltrada.map(a=>{
               const rutinaAsignada = getRutinaAsignadaAlumno(a);
-              console.log("[RUTINA ALUMNO DEBUG]", {
-                alumno: a.nombre || a.name,
-                alumno_id: a.id,
-                rutinasSB_count: Array.isArray(rutinasSB) ? rutinasSB.length : null,
-                rutinasSBEntrenador_count: Array.isArray(rutinasSBEntrenador) ? rutinasSBEntrenador.length : null,
-                routines_count: Array.isArray(routines) ? routines.length : null,
-                rutinasUnificadas_count: Array.isArray(rutinasUnificadas) ? rutinasUnificadas.length : null,
-                candidatos: (rutinasUnificadas || []).filter(function (r) {
-                  var alumnoRutinaId = getRutinaAlumnoId(r);
-                  return alumnoRutinaId != null && String(alumnoRutinaId) === String(a.id);
-                }).map(function (r) {
-                  return {
-                    id: r.id,
-                    nombre: r.nombre,
-                    alumno_id: r.alumno_id,
-                    assigned_to: r.assigned_to,
-                    atleta_id: r.atleta_id,
-                    alumnoId: r.alumnoId,
-                    datos_alumno_id: r.datos?.alumno?.id,
-                    datos_alumnoId: r.datos?.alumnoId,
-                    entrenador_id: r.entrenador_id
-                  };
-                }),
-                resultado_getRutinaAsignadaAlumno: rutinaAsignada ? {
-                  id: rutinaAsignada.id,
-                  nombre: rutinaAsignada.nombre,
-                  alumno_id: rutinaAsignada.alumno_id,
-                  entrenador_id: rutinaAsignada.entrenador_id
-                } : null
-              });
               return (
               <div key={a.id} style={{position:"relative",background:coachAluSurface,borderRadius:12,padding:"14px 14px 12px",marginBottom:10,border:alumnoActivo?.id===a.id?"1px solid #2563eb":"1px solid "+coachAluBorderSoft,boxShadow:darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.08)"}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:12}}>

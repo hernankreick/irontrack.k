@@ -154,7 +154,6 @@ export function WorkoutScreen(props) {
             semana:semanaParaGuardar, ejercicios:exercises.map(e=>e.id).join(","),
             fecha:hoyFin, hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}),
           });
-          if (resSesion && resSesion[0]) console.log("[addSesion] OK:", resSesion[0].id);
           if (typeof onSesionGuardada === "function") onSesionGuardada();
         }
       } catch(e) { console.error("[addSesion]", e); }
