@@ -140,6 +140,58 @@
   color: #93c5fd;
 }
 
+.it-routine-add-day {
+  min-height: 74px;
+  transition:
+    transform 180ms var(--it-r-ease),
+    box-shadow 180ms var(--it-r-ease),
+    background-color 180ms var(--it-r-ease),
+    border-color 180ms var(--it-r-ease);
+}
+
+.it-routine-add-day:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(37, 99, 235, 0.18);
+}
+
+.it-routine-add-day:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.it-routine-add-day__icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(37, 99, 235, 0.28);
+}
+
+.it-routine-add-day__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.it-routine-add-day__title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.it-routine-add-day__subtitle {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
 /* ── Menú contextual ── */
 .it-routine-menu-pop {
   opacity: 0;

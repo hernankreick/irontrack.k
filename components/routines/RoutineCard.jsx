@@ -1107,28 +1107,36 @@ export function RoutineCard({
           })}
           <button
             type="button"
-            className="it-routine-btn it-routine-btn--ghost hov"
+            className="it-routine-btn it-routine-add-day hov"
             onClick={addEmptyDay}
             style={{
               width: '100%',
               marginTop: S.gridGapTight,
-              border: `1px dashed ${border}`,
-              borderRadius: 10,
-              padding: '12px 14px',
-              background: darkMode ? 'rgba(37,99,235,0.08)' : 'rgba(37,99,235,0.05)',
-              color: '#2563EB',
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 18,
+              padding: '16px 18px',
+              background: '#0D1424',
+              color: '#fff',
               fontFamily: 'inherit',
-              fontSize: 14,
-              fontWeight: 800,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
+              justifyContent: 'flex-start',
+              gap: 12,
+              textAlign: 'left',
             }}
           >
-            <Ic name="plus" size={16} color="#2563EB" />
-            {M(lang, '+ Agregar día', '+ Add day', '+ Adicionar dia')}
+            <span className="it-routine-add-day__icon" aria-hidden="true">
+              <Ic name="plus" size={18} color="#2563EB" />
+            </span>
+            <span className="it-routine-add-day__copy">
+              <span className="it-routine-add-day__title">
+                {M(lang, 'Agregar día', 'Add day', 'Adicionar dia')}
+              </span>
+              <span className="it-routine-add-day__subtitle">
+                {M(lang, 'Nuevo bloque de rutina', 'New routine block', 'Novo bloco de rotina')}
+              </span>
+            </span>
           </button>
         </div>
       )}
