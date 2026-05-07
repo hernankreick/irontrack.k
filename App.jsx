@@ -5817,7 +5817,7 @@ function GymApp() {
           </div>
         </div>
       )}
-      {editEx&&typeof document!=="undefined"&&createPortal(
+      {editEx&&(
         <EditExModal darkMode={darkMode} key={editEx.rId+"-"+editEx.dIdx+"-"+editEx.eIdx} editEx={editEx} btn={btn} inp={inp} allEx={allEx} es={es} PATS={PATS} msg={msg}
           onSave={async(updatedRaw)=>{
             const updated = sanitizeExerciseSnapshotForWrite(updatedRaw);
@@ -5859,8 +5859,7 @@ function GymApp() {
             setEditEx(null);toast2("Guardado ✓");
           }}
           onClose={()=>setEditEx(null)}
-        />,
-        document.body
+        />
       )}
       {loginModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:130,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setLoginModal(false)}>

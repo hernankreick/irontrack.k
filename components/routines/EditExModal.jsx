@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import BaseModal from '../modals/BaseModal.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 
 function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, allEx, msg}) {
@@ -37,40 +38,30 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
   const color = pat?.color||"#2563EB";
 
   return (
-    <div
-      style={{
-        position:"fixed",
-        inset:0,
+    <BaseModal
+      open={!!editEx}
+      onClose={onClose}
+      maxWidth={720}
+      closeOnOutside={true}
+      zIndex={210}
+      overlayStyle={{
         background:"rgba(0,0,0,.92)",
-        zIndex:210,
         overflowY:"auto",
         WebkitOverflowScrolling:"touch",
-        display:"flex",
-        flexDirection:"column",
-        alignItems:"center",
-        justifyContent:"safe center",
-        boxSizing:"border-box",
         padding:"max(12px, env(safe-area-inset-top, 0px)) 16px max(12px, env(safe-area-inset-bottom, 0px))",
       }}
-      onClick={onClose}
+      contentStyle={{
+        background:bgCard,
+        color:textMain,
+        width:"100%",
+        borderRadius:16,
+        padding:"20px 16px",
+        maxHeight:"calc(100dvh - 32px)",
+        overflowY:"auto",
+        border:"1px solid "+border,
+        boxSizing:"border-box",
+      }}
     >
-      <div
-        style={{
-          background:bgCard,
-          color:textMain,
-          margin:0,
-          width:"100%",
-          maxWidth:560,
-          flexShrink:0,
-          borderRadius:16,
-          padding:"20px 16px",
-          maxHeight:"min(85dvh, calc(100dvh - 24px))",
-          overflowY:"auto",
-          border:"1px solid "+border,
-          boxSizing:"border-box",
-        }}
-        onClick={e=>e.stopPropagation()}
-      >
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <div style={{width:36,height:36,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:color,flexShrink:0}}>{pat?.icon||"·"}</div>
           <div style={{fontSize:22,fontWeight:800,flex:1,color:textMain}}>{nombre}</div>
@@ -162,8 +153,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
             GUARDAR
           </button>
         </div>
-      </div>
-    </div>
+    </BaseModal>
   );
 }
 
