@@ -4406,6 +4406,7 @@ function GymApp() {
             coachAluShell={coachAluShell}
             coachAluSubtle={coachAluSubtle}
             coachAluSurface={coachAluSurface}
+            coachAluTrack={coachAluTrack}
             coachAlumnosCounts={coachAlumnosCounts}
             coachAlumnosFilter={coachAlumnosFilter}
             coachAlumnosListaFiltrada={coachAlumnosListaFiltrada}
@@ -4431,9 +4432,8 @@ function GymApp() {
             notaDiaInput={notaDiaInput}
             routineForAssign={routineForAssign}
             routines={routines}
+            rutinasLoaded={rutinasLoaded}
             sb={sb}
-            semanaCiclo={semanaCiclo}
-            semCalLabel={semCalLabel}
             setAddExModal={setAddExModal}
             setAddExMuscle={setAddExMuscle}
             setAddExPat={setAddExPat}

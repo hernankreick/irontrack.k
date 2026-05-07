@@ -5,16 +5,20 @@ import { getRutinaAlumnoId, getRutinaBadgeConfig } from '../../lib/routineStore.
 
 export default function StudentsSection(props) {
   const {
-    allEx, alumnoActivo, alumnoProgreso, alumnos, bgCard, bgSub, border, cargarAlumnos, cleanActiveCoachAlumnos,
-    coachAluBorderSoft, coachAluDropdown, coachAluDropdownShadow, coachAluGhostBtn, coachAluShell, coachAluSubtle, coachAluSurface,
-    coachAlumnosCounts, coachAlumnosFilter, coachAlumnosListaFiltrada, coachAlumnosSearch, coachCardMenuId, coachDiaSecsOpen, coachRoutineDiaIdx, coachRutinaMenuOpen,
-    completedDays, currentWeek, darkMode, ENTRENADOR_ID, es, EX, generarSugerenciasAlumno, getRutinaAsignadaAlumno, loadingSB, mergeRutinasAsignadas, msg,
-    newAlumnoData, newAlumnoErrors, newAlumnoForm, notaDiaInput, routineForAssign, routines, sb, semanaCiclo, semCalLabel,
+    allEx = [], alumnoActivo, alumnoProgreso = [], alumnos = [], bgCard, bgSub, border, cargarAlumnos, cleanActiveCoachAlumnos,
+    coachAluBorderSoft, coachAluDropdown, coachAluDropdownShadow, coachAluGhostBtn, coachAluShell, coachAluSubtle, coachAluSurface, coachAluTrack,
+    coachAlumnosCounts = { todos: 0, activos: 0, inactivos: 0, sin_rutina: 0 }, coachAlumnosFilter, coachAlumnosListaFiltrada = [], coachAlumnosSearch, coachCardMenuId, coachDiaSecsOpen = {}, coachRoutineDiaIdx, coachRutinaMenuOpen,
+    completedDays = [], currentWeek, darkMode, ENTRENADOR_ID, es, EX = [], generarSugerenciasAlumno, getRutinaAsignadaAlumno, loadingSB, mergeRutinasAsignadas, msg,
+    newAlumnoData = { nombre: "", email: "", pass: "" }, newAlumnoErrors = {}, newAlumnoForm, notaDiaInput, routineForAssign, routines = [], rutinasLoaded, sb,
     setAddExModal, setAddExMuscle, setAddExPat, setAddExSearch, setAddExSelectedIds, setAliasModal, setAlumnoActivo, setAlumnoProgreso, setAlumnoSesiones, setAlumnos, setAssignRoutineId,
     setCoachAlumnosFilter, setCoachAlumnosSearch, setCoachCardMenuId, setChatModal, setCoachDiaSecsOpen, setCoachDialog, setCoachRoutineDiaIdx, setCoachRutinaMenuOpen, setEditEx,
     setLoadingSB, setNewAlumnoData, setNewAlumnoErrors, setNewAlumnoForm, setNotaDiaInput, setRegistrosSubTab, setRutinasSB, setRutinasSBEntrenador,
-    showCoachDesktopShell, sugsOpen, setSugsOpen, textMain, textMuted, toast2
+    showCoachDesktopShell, sugsOpen = {}, setSugsOpen, textMain, textMuted, toast2
   } = props;
+  const t = typeof msg === "function" ? msg : function (esText, enText) { return es ? esText : enText; };
+  const assignedRoutineFor = typeof getRutinaAsignadaAlumno === "function"
+    ? getRutinaAsignadaAlumno
+    : function () { return null; };
 
   return (
 
@@ -176,7 +180,7 @@ export default function StudentsSection(props) {
             )}
 
             {coachAlumnosListaFiltrada.map(a=>{
-              const rutinaAsignada = getRutinaAsignadaAlumno(a);
+              const rutinaAsignada = assignedRoutineFor(a);
               return (
               <div key={a.id} style={{position:"relative",background:coachAluSurface,borderRadius:12,padding:"14px 14px 12px",marginBottom:10,border:alumnoActivo?.id===a.id?"1px solid #2563eb":"1px solid "+coachAluBorderSoft,boxShadow:darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.08)"}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
@@ -301,7 +305,7 @@ export default function StudentsSection(props) {
                 {alumnoActivo?.id===a.id&&(
                   <div>
                     {(()=>{
-                      const rutinaActiva = getRutinaAsignadaAlumno(a.id);
+                      const rutinaActiva = assignedRoutineFor(a.id);
                       if(!rutinaActiva) return <div style={{background:coachAluSurface,borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid "+coachAluBorderSoft}}><div style={{fontSize:13,color:textMuted}}>{msg("Sin rutina asignada", "No routine assigned")}</div></div>;
                       const dias=rutinaActiva.datos?.days||[];
                       const semanaCiclo = currentWeek + 1;
@@ -464,7 +468,7 @@ export default function StudentsSection(props) {
                         toast2(msg('Creá una rutina en RUTINAS', 'Create a routine in ROUTINES', 'Crie uma rotina em ROTINAS'));
                         return;
                       }
-                      const ex0 = getRutinaAsignadaAlumno(a.id);
+                      const ex0 = assignedRoutineFor(a.id);
                       const rutinaParaAsignar = rutinaLocal.datos
                         ? rutinaLocal
                         : {
@@ -483,10 +487,10 @@ export default function StudentsSection(props) {
                           ? '¿Asignar rutina: ' + rutinaNombre + ' a ' + a.nombre + '?'
                           : 'Assign routine: ' + rutinaNombre + ' to ' + a.nombre + '?';
                       setCoachDialog({ t: 'assignRut', a: a, ex: ex0 || null, rutinaLocal: rutinaParaAsignar, assignMsg: assignMsg0 });
-                    }}>{getRutinaAsignadaAlumno(a.id)?(<><Ic name="refresh-cw" size={16}/>{msg("Cambiar rutina", "Change routine")}</>):(<><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</>)}</button>
+                    }}>{assignedRoutineFor(a.id)?(<><Ic name="refresh-cw" size={16}/>{msg("Cambiar rutina", "Change routine")}</>):(<><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</>)}</button>
                     {/* ── SUGERENCIAS ── */}
                     {(()=>{
-                      const rutSB = getRutinaAsignadaAlumno(a.id);
+                      const rutSB = assignedRoutineFor(a.id);
                       const regsAlu = alumnoProgreso || [];
                       if(!rutSB || regsAlu.length < 2) return null;
                       const sugs = generarSugerenciasAlumno(regsAlu, rutSB.datos, EX);
