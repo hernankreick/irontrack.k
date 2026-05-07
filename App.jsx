@@ -97,12 +97,17 @@ import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMs
 import {
   buildRutinaInsertBody,
   cleanRutinaWriteBody,
-  findRutinaForAlumno,
+  dedupeRutinas,
   getAssignmentRoutineParts,
+  getRutinaAsignadaAlumno as getRutinaAsignadaAlumnoFromStore,
   getRutinaAlumnoId,
+  getRutinaBadgeConfig,
+  hasAlumnoRutina,
   mergeRutinasAsignadas,
   normalizeRutinaLocalForAssignment,
-} from './lib/routineAssignment.js';
+  resolveAlumnoId,
+  resolveEntrenadorId,
+} from './lib/routineStore.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { Calendar as CalNavIcon, CalendarDays, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
@@ -629,8 +634,7 @@ function GymApp() {
   }, [rutinasSBEntrenadorLimpias, rutinasSB, alumnosActivosIds]);
 
   const getRutinaAsignadaAlumno = React.useCallback(function (alumnoOrId) {
-    var alumnoId = alumnoOrId && typeof alumnoOrId === "object" ? alumnoOrId.id : alumnoOrId;
-    return findRutinaForAlumno(rutinasUnificadas, alumnoId);
+    return getRutinaAsignadaAlumnoFromStore(rutinasUnificadas, alumnoOrId);
   }, [rutinasUnificadas]);
 
   const cargarRutinasEntrenador = React.useCallback(async function (alumnosScope) {
@@ -808,18 +812,7 @@ function GymApp() {
     return routines.find(function(r){return r.id===id;}) || null;
   }, [routines, assignRoutineId]);
   const rutinasCalendarioEntrenador = useMemo(function () {
-    var seen = {};
-    var out = [];
-    [rutinasUnificadas || [], routines || []].forEach(function (list) {
-      (list || []).forEach(function (r) {
-        if (!r) return;
-        var id = r.id != null ? String(r.id) : "";
-        if (!id || seen[id]) return;
-        seen[id] = true;
-        out.push(r);
-      });
-    });
-    return out;
+    return dedupeRutinas([].concat(rutinasUnificadas || [], routines || []), { requireId: true });
   }, [rutinasUnificadas, routines]);
 
   const assignRoutineToAlumno = React.useCallback(async function ({ alumno, rutina, fecha, previousRoutine }) {
@@ -828,8 +821,8 @@ function GymApp() {
       throw new Error("Inicia sesion nuevamente para asignar rutinas");
     }
 
-    var alumnoIdAssign = alumno && alumno.id ? String(alumno.id) : "";
-    var entrenadorIdAssign = authSessionAssign.user && authSessionAssign.user.id ? String(authSessionAssign.user.id) : "";
+    var alumnoIdAssign = resolveAlumnoId(alumno);
+    var entrenadorIdAssign = resolveEntrenadorId(authSessionAssign);
     if (!alumnoIdAssign || !entrenadorIdAssign || !rutina) {
       console.error("[assignRut] datos invalidos", {
         alumno_id: alumnoIdAssign || null,
@@ -1694,7 +1687,7 @@ function GymApp() {
   }, []);
 
   const coachAlumnoCategoria = React.useCallback(function (a) {
-    if (!getRutinaAsignadaAlumno(a.id)) return "sin_rutina";
+    if (!hasAlumnoRutina(a, rutinasUnificadas)) return "sin_rutina";
     var cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000;
     var ses = sesionesGlobalesLimpias || [];
     for (var i = 0; i < ses.length; i++) {
@@ -1720,7 +1713,7 @@ function GymApp() {
       }
     }
     return "inactivo";
-  }, [getRutinaAsignadaAlumno, sesionesGlobalesLimpias, progresoGlobalLimpio]);
+  }, [rutinasUnificadas, sesionesGlobalesLimpias, progresoGlobalLimpio]);
 
   const coachAlumnosCounts = React.useMemo(function () {
     var c = { todos: alumnosActivosLimpios.length, activos: 0, inactivos: 0, sin_rutina: 0 };
@@ -4638,11 +4631,12 @@ function GymApp() {
                     <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
                       <span style={{fontSize:17,fontWeight:800,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
                       {(() => {
-                        var cfg = !rutinasLoaded
-                          ? { bg: darkMode ? "#1e293b" : "#f1f5f9", color: darkMode ? "#94a3b8" : "#64748b", t: "..." }
-                          : rutinaAsignada
-                          ? { bg: darkMode ? "#14532d" : "#dcfce7", color: darkMode ? "#4ade80" : "#15803d", t: rutinaAsignada.nombre || msg("Con rutina", "Has routine") }
-                          : { bg: darkMode ? "#1e293b" : "#f1f5f9", color: darkMode ? "#94a3b8" : "#475569", t: msg("Sin rutina", "No routine") };
+                        var cfg = getRutinaBadgeConfig({
+                          rutina: rutinaAsignada,
+                          rutinasLoaded: rutinasLoaded,
+                          darkMode: darkMode,
+                          msg: msg,
+                        });
                         return <span style={{fontSize:11,fontWeight:800,padding:"2px 8px",borderRadius:6,background:cfg.bg,color:cfg.color}}>{cfg.t}</span>;
                       })()}
                     </div>
