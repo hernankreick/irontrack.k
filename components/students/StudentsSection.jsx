@@ -4,6 +4,7 @@ import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 import { getRutinaAlumnoId } from '../../lib/routineStore.js';
 import { getStudentWeeklyProgress } from '../../lib/studentWeeklyProgress.js';
 import StudentCard from './StudentCard.jsx';
+import StudentDetailPanel from './StudentDetailPanel.jsx';
 
 export default function StudentsSection(props) {
   const {
@@ -205,6 +206,61 @@ export default function StudentsSection(props) {
                 completedDays: completedDays,
                 currentWeek: currentWeek,
               });
+              const isAlumnoActive = alumnoActivo?.id===a.id;
+              const rutinaActiva = isAlumnoActive ? assignedRoutineFor(a.id) : null;
+              const dias = rutinaActiva ? (rutinaActiva.datos?.days||[]) : [];
+              const rId = rutinaActiva ? rutinaActiva.id : null;
+              const weeklyProgress = rutinaActiva ? getStudentWeeklyProgress({
+                alumno: a,
+                rutina: rutinaActiva,
+                sesiones: sesionesForAlumno(a),
+                progreso: progresoGlobal,
+                completedDays: completedDays,
+                currentWeek: currentWeek,
+              }) : null;
+              const semanaCiclo = weeklyProgress ? weeklyProgress.weekNumber : 1;
+              const semanaIdx = weeklyProgress ? weeklyProgress.weekIndex : 0;
+              const diasCompletados = weeklyProgress ? weeklyProgress.completedDays : 0;
+              const hoyDate = new Date();
+              const inicioSemana = new Date(hoyDate);
+              inicioSemana.setDate(hoyDate.getDate() - ((hoyDate.getDay()+6)%7));
+              const finSemana = new Date(inicioSemana);
+              finSemana.setDate(inicioSemana.getDate() + 6);
+              const semCalLabel = inicioSemana.getDate() + "/" + (inicioSemana.getMonth()+1) + " — " + finSemana.getDate() + "/" + (finSemana.getMonth()+1);
+              const pctBar = weeklyProgress ? weeklyProgress.pct : 0;
+              const diSel = dias.length ? Math.min(coachRoutineDiaIdx, Math.max(0, dias.length - 1)) : 0;
+              const dSel = dias[diSel] || { warmup: [], exercises: [], label: "" };
+              const proxTxt = weeklyProgress ? (function(){
+                var proxDia, proxSemana;
+                if(diasCompletados >= dias.length) { proxDia = 1; proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1; }
+                else { proxDia = diasCompletados + 1; proxSemana = semanaCiclo; }
+                var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
+                return proxLabel + " · " + (msg("Semana ", "Week ")) + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (msg(" (nuevo ciclo)", " (new cycle)")) : "");
+              })() : "";
+              const warmupItems = (dSel.warmup||[]).map(function(ex,ei){
+                const exInfo=allEx.find(e=>e.id===ex.id);
+                return {
+                  ex: ex,
+                  index: ei,
+                  nombre: resolveExerciseTitle(exInfo||null,ex,es),
+                  key: (rutinaActiva?.id||"rut")+"-d"+diSel+"-wu-"+(ex.id||"ex")+"-"+ei,
+                  isLast: ei >= (dSel.warmup||[]).length-1,
+                };
+              });
+              const exerciseItems = (dSel.exercises||[]).map(function(ex,ei){
+                const exInfo=allEx.find(e=>e.id===ex.id);
+                return {
+                  ex: ex,
+                  index: ei,
+                  nombre: resolveExerciseTitle(exInfo||null,ex,es),
+                  key: (rutinaActiva?.id||"rut")+"-d"+diSel+"-ex-"+(ex.id||"ex")+"-"+ei,
+                  isLast: ei >= (dSel.exercises||[]).length-1,
+                };
+              });
+              const rutSB = isAlumnoActive ? assignedRoutineFor(a.id) : null;
+              const regsAlu = alumnoProgreso || [];
+              const sugs = rutSB && regsAlu.length >= 2 ? generarSugerenciasAlumno(regsAlu, rutSB.datos, EX) : [];
+              const suggestionsOpen = !!sugsOpen[a.id];
               return (
               <StudentCard
                 key={a.id}
@@ -262,176 +318,61 @@ export default function StudentsSection(props) {
                 }}
                 onAsignarRutina={function () {}}
               >
-                {alumnoActivo?.id===a.id&&(
-                  <div>
-                    {(()=>{
-                      const rutinaActiva = assignedRoutineFor(a.id);
-                      if(!rutinaActiva) return <div style={{background:coachAluSurface,borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid "+coachAluBorderSoft}}><div style={{fontSize:13,color:textMuted}}>{msg("Sin rutina asignada", "No routine assigned")}</div></div>;
-                      const dias=rutinaActiva.datos?.days||[];
-                      const rId = rutinaActiva.id;
-                      const weeklyProgress = getStudentWeeklyProgress({
-                        alumno: a,
-                        rutina: rutinaActiva,
-                        sesiones: sesionesForAlumno(a),
-                        progreso: progresoGlobal,
-                        completedDays: completedDays,
-                        currentWeek: currentWeek,
-                      });
-                      const semanaCiclo = weeklyProgress.weekNumber;
-                      const semanaIdx = weeklyProgress.weekIndex;
-                      const diasCompletados = weeklyProgress.completedDays;
-                      const hoyDate = new Date();
-                      const inicioSemana = new Date(hoyDate);
-                      inicioSemana.setDate(hoyDate.getDate() - ((hoyDate.getDay()+6)%7));
-                      const finSemana = new Date(inicioSemana);
-                      finSemana.setDate(inicioSemana.getDate() + 6);
-                      const semCalLabel = inicioSemana.getDate() + "/" + (inicioSemana.getMonth()+1) + " — " + finSemana.getDate() + "/" + (finSemana.getMonth()+1);
-                      const pctBar = weeklyProgress.pct;
-                      const diSel = dias.length ? Math.min(coachRoutineDiaIdx, Math.max(0, dias.length - 1)) : 0;
-                      const dSel = dias[diSel] || { warmup: [], exercises: [], label: "" };
-                      const proxTxt = (function(){
-                        var proxDia, proxSemana;
-                        if(diasCompletados >= dias.length) { proxDia = 1; proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1; }
-                        else { proxDia = diasCompletados + 1; proxSemana = semanaCiclo; }
-                        var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
-                        return proxLabel + " · " + (msg("Semana ", "Week ")) + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (msg(" (nuevo ciclo)", " (new cycle)")) : "");
-                      })();
-                      return(
-                        <div style={{marginBottom:8}}>
-                          <div style={{background:coachAluSurface,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"16px",position:"relative",boxShadow:darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.06)"}}>
-                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,marginBottom:14}}>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontSize:24,fontWeight:900,color:textMain,lineHeight:1.15}}>{rutinaActiva.nombre}</div>
-                                <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:10,alignItems:"center"}}>
-                                  <span style={{fontSize:14,color:textMuted,fontWeight:600}}>{dias.length} {msg("días", "days")}</span>
-                                  <span style={{padding:"4px 10px",borderRadius:8,background:darkMode?"rgba(59,130,246,0.15)":"rgba(37,99,235,0.1)",border:"1px solid "+(darkMode?"rgba(59,130,246,0.35)":"rgba(37,99,235,0.35)"),color:"#2563eb",fontSize:12,fontWeight:800}}>{msg("Semana", "Week")} {semanaCiclo} {msg("de", "of")} 4</span>
-                                  <span style={{fontSize:13,color:textMuted,fontWeight:600}}>{semCalLabel}</span>
-                                </div>
-                              </div>
-                              <div style={{position:"relative",flexShrink:0}}>
-                                <button type="button" className="hov" aria-label={msg("Opciones de rutina", "Routine options")} style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:10,cursor:"pointer"}} onClick={function(){setCoachRutinaMenuOpen(function(o){return !o;});}}>
-                                  <Ic name="more-vertical" size={18} color={textMuted}/>
-                                </button>
-                                {coachRutinaMenuOpen && (
-                                  <div style={{position:"absolute",right:0,top:"100%",marginTop:6,background:coachAluDropdown,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:6,zIndex:40,minWidth:200,boxShadow:coachAluDropdownShadow}} onClick={function(e){e.stopPropagation();}}>
-                                    <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#fbbf24",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
-                                      setCoachDialog({ t: 'resetWeek', semanaCiclo: semanaCiclo });
-                                    }}>
-                                      <Ic name="refresh-cw" size={15} color="#fbbf24"/> {msg("Reiniciar semana", "Reset week")}
-                                    </button>
-                                    <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
-                                      setCoachDialog({ t: 'resetRoutine', a: a, rutinaActiva: rutinaActiva });
-                                    }}>
-                                      <Ic name="refresh-cw" size={15} color="#f87171"/> {msg("Reiniciar rutina", "Reset routine")}
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div style={{marginBottom:12}}>
-                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
-                                <span style={{fontSize:14,fontWeight:700,color:textMain}}>{diasCompletados} {msg("de", "of")} {dias.length} {msg("días completados", "days completed")}</span>
-                                <span style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>{pctBar}%</span>
-                              </div>
-                              <div style={{height:12,background:coachAluTrack,borderRadius:8,overflow:"hidden"}}>
-                                <div style={{width:pctBar+"%",height:"100%",background:"linear-gradient(90deg,#22c55e,#16a34a)",borderRadius:8,transition:"width .25s ease"}}/>
-                              </div>
-                            </div>
-                            <div style={{marginBottom:14,padding:"10px 12px",background:darkMode?"rgba(59,130,246,0.06)":"rgba(37,99,235,0.06)",border:"1px solid "+(darkMode?"rgba(59,130,246,0.2)":"rgba(37,99,235,0.2)"),borderRadius:10}}>
-                              <span style={{fontSize:13,color:textMuted,fontWeight:600}}>{msg("Próxima sesión:", "Next session:")} </span>
-                              <span style={{fontSize:13,color:textMain,fontWeight:700}}>{proxTxt}</span>
-                            </div>
-                            {dias.length > 0 && (
-                              <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:14,paddingBottom:4,WebkitOverflowScrolling:"touch"}}>
-                                {dias.map(function(d, di){
-                                  var dayDone = weeklyProgress.completedDayIndexes.indexOf(di) !== -1 || (!weeklyProgress.sesiones.length && completedDays.includes(rId+"-"+di+"-w"+semanaIdx));
-                                  var active = di === diSel;
-                                  return (
-                                    <button
-                                      key={(rutinaActiva?.id||"rut")+"-tab-"+di}
-                                      type="button"
-                                      className="hov"
-                                      onClick={function(){ setCoachRoutineDiaIdx(di); }}
-                                      style={{
-                                        flexShrink:0,
-                                        padding:"10px 14px",
-                                        borderRadius:10,
-                                        border:active?"2px solid #2563eb":"1px solid "+coachAluBorderSoft,
-                                        background:active?(darkMode?"rgba(59,130,246,0.18)":"rgba(37,99,235,0.12)"):coachAluSubtle,
-                                        color:active?textMain:textMuted,
-                                        fontSize:13,
-                                        fontWeight:800,
-                                        cursor:"pointer",
-                                        fontFamily:"inherit",
-                                        display:"flex",
-                                        alignItems:"center",
-                                        gap:6,
-                                      }}
-                                    >
-                                      {msg("Día ", "Day ")}{di+1}
-                                      {dayDone ? <Ic name="check-sm" size={14} color="#22c55e"/> : null}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            {dias.length > 0 && (
-                              <div style={{background:coachAluSubtle,borderRadius:12,border:"1px solid "+coachAluBorderSoft,padding:"12px"}}>
-                                <div style={{fontSize:12,fontWeight:800,color:textMuted,marginBottom:10}}>{dSel.label || ((msg("Día ", "Day "))+(diSel+1))} · {((dSel.warmup||[]).length+(dSel.exercises||[]).length)} {msg("ej.", "ex.")}</div>
-                                <div style={{marginBottom:12}}>
-                                    <button type="button" className="hov" onClick={function(){ setCoachDiaSecsOpen(function(o){ return {...o, warmup:!o.warmup}; }); }} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"transparent",border:"none",padding:"6px 0",cursor:"pointer",marginBottom:8}}>
-                                      <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{msg("ENTRADA EN CALOR", "WARM-UP")}</span>
-                                      <Ic name="chevron-right" size={16} color="#f59e0b" style={{transform:coachDiaSecsOpen.warmup?"rotate(90deg)":"none",transition:"transform .2s"}}/>
-                                    </button>
-                                    {coachDiaSecsOpen.warmup && (
-                                      <div>
-                                        {(dSel.warmup||[]).map((ex,ei)=>{
-                                          const exInfo=allEx.find(e=>e.id===ex.id);
-                                          const nombre=resolveExerciseTitle(exInfo||null,ex,es);
-                                          return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.warmup||[]).length-1?"1px solid "+coachAluBorderSoft:"none"}}>
-                                            <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{nombre}</div>
-                                            <div style={{fontSize:12,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
-                                            <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"warmup",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
-                                          </div>;
-                                        })}
-                                        <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:6,padding:"8px",background:"transparent",border:"1px dashed rgba(245,158,11,0.45)",borderRadius:8,fontSize:12,fontWeight:700,color:"#f59e0b",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#f59e0b"/>{msg("+ Añadir ejercicio", "+ Add exercise")}</button>
-                                      </div>
-                                    )}
-                                </div>
-                                <button type="button" className="hov" onClick={function(){ setCoachDiaSecsOpen(function(o){ return {...o, main:!o.main}; }); }} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"transparent",border:"none",padding:"6px 0",cursor:"pointer",marginBottom:8}}>
-                                  <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{msg("BLOQUE PRINCIPAL", "MAIN BLOCK")}</span>
-                                  <Ic name="chevron-right" size={16} color="#f59e0b" style={{transform:coachDiaSecsOpen.main?"rotate(90deg)":"none",transition:"transform .2s"}}/>
-                                </button>
-                                {coachDiaSecsOpen.main && (
-                                  <div>
-                                    {(dSel.exercises||[]).map((ex,ei)=>{
-                                      const exInfo=allEx.find(e=>e.id===ex.id);
-                                      const nombre=resolveExerciseTitle(exInfo||null,ex,es);
-                                      return <div key={(rutinaActiva?.id||"rut")+"-d"+diSel+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:ei<(dSel.exercises||[]).length-1?"1px solid "+coachAluBorderSoft:"none"}}>
-                                        <div style={{flex:1,fontSize:15,fontWeight:700,color:textMain}}>{nombre}</div>
-                                        <div style={{fontSize:12,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
-                                        <button className="hov" onClick={()=>setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:ei,bloque:"exercises",ex:{...ex}})} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
-                                      </div>;
-                                    })}
-                                    <button className="hov" onClick={()=>{setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed rgba(59,130,246,0.4)",borderRadius:8,fontSize:13,fontWeight:700,color:"#3b82f6",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#3b82f6"/>{msg("+ Añadir ejercicio", "+ Add exercise")}</button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <div style={{display:"flex",gap:8,marginTop:14}}>
-                              <button className="hov" style={{flex:2,padding:"10px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMain,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={function () {
-                                var rut = {id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};
-                                setCoachDialog({ t: 'goRoutines', rutinaActiva: rutinaActiva, a: a, rutina: rut });
-                              }}><Ic name="edit-2" size={16} color={textMuted}/>{msg("Editar rutina", "Edit routine")}</button>
-                              <button className="hov" style={{padding:"10px 16px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={function () {
-                                setCoachDialog({ t: 'quitarRut', rutinaActiva: rutinaActiva, a: a });
-                              }}><Ic name="trash-2" size={15}/></button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={function () {
+                {isAlumnoActive&&(
+                  <StudentDetailPanel
+                    alumno={a}
+                    rutinaActiva={rutinaActiva}
+                    routineForAssign={routineForAssign}
+                    dias={dias}
+                    rId={rId}
+                    weeklyProgress={weeklyProgress}
+                    semanaCiclo={semanaCiclo}
+                    semanaIdx={semanaIdx}
+                    diasCompletados={diasCompletados}
+                    semCalLabel={semCalLabel}
+                    pctBar={pctBar}
+                    diSel={diSel}
+                    dSel={dSel}
+                    proxTxt={proxTxt}
+                    warmupItems={warmupItems}
+                    exerciseItems={exerciseItems}
+                    sugs={sugs}
+                    rutSB={rutSB}
+                    suggestionsOpen={suggestionsOpen}
+                    completedDays={completedDays}
+                    coachRutinaMenuOpen={coachRutinaMenuOpen}
+                    coachDiaSecsOpen={coachDiaSecsOpen}
+                    notaDiaInput={notaDiaInput}
+                    darkMode={darkMode}
+                    es={es}
+                    msg={msg}
+                    textMain={textMain}
+                    textMuted={textMuted}
+                    bgSub={bgSub}
+                    border={border}
+                    coachAluSurface={coachAluSurface}
+                    coachAluBorderSoft={coachAluBorderSoft}
+                    coachAluTrack={coachAluTrack}
+                    coachAluSubtle={coachAluSubtle}
+                    coachAluDropdown={coachAluDropdown}
+                    coachAluDropdownShadow={coachAluDropdownShadow}
+                    coachAluGhostBtn={coachAluGhostBtn}
+                    onToggleRoutineMenu={function(){setCoachRutinaMenuOpen(function(o){return !o;});}}
+                    onResetWeek={function(){ setCoachDialog({ t: 'resetWeek', semanaCiclo: semanaCiclo }); }}
+                    onResetRoutine={function(){ setCoachDialog({ t: 'resetRoutine', a: a, rutinaActiva: rutinaActiva }); }}
+                    onSelectDay={function(di){ setCoachRoutineDiaIdx(di); }}
+                    onToggleWarmup={function(){ setCoachDiaSecsOpen(function(o){ return {...o, warmup:!o.warmup}; }); }}
+                    onToggleMain={function(){ setCoachDiaSecsOpen(function(o){ return {...o, main:!o.main}; }); }}
+                    onEditWarmupExercise={function(item){ setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:item.index,bloque:"warmup",ex:{...item.ex}}); }}
+                    onAddWarmupExercise={function(){setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"warmup"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}}
+                    onEditMainExercise={function(item){ setEditEx({rId:rutinaActiva.id,dIdx:diSel,eIdx:item.index,bloque:"exercises",ex:{...item.ex}}); }}
+                    onAddMainExercise={function(){setAddExModal({rId:rutinaActiva.id,dIdx:diSel,bloque:"exercises"});setAddExSearch("");setAddExPat(null);setAddExMuscle(null);setAddExSelectedIds([]);}}
+                    onEditRoutine={function () {
+                      var rut = {id:rutinaActiva.id,...(rutinaActiva.datos||{}),name:rutinaActiva.nombre,saved:true,alumno_id:a.id,alumno:a.nombre};
+                      setCoachDialog({ t: 'goRoutines', rutinaActiva: rutinaActiva, a: a, rutina: rut });
+                    }}
+                    onRemoveRoutine={function () { setCoachDialog({ t: 'quitarRut', rutinaActiva: rutinaActiva, a: a }); }}
+                    onAssignRoutine={function () {
                       const rutinaLocal = routineForAssign;
                       if (!rutinaLocal) {
                         toast2(msg('Creá una rutina en RUTINAS', 'Create a routine in ROUTINES', 'Crie uma rotina em ROTINAS'));
@@ -456,128 +397,36 @@ export default function StudentsSection(props) {
                           ? '¿Asignar rutina: ' + rutinaNombre + ' a ' + a.nombre + '?'
                           : 'Assign routine: ' + rutinaNombre + ' to ' + a.nombre + '?';
                       setCoachDialog({ t: 'assignRut', a: a, ex: ex0 || null, rutinaLocal: rutinaParaAsignar, assignMsg: assignMsg0 });
-                    }}>{assignedRoutineFor(a.id)?(<><Ic name="refresh-cw" size={16}/>{msg("Cambiar rutina", "Change routine")}</>):(<><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</>)}</button>
-                    {/* ── SUGERENCIAS ── */}
-                    {(()=>{
-                      const rutSB = assignedRoutineFor(a.id);
-                      const regsAlu = alumnoProgreso || [];
-                      if(!rutSB || regsAlu.length < 2) return null;
-                      const sugs = generarSugerenciasAlumno(regsAlu, rutSB.datos, EX);
-                      if(sugs.length === 0) return null;
-                      var open = !!sugsOpen[a.id];
-                      const colores = {
-                        subir: {icon:(<Ic name="trending-up" size={16} color="#22C55E"/>),bg:"#22C55E12",border:"#22C55E33",color:"#22C55E",btnBg:"#22C55E"},
-                        bajar: {icon:(<Ic name="trending-up" size={16} color="#EF4444" style={{transform:"rotate(180deg)"}}/>),bg:"#EF444412",border:"#EF444433",color:"#EF4444",btnBg:"#EF4444"},
-                        ajustar: {icon:(<Ic name="zap" size={16} color="#F59E0B"/>),bg:"#F59E0B12",border:"#F59E0B33",color:"#F59E0B",btnBg:"#F59E0B"},
-                        cambiar: {icon:(<Ic name="refresh-cw" size={16} color="#2563EB"/>),bg:"#2563EB12",border:"#2563EB33",color:"#2563EB",btnBg:"#2563EB"},
-                        mantener: {icon:(<Ic name="chevron-right" size={16} color={textMuted}/>),bg:bgSub,border:border,color:textMuted,btnBg:"#2563EB"}
-                      };
-                      return (
-                        <div style={{marginTop:12,marginBottom:8}}>
-                          <button
-                            type="button"
-                            className="hov"
-                            onClick={function(){ setSugsOpen(function(prev){ return {...prev, [a.id]: !prev[a.id]}; }); }}
-                            style={{
-                              width:"100%",
-                              background:bgSub,
-                              border:"1px solid "+border,
-                              borderRadius:12,
-                              padding:"10px 12px",
-                              cursor:"pointer",
-                              display:"flex",
-                              alignItems:"center",
-                              justifyContent:"space-between",
-                              gap:10
-                            }}
-                          >
-                            <div style={{display:"flex",alignItems:"center",gap:8}}>
-                              <Ic name="info" size={16} color="#F59E0B"/>
-                              <div style={{fontSize:11,fontWeight:800,color:"#F59E0B",letterSpacing:2,textTransform:"uppercase"}}>{msg("SUGERENCIAS", "SUGGESTIONS")}</div>
-                              <span style={{fontSize:12,fontWeight:800,color:textMuted,background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:999,padding:"2px 8px"}}>{sugs.length}</span>
-                            </div>
-                            <Ic
-                              name="chevron-right"
-                              size={18}
-                              color={textMuted}
-                              style={{transition:"transform .18s ease", transform: open ? "rotate(90deg)" : "rotate(0deg)"}}
-                            />
-                          </button>
-                          {open && (
-                            <div style={{marginTop:10,maxHeight:260,overflowY:"auto",paddingRight:4}}>
-                              {sugs.map(function(sug,si){
-                                var c = colores[sug.tipo] || colores.mantener;
-                                var sugKey = a.id+"-sug-"+(sug.exId||"ex")+"-"+sug.dIdx+"-"+sug.eIdx+"-"+sug.tipo;
-                                return (
-                                  <div key={sugKey} id={sugKey} style={{background:c.bg,border:"1px solid "+c.border,borderRadius:12,padding:"12px",marginBottom:8}}>
-                                    <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
-                                      <div style={{flexShrink:0,marginTop:1}}>{c.icon}</div>
-                                      <div style={{flex:1,minWidth:0}}>
-                                        <div style={{fontSize:13,fontWeight:800,color:c.color,marginBottom:2}}>{sug.nombre}</div>
-                                        <div style={{fontSize:14,fontWeight:700,color:textMain}}>{sug.accion}</div>
-                                        <div style={{fontSize:12,color:textMuted,marginTop:2,display:"flex",alignItems:"center",gap:4}}>
-                                          <Ic name="chevron-right" size={12} color={textMuted}/>
-                                          {sug.ajuste}
-                                        </div>
-                                        <div style={{display:"flex",gap:8,marginTop:8}}>
-                                          <button className="hov" onClick={function(){
-                                            var exConSug = {...sug.exData};
-                                            if(sug.sugKg) exConSug.kg = sug.sugKg;
-                                            if(sug.sugReps) exConSug.reps = sug.sugReps;
-                                            if(sug.sugSets) exConSug.sets = sug.sugSets;
-                                            if(sug.sugPause) exConSug.pause = sug.sugPause;
-                                            setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:exConSug});
-                                          }} style={{padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{msg("APLICAR", "APPLY")}</button>
-                                          <button className="hov" onClick={function(){
-                                            var el=document.getElementById(sugKey);
-                                            if(el){el.style.opacity="0";el.style.height="0";el.style.padding="0";el.style.margin="0";el.style.overflow="hidden";el.style.transition="all .3s ease";}
-                                          }} style={{padding:"5px 14px",background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("IGNORAR", "IGNORE")}</button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    <div style={{marginTop:12,borderTop:"1px solid "+border,paddingTop:12}}>
-                      <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,
-                        textTransform:"uppercase",marginBottom:8}}>
-                        <Ic name="bookmark" size={14} color={textMuted}/> {msg("Nota del día", "Daily note")}
-                      </div>
-                      <textarea
-                        style={{width:"100%",background:bgSub,color:textMain,border:"1px solid "+border,
-                          borderRadius:12,padding:"8px 12px",fontSize:15,fontFamily:"Inter,sans-serif",
-                          resize:"none",lineHeight:1.5,outline:"none",minHeight:80}}
-                        placeholder={msg("Escribí una nota, recordatorio o indicación para el alumno...", "Write a note, reminder or instruction for this athlete...")}
-                        value={notaDiaInput}
-                        onChange={e=>setNotaDiaInput(e.target.value)}
-                      />
-                      <button className="hov" style={{width:"100%",marginTop:8,padding:"8px",
-                        background:"#2563EB",color:"#fff",border:"none",borderRadius:12,
-                        fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
-                        onClick={async()=>{
-                          if(!notaDiaInput.trim()) return;
-                          try{
-                            await sb.setNota({
-                              alumno_id:a.id,
-                              entrenador_id:ENTRENADOR_ID,
-                              contenido:notaDiaInput.trim(),
-                              texto:notaDiaInput.trim(),
-                              fecha:new Date().toLocaleDateString("es-AR")
-                            });
-                            toast2(msg("Nota enviada ✓", "Note sent ✓"));
-                            setNotaDiaInput("");
-                          }catch(e){toast2("Error al enviar nota");}
-                        }}>
-                        {msg("Enviar nota", "Send note")}
-                      </button>
-                    </div>
-
-                  </div>
+                    }}
+                    onToggleSuggestions={function(){ setSugsOpen(function(prev){ return {...prev, [a.id]: !prev[a.id]}; }); }}
+                    onApplySuggestion={function(sug){
+                      var exConSug = {...sug.exData};
+                      if(sug.sugKg) exConSug.kg = sug.sugKg;
+                      if(sug.sugReps) exConSug.reps = sug.sugReps;
+                      if(sug.sugSets) exConSug.sets = sug.sugSets;
+                      if(sug.sugPause) exConSug.pause = sug.sugPause;
+                      setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:exConSug});
+                    }}
+                    onIgnoreSuggestion={function(sugKey){
+                      var el=document.getElementById(sugKey);
+                      if(el){el.style.opacity="0";el.style.height="0";el.style.padding="0";el.style.margin="0";el.style.overflow="hidden";el.style.transition="all .3s ease";}
+                    }}
+                    onNotaChange={function(e){ setNotaDiaInput(e.target.value); }}
+                    onEnviarNota={async function(){
+                      if(!notaDiaInput.trim()) return;
+                      try{
+                        await sb.setNota({
+                          alumno_id:a.id,
+                          entrenador_id:ENTRENADOR_ID,
+                          contenido:notaDiaInput.trim(),
+                          texto:notaDiaInput.trim(),
+                          fecha:new Date().toLocaleDateString("es-AR")
+                        });
+                        toast2(msg("Nota enviada ✓", "Note sent ✓"));
+                        setNotaDiaInput("");
+                      }catch(e){toast2("Error al enviar nota");}
+                    }}
+                  />
                 )}
               </StudentCard>
             )})}
