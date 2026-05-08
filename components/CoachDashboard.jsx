@@ -20,6 +20,7 @@ import ProgresoView from "./ProgresoView.jsx";
 import { coachType as T, coachSpace as S, coachFirstNameFromFullName } from "./coachUiScale.js";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
+import { getStudentRoutine, getStudentWeeklyProgress } from "../lib/studentWeeklyProgress.js";
 
 /** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
 export const NAV_ITEM_PAD = "10px 12px";
@@ -284,7 +285,7 @@ function defaultCoachAlumnoCategoria(a, rutinasSBEntrenador, sesionesGlobales, p
   var cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000;
   var ses = sesionesGlobales || [];
   for (var i = 0; i < ses.length; i++) {
-    if (ses[i].alumno_id !== a.id) continue;
+    if (String(ses[i].alumno_id) !== String(a.id)) continue;
     var raw = ses[i].created_at || "";
     if (!raw) continue;
     var d = new Date(raw.slice(0, 10));
@@ -311,11 +312,11 @@ function defaultCoachAlumnoCategoria(a, rutinasSBEntrenador, sesionesGlobales, p
 function getLastActivityMs(a, sesionesGlobales, progresoGlobal) {
   var best = null;
   (sesionesGlobales || []).forEach(function (s) {
-    if (s.alumno_id !== a.id) return;
+    if (String(s.alumno_id) !== String(a.id)) return;
     var t = parseDateMs(s.created_at || s.fecha);
     if (t != null && (best == null || t > best)) best = t;
   });
-  (progresoGlobal[a.id] || []).forEach(function (r) {
+  (progresoGlobal[String(a.id)] || progresoGlobal[a.id] || []).forEach(function (r) {
     var t = parseDateMs(r.fecha);
     if (t != null && (best == null || t > best)) best = t;
   });
@@ -324,14 +325,14 @@ function getLastActivityMs(a, sesionesGlobales, progresoGlobal) {
 
 function countSesionesSince(a, sesionesGlobales, sinceMs) {
   return (sesionesGlobales || []).filter(function (s) {
-    if (s.alumno_id !== a.id) return false;
+    if (String(s.alumno_id) !== String(a.id)) return false;
     var t = parseDateMs(s.created_at || s.fecha);
     return t != null && t >= sinceMs;
   }).length;
 }
 
 function countProgresoSince(a, progresoGlobal, sinceMs) {
-  return (progresoGlobal[a.id] || []).filter(function (r) {
+  return (progresoGlobal[String(a.id)] || progresoGlobal[a.id] || []).filter(function (r) {
     var t = parseDateMs(r.fecha);
     return t != null && t >= sinceMs;
   }).length;
@@ -348,8 +349,15 @@ function formatUltimaSesion(lastMs, lang, sinRutina) {
   return M(lang, "Sin actividad", "No activity", "Sem atividade");
 }
 
-function computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal) {
+function computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal, rutina) {
   if (cat === "sin_rutina") return 0;
+  var weekly = getStudentWeeklyProgress({
+    alumno: a,
+    rutina: rutina,
+    sesiones: sesionesGlobales,
+    progreso: progresoGlobal,
+  });
+  if (weekly.totalDays > 0 || weekly.completedDays > 0) return weekly.pct;
   var now = Date.now();
   var d7 = now - 7 * 86400000;
   var ses = sesionesGlobales || [];
@@ -467,12 +475,19 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang
   return out.slice(0, 12);
 }
 
-function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, lang) {
+function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
   return alumnos
     .map(function (a) {
       var cat = catFn(a);
-      var pct = computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal);
+      var rutina = getStudentRoutine(rutinasSBEntrenador, a);
+      var weekly = getStudentWeeklyProgress({
+        alumno: a,
+        rutina: rutina,
+        sesiones: sesionesGlobales,
+        progreso: progresoGlobal,
+      });
+      var pct = computeCompliancePct(a, cat, sesionesGlobales, progresoGlobal, rutina);
       var lastMs = getLastActivityMs(a, sesionesGlobales, progresoGlobal);
       var ult = formatUltimaSesion(lastMs, lang, cat === "sin_rutina");
       return {
@@ -482,6 +497,7 @@ function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, 
         pct: pct,
         ult: ult,
         cat: cat,
+        weekly: weekly,
       };
     })
     .filter(function (row) {
@@ -563,9 +579,9 @@ export default function CoachDashboard({
 
   var coachActiveRows = React.useMemo(
     function () {
-      return buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, lang);
+      return buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang);
     },
-    [alumnos, catFn, sesionesGlobales, progresoGlobal, lang]
+    [alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang]
   );
 
   var weekBars = React.useMemo(
@@ -605,9 +621,18 @@ export default function CoachDashboard({
   var nowMs = Date.now();
   var weekStartMs = nowMs - 7 * 86400000;
   var prevWeekStartMs = nowMs - 14 * 86400000;
-  var sesionesCompletadas = sesionesBetween(sesionesGlobales, weekStartMs, nowMs);
+  var weeklyTeam = (alumnos || []).map(function (a) {
+    return getStudentWeeklyProgress({
+      alumno: a,
+      rutina: getStudentRoutine(rutinasSBEntrenador, a),
+      sesiones: sesionesGlobales,
+      progreso: progresoGlobal,
+    });
+  });
+  var sesionesCompletadas = weeklyTeam.reduce(function (sum, w) { return sum + (w.completedDays || 0); }, 0);
   var sesionesPrevias = sesionesBetween(sesionesGlobales, prevWeekStartMs, weekStartMs);
-  var sesionesTotales = weeklyTargetFromRutinas(alumnos, rutinasSBEntrenador);
+  var sesionesTotales = weeklyTeam.reduce(function (sum, w) { return sum + (w.totalDays || 0); }, 0);
+  if (sesionesTotales <= 0) sesionesTotales = weeklyTargetFromRutinas(alumnos, rutinasSBEntrenador);
   if (sesionesTotales <= 0) sesionesTotales = Math.max(sesionesCompletadas, alumnos.length);
   var pctSemana = sesionesTotales > 0 ? Math.min(100, Math.round((sesionesCompletadas / sesionesTotales) * 100)) : 0;
   var pctSemanaPrevia = sesionesTotales > 0 ? Math.min(100, Math.round((sesionesPrevias / sesionesTotales) * 100)) : 0;

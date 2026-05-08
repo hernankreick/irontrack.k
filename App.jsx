@@ -109,6 +109,7 @@ import {
   resolveAlumnoId,
   resolveEntrenadorId,
 } from './lib/routineStore.js';
+import { getStudentWeeklyProgress } from './lib/studentWeeklyProgress.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { Calendar as CalNavIcon, CalendarDays, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
@@ -1648,13 +1649,13 @@ function GymApp() {
     var cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000;
     var ses = sesionesGlobalesLimpias || [];
     for (var i = 0; i < ses.length; i++) {
-      if (ses[i].alumno_id !== a.id) continue;
+      if (String(ses[i].alumno_id) !== String(a.id)) continue;
       var raw = ses[i].created_at || "";
       if (!raw) continue;
       var d = new Date(raw.slice(0, 10));
       if (!isNaN(d.getTime()) && d.getTime() >= cutoff) return "activo";
     }
-    var plist = progresoGlobalLimpio[a.id];
+    var plist = progresoGlobalLimpio[String(a.id)] || progresoGlobalLimpio[a.id];
     if (plist && plist.length) {
       for (var j = 0; j < plist.length; j++) {
         var fecha = plist[j].fecha || "";
@@ -1829,21 +1830,22 @@ function GymApp() {
       if (sessionData?.role !== "entrenador") {
         return { alumnos: [], rutinas: [], ejercicios: [], sesiones: [] };
       }
-      var weekMs = 7 * 24 * 60 * 60 * 1000;
-      var weekAgo = Date.now() - weekMs;
       var sg = sesionesGlobalesLimpias || [];
       var alumnosSearch = (alumnosActivosLimpios || []).map(function (a) {
         var cat = coachAlumnoCategoria(a);
         var estado = cat === "activo" ? "ok" : cat === "inactivo" ? "inactivo" : "riesgo";
         var sesCount = sg.filter(function (s) {
-          return s.alumno_id === a.id;
+          return String(s.alumno_id) === String(a.id);
         }).length;
-        var weekSessions = sg.filter(function (s) {
-          if (s.alumno_id !== a.id) return false;
-          var t = new Date(s.created_at || 0).getTime();
-          return !isNaN(t) && t >= weekAgo;
-        }).length;
-        var pct = Math.min(100, Math.round((weekSessions / 3) * 100));
+        var weekly = getStudentWeeklyProgress({
+          alumno: a,
+          rutina: getRutinaAsignadaAlumno(a),
+          sesiones: sg,
+          progreso: progresoGlobalLimpio,
+          completedDays: completedDays,
+          currentWeek: currentWeek,
+        });
+        var pct = weekly.pct;
         return {
           id: a.id,
           nombre: a.nombre || a.email || "Sin nombre",
@@ -1903,7 +1905,7 @@ function GymApp() {
         sesiones: sesionesSearch,
       };
     },
-    [sessionData, alumnosActivosLimpios, sesionesGlobalesLimpias, rutinasSBEntrenadorLimpias, allEx, coachAlumnoCategoria]
+    [sessionData, alumnosActivosLimpios, sesionesGlobalesLimpias, rutinasSBEntrenadorLimpias, allEx, coachAlumnoCategoria, getRutinaAsignadaAlumno, progresoGlobalLimpio, completedDays, currentWeek]
   );
 
   var coachGlobalSearchNavigate = React.useCallback(
@@ -4393,6 +4395,7 @@ function GymApp() {
             allEx={allEx}
             alumnoActivo={alumnoActivo}
             alumnoProgreso={alumnoProgreso}
+            alumnoSesiones={alumnoSesiones}
             alumnos={alumnos}
             bgCard={bgCard}
             bgSub={bgSub}
@@ -4462,6 +4465,8 @@ function GymApp() {
             setRegistrosSubTab={setRegistrosSubTab}
             setRutinasSB={setRutinasSB}
             setRutinasSBEntrenador={setRutinasSBEntrenador}
+            sesionesGlobales={sesionesGlobalesLimpias}
+            progresoGlobal={progresoGlobalLimpio}
             showCoachDesktopShell={showCoachDesktopShell}
             sugsOpen={sugsOpen}
             setSugsOpen={setSugsOpen}

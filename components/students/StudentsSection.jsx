@@ -2,10 +2,11 @@ import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 import { getRutinaAlumnoId, getRutinaBadgeConfig } from '../../lib/routineStore.js';
+import { getStudentWeeklyProgress } from '../../lib/studentWeeklyProgress.js';
 
 export default function StudentsSection(props) {
   const {
-    allEx = [], alumnoActivo, alumnoProgreso = [], alumnos = [], bgCard, bgSub, border, cargarAlumnos, cleanActiveCoachAlumnos,
+    allEx = [], alumnoActivo, alumnoProgreso = [], alumnoSesiones = [], alumnos = [], bgCard, bgSub, border, cargarAlumnos, cleanActiveCoachAlumnos,
     coachAluBorderSoft, coachAluDropdown, coachAluDropdownShadow, coachAluGhostBtn, coachAluShell, coachAluSubtle, coachAluSurface, coachAluTrack,
     coachAlumnosCounts = { todos: 0, activos: 0, inactivos: 0, sin_rutina: 0 }, coachAlumnosFilter, coachAlumnosListaFiltrada = [], coachAlumnosSearch, coachCardMenuId, coachDiaSecsOpen = {}, coachRoutineDiaIdx, coachRutinaMenuOpen,
     completedDays = [], currentWeek, darkMode, ENTRENADOR_ID, es, EX = [], generarSugerenciasAlumno, getRutinaAsignadaAlumno, loadingSB, mergeRutinasAsignadas, msg,
@@ -13,12 +14,26 @@ export default function StudentsSection(props) {
     setAddExModal, setAddExMuscle, setAddExPat, setAddExSearch, setAddExSelectedIds, setAliasModal, setAlumnoActivo, setAlumnoProgreso, setAlumnoSesiones, setAlumnos, setAssignRoutineId,
     setCoachAlumnosFilter, setCoachAlumnosSearch, setCoachCardMenuId, setChatModal, setCoachDiaSecsOpen, setCoachDialog, setCoachRoutineDiaIdx, setCoachRutinaMenuOpen, setEditEx,
     setLoadingSB, setNewAlumnoData, setNewAlumnoErrors, setNewAlumnoForm, setNotaDiaInput, setRegistrosSubTab, setRutinasSB, setRutinasSBEntrenador,
-    showCoachDesktopShell, sugsOpen = {}, setSugsOpen, textMain, textMuted, toast2
+    sesionesGlobales = [], progresoGlobal = {}, showCoachDesktopShell, sugsOpen = {}, setSugsOpen, textMain, textMuted, toast2
   } = props;
   const t = typeof msg === "function" ? msg : function (esText, enText) { return es ? esText : enText; };
   const assignedRoutineFor = typeof getRutinaAsignadaAlumno === "function"
     ? getRutinaAsignadaAlumno
     : function () { return null; };
+  const sesionesForAlumno = React.useCallback(function (a) {
+    var aid = String(a && a.id != null ? a.id : a);
+    var byGlobal = (sesionesGlobales || []).filter(function (s) {
+      return String(s && s.alumno_id) === aid;
+    });
+    var bySelected = alumnoActivo && String(alumnoActivo.id) === aid ? (alumnoSesiones || []) : [];
+    var seen = {};
+    return bySelected.concat(byGlobal).filter(function (s, idx) {
+      var key = s && s.id != null ? "id:" + String(s.id) : "row:" + idx + ":" + String(s && (s.fecha || s.created_at || ""));
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    });
+  }, [sesionesGlobales, alumnoSesiones, alumnoActivo]);
 
   return (
 
@@ -203,10 +218,18 @@ export default function StudentsSection(props) {
                     <div style={{fontSize:13,color:textMuted,lineHeight:1.4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
                     {(() => {
                       var rA = rutinaAsignada;
-                      var nD = rA ? (rA.datos?.days || []).length : 0;
-                      var done = rA ? completedDays.filter(function (k) { return k.startsWith(rA.id + "-") && k.endsWith("-w" + currentWeek); }).length : 0;
+                      var weekly = getStudentWeeklyProgress({
+                        alumno: a,
+                        rutina: rA,
+                        sesiones: sesionesForAlumno(a),
+                        progreso: progresoGlobal,
+                        completedDays: completedDays,
+                        currentWeek: currentWeek,
+                      });
+                      var nD = weekly.totalDays;
+                      var done = weekly.completedDays;
                       if (!nD) return null;
-                      var pct = Math.min(100, Math.round((done / nD) * 100));
+                      var pct = weekly.pct;
                       return (
                         <div style={{marginTop:10}}>
                           <div style={{fontSize:12,fontWeight:700,color:textMuted,marginBottom:4}}>{done}/{nD} {msg("días esta semana", "days this week")}</div>
@@ -308,16 +331,25 @@ export default function StudentsSection(props) {
                       const rutinaActiva = assignedRoutineFor(a.id);
                       if(!rutinaActiva) return <div style={{background:coachAluSurface,borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid "+coachAluBorderSoft}}><div style={{fontSize:13,color:textMuted}}>{msg("Sin rutina asignada", "No routine assigned")}</div></div>;
                       const dias=rutinaActiva.datos?.days||[];
-                      const semanaCiclo = currentWeek + 1;
                       const rId = rutinaActiva.id;
-                      const diasCompletados = completedDays.filter(function(k){return k.startsWith(rId+"-") && k.endsWith("-w"+currentWeek)}).length;
+                      const weeklyProgress = getStudentWeeklyProgress({
+                        alumno: a,
+                        rutina: rutinaActiva,
+                        sesiones: sesionesForAlumno(a),
+                        progreso: progresoGlobal,
+                        completedDays: completedDays,
+                        currentWeek: currentWeek,
+                      });
+                      const semanaCiclo = weeklyProgress.weekNumber;
+                      const semanaIdx = weeklyProgress.weekIndex;
+                      const diasCompletados = weeklyProgress.completedDays;
                       const hoyDate = new Date();
                       const inicioSemana = new Date(hoyDate);
                       inicioSemana.setDate(hoyDate.getDate() - ((hoyDate.getDay()+6)%7));
                       const finSemana = new Date(inicioSemana);
                       finSemana.setDate(inicioSemana.getDate() + 6);
                       const semCalLabel = inicioSemana.getDate() + "/" + (inicioSemana.getMonth()+1) + " — " + finSemana.getDate() + "/" + (finSemana.getMonth()+1);
-                      const pctBar = dias.length ? Math.min(100, Math.round((diasCompletados / dias.length) * 100)) : 0;
+                      const pctBar = weeklyProgress.pct;
                       const diSel = dias.length ? Math.min(coachRoutineDiaIdx, Math.max(0, dias.length - 1)) : 0;
                       const dSel = dias[diSel] || { warmup: [], exercises: [], label: "" };
                       const proxTxt = (function(){
@@ -375,7 +407,7 @@ export default function StudentsSection(props) {
                             {dias.length > 0 && (
                               <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:14,paddingBottom:4,WebkitOverflowScrolling:"touch"}}>
                                 {dias.map(function(d, di){
-                                  var dayDone = completedDays.includes(rId+"-"+di+"-w"+currentWeek);
+                                  var dayDone = weeklyProgress.completedDayIndexes.indexOf(di) !== -1 || (!weeklyProgress.sesiones.length && completedDays.includes(rId+"-"+di+"-w"+semanaIdx));
                                   var active = di === diSel;
                                   return (
                                     <button
