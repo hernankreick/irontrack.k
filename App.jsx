@@ -3,6 +3,7 @@ import { PATS, EX, VIDEOS, IMGS } from './lib/exerciseStaticData.js';
 import { Ic } from './components/Ic.jsx';
 import { LogForm } from './components/LogForm.jsx';
 import { RutinaView } from './components/RutinaView.jsx';
+import ExerciseHistoryModal from './components/routines/ExerciseHistoryModal.jsx';
 import { WorkoutScreen } from './components/WorkoutScreen.jsx';
 import { Chat } from './components/Chat.jsx';
 import { ChatFlotante } from './components/ChatFlotante.jsx';
@@ -5105,60 +5106,31 @@ function GymApp() {
         </BaseModal>
       )}
       {detailEx&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:100,display:"flex",alignItems:"flex-end"}} onClick={()=>setDetailEx(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxHeight:"80dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
-              <span style={{fontSize:36}}>{PATS[detailEx.pattern]?.icon}</span>
-              <div>
-                <div style={{fontSize:28,fontWeight:800,letterSpacing:1}}>{es?detailEx.name:detailEx.nameEn}</div>
-                <div style={{display:"flex",gap:8,marginTop:4}}>
-                  <span style={tag(PATS[detailEx.pattern]?.color||"#2563EB")}>{es?PATS[detailEx.pattern]?.label:PATS[detailEx.pattern]?.labelEn}</span>
-                  <span style={{fontSize:13,color:textMuted}}>{detailEx.muscle} · {detailEx.equip}</span>
-                </div>
-              </div>
-              <button className="hov" style={{...btn(),marginLeft:"auto",fontSize:22,padding:"4px 8px"}} onClick={()=>setDetailEx(null)}>x</button>
-            </div>
-            <div style={{marginBottom:12}}>
-              {IMGS[detailEx.id]&&(
-                <div style={{borderRadius:12,overflow:"hidden",background:darkMode?"#162234":"#E2E8F0",marginBottom:8,position:"relative"}}>
-                  <img src={IMGS[detailEx.id]} alt={detailEx.name}
-                    style={{width:"100%",maxHeight:200,objectFit:"cover",display:"block"}}
-                    onError={e=>{e.target.style.display="none"}}
-                  />
-                </div>
-              )}
-              {VIDEOS[detailEx.id]&&(
-                <a href={VIDEOS[detailEx.id]} target="_blank" rel="noopener noreferrer"
-                  style={{display:"flex",alignItems:"center",gap:8,background:"#162234",border:"1px solid #2D4057",borderRadius:12,padding:"8px 16px",textDecoration:"none"}}>
-                  <span style={{fontSize:28}}>▶️</span>
-                  <div>
-                    <div style={{fontSize:15,fontWeight:700,color:textMain}}>{msg("Ver video en YouTube", "Watch on YouTube")}</div>
-                    <div style={{fontSize:11,color:textMuted}}>{msg("Tutorial de técnica", "Technique tutorial")}</div>
-                  </div>
-                </a>
-              )}
-            </div>
-            <span style={lbl}>{msg("HISTORIAL", "HISTORY")}</span>
-            {(progress[detailEx.id]?.sets||[]).length===0&&<div style={{color:textMuted,fontSize:15,margin:"8px 0 10px"}}>{msg("Sin registros", "No records")}</div>}
-            {(progress[detailEx.id]?.sets||[]).slice(0,10).map((s2,i)=>(
-              <div key={detailEx.id+"-hist-"+(s2.date||"")+"-"+(s2.kg??"")+"-"+(s2.reps??"")+"-"+(s2.week ?? "nw")+"-"+i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),fontSize:15}}>
-                <span>{s2.kg}kg x {s2.reps} reps</span>
-                <span style={{color:textMuted}}>{s2.date}</span>
-              </div>
-            ))}
-            <button className="hov" style={{...btn("#2563EB22"),color:"#2563EB",width:"100%",marginTop:12,padding:"8px"}} onClick={()=>{setLogModal({...detailEx});setDetailEx(null);}}>
-              + LOG SET
-            </button>
-            {expandedR&&selDay!==null&&(
-              <button className="hov" style={{...btn("#2563EB22"),color:"#2563EB",width:"100%",marginTop:8,padding:"8px"}} onClick={()=>{
-                setRoutines(p=>p.map(r=>r.id===expandedR?{...r,days:r.days.map((d,i)=>i===selDay?{...d,exercises:[...d.exercises,{id:detailEx.id,sets:"3",reps:"8-10",kg:"",pause:90,note:"",weeks:[]}]}:d)}:r));
-                toast2("Ejercicio agregado");
-                setDetailEx(null);
-                setTab("plan");
-              }}>+ AGREGAR A RUTINA</button>
-            )}
-          </div>
-        </div>
+        <ExerciseHistoryModal
+          exercise={detailEx}
+          history={progress[detailEx.id]?.sets||[]}
+          pattern={PATS[detailEx.pattern]}
+          imageSrc={IMGS[detailEx.id]}
+          videoSrc={VIDEOS[detailEx.id]}
+          canAddToRoutine={!!(expandedR&&selDay!==null)}
+          darkMode={darkMode}
+          es={es}
+          msg={msg}
+          btn={btn}
+          lbl={lbl}
+          tag={tag}
+          bgCard={bgCard}
+          textMain={textMain}
+          textMuted={textMuted}
+          onClose={()=>setDetailEx(null)}
+          onLogSet={()=>{setLogModal({...detailEx});setDetailEx(null);}}
+          onAddToRoutine={()=>{
+            setRoutines(p=>p.map(r=>r.id===expandedR?{...r,days:r.days.map((d,i)=>i===selDay?{...d,exercises:[...d.exercises,{id:detailEx.id,sets:"3",reps:"8-10",kg:"",pause:90,note:"",weeks:[]}]}:d)}:r));
+            toast2("Ejercicio agregado");
+            setDetailEx(null);
+            setTab("plan");
+          }}
+        />
       )}
       {false&&logModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:110,display:"flex",alignItems:"flex-end"}} onClick={()=>setLogModal(null)}>
