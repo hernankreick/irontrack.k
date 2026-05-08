@@ -1,8 +1,9 @@
 import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
-import { getRutinaAlumnoId, getRutinaBadgeConfig } from '../../lib/routineStore.js';
+import { getRutinaAlumnoId } from '../../lib/routineStore.js';
 import { getStudentWeeklyProgress } from '../../lib/studentWeeklyProgress.js';
+import StudentCard from './StudentCard.jsx';
 
 export default function StudentsSection(props) {
   const {
@@ -196,135 +197,71 @@ export default function StudentsSection(props) {
 
             {coachAlumnosListaFiltrada.map(a=>{
               const rutinaAsignada = assignedRoutineFor(a);
+              const progresoSemanal = getStudentWeeklyProgress({
+                alumno: a,
+                rutina: rutinaAsignada,
+                sesiones: sesionesForAlumno(a),
+                progreso: progresoGlobal,
+                completedDays: completedDays,
+                currentWeek: currentWeek,
+              });
               return (
-              <div key={a.id} style={{position:"relative",background:coachAluSurface,borderRadius:12,padding:"14px 14px 12px",marginBottom:10,border:alumnoActivo?.id===a.id?"1px solid #2563eb":"1px solid "+coachAluBorderSoft,boxShadow:darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.08)"}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
-                  <div style={{width:48,height:48,borderRadius:"50%",background:"#2563eb",color:"#fff",fontSize:20,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"inherit"}}>
-                    {(a.nombre||a.email||"?").trim().charAt(0).toUpperCase()}
-                  </div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-                      <span style={{fontSize:17,fontWeight:800,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
-                      {(() => {
-                        var cfg = getRutinaBadgeConfig({
-                          rutina: rutinaAsignada,
-                          rutinasLoaded: rutinasLoaded,
-                          darkMode: darkMode,
-                          msg: msg,
-                        });
-                        return <span style={{fontSize:11,fontWeight:800,padding:"2px 8px",borderRadius:6,background:cfg.bg,color:cfg.color}}>{cfg.t}</span>;
-                      })()}
-                    </div>
-                    <div style={{fontSize:13,color:textMuted,lineHeight:1.4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
-                    {(() => {
-                      var rA = rutinaAsignada;
-                      var weekly = getStudentWeeklyProgress({
-                        alumno: a,
-                        rutina: rA,
-                        sesiones: sesionesForAlumno(a),
-                        progreso: progresoGlobal,
-                        completedDays: completedDays,
-                        currentWeek: currentWeek,
-                      });
-                      var nD = weekly.totalDays;
-                      var done = weekly.completedDays;
-                      if (!nD) return null;
-                      var pct = weekly.pct;
-                      return (
-                        <div style={{marginTop:10}}>
-                          <div style={{fontSize:12,fontWeight:700,color:textMuted,marginBottom:4}}>{done}/{nD} {msg("días esta semana", "days this week")}</div>
-                          <div style={{height:6,background:coachAluTrack,borderRadius:4,overflow:"hidden"}}>
-                            <div style={{width: pct + "%", height: "100%", background: "#22c55e", borderRadius: 4, transition: "width .2s ease"}}/>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                  <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginLeft:"auto"}}>
-                    <button
-                      className="hov"
-                      style={{background:"#3b82f6",color:"#fff",border:"none",borderRadius:10,padding:"8px 18px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
-                      onClick={async function () {
-                        setCoachCardMenuId(null);
-                        if (alumnoActivo?.id === a.id) { setAlumnoActivo(null); return; }
-                        setAlumnoActivo(a); setRegistrosSubTab(0); setLoadingSB(true);
-                        const ruts = await sb.getRutinas(a.id); setRutinasSB(ruts || []);
-                        setRutinasSBEntrenador(function (prev) {
-                          var fresh = Array.isArray(ruts) ? ruts : [];
-                          return mergeRutinasAsignadas(
-                            fresh,
-                            (prev || []).filter(function (r) {
-                              var alumnoRutinaId = getRutinaAlumnoId(r);
-                              return alumnoRutinaId == null || String(alumnoRutinaId) !== String(a.id);
-                            })
-                          );
-                        });
-                        const prog = await sb.getProgreso(a.id); setAlumnoProgreso(prog || []);
-                        const ses = await sb.getSesiones(a.id); setAlumnoSesiones(ses || []);
-                        setLoadingSB(false);
-                      }}
-                    >{alumnoActivo?.id === a.id ? (msg("CERRAR", "CLOSE", "FECHAR")) : msg("VER", "VIEW", "VER")}</button>
-                    <div style={{position:"relative"}}>
-                      <button
-                        type="button"
-                        className="hov"
-                        aria-label={msg("Más opciones", "More options")}
-                        style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:10,cursor:"pointer"}}
-                        onClick={function (e) { e.stopPropagation(); setCoachCardMenuId(coachCardMenuId === a.id ? null : a.id); }}
-                      >
-                        <Ic name="more-vertical" size={18} color="currentColor"/>
-                      </button>
-                      {coachCardMenuId === a.id && (
-                        <div
-                          style={{position:"absolute",right:0,top:"100%",marginTop:6,background:coachAluDropdown,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:6,zIndex:30,minWidth:176,boxShadow:coachAluDropdownShadow}}
-                          onClick={function (e) { e.stopPropagation(); }}
-                        >
-                          <button
-                            type="button"
-                            className="hov"
-                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:textMain,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
-                            onClick={function () {
-                              setCoachCardMenuId(null);
-                              setCoachDialog({ t: 'editAlum', a: a });
-                            }}
-                          >
-                            <Ic name="edit-2" size={16} color={textMuted}/> {msg("Editar", "Edit")}
-                          </button>
-                          <button
-                            type="button"
-                            className="hov"
-                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:textMain,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
-                            onClick={function () { setCoachCardMenuId(null); setChatModal({ alumnoId: a.id, alumnoNombre: a.nombre || a.email || "Alumno" }); }}
-                          >
-                            <Ic name="message-circle" size={16} color="#2563eb"/> {msg("Mensaje", "Message")}
-                          </button>
-                          <button
-                            type="button"
-                            className="hov"
-                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f59e0b",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
-                            onClick={function () {
-                              setCoachCardMenuId(null);
-                              setCoachDialog({ t: 'clearProgress', a: a });
-                            }}
-                          >
-                            <Ic name="refresh-cw" size={16} color="#f59e0b"/> {msg("Limpiar historial de progreso", "Clear progress history")}
-                          </button>
-                          <button
-                            type="button"
-                            className="hov"
-                            style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}
-                            onClick={function () {
-                              setCoachCardMenuId(null);
-                              setCoachDialog({ t: 'deleteAlumno', a: a });
-                            }}
-                          >
-                            <Ic name="trash-2" size={16} color="#f87171"/> {msg("Eliminar", "Delete")}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+              <StudentCard
+                key={a.id}
+                alumno={a}
+                rutinaAsignada={rutinaAsignada}
+                progresoSemanal={progresoSemanal}
+                rutinasLoaded={rutinasLoaded}
+                isActive={alumnoActivo?.id===a.id}
+                isMenuOpen={coachCardMenuId === a.id}
+                darkMode={darkMode}
+                msg={msg}
+                textMain={textMain}
+                textMuted={textMuted}
+                coachAluSurface={coachAluSurface}
+                coachAluBorderSoft={coachAluBorderSoft}
+                coachAluTrack={coachAluTrack}
+                coachAluSubtle={coachAluSubtle}
+                coachAluDropdown={coachAluDropdown}
+                coachAluDropdownShadow={coachAluDropdownShadow}
+                onVer={async function () {
+                  setCoachCardMenuId(null);
+                  if (alumnoActivo?.id === a.id) { setAlumnoActivo(null); return; }
+                  setAlumnoActivo(a); setRegistrosSubTab(0); setLoadingSB(true);
+                  const ruts = await sb.getRutinas(a.id); setRutinasSB(ruts || []);
+                  setRutinasSBEntrenador(function (prev) {
+                    var fresh = Array.isArray(ruts) ? ruts : [];
+                    return mergeRutinasAsignadas(
+                      fresh,
+                      (prev || []).filter(function (r) {
+                        var alumnoRutinaId = getRutinaAlumnoId(r);
+                        return alumnoRutinaId == null || String(alumnoRutinaId) !== String(a.id);
+                      })
+                    );
+                  });
+                  const prog = await sb.getProgreso(a.id); setAlumnoProgreso(prog || []);
+                  const ses = await sb.getSesiones(a.id); setAlumnoSesiones(ses || []);
+                  setLoadingSB(false);
+                }}
+                onToggleMenu={function (e) { e.stopPropagation(); setCoachCardMenuId(coachCardMenuId === a.id ? null : a.id); }}
+                onEdit={function () {
+                  setCoachCardMenuId(null);
+                  setCoachDialog({ t: 'editAlum', a: a });
+                }}
+                onChat={function () {
+                  setCoachCardMenuId(null);
+                  setChatModal({ alumnoId: a.id, alumnoNombre: a.nombre || a.email || "Alumno" });
+                }}
+                onClearProgress={function () {
+                  setCoachCardMenuId(null);
+                  setCoachDialog({ t: 'clearProgress', a: a });
+                }}
+                onDelete={function () {
+                  setCoachCardMenuId(null);
+                  setCoachDialog({ t: 'deleteAlumno', a: a });
+                }}
+                onAsignarRutina={function () {}}
+              >
                 {alumnoActivo?.id===a.id&&(
                   <div>
                     {(()=>{
@@ -383,7 +320,7 @@ export default function StudentsSection(props) {
                                       <Ic name="refresh-cw" size={15} color="#fbbf24"/> {msg("Reiniciar semana", "Reset week")}
                                     </button>
                                     <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
-                                      setCoachDialog({ t: 'resetRoutine' });
+                                      setCoachDialog({ t: 'resetRoutine', a: a, rutinaActiva: rutinaActiva });
                                     }}>
                                       <Ic name="refresh-cw" size={15} color="#f87171"/> {msg("Reiniciar rutina", "Reset routine")}
                                     </button>
@@ -642,7 +579,7 @@ export default function StudentsSection(props) {
 
                   </div>
                 )}
-              </div>
+              </StudentCard>
             )})}
           </div>
   );
