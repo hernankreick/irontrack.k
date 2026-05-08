@@ -2,6 +2,7 @@ import React from 'react';
 import { Ic } from '../Ic.jsx';
 import StudentRoutinePreview from './StudentRoutinePreview.jsx';
 import StudentSuggestionsPanel from './StudentSuggestionsPanel.jsx';
+import StudentNotesPanel from './StudentNotesPanel.jsx';
 
 export default function StudentDetailPanel({
   alumno,
@@ -67,26 +68,17 @@ export default function StudentDetailPanel({
           <div style={{fontSize:13,color:textMuted}}>{msg("Sin rutina asignada", "No routine assigned")}</div>
         </div>
         <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={onAssignRoutine}><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</button>
-        <div style={{marginTop:12,borderTop:"1px solid "+border,paddingTop:12}}>
-          <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,
-            textTransform:"uppercase",marginBottom:8}}>
-            <Ic name="bookmark" size={14} color={textMuted}/> {msg("Nota del día", "Daily note")}
-          </div>
-          <textarea
-            style={{width:"100%",background:bgSub,color:textMain,border:"1px solid "+border,
-              borderRadius:12,padding:"8px 12px",fontSize:15,fontFamily:"Inter,sans-serif",
-              resize:"none",lineHeight:1.5,outline:"none",minHeight:80}}
-            placeholder={msg("Escribí una nota, recordatorio o indicación para el alumno...", "Write a note, reminder or instruction for this athlete...")}
-            value={notaDiaInput}
-            onChange={onNotaChange}
-          />
-          <button className="hov" style={{width:"100%",marginTop:8,padding:"8px",
-            background:"#2563EB",color:"#fff",border:"none",borderRadius:12,
-            fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
-            onClick={onEnviarNota}>
-            {msg("Enviar nota", "Send note")}
-          </button>
-        </div>
+        <StudentNotesPanel
+          alumno={alumno}
+          nota={notaDiaInput}
+          msg={msg}
+          textMain={textMain}
+          textMuted={textMuted}
+          bgSub={bgSub}
+          border={border}
+          onChange={onNotaChange}
+          onSave={onEnviarNota}
+        />
       </div>
     );
   }
@@ -150,26 +142,17 @@ export default function StudentDetailPanel({
         onApplySuggestion={onApplySuggestion}
         onIgnoreSuggestion={onIgnoreSuggestion}
       />
-      <div style={{marginTop:12,borderTop:"1px solid "+border,paddingTop:12}}>
-        <div style={{fontSize:11,fontWeight:600,color:textMuted,letterSpacing:1,
-          textTransform:"uppercase",marginBottom:8}}>
-          <Ic name="bookmark" size={14} color={textMuted}/> {msg("Nota del día", "Daily note")}
-        </div>
-        <textarea
-          style={{width:"100%",background:bgSub,color:textMain,border:"1px solid "+border,
-            borderRadius:12,padding:"8px 12px",fontSize:15,fontFamily:"Inter,sans-serif",
-            resize:"none",lineHeight:1.5,outline:"none",minHeight:80}}
-          placeholder={msg("Escribí una nota, recordatorio o indicación para el alumno...", "Write a note, reminder or instruction for this athlete...")}
-          value={notaDiaInput}
-          onChange={onNotaChange}
-        />
-        <button className="hov" style={{width:"100%",marginTop:8,padding:"8px",
-          background:"#2563EB",color:"#fff",border:"none",borderRadius:12,
-          fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
-          onClick={onEnviarNota}>
-          {msg("Enviar nota", "Send note")}
-        </button>
-      </div>
+      <StudentNotesPanel
+        alumno={alumno}
+        nota={notaDiaInput}
+        msg={msg}
+        textMain={textMain}
+        textMuted={textMuted}
+        bgSub={bgSub}
+        border={border}
+        onChange={onNotaChange}
+        onSave={onEnviarNota}
+      />
     </div>
   );
 }
