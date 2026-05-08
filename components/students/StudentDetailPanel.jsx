@@ -1,8 +1,8 @@
 import React from 'react';
-import { Ic } from '../Ic.jsx';
 import StudentRoutinePreview from './StudentRoutinePreview.jsx';
 import StudentSuggestionsPanel from './StudentSuggestionsPanel.jsx';
 import StudentNotesPanel from './StudentNotesPanel.jsx';
+import StudentRoutineActions from './StudentRoutineActions.jsx';
 
 export default function StudentDetailPanel({
   alumno,
@@ -67,7 +67,15 @@ export default function StudentDetailPanel({
         <div style={{background:coachAluSurface,borderRadius:12,padding:"16px",marginBottom:8,textAlign:"center",border:"1px solid "+coachAluBorderSoft}}>
           <div style={{fontSize:13,color:textMuted}}>{msg("Sin rutina asignada", "No routine assigned")}</div>
         </div>
-        <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={onAssignRoutine}><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</button>
+        <StudentRoutineActions
+          variant="assign"
+          hasRoutine={false}
+          msg={msg}
+          textMuted={textMuted}
+          coachAluBorderSoft={coachAluBorderSoft}
+          coachAluGhostBtn={coachAluGhostBtn}
+          onAssignRoutine={onAssignRoutine}
+        />
         <StudentNotesPanel
           alumno={alumno}
           nota={notaDiaInput}
@@ -127,7 +135,15 @@ export default function StudentDetailPanel({
         onEditRoutine={onEditRoutine}
         onRemoveRoutine={onRemoveRoutine}
       />
-      <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"8px",width:"100%",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}} onClick={onAssignRoutine}>{rutinaActiva?(<><Ic name="refresh-cw" size={16}/>{msg("Cambiar rutina", "Change routine")}</>):(<><Ic name="plus" size={16}/>{msg("Asignar rutina", "Assign routine")}</>)}</button>
+      <StudentRoutineActions
+        variant="assign"
+        hasRoutine={!!rutinaActiva}
+        msg={msg}
+        textMuted={textMuted}
+        coachAluBorderSoft={coachAluBorderSoft}
+        coachAluGhostBtn={coachAluGhostBtn}
+        onAssignRoutine={onAssignRoutine}
+      />
       <StudentSuggestionsPanel
         alumno={alumno}
         rutinaAsignada={rutSB}
