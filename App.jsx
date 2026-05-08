@@ -2422,30 +2422,6 @@ function GymApp() {
     } catch (e) {}
   }
 
-  function logResetRoutineDebug(stage, alumnoId, rutina, extra) {
-    try {
-      var aid = String(alumnoId || "");
-      var rid = rutina && rutina.id != null ? String(rutina.id) : "";
-      var rname = rutina && (rutina.nombre || rutina.name) ? String(rutina.nombre || rutina.name) : "";
-      var sgAlumno = (sesionesGlobales || []).filter(function (s) { return String(s && s.alumno_id) === aid; });
-      var asAlumno = (alumnoSesiones || []).filter(function (s) { return String(s && s.alumno_id) === aid; });
-      var cdState = (completedDays || []).filter(function (k) {
-        var text = String(k);
-        return (rid && text.indexOf(rid) >= 0) || text.indexOf(aid) >= 0;
-      });
-      console.log("[IT reset-debug] resetRoutine " + stage, Object.assign({
-        alumnoId: aid,
-        rutinaId: rid,
-        rutinaNombre: rname,
-        sesionesGlobalesFiltradasPorAlumno: sgAlumno,
-        alumnoSesionesFiltradasPorAlumno: asAlumno,
-        completedDaysFiltrado: cdState,
-        localStorage_it_cd: (function () { try { return localStorage.getItem("it_cd"); } catch (e) { return null; } })(),
-        localStorage_it_pg: (function () { try { return localStorage.getItem("it_pg"); } catch (e) { return null; } })(),
-      }, extra || {}));
-    } catch (e) {}
-  }
-
   async function resetAlumnoRoutineHistory(alumno, rutina) {
     var aid = alumno && alumno.id != null ? String(alumno.id) : (alumnoActivo && alumnoActivo.id != null ? String(alumnoActivo.id) : "");
     var rut = rutina || (aid ? getRutinaAsignadaAlumno(aid) : null);
@@ -2454,7 +2430,6 @@ function GymApp() {
     if (!aid) throw new Error("alumnoId requerido");
 
     var exIds = getRutinaExerciseIdsForCleanup(rut);
-    logResetRoutineDebug("before", aid, rut, { ejerciciosRutina: exIds });
     await Promise.all([
       typeof sb.deleteSesionesByAlumnoRutina === "function"
         ? sb.deleteSesionesByAlumnoRutina(aid, rid, rname)
@@ -2534,11 +2509,9 @@ function GymApp() {
     setCoachRoutineDiaIdx(0);
     setRegistrosSubTab(0);
     clearRoutineLocalKeysForAlumno(aid, rid);
-    var freshSesiones = [];
-    var freshProgreso = [];
     try {
-      freshSesiones = await sb.getSesiones(aid) || [];
-      freshProgreso = await sb.getProgreso(aid) || [];
+      var freshSesiones = await sb.getSesiones(aid) || [];
+      var freshProgreso = await sb.getProgreso(aid) || [];
       if (alumnoActivo && String(alumnoActivo.id) === aid) {
         setAlumnoSesiones(freshSesiones);
         setAlumnoProgreso(freshProgreso);
@@ -2549,14 +2522,9 @@ function GymApp() {
         return next;
       });
     } catch (e) {
-      console.error("[IT reset-debug] fetch after reset failed", e);
+      console.error("[resetAlumnoRoutineHistory] fetch after reset failed", e);
     }
     await cargarSesionesGlobales();
-    logResetRoutineDebug("after", aid, rut, {
-      sesionesSupabasePostReset: freshSesiones,
-      progresoSupabasePostReset: freshProgreso,
-      ejerciciosRutina: exIds,
-    });
     return true;
   }
 
