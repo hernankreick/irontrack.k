@@ -224,6 +224,10 @@ const sb = {
       const { error } = await supabase.from("sesiones").delete().eq("alumno_id", aid).eq("rutina_id", rid);
       if (error) throw error;
     }
+    if (rid) {
+      const { error } = await supabase.from("sesiones").delete().eq("alumno_id", aid).is("rutina_id", null);
+      if (error) throw error;
+    }
     if (rname) {
       var q = supabase.from("sesiones").delete().eq("alumno_id", aid).eq("rutina_nombre", rname);
       if (rid) q = q.is("rutina_id", null);
@@ -2401,13 +2405,44 @@ function GymApp() {
     try {
       localStorage.removeItem('it_last_week_advance_date');
       var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
-      if (!rid) return;
       var cd = JSON.parse(localStorage.getItem("it_cd") || "[]");
       if (Array.isArray(cd)) {
         localStorage.setItem("it_cd", JSON.stringify(cd.filter(function (k) {
-          return !String(k).startsWith(rid + "-");
+          var text = String(k);
+          return !((rid && text.indexOf(rid) >= 0) || text.indexOf(String(alumnoId)) >= 0);
         })));
       }
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var key = localStorage.key(i);
+        if (!key || key.indexOf("it_") !== 0) continue;
+        if (key.indexOf(String(alumnoId)) >= 0 || (rid && key.indexOf(rid) >= 0)) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (e) {}
+  }
+
+  function logResetRoutineDebug(stage, alumnoId, rutina, extra) {
+    try {
+      var aid = String(alumnoId || "");
+      var rid = rutina && rutina.id != null ? String(rutina.id) : "";
+      var rname = rutina && (rutina.nombre || rutina.name) ? String(rutina.nombre || rutina.name) : "";
+      var sgAlumno = (sesionesGlobales || []).filter(function (s) { return String(s && s.alumno_id) === aid; });
+      var asAlumno = (alumnoSesiones || []).filter(function (s) { return String(s && s.alumno_id) === aid; });
+      var cdState = (completedDays || []).filter(function (k) {
+        var text = String(k);
+        return (rid && text.indexOf(rid) >= 0) || text.indexOf(aid) >= 0;
+      });
+      console.log("[IT reset-debug] resetRoutine " + stage, Object.assign({
+        alumnoId: aid,
+        rutinaId: rid,
+        rutinaNombre: rname,
+        sesionesGlobalesFiltradasPorAlumno: sgAlumno,
+        alumnoSesionesFiltradasPorAlumno: asAlumno,
+        completedDaysFiltrado: cdState,
+        localStorage_it_cd: (function () { try { return localStorage.getItem("it_cd"); } catch (e) { return null; } })(),
+        localStorage_it_pg: (function () { try { return localStorage.getItem("it_pg"); } catch (e) { return null; } })(),
+      }, extra || {}));
     } catch (e) {}
   }
 
@@ -2419,6 +2454,7 @@ function GymApp() {
     if (!aid) throw new Error("alumnoId requerido");
 
     var exIds = getRutinaExerciseIdsForCleanup(rut);
+    logResetRoutineDebug("before", aid, rut, { ejerciciosRutina: exIds });
     await Promise.all([
       typeof sb.deleteSesionesByAlumnoRutina === "function"
         ? sb.deleteSesionesByAlumnoRutina(aid, rid, rname)
@@ -2490,14 +2526,37 @@ function GymApp() {
     });
     setCompletedDays(function (prev) {
       return (prev || []).filter(function (k) {
-        return !(rid && String(k).startsWith(rid + "-"));
+        var text = String(k);
+        return !((rid && text.indexOf(rid) >= 0) || text.indexOf(aid) >= 0);
       });
     });
     setCurrentWeek(0);
     setCoachRoutineDiaIdx(0);
     setRegistrosSubTab(0);
     clearRoutineLocalKeysForAlumno(aid, rid);
+    var freshSesiones = [];
+    var freshProgreso = [];
+    try {
+      freshSesiones = await sb.getSesiones(aid) || [];
+      freshProgreso = await sb.getProgreso(aid) || [];
+      if (alumnoActivo && String(alumnoActivo.id) === aid) {
+        setAlumnoSesiones(freshSesiones);
+        setAlumnoProgreso(freshProgreso);
+      }
+      setProgresoGlobal(function (prev) {
+        var next = Object.assign({}, prev || {});
+        next[aid] = freshProgreso;
+        return next;
+      });
+    } catch (e) {
+      console.error("[IT reset-debug] fetch after reset failed", e);
+    }
     await cargarSesionesGlobales();
+    logResetRoutineDebug("after", aid, rut, {
+      sesionesSupabasePostReset: freshSesiones,
+      progresoSupabasePostReset: freshProgreso,
+      ejerciciosRutina: exIds,
+    });
     return true;
   }
 
