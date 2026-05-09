@@ -402,7 +402,7 @@ function weeklyTargetFromRutinas(alumnos, rutinasSBEntrenador) {
  * Alertas derivadas solo de datos reales (sin inventar alumnos).
  * Prioridad: sin rutina > rutina terminada > a 1 sesiÃ³n > inactivo > poca actividad en la semana (con rutina).
  */
-function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, P) {
+function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, P, currentWeek) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
   var ses = sesionesGlobales || [];
   var out = [];
@@ -434,11 +434,13 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
         rutina: rutina,
         sesiones: ses,
         progreso: progresoGlobal,
+        currentWeek: currentWeek,
       });
       var totalDays = weekly.totalDays || 0;
-      var completedDays = weekly.completedDays || 0;
+      var completedDaysFromSessions = weekly.completedDaysFromSessions || 0;
+      var hasRealRoutineSessions = (weekly.realSessionsCount || 0) > 0;
       var rutinaId = String(rutina.id || weekly.rutinaId || "");
-      if (rutinaId && totalDays > 0 && completedDays >= totalDays) {
+      if (rutinaId && totalDays > 0 && hasRealRoutineSessions && completedDaysFromSessions >= totalDays) {
         out.push({
           key: "rutina-terminada-" + a.id + "-" + rutinaId,
           alumnoId: a.id,
@@ -448,7 +450,7 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
           badge: M(lang, "Rutina terminada", "Routine completed", "Rotina concluÃ­da"),
           bc: pal.green,
           bd: pal.greenDim,
-          desc: name + M(lang, " terminÃ³ su rutina.", " completed their routine.", " concluiu sua rotina."),
+          desc: name + M(lang, " terminó su rutina.", " completed their routine.", " concluiu sua rotina."),
           severity: 1,
           category: "logro",
           primaryLabel: M(lang, "FELICITAR", "CONGRATULATE", "PARABENIZAR"),
@@ -458,21 +460,21 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
         });
         return;
       }
-      if (rutinaId && totalDays > 0 && completedDays === totalDays - 1) {
+      if (rutinaId && totalDays > 1 && hasRealRoutineSessions && completedDaysFromSessions > 0 && completedDaysFromSessions === totalDays - 1) {
         out.push({
           key: "rutina-falta-1-" + a.id + "-" + rutinaId,
           alumnoId: a.id,
           rutinaId: rutinaId,
           initials: initials,
           name: name,
-          badge: M(lang, "Le queda 1 sesiÃ³n", "1 session left", "Falta 1 sessÃ£o"),
+          badge: M(lang, "Le queda 1 sesión", "1 session left", "Falta 1 sessão"),
           bc: pal.blue,
           bd: pal.blueDim,
           desc: M(
             lang,
-            "A " + name + " le queda 1 sesiÃ³n para completar su rutina.",
+            "A " + name + " le queda 1 sesión para completar su rutina.",
             name + " has 1 session left to complete their routine.",
-            "Falta 1 sessÃ£o para " + name + " concluir a rotina."
+            "Falta 1 sessão para " + name + " concluir a rotina."
           ),
           severity: 2,
           category: "seguimiento",
@@ -607,6 +609,7 @@ export default function CoachDashboard({
   getAlumnoCategoria,
   /** Alineado con `darkMode` de App (config Tema día/noche). */
   darkMode = true,
+  currentWeek = 0,
   /** Nombre del entrenador (session) para saludo e iniciales en la shell. */
   coachName = "",
 }) {
@@ -629,9 +632,9 @@ export default function CoachDashboard({
 
   var coachAlertsReal = React.useMemo(
     function () {
-      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C);
+      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C, currentWeek);
     },
-    [alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C]
+    [alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C, currentWeek]
   );
 
   var coachActiveRows = React.useMemo(

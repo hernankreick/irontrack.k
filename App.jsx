@@ -3857,6 +3857,7 @@ function GymApp() {
                 allEx={allEx}
                 lang={lang}
                 darkMode={darkMode}
+                currentWeek={currentWeek}
                 coachName={sessionData?.name || ""}
                 onEnviarMensaje={function () {
                   var first = (alumnos || [])[0];
