@@ -3,7 +3,14 @@ import { Ic } from './Ic.jsx';
 import { ExerciseVideoPlayButton } from './ExerciseVideoPlayButton.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
-import { calculateNewWeightPR, calculateSetsVolume } from '../lib/workoutSession.js';
+import {
+  calculateNewWeightPR,
+  calculateSetsVolume,
+  canLogWorkoutSet,
+  exerciseHasSuggestedLoad,
+  normalizeWorkoutKg,
+  resolveWorkoutRepsInput,
+} from '../lib/workoutSession.js';
 
 /**
  * Píldoras de reps: 3 estados (fuera de rango / rango sugerido / seleccionada).
@@ -99,8 +106,11 @@ export function WorkoutExercisePanel(props) {
   const [pause, setPause] = React.useState(90);
   const [rpe, setRpe] = React.useState(null);
 
-  const pendingPR = calculateNewWeightPR({ max: pr }, kg);
+  const validationExercise = { ...(info || {}), ...(ex || {}) };
+  const hasSuggestedLoad = exerciseHasSuggestedLoad(validationExercise);
+  const pendingPR = hasSuggestedLoad ? calculateNewWeightPR({ max: pr }, kg) : null;
   const isPR = !!pendingPR;
+  const canLogSet = canLogWorkoutSet(validationExercise, kg, reps);
 
   React.useEffect(()=>{
     if(ex) {
@@ -156,7 +166,7 @@ export function WorkoutExercisePanel(props) {
   const videoUrlResolved = resolveVideoUrl(info, ex, videoOverrides);
 
   const handleLogSet = () => {
-    if(!kg || !reps) return;
+    if(!canLogWorkoutSet(validationExercise, kg, reps)) return;
     // Haptic feedback — vibración corta al registrar set
     try { if(navigator.vibrate) navigator.vibrate([40]); } catch(e){}
     // Micro-feedback: flash + check animation
@@ -165,14 +175,14 @@ export function WorkoutExercisePanel(props) {
     setTimeout(()=>setSetFlash(false), 600);
     setTimeout(()=>setShowCheckAnim(false), 800);
     // Detectar PR
-    const newPR = calculateNewWeightPR({ max: pr }, kg);
+    const newPR = hasSuggestedLoad ? calculateNewWeightPR({ max: pr }, kg) : null;
     if(newPR) {
       // Haptic doble para PR
       try { if(navigator.vibrate) navigator.vibrate([60,40,120]); } catch(e){}
       setPrCelebration({ejercicio: displayName, kg: newPR.kg});
       setTimeout(()=>setPrCelebration(null), 2500);
     }
-    logSet(ex.id, parseFloat(kg), parseInt(reps), note, rpe);
+    logSet(ex.id, normalizeWorkoutKg(kg), resolveWorkoutRepsInput(reps, validationExercise), note, rpe);
     if(pause>0) startTimer(pause, pat.color);
     setNote("");
     setRpe(null);
@@ -210,9 +220,9 @@ export function WorkoutExercisePanel(props) {
             ariaLabelDisabled={es?"Video no disponible":"No video available"}
           />
         </div>
-        {(pr>0||ultimoSet)&&(
+        {((hasSuggestedLoad&&pr>0)||ultimoSet)&&(
           <div style={{display:"flex",gap:8,marginTop:8}}>
-            {pr>0&&<span style={{background:"#f59e0b15",border:"1px solid #f59e0b33",borderRadius:6,
+            {hasSuggestedLoad&&pr>0&&<span style={{background:"#f59e0b15",border:"1px solid #f59e0b33",borderRadius:6,
               padding:"4px 8px",fontSize:13,fontWeight:700,color:"#60A5FA"}}>
               🏆 PR {pr}kg
             </span>}
@@ -267,7 +277,7 @@ export function WorkoutExercisePanel(props) {
           }}
           onTouchEnd={()=>{
             setSwiping(false);
-            if(swipeDelta < -80 && kg && reps) {
+            if(swipeDelta < -80 && canLogSet) {
               // Haptic fuerte al completar por swipe
               try { if(navigator.vibrate) navigator.vibrate([30,30,60]); } catch(e){}
               handleLogSet();
@@ -407,11 +417,11 @@ export function WorkoutExercisePanel(props) {
 
             {/* BOTÓN REGISTRAR */}
             <button className={"hov"+(showCheckAnim?" check-pulse":"")} onClick={handleLogSet}
-              disabled={!kg||!reps}
+              disabled={!canLogSet}
               style={{width:"100%",padding:"14px",
-                background:(!kg||!reps)?"#1a2535":showCheckAnim?"#22C55E":"#2563EB",
-                color:(!kg||!reps)?"#475569":"#fff",border:"none",borderRadius:10,
-                fontSize:16,fontWeight:800,cursor:(!kg||!reps)?"default":"pointer",
+                background:(!canLogSet)?"#1a2535":showCheckAnim?"#22C55E":"#2563EB",
+                color:(!canLogSet)?"#475569":"#fff",border:"none",borderRadius:10,
+                fontSize:16,fontWeight:800,cursor:(!canLogSet)?"default":"pointer",
                 fontFamily:"inherit",letterSpacing:0.5,marginBottom:8,
                 transition:"background .15s ease",
                 display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
