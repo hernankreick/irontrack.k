@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import { WorkoutExercisePanel } from './WorkoutExercisePanel.jsx';
 import { resolveExerciseTitle } from '../lib/exerciseResolve.js';
+import RestTimer from './workout/RestTimer.jsx';
 import {
   buildCompletedDayKey,
   buildSessionPayload,
@@ -235,67 +236,18 @@ export function WorkoutScreen(props) {
         </div>
       </div>
 
-      {/* ── Timer de descanso — circular ── */}
-      {timer && (
-        <div style={{
-          position:"absolute", inset:0, zIndex:90,
-          background:"rgba(10,18,40,.96)",
-          display:"flex", flexDirection:"column",
-          alignItems:"center", justifyContent:"center", gap:16,
-        }}>
-          <div style={{ fontSize:11, fontWeight:700, color:textMuted, letterSpacing:1.2, textTransform:"uppercase" }}>
-            {es ? "Descanso" : "Rest"}
-          </div>
-
-          {/* SVG circular */}
-          <div style={{ position:"relative", width:180, height:180 }}>
-            <svg width="180" height="180" viewBox="0 0 180 180" style={{ transform:"rotate(-90deg)" }}>
-              <circle cx="90" cy="90" r="80" fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="10"/>
-              <circle
-                cx="90" cy="90" r="80" fill="none"
-                stroke={restRemaining > timer.total * 0.5 ? green : restRemaining > timer.total * 0.25 ? "#F59E0B" : "#EF4444"}
-                strokeWidth="10"
-                strokeLinecap="round"
-                strokeDasharray={`${2 * Math.PI * 80}`}
-                strokeDashoffset={`${2 * Math.PI * 80 * (1 - (timer.total - restRemaining) / Math.max(timer.total, 1))}`}
-                style={{ transition:"stroke-dashoffset .1s linear, stroke .5s ease" }}
-              />
-            </svg>
-            <div style={{
-              position:"absolute", inset:0,
-              display:"flex", flexDirection:"column",
-              alignItems:"center", justifyContent:"center",
-            }}>
-              <div style={{ fontSize:44, fontWeight:900, color:textMain, lineHeight:1 }}>
-                {Math.floor(restRemaining/60)}:{String(restRemaining%60).padStart(2,"0")}
-              </div>
-              <div style={{ fontSize:11, fontWeight:700, color:textMuted, letterSpacing:1, textTransform:"uppercase", marginTop:4 }}>
-                {es ? "restante" : "remaining"}
-              </div>
-            </div>
-          </div>
-
-          {nextEx && (
-            <div style={{ fontSize:14, color:textMuted, textAlign:"center" }}>
-              {es ? "Próximo:" : "Next up:"}{" "}
-              <strong style={{ color:textMain }}>{nextDisplayName}</strong>
-            </div>
-          )}
-
-          <button
-            className="hov"
-            onClick={() => startTimer(0)}
-            style={{
-              padding:"10px 28px", borderRadius:12,
-              background:"transparent", border:`1px solid ${border2}`,
-              color:textMain, fontSize:13, fontWeight:700,
-              fontFamily:"inherit", cursor:"pointer",
-            }}
-          >
-            {es ? "Saltar descanso →" : "Skip rest →"}
-          </button>
-        </div>
-      )}
+      <RestTimer
+        active={!!timer}
+        remainingSeconds={restRemaining}
+        totalSeconds={timer?.total || 0}
+        nextLabel={nextEx ? nextDisplayName : ""}
+        es={es}
+        green={green}
+        border2={border2}
+        textMain={textMain}
+        textMuted={textMuted}
+        onSkip={() => startTimer(0)}
+      />
 
       {/* ── Dots — progreso por ejercicio ── */}
       <div style={{ display:"flex", gap:6, padding:"10px 16px 4px", flexShrink:0, overflowX:"auto" }}>
