@@ -112,6 +112,12 @@ import {
 } from './lib/routineStore.js';
 import { getStudentWeeklyProgress } from './lib/studentWeeklyProgress.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
+import {
+  buildExerciseSetRecord,
+  calculateNewWeightPR,
+  prepareExerciseHistoryModalData,
+  updateExerciseProgressRecord,
+} from './lib/exerciseHistory.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { Calendar as CalNavIcon, CalendarDays, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
@@ -1756,10 +1762,9 @@ function GymApp() {
 
   const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe) => {
     const d = new Date().toLocaleDateString("es-AR");
+    const newSet = buildExerciseSetRecord(kg, reps, d, currentWeek, note, rpe);
     setProgress(prev=>{
-      const ex = {...(prev[exId]||{sets:[],max:0})};
-      ex.sets = [{kg:parseFloat(kg)||0,reps:parseInt(reps)||0,date:d,week:currentWeek,note,rpe:rpe||null},...(ex.sets||[])].slice(0,50);
-      ex.max = Math.max(ex.max||0,parseFloat(kg)||0);
+      const ex = updateExerciseProgressRecord(prev[exId], newSet);
       return {...prev,[exId]:ex};
     });
     // Guardar en Supabase — si offline, guardar en cola local
@@ -1783,19 +1788,17 @@ function GymApp() {
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
     const exPrevData = progress[exId]||{sets:[],max:0};
-    const newKgVal = parseFloat(kg)||0;
-    if(newKgVal > (exPrevData.max||0) && (exPrevData.max||0) > 0) {
+    const newPR = calculateNewWeightPR(exPrevData, kg);
+    if(newPR) {
       const inf = [...EX,...(customEx||[])].find(e=>e.id===exId);
       const exR = routines.flatMap(r=>r.days||[]).flatMap(d=>[...(d.warmup||[]),...(d.exercises||[])]).find(e=>e.id===exId);
       const nombreEj = resolveExerciseTitle(inf || null, exR || null, es);
-      const prevMax = exPrevData.max||0;
-      const diff = Math.round((newKgVal - prevMax)*10)/10;
-      setPrCelebration({ejercicio: nombreEj, kg: newKgVal, prevKg: prevMax, diff: diff, exId: exId});
+      setPrCelebration({ejercicio: nombreEj, kg: newPR.kg, prevKg: newPR.prevKg, diff: newPR.diff, exId: exId});
       // Guardar PR en lista de la sesión
       setSessionPRList(function(prev){
-        var existe = prev.find(function(p){return p.exId===exId && p.kg===newKgVal});
+        var existe = prev.find(function(p){return p.exId===exId && p.kg===newPR.kg});
         if(existe) return prev;
-        return [...prev, {exId:exId, ejercicio:nombreEj, kg:newKgVal, prevKg:prevMax, diff:diff}];
+        return [...prev, {exId:exId, ejercicio:nombreEj, kg:newPR.kg, prevKg:newPR.prevKg, diff:newPR.diff}];
       });
       setTimeout(()=>setPrCelebration(null), 3000);
     }
@@ -1855,6 +1858,15 @@ function GymApp() {
     if(!q) return true;
     return e.name.toLowerCase().includes(q)||e.nameEn.toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
   });
+  const detailExHistoryData = React.useMemo(function () {
+    return prepareExerciseHistoryModalData({
+      exercise: detailEx,
+      progress: progress,
+      patterns: PATS,
+      images: IMGS,
+      videos: VIDEOS,
+    });
+  }, [detailEx, progress]);
 
   /** Datos normalizados para GlobalSearch (coach). */
   const coachGlobalSearchData = React.useMemo(
@@ -5107,11 +5119,11 @@ function GymApp() {
       )}
       {detailEx&&(
         <ExerciseHistoryModal
-          exercise={detailEx}
-          history={progress[detailEx.id]?.sets||[]}
-          pattern={PATS[detailEx.pattern]}
-          imageSrc={IMGS[detailEx.id]}
-          videoSrc={VIDEOS[detailEx.id]}
+          exercise={detailExHistoryData.exercise}
+          history={detailExHistoryData.history}
+          pattern={detailExHistoryData.pattern}
+          imageSrc={detailExHistoryData.imageSrc}
+          videoSrc={detailExHistoryData.videoSrc}
           canAddToRoutine={!!(expandedR&&selDay!==null)}
           darkMode={darkMode}
           es={es}
