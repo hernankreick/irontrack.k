@@ -113,11 +113,16 @@ import {
 import { getStudentWeeklyProgress } from './lib/studentWeeklyProgress.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import {
-  buildExerciseSetRecord,
-  calculateNewWeightPR,
   prepareExerciseHistoryModalData,
-  updateExerciseProgressRecord,
 } from './lib/exerciseHistory.js';
+import {
+  buildExerciseSetRecord,
+  buildPendingProgressItem,
+  buildProgressPayload,
+  calculateNewWeightPR,
+  updateExerciseKgInRoutines,
+  updateExerciseProgressRecord,
+} from './lib/workoutSession.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { Calendar as CalNavIcon, CalendarDays, Dumbbell, Download as DownloadNavIcon, TrendingUp as TrendNavIcon } from 'lucide-react';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
@@ -1435,12 +1440,7 @@ function GymApp() {
       if(!alumnoIdSync) return;
       pending.forEach(item => {
         try {
-          sb.addProgreso({
-            alumno_id: alumnoIdSync,
-            ejercicio_id: item.exId,
-            kg: item.kg, reps: item.reps,
-            nota: item.note||'', fecha: item.date
-          });
+          sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date));
         } catch(e) {}
       });
       localStorage.removeItem('it_pending_sync');
@@ -1771,19 +1771,12 @@ function GymApp() {
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     if(alumnoIdSync) {
       if(!isOnline) {
-        const item = {exId, kg:parseFloat(kg)||0, reps:parseInt(reps)||0, note:note||'', date:d};
+        const item = buildPendingProgressItem(exId, kg, reps, note, d);
         const updated = [...pendingSync, item];
         setPendingSync(updated);
         try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
       } else {
-        sb.addProgreso({
-          alumno_id: alumnoIdSync,
-          ejercicio_id: exId,
-          kg: parseFloat(kg)||0,
-          reps: parseInt(reps)||0,
-          nota: note||"",
-          fecha: d
-        }).catch(function(e){console.error("[PROGRESO] ERR",e)});
+        sb.addProgreso(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d)).catch(function(e){console.error("[PROGRESO] ERR",e)});
       }
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
@@ -1809,10 +1802,7 @@ function GymApp() {
     }
     // Actualizar kg en la rutina para autocompletar sets restantes
     if(parseFloat(kg)>0) {
-      setRoutines(prev=>prev.map(r=>({...r,days:r.days.map(d=>({...d,
-        exercises:d.exercises.map(ex=>ex.id===exId?{...ex,kg:String(kg)}:ex),
-        warmup:(d.warmup||[]).map(ex=>ex.id===exId?{...ex,kg:String(kg)}:ex)
-      }))})));
+      setRoutines(prev=>updateExerciseKgInRoutines(prev, exId, kg));
     }
   };
 

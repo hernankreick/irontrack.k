@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import { WorkoutExercisePanel } from './WorkoutExercisePanel.jsx';
-import { normalizeFecha } from '../lib/normalizeFecha.js';
 import { resolveExerciseTitle } from '../lib/exerciseResolve.js';
+import {
+  buildCompletedDayKey,
+  buildSessionPayload,
+  buildWorkoutSummary,
+  calculateDayProgress,
+  countCompletedDaysForWeek,
+  getWorkoutExerciseStatus,
+  mergeCompletedDay,
+  removeUndefinedPayloadFields,
+  sessionAlreadyExists,
+} from '../lib/workoutSession.js';
 
 export function WorkoutScreen(props) {
   const {
@@ -40,15 +50,22 @@ export function WorkoutScreen(props) {
        }[info?.pattern] || { icon:"E", color:textMuted })
     : { icon:"E", color:textMuted };
 
-  const setsHoy      = ex ? (progress[ex.id]?.sets||[]).filter(s => s.date===hoy && (s.week===undefined||s.week===currentWeek)) : [];
-  const totalSets    = parseInt(ex?.sets) || 3;
-  const setsRestantes = Math.max(0, totalSets - setsHoy.length);
-  const setActualNum  = setsHoy.length + 1;
-  const ultimoSet     = setsHoy[0];
-  const pr            = ex ? (progress[ex.id]?.max || 0) : 0;
+  const exerciseStatus = getWorkoutExerciseStatus({
+    exercise: ex,
+    progress: progress,
+    date: hoy,
+    currentWeek: currentWeek,
+  });
+  const setsHoy = exerciseStatus.setsToday;
+  const totalSets = exerciseStatus.totalSets;
+  const setsRestantes = exerciseStatus.remainingSets;
+  const setActualNum = exerciseStatus.currentSetNumber;
+  const ultimoSet = exerciseStatus.lastSet;
+  const pr = exerciseStatus.pr;
 
-  const totalExDone = exercises.filter(e => (progress[e.id]?.sets||[]).some(s => s.date===hoy)).length;
-  const pct = exercises.length > 0 ? (totalExDone / exercises.length) * 100 : 0;
+  const dayProgress = calculateDayProgress(exercises, progress, hoy, currentWeek, { checkWeek: false });
+  const totalExDone = dayProgress.done;
+  const pct = dayProgress.pct;
 
   const nextEx   = exercises[activeExIdx + 1];
   const nextInfo = nextEx ? allEx.find(e => e.id === nextEx.id) : null;
@@ -94,49 +111,42 @@ export function WorkoutScreen(props) {
   // ── Finalizar (sin cambios de lógica) ─────────────────────────────
   const finalizarSesion = async () => {
     const r = activeR;
-    const dayKey = session.rId + "-" + session.dIdx + "-w" + currentWeek;
-    const newCompleted = completedDays.includes(dayKey) ? completedDays : [...completedDays, dayKey];
+    const dayKey = buildCompletedDayKey(session, currentWeek);
+    const newCompleted = mergeCompletedDay(completedDays, dayKey);
     const totalDays = r ? r.days.length : 1;
-    const daysThisWeek = newCompleted.filter(k => k.startsWith(session.rId+"-") && k.endsWith("-w"+currentWeek)).length;
+    const daysThisWeek = countCompletedDaysForWeek(newCompleted, session.rId, currentWeek);
     setCompletedDays(newCompleted);
     const semanaParaGuardar = currentWeek + 1;
-    const durMin = Math.round((Date.now() - (session.startTime || Date.now())) / 60000) || 1;
-    const exsCompleted = [...(activeDay?.warmup||[]), ...(exercises||[])];
     const hoyFin = new Date().toLocaleDateString("es-AR");
-    const volTotal = exsCompleted.reduce((acc, ex2) => {
-      const s = (progress[ex2.id]?.sets||[]).filter(s => s.date===hoyFin);
-      return acc + s.reduce((a, s2) => a + (s2.kg||0) * (s2.reps||0), 0);
-    }, 0);
-    const prsNuevos = exsCompleted.filter(ex2 => {
-      const pg = progress[ex2.id];
-      if (!pg) return false;
-      const sHoy = (pg.sets||[]).filter(s => s.date===hoyFin);
-      if (!sHoy.length) return false;
-      const maxHoy = Math.max(...sHoy.map(s2 => s2.kg||0));
-      if (maxHoy <= 0) return false;
-      return maxHoy > (preSessionPRs[ex2.id] || 0);
-    }).length;
-    setResumenSesion({
-      durMin, ejercicios: exsCompleted.length,
-      totalSets: exsCompleted.reduce((a, e) => a + (parseInt(e.sets)||3), 0),
-      volTotal: Math.round(volTotal), prsNuevos,
-      diaLabel: activeDay.label || ("Dia " + (session.dIdx+1)),
-      rutinaName: r?.name || "Entrenamiento", fecha: hoyFin,
-    });
+    const horaFin = new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+    setResumenSesion(buildWorkoutSummary({
+      session: session,
+      activeDay: activeDay,
+      activeRoutine: r,
+      progress: progress,
+      preSessionPRs: preSessionPRs,
+      date: hoyFin,
+      now: Date.now(),
+    }));
     setSession(null);
     if (readOnly && sharedParam) {
       try {
         const rutData = JSON.parse(atob(sharedParam));
         if (rutData.alumnoId) {
           const existentes = await sb.getSesiones(rutData.alumnoId);
-          const yaExiste = (existentes||[]).some(s =>
-            normalizeFecha(s.fecha)===normalizeFecha(hoyFin) && s.dia_idx===session.dIdx && s.semana===semanaParaGuardar
-          );
+          const yaExiste = sessionAlreadyExists(existentes, hoyFin, session.dIdx, semanaParaGuardar);
           if (!yaExiste) {
-            sb.addSesion({ alumno_id:rutData.alumnoId, rutina_nombre:r?.name||"",
-              dia_label:activeDay.label||("Dia "+(session.dIdx+1)), dia_idx:session.dIdx,
-              semana:semanaParaGuardar, ejercicios:exercises.map(e=>e.id).join(","),
-              fecha:hoyFin, hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}) });
+            sb.addSesion(removeUndefinedPayloadFields(buildSessionPayload({
+              alumnoId: rutData.alumnoId,
+              session: session,
+              activeDay: activeDay,
+              activeRoutine: r,
+              exercises: exercises,
+              weekToSave: semanaParaGuardar,
+              date: hoyFin,
+              time: horaFin,
+              includeRoutineId: false,
+            })));
           }
         }
       } catch(e) {}
@@ -144,16 +154,19 @@ export function WorkoutScreen(props) {
     if (!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
       try {
         const existentes = await sb.getSesiones(sessionData.alumnoId);
-        const yaExiste = (existentes||[]).some(s =>
-          normalizeFecha(s.fecha)===normalizeFecha(hoyFin) && s.dia_idx===session.dIdx && s.semana===semanaParaGuardar
-        );
+        const yaExiste = sessionAlreadyExists(existentes, hoyFin, session.dIdx, semanaParaGuardar);
         if (!yaExiste) {
-          const resSesion = await sb.addSesion({
-            alumno_id:sessionData.alumnoId, rutina_id:r?.id||null, rutina_nombre:r?.name||"",
-            dia_label:activeDay.label||("Dia "+(session.dIdx+1)), dia_idx:session.dIdx,
-            semana:semanaParaGuardar, ejercicios:exercises.map(e=>e.id).join(","),
-            fecha:hoyFin, hora:new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}),
-          });
+          await sb.addSesion(removeUndefinedPayloadFields(buildSessionPayload({
+            alumnoId: sessionData.alumnoId,
+            session: session,
+            activeDay: activeDay,
+            activeRoutine: r,
+            exercises: exercises,
+            weekToSave: semanaParaGuardar,
+            date: hoyFin,
+            time: horaFin,
+            includeRoutineId: true,
+          })));
           if (typeof onSesionGuardada === "function") onSesionGuardada();
         }
       } catch(e) { console.error("[addSesion]", e); }
@@ -287,7 +300,13 @@ export function WorkoutScreen(props) {
       {/* ── Dots — progreso por ejercicio ── */}
       <div style={{ display:"flex", gap:6, padding:"10px 16px 4px", flexShrink:0, overflowX:"auto" }}>
         {exercises.map((e, i) => {
-          const done   = (progress[e.id]?.sets||[]).filter(s => s.date===hoy).length >= (parseInt(e.sets)||3);
+          const done = getWorkoutExerciseStatus({
+            exercise: e,
+            progress: progress,
+            date: hoy,
+            currentWeek: currentWeek,
+            checkWeek: false,
+          }).isDone;
           const active = i === activeExIdx;
           return (
             <button

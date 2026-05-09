@@ -3,6 +3,7 @@ import { Ic } from './Ic.jsx';
 import { ExerciseVideoPlayButton } from './ExerciseVideoPlayButton.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
+import { calculateNewWeightPR, calculateSetsVolume } from '../lib/workoutSession.js';
 
 /**
  * Píldoras de reps: 3 estados (fuera de rango / rango sugerido / seleccionada).
@@ -98,8 +99,8 @@ export function WorkoutExercisePanel(props) {
   const [pause, setPause] = React.useState(90);
   const [rpe, setRpe] = React.useState(null);
 
-  const kgNum = parseFloat(kg)||0;
-  const isPR = kgNum > 0 && kgNum > pr && pr > 0;
+  const pendingPR = calculateNewWeightPR({ max: pr }, kg);
+  const isPR = !!pendingPR;
 
   React.useEffect(()=>{
     if(ex) {
@@ -164,11 +165,11 @@ export function WorkoutExercisePanel(props) {
     setTimeout(()=>setSetFlash(false), 600);
     setTimeout(()=>setShowCheckAnim(false), 800);
     // Detectar PR
-    const newKgVal = parseFloat(kg)||0;
-    if(newKgVal > pr && pr > 0) {
+    const newPR = calculateNewWeightPR({ max: pr }, kg);
+    if(newPR) {
       // Haptic doble para PR
       try { if(navigator.vibrate) navigator.vibrate([60,40,120]); } catch(e){}
-      setPrCelebration({ejercicio: displayName, kg: newKgVal});
+      setPrCelebration({ejercicio: displayName, kg: newPR.kg});
       setTimeout(()=>setPrCelebration(null), 2500);
     }
     logSet(ex.id, parseFloat(kg), parseInt(reps), note, rpe);
@@ -475,7 +476,7 @@ export function WorkoutExercisePanel(props) {
             {es?"Ejercicio completado":"Exercise complete"}
           </div>
           <div style={{fontSize:13,color:textMuted,marginTop:4}}>
-            {setsHoy.length} sets · {setsHoy.reduce((a,s)=>a+(s.kg||0)*(s.reps||0),0).toLocaleString()} kg
+            {setsHoy.length} sets · {calculateSetsVolume(setsHoy).toLocaleString()} kg
           </div>
           {activeExIdx<exercises.length-1&&(
             <button className="hov" onClick={()=>setActiveExIdx(activeExIdx+1)}
