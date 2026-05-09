@@ -71,7 +71,11 @@ function mapAlertsToNotifications(alertRows) {
   if (!Array.isArray(alertRows)) return [];
   return alertRows.map(function (a) {
     var important = a.severity <= 1;
-    var cat = a.severity === 2 ? "seguimiento" : "adherencia";
+    var cat = a.category || (a.severity === 2 ? "seguimiento" : "adherencia");
+    var action = a.alumnoId != null ? { kind: "alumno", alumnoId: String(a.alumnoId) } : { kind: "tab", tab: "alumnos" };
+    if (a.primaryAction === "chat" && a.alumnoId != null) {
+      action = { kind: "alumno", alumnoId: String(a.alumnoId) };
+    }
     return {
       id: "real-" + a.key,
       category: cat,
@@ -80,7 +84,8 @@ function mapAlertsToNotifications(alertRows) {
       alumnoId: a.alumnoId != null ? String(a.alumnoId) : null,
       preview: a.desc,
       atMs: a.atMs != null ? a.atMs : null,
-      action: a.alumnoId != null ? { kind: "alumno", alumnoId: String(a.alumnoId) } : { kind: "tab", tab: "alumnos" },
+      action: action,
+      hintChat: a.primaryAction === "chat",
     };
   });
 }

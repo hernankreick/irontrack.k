@@ -400,9 +400,9 @@ function weeklyTargetFromRutinas(alumnos, rutinasSBEntrenador) {
 
 /**
  * Alertas derivadas solo de datos reales (sin inventar alumnos).
- * Prioridad: sin rutina > inactivo > poca actividad en la semana (con rutina).
+ * Prioridad: sin rutina > rutina terminada > a 1 sesiÃ³n > inactivo > poca actividad en la semana (con rutina).
  */
-function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang, P) {
+function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, P) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
   var ses = sesionesGlobales || [];
   var out = [];
@@ -426,6 +426,63 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang
         severity: 0,
       });
       return;
+    }
+    var rutina = getStudentRoutine(rutinasSBEntrenador, a);
+    if (rutina) {
+      var weekly = getStudentWeeklyProgress({
+        alumno: a,
+        rutina: rutina,
+        sesiones: ses,
+        progreso: progresoGlobal,
+      });
+      var totalDays = weekly.totalDays || 0;
+      var completedDays = weekly.completedDays || 0;
+      var rutinaId = String(rutina.id || weekly.rutinaId || "");
+      if (rutinaId && totalDays > 0 && completedDays >= totalDays) {
+        out.push({
+          key: "rutina-terminada-" + a.id + "-" + rutinaId,
+          alumnoId: a.id,
+          rutinaId: rutinaId,
+          initials: initials,
+          name: name,
+          badge: M(lang, "Rutina terminada", "Routine completed", "Rotina concluÃ­da"),
+          bc: pal.green,
+          bd: pal.greenDim,
+          desc: name + M(lang, " terminÃ³ su rutina.", " completed their routine.", " concluiu sua rotina."),
+          severity: 1,
+          category: "logro",
+          primaryLabel: M(lang, "FELICITAR", "CONGRATULATE", "PARABENIZAR"),
+          primaryAction: "chat",
+          secondaryLabel: M(lang, "ASIGNAR NUEVA RUTINA", "ASSIGN NEW ROUTINE", "ATRIBUIR NOVA ROTINA"),
+          secondaryAction: "review",
+        });
+        return;
+      }
+      if (rutinaId && totalDays > 0 && completedDays === totalDays - 1) {
+        out.push({
+          key: "rutina-falta-1-" + a.id + "-" + rutinaId,
+          alumnoId: a.id,
+          rutinaId: rutinaId,
+          initials: initials,
+          name: name,
+          badge: M(lang, "Le queda 1 sesiÃ³n", "1 session left", "Falta 1 sessÃ£o"),
+          bc: pal.blue,
+          bd: pal.blueDim,
+          desc: M(
+            lang,
+            "A " + name + " le queda 1 sesiÃ³n para completar su rutina.",
+            name + " has 1 session left to complete their routine.",
+            "Falta 1 sessÃ£o para " + name + " concluir a rotina."
+          ),
+          severity: 2,
+          category: "seguimiento",
+          primaryLabel: M(lang, "REVISAR", "REVIEW", "REVISAR"),
+          primaryAction: "review",
+          secondaryLabel: M(lang, "ASIGNAR NUEVA RUTINA", "ASSIGN NEW ROUTINE", "ATRIBUIR NOVA ROTINA"),
+          secondaryAction: "review",
+        });
+        return;
+      }
     }
     if (cat === "inactivo") {
       out.push({
@@ -572,9 +629,9 @@ export default function CoachDashboard({
 
   var coachAlertsReal = React.useMemo(
     function () {
-      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, lang, C);
+      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C);
     },
-    [alumnos, catFn, sesionesGlobales, progresoGlobal, lang, C]
+    [alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C]
   );
 
   var coachActiveRows = React.useMemo(
@@ -1494,6 +1551,20 @@ export default function CoachDashboard({
               >
                 {coachAlertsReal.map(function (a) {
                   var alumId = a.alumnoId;
+                  var primaryLabel = a.primaryLabel || M(lang, "REVISAR", "REVIEW", "REVISAR");
+                  var secondaryLabel = a.secondaryLabel || M(lang, "VER PERFIL", "VIEW PROFILE", "VER PERFIL");
+                  function runAlertAction(kind) {
+                    if (!alumId) return;
+                    if (kind === "chat" && typeof onAbrirChatAlumno === "function") {
+                      onAbrirChatAlumno(alumId);
+                      return;
+                    }
+                    if (kind === "profile" && typeof onVerPerfil === "function") {
+                      onVerPerfil(alumId);
+                      return;
+                    }
+                    if (typeof onRevisar === "function") onRevisar(alumId);
+                  }
                   return (
                     <div
                       key={a.key}
@@ -1557,11 +1628,10 @@ export default function CoachDashboard({
                           }}
                           disabled={!alumId}
                           onClick={function () {
-                            if (!alumId || typeof onRevisar !== "function") return;
-                            onRevisar(alumId);
+                            runAlertAction(a.primaryAction || "review");
                           }}
                         >
-                          {M(lang, "REVISAR", "REVIEW", "REVISAR")}
+                          {primaryLabel}
                         </button>
                         <button
                           type="button"
@@ -1579,11 +1649,10 @@ export default function CoachDashboard({
                           }}
                           disabled={!alumId}
                           onClick={function () {
-                            if (!alumId || typeof onVerPerfil !== "function") return;
-                            onVerPerfil(alumId);
+                            runAlertAction(a.secondaryAction || "profile");
                           }}
                         >
-                          {M(lang, "VER PERFIL", "VIEW PROFILE", "VER PERFIL")}
+                          {secondaryLabel}
                         </button>
                       </div>
                     </div>
