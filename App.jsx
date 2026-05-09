@@ -77,9 +77,9 @@ import CompletedTodayBanner from './components/student-plan/CompletedTodayBanner
 import StudentNoRoutinesEmptyState from './components/student-plan/StudentNoRoutinesEmptyState.jsx';
 import RoutinePdfDownloadButton from './components/student-plan/RoutinePdfDownloadButton.jsx';
 import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyProgressCard.jsx';
-import SessionSummaryStatsPanel from './components/student-plan/SessionSummaryStatsPanel.jsx';
 import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
+import WorkoutSessionSummary from './components/workout/WorkoutSessionSummary.jsx';
 import EditExModal from './components/routines/EditExModal.jsx';
 import BaseModal from './components/modals/BaseModal.jsx';
 import {
@@ -1829,6 +1829,87 @@ function GymApp() {
   const lbl={fontSize:13,fontWeight:600,letterSpacing:0.3,color:textMuted,marginBottom:4,display:"block"};
   const btn=(col,txt)=>({background:col||(darkMode?"#2D4057":"#E2E8F0"),color:txt||(darkMode?"#FFFFFF":"#0F1923"),border:"none",borderRadius:8,padding:"8px 16px",fontFamily:"Barlow Condensed,sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",letterSpacing:1});
   const tag=(col)=>({background:"#162234",color:"#8B9AB2",border:"1px solid #2D4057",borderRadius:6,padding:"4px 8px",fontSize:13,fontWeight:700});
+
+  const shareSessionSummaryImage = async () => {
+    try {
+      // Generar imagen con Canvas
+      const canvas = document.createElement("canvas");
+      canvas.width = 1080; canvas.height = 1080;
+      const ctx = canvas.getContext("2d");
+      // Fondo degradado oscuro
+      const grad = ctx.createLinearGradient(0,0,0,1080);
+      grad.addColorStop(0,"#0F1923");
+      grad.addColorStop(1,"#1E2D40");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,1080,1080);
+      // LÃ­nea roja superior
+      ctx.fillStyle = "#2563EB";
+      ctx.fillRect(0,0,1080,8);
+      // Logo
+      ctx.fillStyle = "#2563EB";
+      ctx.font = "900 72px 'Arial Black', Arial";
+      ctx.fillText("IRON TRACK", 80, 120);
+      // Nombre rutina
+      ctx.fillStyle = "#FFFFFF";
+      ctx.font = "800 52px Arial";
+      const rName = (resumenSesion.rutinaName||"").toUpperCase();
+      ctx.fillText(rName.slice(0,22), 80, 220);
+      // LÃ­nea separadora
+      ctx.fillStyle = "#2D4057";
+      ctx.fillRect(80, 260, 920, 2);
+      // Stats grandes
+      const stats = [
+        {val: resumenSesion.durMin+"'", label: msg("DURACIÃ“N", "DURATION")},
+        {val: resumenSesion.ejercicios, label: msg("EJERCICIOS", "EXERCISES")},
+        {val: resumenSesion.totalSets, label: "SETS"},
+        {val: (resumenSesion.volTotal/1000).toFixed(1)+"t", label: msg("TONELAJE", "VOLUME")},
+      ];
+      stats.forEach((s,i)=>{
+        const x = 80 + i*240;
+        ctx.fillStyle = "#2563EB";
+        ctx.font = "900 80px 'Arial Black', Arial";
+        ctx.fillText(String(s.val), x, 420);
+        ctx.fillStyle = "#8B9AB2";
+        ctx.font = "700 24px Arial";
+        ctx.fillText(s.label, x, 460);
+      });
+      // PRs
+      if(resumenSesion.prsNuevos > 0){
+        ctx.fillStyle = "#60A5FA";
+        ctx.font = "900 48px 'Arial Black', Arial";
+        ctx.fillText(""+resumenSesion.prsNuevos+" PR "+(msg("NUEVO", "NEW"))+(resumenSesion.prsNuevos>1?"S":"")+"!", 80, 560);
+      }
+      // Semana
+      ctx.fillStyle = "#8B9AB2";
+      ctx.font = "700 32px Arial";
+      ctx.fillText((msg("SEMANA", "WEEK"))+" "+resumenSesion.semana+" / 4", 80, 650);
+      // Hashtag
+      ctx.fillStyle = "#2D4057";
+      ctx.font = "700 28px Arial";
+      ctx.fillText("#IronTrack  #Fitness  #Entrenamiento", 80, 980);
+      // LÃ­nea roja inferior
+      ctx.fillStyle = "#2563EB";
+      ctx.fillRect(0,1072,1080,8);
+      // Convertir a blob y compartir
+      canvas.toBlob(async(blob)=>{
+        if(!blob) return;
+        const file = new File([blob],"irontrack-sesion.png",{type:"image/png"});
+        const txt = "ðŸ’ª "+resumenSesion.rutinaName+" | "+resumenSesion.durMin+"min | "+resumenSesion.ejercicios+" ejercicios | "+resumenSesion.volTotal.toLocaleString()+"kg"+( resumenSesion.prsNuevos>0?" | ðŸ† "+resumenSesion.prsNuevos+" PR!":"")+" #IronTrack";
+        if(navigator.canShare && navigator.canShare({files:[file]})){
+          await navigator.share({files:[file], title:"IRON TRACK", text:txt});
+        } else if(navigator.share){
+          await navigator.share({title:"IRON TRACK", text:txt});
+        } else {
+          // Fallback: descargar imagen
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href=url; a.download="irontrack-sesion.png"; a.click();
+          URL.revokeObjectURL(url);
+          toast2(msg("Imagen guardada!", "Image saved!"));
+        }
+      },"image/png");
+    } catch(e){ console.error(e); toast2(msg("Error al compartir", "Share error")); }
+  };
 
   const allEx = React.useMemo(function () {
     var BIB_PAT = { empuje: 1, traccion: 1, rodilla: 1, bisagra: 1, core: 1, movilidad: 1, cardio: 1, oly: 1 };
@@ -4991,122 +5072,18 @@ function GymApp() {
         document.body
       )}
       <PRCelebrationOverlay prCelebration={prCelebration} setPrCelebration={setPrCelebration} msg={msg} />
-      {resumenSesion && (
-        <BaseModal
-          open={!!resumenSesion}
-          onClose={()=>setResumenSesion(null)}
-          maxWidth={420}
-          closeOnOutside={false}
-          zIndex={10000}
-          overlayStyle={{background:"rgba(0,0,0,.92)",alignItems:"flex-start",paddingTop:"calc(env(safe-area-inset-top, 0px) + 12px)",paddingRight:16,paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 24px)",paddingLeft:16,boxSizing:"border-box",overflowY:"auto",WebkitOverflowScrolling:"touch"}}
-          contentStyle={{background:bgCard,borderRadius:20,padding:"28px 20px",paddingBottom:"calc(28px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:420,maxHeight:"calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 36px)",overflowY:"auto",WebkitOverflowScrolling:"touch",border:"1px solid "+border,textAlign:"center",animation:"fadeIn 0.25s ease"}}
-        >
-            <SessionSummaryStatsPanel
-              resumenSesion={resumenSesion}
-              sessionPRList={sessionPRList}
-              msg={msg}
-              darkMode={darkMode}
-              border={border}
-              textMuted={textMuted}
-              textMain={textMain}
-            />
-
-                        <button className="hov" style={{width:"100%",padding:"12px",background:darkMode?"#162234":"#E2E8F0",border:"none",borderRadius:12,color:textMuted,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}
-                onClick={()=>setResumenSesion(null)}>
-                {msg("Cerrar", "Close")}
-              </button>
-              <div style={{marginBottom:4}}>
-                <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8,textAlign:"center"}}>{msg("COMPARTIR ENTRENAMIENTO", "SHARE WORKOUT")}</div>
-                <button className="hov" style={{
-                  width:"100%",padding:"16px",borderRadius:12,border:"none",cursor:"pointer",
-                  fontFamily:"inherit",fontSize:15,fontWeight:900,letterSpacing:1,
-                  background:"linear-gradient(135deg,#FF3B30,#FF6B35)",color:"#fff",
-                  boxShadow:"0 4px 14px rgba(59,130,246,0.35)"
-                }} onClick={async()=>{
-                  try {
-                    // Generar imagen con Canvas
-                    const canvas = document.createElement("canvas");
-                    canvas.width = 1080; canvas.height = 1080;
-                    const ctx = canvas.getContext("2d");
-                    // Fondo degradado oscuro
-                    const grad = ctx.createLinearGradient(0,0,0,1080);
-                    grad.addColorStop(0,"#0F1923");
-                    grad.addColorStop(1,"#1E2D40");
-                    ctx.fillStyle = grad;
-                    ctx.fillRect(0,0,1080,1080);
-                    // Línea roja superior
-                    ctx.fillStyle = "#2563EB";
-                    ctx.fillRect(0,0,1080,8);
-                    // Logo
-                    ctx.fillStyle = "#2563EB";
-                    ctx.font = "900 72px 'Arial Black', Arial";
-                    ctx.fillText("IRON TRACK", 80, 120);
-                    // Nombre rutina
-                    ctx.fillStyle = "#FFFFFF";
-                    ctx.font = "800 52px Arial";
-                    const rName = (resumenSesion.rutinaName||"").toUpperCase();
-                    ctx.fillText(rName.slice(0,22), 80, 220);
-                    // Línea separadora
-                    ctx.fillStyle = "#2D4057";
-                    ctx.fillRect(80, 260, 920, 2);
-                    // Stats grandes
-                    const stats = [
-                      {val: resumenSesion.durMin+"'", label: msg("DURACIÓN", "DURATION")},
-                      {val: resumenSesion.ejercicios, label: msg("EJERCICIOS", "EXERCISES")},
-                      {val: resumenSesion.totalSets, label: "SETS"},
-                      {val: (resumenSesion.volTotal/1000).toFixed(1)+"t", label: msg("TONELAJE", "VOLUME")},
-                    ];
-                    stats.forEach((s,i)=>{
-                      const x = 80 + i*240;
-                      ctx.fillStyle = "#2563EB";
-                      ctx.font = "900 80px 'Arial Black', Arial";
-                      ctx.fillText(String(s.val), x, 420);
-                      ctx.fillStyle = "#8B9AB2";
-                      ctx.font = "700 24px Arial";
-                      ctx.fillText(s.label, x, 460);
-                    });
-                    // PRs
-                    if(resumenSesion.prsNuevos > 0){
-                      ctx.fillStyle = "#60A5FA";
-                      ctx.font = "900 48px 'Arial Black', Arial";
-                      ctx.fillText(""+resumenSesion.prsNuevos+" PR "+(msg("NUEVO", "NEW"))+(resumenSesion.prsNuevos>1?"S":"")+"!", 80, 560);
-                    }
-                    // Semana
-                    ctx.fillStyle = "#8B9AB2";
-                    ctx.font = "700 32px Arial";
-                    ctx.fillText((msg("SEMANA", "WEEK"))+" "+resumenSesion.semana+" / 4", 80, 650);
-                    // Hashtag
-                    ctx.fillStyle = "#2D4057";
-                    ctx.font = "700 28px Arial";
-                    ctx.fillText("#IronTrack  #Fitness  #Entrenamiento", 80, 980);
-                    // Línea roja inferior
-                    ctx.fillStyle = "#2563EB";
-                    ctx.fillRect(0,1072,1080,8);
-                    // Convertir a blob y compartir
-                    canvas.toBlob(async(blob)=>{
-                      if(!blob) return;
-                      const file = new File([blob],"irontrack-sesion.png",{type:"image/png"});
-                      const txt = "💪 "+resumenSesion.rutinaName+" | "+resumenSesion.durMin+"min | "+resumenSesion.ejercicios+" ejercicios | "+resumenSesion.volTotal.toLocaleString()+"kg"+( resumenSesion.prsNuevos>0?" | 🏆 "+resumenSesion.prsNuevos+" PR!":"")+" #IronTrack";
-                      if(navigator.canShare && navigator.canShare({files:[file]})){
-                        await navigator.share({files:[file], title:"IRON TRACK", text:txt});
-                      } else if(navigator.share){
-                        await navigator.share({title:"IRON TRACK", text:txt});
-                      } else {
-                        // Fallback: descargar imagen
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href=url; a.download="irontrack-sesion.png"; a.click();
-                        URL.revokeObjectURL(url);
-                        toast2(msg("Imagen guardada!", "Image saved!"));
-                      }
-                    },"image/png");
-                  } catch(e){ console.error(e); toast2(msg("Error al compartir", "Share error")); }
-                }}>
-                  <Ic name="upload" size={16}/> {msg("COMPARTIR / GUARDAR IMAGEN", "SHARE / SAVE IMAGE")}
-                </button>
-              </div>
-        </BaseModal>
-      )}
+      <WorkoutSessionSummary
+        resumenSesion={resumenSesion}
+        sessionPRList={sessionPRList}
+        msg={msg}
+        darkMode={darkMode}
+        bgCard={bgCard}
+        border={border}
+        textMuted={textMuted}
+        textMain={textMain}
+        onClose={()=>setResumenSesion(null)}
+        onShareImage={shareSessionSummaryImage}
+      />
       {detailEx&&(
         <ExerciseHistoryModal
           exercise={detailExHistoryData.exercise}
