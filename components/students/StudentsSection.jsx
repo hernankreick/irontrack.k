@@ -358,7 +358,7 @@ export default function StudentsSection(props) {
                     coachAluDropdownShadow={coachAluDropdownShadow}
                     coachAluGhostBtn={coachAluGhostBtn}
                     onToggleRoutineMenu={function(){setCoachRutinaMenuOpen(function(o){return !o;});}}
-                    onResetWeek={function(){ setCoachDialog({ t: 'resetWeek', semanaCiclo: semanaCiclo }); }}
+                    onResetWeek={function(){ setCoachDialog({ t: 'resetWeek', a: a, rutinaActiva: rutinaActiva, semanaCiclo: semanaCiclo }); }}
                     onResetRoutine={function(){ setCoachDialog({ t: 'resetRoutine', a: a, rutinaActiva: rutinaActiva }); }}
                     onSelectDay={function(di){ setCoachRoutineDiaIdx(di); }}
                     onToggleWarmup={function(){ setCoachDiaSecsOpen(function(o){ return {...o, warmup:!o.warmup}; }); }}

@@ -252,10 +252,68 @@ const sb = {
     }
     return true;
   },
+  deleteSesionesByAlumnoRutinaSemana: async (alumnoId, rutinaId, rutinaNombre, semana) => {
+    var aid = String(alumnoId);
+    var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
+    var rname = rutinaNombre != null && rutinaNombre !== "" ? String(rutinaNombre) : "";
+    var week = Number(semana);
+    if (!Number.isFinite(week) || week <= 0) throw new Error("semana requerida");
+    if (rid) {
+      const { error } = await supabase.from("sesiones").delete().eq("alumno_id", aid).eq("rutina_id", rid).eq("semana", week);
+      if (error) throw error;
+    }
+    if (rname) {
+      var q = supabase.from("sesiones").delete().eq("alumno_id", aid).eq("rutina_nombre", rname).eq("semana", week);
+      if (rid) q = q.is("rutina_id", null);
+      const { error } = await q;
+      if (error) throw error;
+    }
+    if (!rid && !rname) {
+      const { error } = await supabase.from("sesiones").delete().eq("alumno_id", aid).eq("semana", week);
+      if (error) throw error;
+    }
+    return true;
+  },
+
+  getSesionesByAlumnoRutinaSemana: async (alumnoId, rutinaId, rutinaNombre, semana) => {
+    var aid = String(alumnoId);
+    var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
+    var rname = rutinaNombre != null && rutinaNombre !== "" ? String(rutinaNombre) : "";
+    var week = Number(semana);
+    if (!Number.isFinite(week) || week <= 0) return [];
+    var rows = [];
+    if (rid) {
+      const { data, error } = await supabase.from("sesiones").select("*").eq("alumno_id", aid).eq("rutina_id", rid).eq("semana", week);
+      if (error) throw error;
+      rows = rows.concat(data || []);
+    }
+    if (rname) {
+      var q = supabase.from("sesiones").select("*").eq("alumno_id", aid).eq("rutina_nombre", rname).eq("semana", week);
+      if (rid) q = q.is("rutina_id", null);
+      const { data, error } = await q;
+      if (error) throw error;
+      rows = rows.concat(data || []);
+    }
+    if (!rid && !rname) {
+      const { data, error } = await supabase.from("sesiones").select("*").eq("alumno_id", aid).eq("semana", week);
+      if (error) throw error;
+      rows = rows.concat(data || []);
+    }
+    return rows;
+  },
   deleteProgresoByAlumnoEjercicios: async (alumnoId, ejercicioIds) => {
+
     var ids = Array.from(new Set((ejercicioIds || []).filter(Boolean).map(String)));
     if (!ids.length) return true;
     const { error } = await supabase.from("progreso").delete().eq("alumno_id", String(alumnoId)).in("ejercicio_id", ids);
+    if (error) throw error;
+    return true;
+  },
+  deleteProgresoByAlumnoEjerciciosFechas: async (alumnoId, ejercicioIds, fechas) => {
+    var ids = Array.from(new Set((ejercicioIds || []).filter(Boolean).map(String)));
+    var fs = Array.from(new Set((fechas || []).filter(Boolean).map(String)));
+    if (!ids.length || !fs.length) return true;
+    const { error } = await supabase.from("progreso").delete().eq("alumno_id", String(alumnoId)).in("ejercicio_id", ids).in("fecha", fs);
     if (error) throw error;
     return true;
   },
@@ -2485,6 +2543,126 @@ function GymApp() {
     return !rid && !rname;
   }
 
+  function sessionBelongsToRoutineWeekForCleanup(s, alumnoId, rutinaId, rutinaNombre, weekNumber) {
+    if (!sessionBelongsToRoutineForCleanup(s, alumnoId, rutinaId, rutinaNombre)) return false;
+    return Number(s && s.semana) === Number(weekNumber);
+  }
+
+  async function resetAlumnoRoutineWeek(alumno, rutina, weekIndex) {
+    var aid = alumno && alumno.id != null ? String(alumno.id) : (alumnoActivo && alumnoActivo.id != null ? String(alumnoActivo.id) : "");
+    var rut = rutina || (aid ? getRutinaAsignadaAlumno(aid) : null);
+    var rid = rut && rut.id != null ? String(rut.id) : "";
+    var rname = rut && (rut.nombre || rut.name) ? String(rut.nombre || rut.name) : "";
+    var wi = Number.isFinite(Number(weekIndex)) ? Number(weekIndex) : currentWeek;
+    var weekNumber = wi + 1;
+    if (!aid) throw new Error("alumnoId requerido");
+
+    var exIds = getRutinaExerciseIdsForCleanup(rut);
+    var exSet = {};
+    exIds.forEach(function (id) { exSet[String(id)] = true; });
+    var weekSessions = [];
+    if (typeof sb.getSesionesByAlumnoRutinaSemana === "function") {
+      weekSessions = await sb.getSesionesByAlumnoRutinaSemana(aid, rid, rname, weekNumber) || [];
+    }
+    var dateSet = {};
+    weekSessions.forEach(function (s) {
+      if (s && s.fecha) dateSet[String(s.fecha)] = true;
+    });
+    var weekDates = Object.keys(dateSet);
+
+    if (typeof sb.deleteSesionesByAlumnoRutinaSemana === "function") {
+      await sb.deleteSesionesByAlumnoRutinaSemana(aid, rid, rname, weekNumber);
+    }
+    if (typeof sb.deleteProgresoByAlumnoEjerciciosFechas === "function" && weekDates.length) {
+      await sb.deleteProgresoByAlumnoEjerciciosFechas(aid, exIds, weekDates);
+    }
+
+    setAlumnoSesiones(function (prev) {
+      if (!alumnoActivo || String(alumnoActivo.id) !== aid) return prev || [];
+      return (prev || []).filter(function (s) {
+        return !sessionBelongsToRoutineWeekForCleanup(s, aid, rid, rname, weekNumber);
+      });
+    });
+    setSesionesGlobales(function (prev) {
+      return (prev || []).filter(function (s) {
+        return !sessionBelongsToRoutineWeekForCleanup(s, aid, rid, rname, weekNumber);
+      });
+    });
+    setSesiones(function (prev) {
+      if (!Array.isArray(prev)) return prev;
+      return prev.filter(function (s) {
+        return !sessionBelongsToRoutineWeekForCleanup(s, aid, rid, rname, weekNumber);
+      });
+    });
+    setAlumnoProgreso(function (prev) {
+      if (!alumnoActivo || String(alumnoActivo.id) !== aid) return prev || [];
+      if (!weekDates.length || !exIds.length) return prev || [];
+      return (prev || []).filter(function (r) {
+        return !(exSet[String(r && r.ejercicio_id)] && dateSet[String(r && r.fecha)]);
+      });
+    });
+    setProgresoGlobal(function (prev) {
+      if (!weekDates.length || !exIds.length) return prev || {};
+      var next = Object.assign({}, prev || {});
+      var key = Object.prototype.hasOwnProperty.call(next, aid) ? aid : Object.keys(next).find(function (k) { return String(k) === aid; });
+      if (key) {
+        next[key] = (next[key] || []).filter(function (r) {
+          return !(exSet[String(r && r.ejercicio_id)] && dateSet[String(r && r.fecha)]);
+        });
+      }
+      return next;
+    });
+    setProgress(function (prev) {
+      if (!prev || !exIds.length) return prev || {};
+      var next = Object.assign({}, prev || {});
+      exIds.forEach(function (id) {
+        var entry = next[id];
+        if (!entry || !Array.isArray(entry.sets)) return;
+        var sets = entry.sets.filter(function (s) {
+          if (s && s.week === wi) return false;
+          if (weekDates.length && dateSet[String(s && s.date)]) return false;
+          return true;
+        });
+        next[id] = Object.assign({}, entry, {
+          sets: sets,
+          max: sets.reduce(function (m, s) { return Math.max(m, parseFloat(s && s.kg) || 0); }, 0),
+        });
+      });
+      try { localStorage.setItem("it_pg", JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+    setPendingSync(function (prev) {
+      if (!weekDates.length || !exIds.length) return prev || [];
+      var next = (prev || []).filter(function (item) {
+        if (!item) return true;
+        if (item.alumno_id != null && String(item.alumno_id) !== aid) return true;
+        var itemEx = String(item.exId || item.ejercicio_id || "");
+        var itemDate = String(item.fecha || item.date || "");
+        return !(exSet[itemEx] && dateSet[itemDate]);
+      });
+      try { localStorage.setItem("it_pending_sync", JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+    setCompletedDays(function (prev) {
+      return (prev || []).filter(function (k) {
+        var text = String(k);
+        if (!text.endsWith("-w" + wi)) return true;
+        if (rid && text.startsWith(rid + "-")) return false;
+        if (!rid && text.indexOf(aid) >= 0) return false;
+        return true;
+      });
+    });
+    setSession(null);
+    setActiveExIdx(0);
+    setCoachRoutineDiaIdx(0);
+    setRegistrosSubTab(0);
+    try {
+      localStorage.removeItem("it_last_week_advance_date");
+    } catch (e) {}
+    await cargarSesionesGlobales();
+    return true;
+  }
+
   function clearRoutineLocalKeysForAlumno(alumnoId, rutinaId) {
     try {
       localStorage.removeItem('it_last_week_advance_date');
@@ -2698,7 +2876,7 @@ function GymApp() {
   async function confirmCoachDialog() {
     var c = coachDialog;
     if (c.t === 'none') return;
-    setCoachDialogLoading(c.t === 'deleteAlumno' || c.t === 'quitarRut' || c.t === 'assignRut' || c.t === 'clearProgress' || c.t === 'resetRoutine');
+    setCoachDialogLoading(c.t === 'deleteAlumno' || c.t === 'quitarRut' || c.t === 'assignRut' || c.t === 'clearProgress' || c.t === 'resetRoutine' || c.t === 'resetWeek');
     try {
       if (c.t === 'deleteAlumno' && c.a) {
         if (typeof sb.deleteAlumno === 'function') {
@@ -2742,13 +2920,9 @@ function GymApp() {
         return;
       }
       if (c.t === 'resetWeek' && c.semanaCiclo != null) {
-        setCompletedDays(function (prev) {
-          return prev.filter(function (k) {
-            return !k.endsWith('-w' + (c.semanaCiclo - 1));
-          });
-        });
+        await resetAlumnoRoutineWeek(c.a || alumnoActivo, c.rutinaActiva || (c.a ? getRutinaAsignadaAlumno(c.a) : null), c.semanaCiclo - 1);
         setCoachRutinaMenuOpen(false);
-        toast2(msg('Semana reiniciada ✓', 'Week reset ✓', 'Semana reiniciada ✓'));
+        toast2(msg('Semana reiniciada', 'Week reset', 'Semana reiniciada'));
         setCoachDialog({ t: 'none' });
         return;
       }
@@ -2919,7 +3093,7 @@ function GymApp() {
       }
     } catch (e1) {
       console.error('[confirmCoachDialog]', e1);
-      if (c.t === 'clearProgress' || c.t === 'resetRoutine') {
+      if (c.t === 'clearProgress' || c.t === 'resetRoutine' || c.t === 'resetWeek') {
         toast2(msg('No se pudo limpiar el historial.', 'Could not clear the history.', 'Não foi possível limpar o histórico.'));
       }
     } finally {
