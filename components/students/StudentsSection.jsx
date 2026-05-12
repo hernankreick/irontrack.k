@@ -2,7 +2,7 @@ import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 import { getRutinaAlumnoId } from '../../lib/routineStore.js';
-import { getStudentWeeklyProgress } from '../../lib/studentWeeklyProgress.js';
+import { getActiveStudentRoutinePosition } from '../../lib/studentWeeklyProgress.js';
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
 
@@ -198,19 +198,19 @@ export default function StudentsSection(props) {
 
             {coachAlumnosListaFiltrada.map(a=>{
               const rutinaAsignada = assignedRoutineFor(a);
-              const progresoSemanal = getStudentWeeklyProgress({
+              const progresoSemanal = getActiveStudentRoutinePosition({
                 alumno: a,
                 rutina: rutinaAsignada,
                 sesiones: sesionesForAlumno(a),
                 progreso: progresoGlobal,
                 completedDays: completedDays,
                 currentWeek: currentWeek,
-              });
+              }).weeklyProgress;
               const isAlumnoActive = alumnoActivo?.id===a.id;
               const rutinaActiva = isAlumnoActive ? assignedRoutineFor(a.id) : null;
               const dias = rutinaActiva ? (rutinaActiva.datos?.days||[]) : [];
               const rId = rutinaActiva ? rutinaActiva.id : null;
-              const weeklyProgress = rutinaActiva ? getStudentWeeklyProgress({
+              const weeklyPosition = rutinaActiva ? getActiveStudentRoutinePosition({
                 alumno: a,
                 rutina: rutinaActiva,
                 sesiones: sesionesForAlumno(a),
@@ -218,6 +218,7 @@ export default function StudentsSection(props) {
                 completedDays: completedDays,
                 currentWeek: currentWeek,
               }) : null;
+              const weeklyProgress = weeklyPosition ? weeklyPosition.weeklyProgress : null;
               const semanaCiclo = weeklyProgress ? weeklyProgress.weekNumber : 1;
               const semanaIdx = weeklyProgress ? weeklyProgress.weekIndex : 0;
               const diasCompletados = weeklyProgress ? weeklyProgress.completedDays : 0;

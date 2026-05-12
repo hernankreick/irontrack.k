@@ -175,6 +175,21 @@ export function WorkoutScreen(props) {
     const lastAdvance = localStorage.getItem("it_last_week_advance_date");
     const todayStr = new Date().toDateString();
     if (daysThisWeek >= totalDays && currentWeek < 3 && lastAdvance !== todayStr) {
+      if (!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId && r?.id && typeof sb.updateRutina === "function") {
+        try {
+          await sb.updateRutina(r.id, {
+            nombre: r.name || r.nombre || "Rutina",
+            alumno_id: sessionData.alumnoId,
+            entrenador_id: r.entrenador_id || sessionData.entrenadorId || "entrenador_principal",
+            datos: Object.assign({}, r.datos || {}, {
+              days: r.days || (r.datos && r.datos.days) || [],
+              semana_activa: currentWeek + 2,
+            }),
+          });
+        } catch (e) {
+          console.error("[advance active week]", e);
+        }
+      }
       setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+currentWeek)));
       setCurrentWeek(currentWeek + 1);
       localStorage.setItem("it_last_week_advance_date", todayStr);

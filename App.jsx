@@ -110,7 +110,7 @@ import {
   resolveAlumnoId,
   resolveEntrenadorId,
 } from './lib/routineStore.js';
-import { getStudentWeeklyProgress } from './lib/studentWeeklyProgress.js';
+import { getActiveStudentRoutinePosition, getStudentWeeklyProgress } from './lib/studentWeeklyProgress.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import {
   prepareExerciseHistoryModalData,
@@ -1548,7 +1548,9 @@ function GymApp() {
               return new Date(b.created_at || 0) - new Date(a.created_at || 0);
             }).slice(0, 1);
             if(ruts && ruts[0] && ruts[0].datos) {
-              setRoutines([{...ruts[0].datos, alumnoId: decoded.alumnoId, id: ruts[0].id}]);
+              setRoutines([{...ruts[0].datos, datos: ruts[0].datos || {}, alumnoId: decoded.alumnoId, alumno_id: decoded.alumnoId, id: ruts[0].id}]);
+              const ses = await sb.getSesiones(decoded.alumnoId);
+              setSesiones(ses || []);
               setSharedLoaded(true);
               return;
             }
@@ -1640,6 +1642,7 @@ function GymApp() {
               id: rSB.id,
               name: rSB.nombre || "Rutina",
               days: rSB.datos?.days || [],
+              datos: rSB.datos || {},
               alumno: rSB.datos?.alumno || sessionData.name || "",
               note: rSB.datos?.note || "",
               alumno_id: sessionData.alumnoId,
@@ -1653,6 +1656,8 @@ function GymApp() {
             });
           }
           // Cargar nota del día
+          const ses = await sb.getSesiones(sessionData.alumnoId);
+          setSesiones(ses || []);
           sb.getNota(sessionData.alumnoId).then(function(res) {
             if(res && res[0]) setNotaDia(res[0].contenido||res[0].texto||"");
           }).catch(function(){});
@@ -2141,19 +2146,35 @@ function GymApp() {
 
   const activeR = session ? routines.find(r=>r.id===session.rId) : null;
   const activeDay = activeR ? activeR.days[session.dIdx] : null;
+  const activeStudentRoutinePosition = useMemo(function () {
+    if (!esAlumno || !routines[0]) {
+      return {
+        currentWeek: currentWeek,
+        currentDayIndex: null,
+        completedDaysInWeek: 0,
+        totalDaysInWeek: 0,
+      };
+    }
+    return getActiveStudentRoutinePosition({
+      alumno: sessionData?.alumnoId || (routines[0] && (routines[0].alumno_id || routines[0].alumnoId)),
+      rutina: routines[0],
+      sesiones: sesiones,
+      completedDays: completedDays,
+      currentWeek: currentWeek,
+    });
+  }, [esAlumno, routines, sessionData?.alumnoId, sesiones, completedDays, currentWeek]);
+  const studentCurrentWeek = esAlumno ? activeStudentRoutinePosition.currentWeek : currentWeek;
   const alumnoPlanHeaderDayNum = useMemo(
     function () {
       if (!esAlumno || tab !== "plan" || !routines[0]) return null;
       const r0 = routines[0];
       const totalDays = r0.days?.length || 0;
       if (totalDays === 0) return null;
-      const daysCompletedThisWeek = completedDays.filter(function (k) {
-        return k.startsWith((r0.id || "") + "-") && k.endsWith("-w" + currentWeek);
-      }).length;
+      const daysCompletedThisWeek = activeStudentRoutinePosition.completedDaysInWeek || 0;
       if (daysCompletedThisWeek >= totalDays) return null;
       return daysCompletedThisWeek + 1;
     },
-    [esAlumno, tab, routines, completedDays, currentWeek]
+    [esAlumno, tab, routines, activeStudentRoutinePosition]
   );
   const showAlumnoProgressStack = (readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId);
   const coachDesktop1024 = useDesktopMin1024();
@@ -2576,6 +2597,35 @@ function GymApp() {
     if (typeof sb.deleteProgresoByAlumnoEjerciciosFechas === "function" && weekDates.length) {
       await sb.deleteProgresoByAlumnoEjerciciosFechas(aid, exIds, weekDates);
     }
+    if (rut && rid && typeof sb.updateRutina === "function") {
+      var resetDatos = Object.assign({}, rut.datos || {}, {
+        days: (rut.datos && rut.datos.days) || rut.days || [],
+        semana_activa: weekNumber,
+        semana_reiniciada: weekNumber,
+        semana_reiniciada_at: new Date().toISOString(),
+      });
+      await sb.updateRutina(rid, {
+        nombre: rut.nombre || rut.name || "Rutina",
+        alumno_id: aid,
+        entrenador_id: rut.entrenador_id || ENTRENADOR_ID,
+        datos: resetDatos,
+      });
+      setRutinasSBEntrenador(function (prev) {
+        return (prev || []).map(function (r0) {
+          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetDatos }) : r0;
+        });
+      });
+      setRutinasSB(function (prev) {
+        return (prev || []).map(function (r0) {
+          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetDatos }) : r0;
+        });
+      });
+      setRoutines(function (prev) {
+        return (prev || []).map(function (r0) {
+          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetDatos, days: resetDatos.days }) : r0;
+        });
+      });
+    }
 
     setAlumnoSesiones(function (prev) {
       if (!alumnoActivo || String(alumnoActivo.id) !== aid) return prev || [];
@@ -2767,6 +2817,35 @@ function GymApp() {
         return !((rid && text.indexOf(rid) >= 0) || text.indexOf(aid) >= 0);
       });
     });
+    if (rut && rid && typeof sb.updateRutina === "function") {
+      var resetAllDatos = Object.assign({}, rut.datos || {}, {
+        days: (rut.datos && rut.datos.days) || rut.days || [],
+        semana_activa: 1,
+      });
+      delete resetAllDatos.semana_reiniciada;
+      delete resetAllDatos.semana_reiniciada_at;
+      await sb.updateRutina(rid, {
+        nombre: rut.nombre || rut.name || "Rutina",
+        alumno_id: aid,
+        entrenador_id: rut.entrenador_id || ENTRENADOR_ID,
+        datos: resetAllDatos,
+      });
+      setRutinasSBEntrenador(function (prev) {
+        return (prev || []).map(function (r0) {
+          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetAllDatos }) : r0;
+        });
+      });
+      setRutinasSB(function (prev) {
+        return (prev || []).map(function (r0) {
+          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetAllDatos }) : r0;
+        });
+      });
+      setRoutines(function (prev) {
+        return (prev || []).map(function (r0) {
+          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetAllDatos, days: resetAllDatos.days }) : r0;
+        });
+      });
+    }
     setCurrentWeek(0);
     setCoachRoutineDiaIdx(0);
     setRegistrosSubTab(0);
@@ -4281,27 +4360,28 @@ function GymApp() {
               const r0 = routines[0];
               const hoy = new Date().toLocaleDateString("es-AR");
               const totalDays = r0?.days?.length||0;
-              const daysCompletedThisWeek = completedDays.filter(k=>k.startsWith((r0?.id||"")+"-")&&k.endsWith("-w"+currentWeek)).length;
+              const currentWeekForStudent = studentCurrentWeek;
+              const daysCompletedThisWeek = activeStudentRoutinePosition.completedDaysInWeek || 0;
               // Racha: semanas consecutivas con al menos 1 día entrenado
               const rachaActual = (() => {
                 if(!r0) return 0;
                 let streak = 0;
                 // Semana actual cuenta si ya entrenó algo
-                for(let w = currentWeek; w >= 0; w--) {
+                for(let w = currentWeekForStudent; w >= 0; w--) {
                   const daysInWeek = completedDays.filter(k =>
                     k.startsWith(r0.id+"-") && k.endsWith("-w"+w)
                   ).length;
                   if(daysInWeek > 0) streak++;
-                  else if(w < currentWeek) break; // semana anterior sin días = se rompe la racha
+                  else if(w < currentWeekForStudent) break; // semana anterior sin días = se rompe la racha
                 }
                 return streak;
               })();
               const nextDayIdx = daysCompletedThisWeek < totalDays ? daysCompletedThisWeek : null;
               const weeklyPct = totalDays > 0 ? Math.min(100, Math.round((daysCompletedThisWeek / totalDays) * 100)) : 0;
               const todayDay = nextDayIdx !== null ? r0?.days?.[nextDayIdx] : null;
-              const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeek)));
+              const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeekForStudent)));
               const totalEjHero = todayDay ? (todayDay.warmup || []).length + (todayDay.exercises || []).length : 0;
-              const doneEjHero = todayDay ? countExercisesWithLogToday(todayDay, progress, hoy, currentWeek) : 0;
+              const doneEjHero = todayDay ? countExercisesWithLogToday(todayDay, progress, hoy, currentWeekForStudent) : 0;
               const pctHero = totalEjHero > 0 ? Math.min(100, Math.round((100 * doneEjHero) / totalEjHero)) : 0;
               const progressStatusHero =
                 pctHero === 0
@@ -4390,7 +4470,7 @@ function GymApp() {
                     border={border}
                     textMuted={textMuted}
                     darkMode={darkMode}
-                    currentWeek={currentWeek}
+                    currentWeek={currentWeekForStudent}
                     daysCompletedThisWeek={daysCompletedThisWeek}
                     totalDays={totalDays}
                     weeklyPct={weeklyPct}
@@ -4405,11 +4485,11 @@ function GymApp() {
                       textMuted={textMuted}
                       hoyBadgeText={msg("HOY", "TODAY", "HOJE")}
                       semDiaLine={
-                        msg("Semana", "Week", "Semana") + " " + (currentWeek + 1) + " · " + msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)
+                        msg("Semana", "Week", "Semana") + " " + (currentWeekForStudent + 1) + " · " + msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)
                       }
                       dayTitle={msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)}
                       exerciseCount={totalEjHero}
-                      durationMinutes={estimateDayMinutes(todayDay, currentWeek)}
+                      durationMinutes={estimateDayMinutes(todayDay, currentWeekForStudent)}
                       completedExercises={doneEjHero}
                       totalExercises={totalEjHero}
                       progressStatusText={progressStatusHero}
@@ -4461,6 +4541,10 @@ function GymApp() {
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
               const hoyStr = new Date().toLocaleDateString("es-AR");
+              const currentWeekForRoutine = String(r.id) === String(routines[0]?.id) ? studentCurrentWeek : currentWeek;
+              const completedDaysForRoutine = String(r.id) === String(routines[0]?.id)
+                ? (activeStudentRoutinePosition.completedDaysInWeek || 0)
+                : completedDays.filter(function(k){return k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeekForRoutine);}).length;
               return (<div key={r.id} style={{marginBottom:20,marginTop:20}}>
                   {/* Título + meta (sin botón PDF arriba: exportación solo al final del plan) */}
                   {planScrollDiag.routineMetaPdf&&(
@@ -4497,26 +4581,26 @@ function GymApp() {
                     <span style={{fontSize:12,color:textMuted,fontWeight:600,whiteSpace:"nowrap"}}>
                       {r.days.length} {msg("días", "days")}
                       {" · "}
-                      {completedDays.filter(function(k){return k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek);}).length}{" "}
+                      {completedDaysForRoutine}{" "}
                       {msg("completados", "done")}
                     </span>
                   </div>
                   {r.days.map((d,di)=>{
-                    const dayKey=r.id+"-"+di+"-w"+currentWeek;
+                    const dayKey=r.id+"-"+di+"-w"+currentWeekForRoutine;
                     const isDayDone=completedDays.includes(dayKey);
-                    const daysCompletedR=completedDays.filter(k=>k.startsWith(r.id+"-")&&k.endsWith("-w"+currentWeek)).length;
+                    const daysCompletedR=completedDaysForRoutine;
                     const localNextDayIdx=daysCompletedR < r.days.length ? daysCompletedR : null;
                     const isNextDay=di===localNextDayIdx;
                     const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
                     const totalEj=((d.warmup||[]).length+(d.exercises||[]).length);
                     const isOpen=expandedPlanDay===r.id+"-"+di;
-                    const estMin=estimateDayMinutes(d,currentWeek);
+                    const estMin=estimateDayMinutes(d,currentWeekForRoutine);
                     const metaLine=
                       totalEj + " " + msg("ejercicios", "exercises", "exercícios") + " · ~" + estMin + " " + msg("min", "min", "min");
                     const doneEjRow = isDayDone
                       ? totalEj
                       : isNextDay
-                        ? countExercisesWithLogToday(d, progress, hoyStr, currentWeek)
+                        ? countExercisesWithLogToday(d, progress, hoyStr, currentWeekForRoutine)
                         : 0;
                     const rightProgress = doneEjRow + "/" + totalEj;
 
@@ -4579,7 +4663,7 @@ function GymApp() {
                                 var inf=allEx.find(function(e){return e.id===ex.id});
                                 var nombre=resolveExerciseTitle(inf||null,ex,es);
                                 var vUrl=resolveVideoUrl(inf||null,ex,videoOverrides);
-                                var w=((ex.weeks||[])[currentWeek])||{};
+                                var w=((ex.weeks||[])[currentWeekForRoutine])||{};
                                 var s=w.sets||ex.sets||"-";
                                 var rp=w.reps||ex.reps||"-";
                                 var kg2=w.kg||ex.kg||"";
@@ -5912,7 +5996,7 @@ function GymApp() {
           setSession={setSession}
           setCompletedDays={setCompletedDays}
           completedDays={completedDays}
-          currentWeek={currentWeek}
+          currentWeek={esAlumno ? studentCurrentWeek : currentWeek}
           setCurrentWeek={setCurrentWeek}
           preSessionPRs={preSessionPRs}
           setResumenSesion={setResumenSesion}
@@ -5929,6 +6013,12 @@ function GymApp() {
           sessionPRList={sessionPRList}
           videoOverrides={videoOverrides}
           setVideoModal={setVideoModal}
+          onSesionGuardada={async function () {
+            if (sessionData?.alumnoId) {
+              var fresh = await sb.getSesiones(sessionData.alumnoId);
+              setSesiones(fresh || []);
+            }
+          }}
         />
       )}
       {!resumenSesion && !hideGlobalBottomNavCoachDash && !(showCoachDesktopShell && coachDesktop1024) && (
