@@ -4507,7 +4507,7 @@ function GymApp() {
         )}
         {tab==="scanner"&&!esAlumno&&(
           <div className="min-w-0 max-w-full">
-            <ScannerRutina darkMode={darkMode} sb={sb} setRoutines={setRoutines} alumnos={alumnosActivosLimpios} toast2={toast2} es={es} setTab={setTab} user={user} customEx={customEx}/>
+            <ScannerRutina darkMode={darkMode} sb={sb} setRoutines={setRoutines} alumnos={alumnosActivosLimpios} toast2={toast2} es={es} setTab={setTab} user={user} customEx={customEx} msg={msg} green={green}/>
           </div>
         )}
         {tab==="biblioteca"&&!esAlumno&&(
@@ -5619,7 +5619,7 @@ function GymApp() {
   );
 }
 
-function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, user, darkMode}) {
+function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, user, darkMode, customEx, msg, green}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
@@ -5639,8 +5639,8 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
   const fileRef = React.useRef();
   const fileGalRef = React.useRef();
   const allEx = React.useMemo(()=>{
-    try{ const c=JSON.parse(localStorage.getItem("it_cex")||"[]"); return [...EX,...c]; }catch(e){return EX;}
-  },[]);
+    return [...EX,...(Array.isArray(customEx)?customEx:[])];
+  },[customEx]);
 
   const procesarImagen = async (base64) => {
     setPaso(2); setProcesando(true); setProgreso(0);
@@ -5707,8 +5707,8 @@ function ScannerRutina({sb, routines, setRoutines, alumnos, toast2, setTab, es, 
   const agregarAutoEx = (idx) => {
     const ej = resultado.ejercicios[idx];
     const newEx = {id:"scan_"+Date.now()+"_"+idx, name:ej.nombre, nameEn:ej.nombre, pattern:"core", muscle:"", equip:"", custom:true, scanned:true};
-    const customEx = JSON.parse(localStorage.getItem("it_customEx")||"[]");
-    localStorage.setItem("it_customEx", JSON.stringify([...customEx, newEx]));
+    const storedCustomEx = JSON.parse(localStorage.getItem("it_customEx")||"[]");
+    localStorage.setItem("it_customEx", JSON.stringify([...storedCustomEx, newEx]));
     const upd = resultado.ejercicios.map((e,i)=>i===idx?{...e,selManual:newEx,autoAdded:true}:e);
     setResultado({...resultado, ejercicios:upd});
     toast2("Ejercicio agregado a biblioteca ✓");
