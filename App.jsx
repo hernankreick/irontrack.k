@@ -757,23 +757,40 @@ function GymApp() {
 
     var res = insertResult.data;
     var oldRutina = previousRoutine || getRutinaAsignadaAlumno(alumnoIdAssign);
-    if (oldRutina && oldRutina.id != null && String(oldRutina.id) !== String(res.id)) {
-      try {
-        await sb.deleteRutina(oldRutina.id);
-        var oldId = String(oldRutina.id);
-        setRutinasSB(function (prev) {
-          return (prev || []).filter(function (x) {
-            return String(x.id) !== oldId;
-          });
-        });
-        setRutinasSBEntrenador(function (prev) {
-          return (prev || []).filter(function (x) {
-            return String(x.id) !== oldId;
-          });
-        });
-      } catch (eOldRutina) {
-        console.error("[assignRut] error al quitar rutina anterior despues del insert", eOldRutina);
+    var oldRutinas = [];
+    var seenOldRutinas = {};
+    function addOldRutinaForReplace(r) {
+      if (!r || r.id == null || String(r.id) === String(res.id)) return;
+      var ridAlumno = getRutinaAlumnoId(r);
+      if (ridAlumno == null || String(ridAlumno) !== String(alumnoIdAssign)) return;
+      var key = String(r.id);
+      if (seenOldRutinas[key]) return;
+      seenOldRutinas[key] = true;
+      oldRutinas.push(r);
+    }
+    addOldRutinaForReplace(previousRoutine);
+    addOldRutinaForReplace(oldRutina);
+    (rutinasUnificadas || []).forEach(addOldRutinaForReplace);
+    var oldRutinaIds = {};
+    if (oldRutinas.length > 0) {
+      for (var oldIdx = 0; oldIdx < oldRutinas.length; oldIdx += 1) {
+        try {
+          await sb.deleteRutina(oldRutinas[oldIdx].id);
+          oldRutinaIds[String(oldRutinas[oldIdx].id)] = true;
+        } catch (eOldRutina) {
+          console.error("[assignRut] error al quitar rutina anterior despues del insert", eOldRutina);
+        }
       }
+      setRutinasSB(function (prev) {
+        return (prev || []).filter(function (x) {
+          return !oldRutinaIds[String(x.id)];
+        });
+      });
+      setRutinasSBEntrenador(function (prev) {
+        return (prev || []).filter(function (x) {
+          return !oldRutinaIds[String(x.id)];
+        });
+      });
     }
 
     setRutinasSB(function (prev) {
@@ -792,7 +809,7 @@ function GymApp() {
       var replaced = false;
       var next = prevList
         .filter(function (r) {
-          return !oldRutina || String(r.id) !== String(oldRutina.id);
+          return !oldRutinaIds[String(r.id)];
         })
         .map(function (r) {
           if (String(r.id) === String(res.id)) {
@@ -805,7 +822,7 @@ function GymApp() {
     });
 
     return { ok: true, rutina: res };
-  }, [getRutinaAsignadaAlumno, setRoutines]);
+  }, [getRutinaAsignadaAlumno, rutinasUnificadas, setRoutines]);
   const [dupDayModal, setDupDayModal] = useState(null); // {rId, dIdx, days}
   const [dupDayClosing, setDupDayClosing] = useState(false);
   const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
