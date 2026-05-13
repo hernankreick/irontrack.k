@@ -55,7 +55,7 @@ export default function RestTimer({
 
       {nextLabel && (
         <div style={{ fontSize:14, color:textMuted, textAlign:"center" }}>
-          {es ? "PrÃ³ximo:" : "Next up:"}{" "}
+          {es ? "Próximo:" : "Next up:"}{" "}
           <strong style={{ color:textMain }}>{nextLabel}</strong>
         </div>
       )}
@@ -70,7 +70,7 @@ export default function RestTimer({
           fontFamily:"inherit", cursor:"pointer",
         }}
       >
-        {es ? "Saltar descanso â†’" : "Skip rest â†’"}
+        {es ? "Saltar descanso →" : "Skip rest →"}
       </button>
     </div>
   );

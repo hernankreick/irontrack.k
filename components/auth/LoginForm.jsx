@@ -30,7 +30,7 @@ function LoginForm({es, btn, inp, lbl, onLogin, onClose, darkMode, msg}) {
           onLogin({name:mode==="register"?name:email.split("@")[0],email,id:email});
         }}>ENTRAR</button>
       <div style={{textAlign:"center",fontSize:15,color:textMuted,cursor:"pointer",marginBottom:8}} onClick={()=>setMode(m=>m==="login"?"register":"login")}>
-        {mode==="login"?(msg("No tenes cuenta? Registrate", "No account? Register")):(msg("Ya tenes cuenta? IniciÃ¡ sesion", "Already have an account? Log in"))}
+        {mode==="login"?(msg("No tenes cuenta? Registrate", "No account? Register")):(msg("Ya tenes cuenta? Iniciá sesion", "Already have an account? Log in"))}
       </div>
       <button className="hov" style={{...btn(),width:"100%",padding:"8px",fontSize:15}} onClick={onClose}>CANCELAR</button>
     </div>

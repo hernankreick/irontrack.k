@@ -1907,7 +1907,7 @@ function GymApp() {
       grad.addColorStop(1,"#1E2D40");
       ctx.fillStyle = grad;
       ctx.fillRect(0,0,1080,1080);
-      // LÃ­nea roja superior
+      // Línea roja superior
       ctx.fillStyle = "#2563EB";
       ctx.fillRect(0,0,1080,8);
       // Logo
@@ -1919,12 +1919,12 @@ function GymApp() {
       ctx.font = "800 52px Arial";
       const rName = (resumenSesion.rutinaName||"").toUpperCase();
       ctx.fillText(rName.slice(0,22), 80, 220);
-      // LÃ­nea separadora
+      // Línea separadora
       ctx.fillStyle = "#2D4057";
       ctx.fillRect(80, 260, 920, 2);
       // Stats grandes
       const stats = [
-        {val: resumenSesion.durMin+"'", label: msg("DURACIÃ“N", "DURATION")},
+        {val: resumenSesion.durMin+"'", label: msg("DURACIÓN", "DURATION")},
         {val: resumenSesion.ejercicios, label: msg("EJERCICIOS", "EXERCISES")},
         {val: resumenSesion.totalSets, label: "SETS"},
         {val: (resumenSesion.volTotal/1000).toFixed(1)+"t", label: msg("TONELAJE", "VOLUME")},
@@ -1952,7 +1952,7 @@ function GymApp() {
       ctx.fillStyle = "#2D4057";
       ctx.font = "700 28px Arial";
       ctx.fillText("#IronTrack  #Fitness  #Entrenamiento", 80, 980);
-      // LÃ­nea roja inferior
+      // Línea roja inferior
       ctx.fillStyle = "#2563EB";
       ctx.fillRect(0,1072,1080,8);
       // Convertir a blob y compartir

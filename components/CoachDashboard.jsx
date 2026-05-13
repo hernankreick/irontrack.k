@@ -400,7 +400,7 @@ function weeklyTargetFromRutinas(alumnos, rutinasSBEntrenador) {
 
 /**
  * Alertas derivadas solo de datos reales (sin inventar alumnos).
- * Prioridad: sin rutina > rutina terminada > a 1 sesiÃ³n > inactivo > poca actividad en la semana (con rutina).
+ * Prioridad: sin rutina > rutina terminada > a 1 sesión > inactivo > poca actividad en la semana (con rutina).
  */
 function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, P, currentWeek) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
@@ -447,7 +447,7 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
           rutinaId: rutinaId,
           initials: initials,
           name: name,
-          badge: M(lang, "Rutina terminada", "Routine completed", "Rotina concluÃ­da"),
+          badge: M(lang, "Rutina terminada", "Routine completed", "Rotina concluída"),
           bc: pal.green,
           bd: pal.greenDim,
           desc: name + M(lang, " terminó su rutina.", " completed their routine.", " concluiu sua rotina."),
