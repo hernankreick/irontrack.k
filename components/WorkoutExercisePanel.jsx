@@ -7,7 +7,9 @@ import {
   calculateNewWeightPR,
   calculateSetsVolume,
   canLogWorkoutSet,
+  exerciseHasTimeTarget,
   exerciseHasSuggestedLoad,
+  formatWorkoutSetLabel,
   normalizeWorkoutKg,
   resolveWorkoutRepsInput,
 } from '../lib/workoutSession.js';
@@ -85,6 +87,7 @@ export function WorkoutExercisePanel(props) {
     sessionPRList,
     videoOverrides,
     setVideoModal,
+    currentWeek,
     logSet,
     startTimer,
     setPrCelebration,
@@ -108,6 +111,7 @@ export function WorkoutExercisePanel(props) {
 
   const validationExercise = { ...(info || {}), ...(ex || {}) };
   const hasSuggestedLoad = exerciseHasSuggestedLoad(validationExercise);
+  const isTimedExercise = exerciseHasTimeTarget(validationExercise);
   const pendingPR = hasSuggestedLoad ? calculateNewWeightPR({ max: pr }, kg) : null;
   const isPR = !!pendingPR;
   const canLogSet = canLogWorkoutSet(validationExercise, kg, reps);
@@ -182,7 +186,7 @@ export function WorkoutExercisePanel(props) {
       setPrCelebration({ejercicio: displayName, kg: newPR.kg});
       setTimeout(()=>setPrCelebration(null), 2500);
     }
-    logSet(ex.id, normalizeWorkoutKg(kg), resolveWorkoutRepsInput(reps, validationExercise), note, rpe);
+    logSet(ex.id, normalizeWorkoutKg(kg), resolveWorkoutRepsInput(reps, validationExercise), note, rpe, currentWeek);
     if(pause>0) startTimer(pause, pat.color);
     setNote("");
     setRpe(null);
@@ -228,7 +232,7 @@ export function WorkoutExercisePanel(props) {
             </span>}
             {ultimoSet&&<span style={{background:bgSub,borderRadius:6,padding:"4px 8px",
               fontSize:13,fontWeight:500,color:textMuted}}>
-              {es?"Último":"Last"}: {ultimoSet.kg}kg×{ultimoSet.reps}
+              {es?"Último":"Last"}: {formatWorkoutSetLabel(validationExercise, ultimoSet)}
             </span>}
           </div>
         )}
@@ -247,7 +251,7 @@ export function WorkoutExercisePanel(props) {
                 color:"#22C55E",display:"flex",alignItems:"center",justifyContent:"center",
                 fontSize:13,fontWeight:900,flexShrink:0}}>✓</div>
               <div style={{flex:1,fontSize:18,fontWeight:800,color:textMain}}>
-                {s.kg}kg × {s.reps} reps
+                {formatWorkoutSetLabel(validationExercise, s)}
               </div>
               {s.rpe&&<span style={{fontSize:13,color:textMuted,fontWeight:500}}>RPE {s.rpe}</span>}
             </div>
@@ -327,6 +331,7 @@ export function WorkoutExercisePanel(props) {
             </div>
 
             {/* PESO - input editable + botón [+] */}
+            {hasSuggestedLoad&&(
             <div style={{marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                 <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>PESO</span>
@@ -367,12 +372,13 @@ export function WorkoutExercisePanel(props) {
               </div>
               <div style={{fontSize:9,color:"#374151",marginTop:3}}>{es?"Tocá ±1 kg · mantené ±5 kg":"Tap ±1 kg · hold ±5 kg"}</div>
             </div>
+            )}
 
             {/* REPS - pills dinámicas extendidas */}
             <div style={{marginBottom:12}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>REPS</span>
-                <span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{reps} reps</span>
+                <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>{isTimedExercise ? (es?"DURACIÓN":"DURATION") : "REPS"}</span>
+                <span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{isTimedExercise ? reps + '"' : reps + " reps"}</span>
               </div>
               {(()=>{
                 var repsStr=(ex?.reps||"8").toString();
@@ -486,7 +492,9 @@ export function WorkoutExercisePanel(props) {
             {es?"Ejercicio completado":"Exercise complete"}
           </div>
           <div style={{fontSize:13,color:textMuted,marginTop:4}}>
-            {setsHoy.length} sets · {calculateSetsVolume(setsHoy).toLocaleString()} kg
+            {hasSuggestedLoad
+              ? setsHoy.length + " sets · " + calculateSetsVolume(setsHoy).toLocaleString() + " kg"
+              : setsHoy.length + " sets"}
           </div>
           {activeExIdx<exercises.length-1&&(
             <button className="hov" onClick={()=>setActiveExIdx(activeExIdx+1)}

@@ -12,6 +12,8 @@ export default function WorkoutSessionSummary({
   border,
   textMuted,
   textMain,
+  allEx,
+  videoOverrides,
   onClose,
   onShareImage,
 }) {
@@ -24,8 +26,8 @@ export default function WorkoutSessionSummary({
       maxWidth={420}
       closeOnOutside={false}
       zIndex={10000}
-      overlayStyle={{background:"rgba(0,0,0,.92)",alignItems:"flex-start",paddingTop:"calc(env(safe-area-inset-top, 0px) + 12px)",paddingRight:16,paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 24px)",paddingLeft:16,boxSizing:"border-box",overflowY:"auto",WebkitOverflowScrolling:"touch"}}
-      contentStyle={{background:bgCard,borderRadius:20,padding:"28px 20px",paddingBottom:"calc(28px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:420,maxHeight:"calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 36px)",overflowY:"auto",WebkitOverflowScrolling:"touch",border:"1px solid "+border,textAlign:"center",animation:"fadeIn 0.25s ease"}}
+      overlayStyle={{background:"#0A0F1A",alignItems:"flex-start",paddingTop:"calc(env(safe-area-inset-top, 0px) + 10px)",paddingRight:16,paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 20px)",paddingLeft:16,boxSizing:"border-box",overflowY:"auto",WebkitOverflowScrolling:"touch"}}
+      contentStyle={{background:"transparent",borderRadius:0,padding:"18px 0 0",paddingBottom:"calc(20px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:440,maxHeight:"none",overflowY:"visible",WebkitOverflowScrolling:"touch",border:"none",textAlign:"left",animation:"fadeIn 0.25s ease",boxShadow:"none"}}
     >
       <SessionSummaryStatsPanel
         resumenSesion={resumenSesion}
@@ -35,21 +37,23 @@ export default function WorkoutSessionSummary({
         border={border}
         textMuted={textMuted}
         textMain={textMain}
+        allEx={allEx}
+        videoOverrides={videoOverrides}
       />
 
-      <button className="hov" style={{width:"100%",padding:"12px",background:darkMode?"#162234":"#E2E8F0",border:"none",borderRadius:12,color:textMuted,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",marginBottom:8}}
-        onClick={onClose}>
-        {msg("Cerrar", "Close")}
-      </button>
-      <div style={{marginBottom:4}}>
-        <div style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,marginBottom:8,textAlign:"center"}}>{msg("COMPARTIR ENTRENAMIENTO", "SHARE WORKOUT")}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:18}}>
         <button className="hov" style={{
-          width:"100%",padding:"16px",borderRadius:12,border:"none",cursor:"pointer",
-          fontFamily:"inherit",fontSize:15,fontWeight:900,letterSpacing:1,
-          background:"linear-gradient(135deg,#FF3B30,#FF6B35)",color:"#fff",
-          boxShadow:"0 4px 14px rgba(59,130,246,0.35)"
+          width:"100%",minHeight:50,padding:"13px 16px",borderRadius:16,border:"1px solid rgba(37,99,235,0.35)",cursor:"pointer",
+          fontFamily:"inherit",fontSize:13,fontWeight:850,letterSpacing:0.6,
+          background:"#2563EB",color:"#fff",
+          boxShadow:"0 16px 34px rgba(37,99,235,0.24)",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:8
         }} onClick={onShareImage}>
           <Ic name="upload" size={16}/> {msg("COMPARTIR / GUARDAR IMAGEN", "SHARE / SAVE IMAGE")}
+        </button>
+        <button className="hov" style={{width:"100%",minHeight:44,padding:"11px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:16,color:"#94A3B8",fontSize:14,fontWeight:750,cursor:"pointer",fontFamily:"inherit"}}
+          onClick={onClose}>
+          {msg("Cerrar", "Close")}
         </button>
       </div>
     </BaseModal>

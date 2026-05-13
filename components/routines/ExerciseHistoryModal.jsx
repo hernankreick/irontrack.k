@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatWorkoutSetLabel } from '../../lib/workoutSession.js';
 
 export default function ExerciseHistoryModal({
   exercise,
@@ -61,7 +62,7 @@ export default function ExerciseHistoryModal({
         {history.slice(0,10).map(function(s2,i){
           return (
             <div key={exercise.id+"-hist-"+(s2.date||"")+"-"+(s2.kg??"")+"-"+(s2.reps??"")+"-"+(s2.week ?? "nw")+"-"+i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid "+(darkMode?"#2D4057":"#2D4057"),fontSize:15}}>
-              <span>{s2.kg}kg x {s2.reps} reps</span>
+              <span>{formatWorkoutSetLabel(exercise, s2)}</span>
               <span style={{color:textMuted}}>{s2.date}</span>
             </div>
           );

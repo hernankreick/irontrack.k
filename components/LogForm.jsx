@@ -2,6 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Ic } from './Ic.jsx';
 import { useIronTrackI18n } from '../contexts/IronTrackI18nContext.jsx';
 import { irontrackMsg as M, pickExerciseName, pickPatLabel } from '../lib/irontrackMsg.js';
+import {
+  canLogWorkoutSet,
+  formatWorkoutSetLabel,
+  normalizeWorkoutKg,
+  resolveWorkoutRepsInput,
+} from '../lib/workoutSession.js';
 
 export function LogForm({ex, btn, inp, lbl, tag, fmtP, progress, onLog, onClose, darkMode, PATS}) {
   const { lang } = useIronTrackI18n();
@@ -29,6 +35,7 @@ export function LogForm({ex, btn, inp, lbl, tag, fmtP, progress, onLog, onClose,
   const rpeColors={6:"#22C55E",7:"#22C55E",8:"#60A5FA",9:"#8B9AB2",10:"#2563EB"};
   const rpeLabels={6:M(lang,"Muy facil","Easy","Muito fácil"),7:M(lang,"Controlado","Moderate","Controlado"),8:M(lang,"Exigente","Hard","Exigente"),9:M(lang,"Muy duro","Very Hard","Muito pesado"),10:M(lang,"Al limite","Max","No limite")};
   const kgNum = parseFloat(kg)||0;
+  const canLogSet = canLogWorkoutSet(ex, kg, reps);
   const adjustKg = (delta) => setKg(v=>String(Math.max(0,(parseFloat(v)||0)+delta)));
   const holdTimer = useRef(null);
   const holdInterval = useRef(null);
@@ -85,7 +92,7 @@ export function LogForm({ex, btn, inp, lbl, tag, fmtP, progress, onLog, onClose,
       {lastSet&&(
         <div style={{background:bgSub,borderRadius:12,padding:"8px 12px",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <span style={{fontSize:13,color:textMuted}}>{M(lang,"Última vez","Last time","Última vez")}</span>
-          <span style={{fontSize:15,fontWeight:800,color:textMain}}>{lastSet.kg}kg × {lastSet.reps} reps</span>
+          <span style={{fontSize:15,fontWeight:800,color:textMain}}>{formatWorkoutSetLabel(ex, lastSet)}</span>
         </div>
       )}
       {isPR&&(
@@ -175,14 +182,15 @@ export function LogForm({ex, btn, inp, lbl, tag, fmtP, progress, onLog, onClose,
         </div>
       </div>
       <button className="hov"
-        style={{width:"100%",padding:"14px",background:isPR?"#60A5FA":"#2563EB",
-          color:"#fff",border:"none",borderRadius:10,fontSize:16,fontWeight:800,
-          cursor:"pointer",fontFamily:"inherit",letterSpacing:0.5,marginBottom:8,
+        disabled={!canLogSet}
+        style={{width:"100%",padding:"14px",background:!canLogSet?"#1a2535":isPR?"#60A5FA":"#2563EB",
+          color:!canLogSet?"#475569":"#fff",border:"none",borderRadius:10,fontSize:16,fontWeight:800,
+          cursor:!canLogSet?"default":"pointer",fontFamily:"inherit",letterSpacing:0.5,marginBottom:8,
           display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
         onClick={()=>{
-          if(!kg||!reps) return;
+          if(!canLogWorkoutSet(ex, kg, reps)) return;
           try{navigator.vibrate&&navigator.vibrate(50)}catch(e){}
-          onLog(parseFloat(kg),parseInt(reps),note,pause,rpe);
+          onLog(normalizeWorkoutKg(kg),resolveWorkoutRepsInput(reps, ex),note,pause,rpe);
         }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         {M(lang,"REGISTRAR SET","LOG SET","REGISTRAR SÉRIE")}

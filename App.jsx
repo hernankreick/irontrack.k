@@ -120,6 +120,7 @@ import {
   buildPendingProgressItem,
   buildProgressPayload,
   calculateNewWeightPR,
+  formatWorkoutSetLabel,
   updateExerciseKgInRoutines,
   updateExerciseProgressRecord,
 } from './lib/workoutSession.js';
@@ -1823,9 +1824,10 @@ function GymApp() {
     setTimer({ total: secs, color, endAt: Date.now() + secs * 1000 });
   };
 
-  const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe) => {
+  const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe, weekOverride) => {
     const d = new Date().toLocaleDateString("es-AR");
-    const newSet = buildExerciseSetRecord(kg, reps, d, currentWeek, note, rpe);
+    const weekForSet = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : currentWeek;
+    const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe);
     setProgress(prev=>{
       const ex = updateExerciseProgressRecord(prev[exId], newSet);
       return {...prev,[exId]:ex};
@@ -4869,7 +4871,7 @@ function GymApp() {
                   <div style={{display:"flex",gap:4,overflowX:"auto"}}>
                     {(pg.sets||[]).slice(0,5).map((s2,i)=>(
                       <div key={ex.id+"-pg-mini-"+(s2.date||"")+"-"+(s2.kg??"")+"-"+(s2.reps??"")+"-"+i} style={{background:darkMode?"#162234":"#E2E8F0",borderRadius:6,padding:"4px 8px",flexShrink:0,fontSize:13}}>
-                        <div style={{fontWeight:700}}>{s2.kg}kg x {s2.reps}</div>
+                        <div style={{fontWeight:700}}>{formatWorkoutSetLabel(ex, s2)}</div>
                         <div style={{color:textMuted,fontSize:13}}>{s2.date}</div>
                       </div>
                     ))}
@@ -5340,6 +5342,8 @@ function GymApp() {
         border={border}
         textMuted={textMuted}
         textMain={textMain}
+        allEx={allEx}
+        videoOverrides={videoOverrides}
         onClose={()=>setResumenSesion(null)}
         onShareImage={shareSessionSummaryImage}
       />

@@ -310,6 +310,7 @@ export function WorkoutScreen(props) {
             textMain={textMain} textMuted={textMuted}
             sessionPRList={sessionPRList}
             videoOverrides={videoOverrides} setVideoModal={setVideoModal}
+            currentWeek={currentWeek}
             logSet={logSet} startTimer={startTimer}
             setPrCelebration={setPrCelebration} progress={progress}
           />
