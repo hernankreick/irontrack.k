@@ -16,17 +16,18 @@ export default function CoachSectionRenderer({
   coachDesktop1024,
   dashboardProps,
   calendarProps,
-  mobileDrawerProps,
-  settingsProps,
-  exercisesProps,
   routinesProps,
-  scannerProps,
   studentsProps,
+  exercisesProps,
+  settingsProps,
+  mobileDrawerProps,
+  scannerProps,
 }) {
   const isCoach = sessionData?.role === "entrenador" && !esAlumno;
 
   return (
     <>
+      {/* Main coach sections */}
       {(tab === "plan" || tab === "progress") && isCoach && (
         <CoachDashboardMain
           activeNav={tab === "progress" ? "progreso" : "dashboard"}
@@ -40,10 +41,24 @@ export default function CoachSectionRenderer({
         </div>
       )}
 
-      {showCoachDesktopShell && !coachDesktop1024 && (
-        <CoachMobileDrawer {...mobileDrawerProps} />
+      {tab === "routines" && !esAlumno && (
+        <CoachRoutinesMain {...routinesProps} />
       )}
 
+      {tab === "alumnos" && sessionData?.role === "entrenador" && (
+        <CoachStudentsMain {...studentsProps} />
+      )}
+
+      {/* Exercise library aliases */}
+      {tab === "library" && !esAlumno && (
+        <CoachExercisesMain {...exercisesProps} />
+      )}
+
+      {tab === "biblioteca" && !esAlumno && (
+        <CoachExercisesMain {...exercisesProps} />
+      )}
+
+      {/* Coach shell/support views */}
       {(tab === "settings" || tab === "perfil") && showCoachDesktopShell && isCoach && sessionData && (
         <SettingsPage
           key={tab}
@@ -54,26 +69,14 @@ export default function CoachSectionRenderer({
         />
       )}
 
-      {tab === "library" && !esAlumno && (
-        <CoachExercisesMain {...exercisesProps} />
-      )}
-
-      {tab === "routines" && !esAlumno && (
-        <CoachRoutinesMain {...routinesProps} />
+      {showCoachDesktopShell && !coachDesktop1024 && (
+        <CoachMobileDrawer {...mobileDrawerProps} />
       )}
 
       {tab === "scanner" && !esAlumno && (
         <div className="min-w-0 max-w-full">
           <ScannerRutina {...scannerProps} />
         </div>
-      )}
-
-      {tab === "biblioteca" && !esAlumno && (
-        <CoachExercisesMain {...exercisesProps} />
-      )}
-
-      {tab === "alumnos" && sessionData?.role === "entrenador" && (
-        <CoachStudentsMain {...studentsProps} />
       )}
     </>
   );
