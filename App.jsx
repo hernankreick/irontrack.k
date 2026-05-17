@@ -91,7 +91,7 @@ import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyPr
 import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import WorkoutSessionSummary from './components/workout/WorkoutSessionSummary.jsx';
-import EditExModal from './components/routines/EditExModal.jsx';
+import EditExerciseModalHost from './components/routines/EditExerciseModalHost.jsx';
 import AddExerciseModal from './components/modals/AddExerciseModal.jsx';
 import CoachChatModal from './components/modals/CoachChatModal.jsx';
 import {
@@ -4817,8 +4817,15 @@ function GymApp() {
         msg={msg}
         onClose={()=>setChatModal(null)}
       />
-      {editEx&&(
-        <EditExModal darkMode={darkMode} key={editEx.rId+"-"+editEx.dIdx+"-"+editEx.eIdx} editEx={editEx} btn={btn} inp={inp} allEx={allEx} es={es} PATS={PATS} msg={msg}
+      <EditExerciseModalHost
+        editEx={editEx}
+        darkMode={darkMode}
+        btn={btn}
+        inp={inp}
+        allEx={allEx}
+        es={es}
+        PATS={PATS}
+        msg={msg}
           onSave={async(updatedRaw)=>{
             const updated = sanitizeExerciseSnapshotForWrite(updatedRaw);
             const blq = editEx.bloque||"exercises";
@@ -4860,7 +4867,6 @@ function GymApp() {
           }}
           onClose={()=>setEditEx(null)}
         />
-      )}
       {loginModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:130,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setLoginModal(false)}>
           <div style={{background:bgCard,borderRadius:16,padding:"24px 20px",width:"100%",maxWidth:360,animation:"fadeIn 0.25s ease"}} onClick={e=>e.stopPropagation()}>
