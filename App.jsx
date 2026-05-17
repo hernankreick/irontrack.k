@@ -9,6 +9,7 @@ import { ChatFlotante } from './components/ChatFlotante.jsx';
 import AlumnoRestTimerBar from './components/student/AlumnoRestTimerBar.jsx';
 import StudentMainView from './components/student/StudentMainView.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
+import { useAppShellUIState } from './hooks/useAppShellUIState.js';
 import { useCoachUIState } from './hooks/useCoachUIState.js';
 import { useStudentUIState } from './hooks/useStudentUIState.js';
 import {
@@ -690,11 +691,16 @@ function GymApp() {
     return irontrackMsg(lang, esStr, enStr, ptStr);
   }, [lang]);
   const { install: installPWA, canInstall: canInstallPWA } = usePWAInstall();
+  const {
+    toast,
+    toast2,
+    settingsOpen,
+    setSettingsOpen,
+  } = useAppShellUIState();
 
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
   const [progress, setProgress] = useState(() => { try{return JSON.parse(localStorage.getItem("it_pg")||"{}")}catch(e){return {}} });
   const [user, setUser] = useState(() => { try{return JSON.parse(localStorage.getItem("it_u")||"null")}catch(e){return null} });
-  const [toast, setToast] = useState(null);
   const [search, setSearch] = useState("");
   const [filterPat, setFilterPat] = useState(null);
   const [detailEx, setDetailEx] = useState(null);
@@ -875,7 +881,6 @@ function GymApp() {
   const planScrollCtxRef = useRef({ alumnoPlan: false, headerCollapse: true });
   const [resumenSesion, setResumenSesion] = useState(null);
   const [chatOpenId, setChatOpenId] = useState(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileEdit, setProfileEdit] = useState({nombre:"",apellido:"",email:"",phone:"",avatarDataUrl:null});
   const [showWelcome, setShowWelcome] = useState(()=>{ try{ const v=localStorage.getItem("it_show_welcome"); if(v){localStorage.removeItem("it_show_welcome");return true;} return false; }catch(e){return false;} });
@@ -913,10 +918,6 @@ function GymApp() {
   const [timer, setTimer] = useState(null);
   const timerRef = useRef(null);
   const mobileDrawerRef = useRef(null);
-  const toast2 = useCallback((msg, type) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2200);
-  }, []);
   var ALUMNO_HEADER_MINI_PX = 56;
   /** Colapso visual únicamente: NO quitar nodos ni height:0. La caja real la fija studentHeaderShellRef (altura monótona). */
   function applyAlumnoHeaderLayerStyles(collapsed) {
