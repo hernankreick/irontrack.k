@@ -6,7 +6,6 @@ import { RutinaView } from './components/RutinaView.jsx';
 import ExerciseHistoryModal from './components/routines/ExerciseHistoryModal.jsx';
 import NewRoutineModal from './components/routines/NewRoutineModal.jsx';
 import { WorkoutScreen } from './components/WorkoutScreen.jsx';
-import { Chat } from './components/Chat.jsx';
 import { ChatFlotante } from './components/ChatFlotante.jsx';
 import AlumnoRestTimerBar from './components/student/AlumnoRestTimerBar.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
@@ -89,6 +88,7 @@ import WorkoutSessionSummary from './components/workout/WorkoutSessionSummary.js
 import EditExModal from './components/routines/EditExModal.jsx';
 import BaseModal from './components/modals/BaseModal.jsx';
 import AddExerciseModal from './components/modals/AddExerciseModal.jsx';
+import CoachChatModal from './components/modals/CoachChatModal.jsx';
 import {
   estimateDayMinutes,
   countExercisesWithLogToday,
@@ -4962,27 +4962,18 @@ function GymApp() {
         </BaseModal>
       )}
             {/* ── Modal chat entrenador ── */}
-      {chatModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setChatModal(null)}>
-          <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxWidth:480,border:"1px solid "+border,maxHeight:"80dvh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <div style={{width:32,height:32,borderRadius:"50%",background:"#2563EB22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#2563EB"}}>
-                  {(chatModal.alumnoNombre||"?").slice(0,2).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{fontSize:15,fontWeight:800,color:textMain}}>{chatModal.alumnoNombre}</div>
-                  <div style={{fontSize:11,color:textMuted}}>{msg("Chat interno", "Internal chat")}</div>
-                </div>
-              </div>
-              <button onClick={()=>setChatModal(null)} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer",padding:"4px"}}><Ic name="x" size={18}/></button>
-            </div>
-            <div style={{flex:1,overflow:"hidden"}}>
-              <Chat darkMode={darkMode} es={es} alumnoId={chatModal.alumnoId} alumnoNombre={chatModal.alumnoNombre} esEntrenador={true} sb={sb}/>
-            </div>
-          </div>
-        </div>
-      )}
+      <CoachChatModal
+        chatModal={chatModal}
+        darkMode={darkMode}
+        es={es}
+        sb={sb}
+        bgCard={bgCard}
+        border={border}
+        textMain={textMain}
+        textMuted={textMuted}
+        msg={msg}
+        onClose={()=>setChatModal(null)}
+      />
       {editEx&&(
         <EditExModal darkMode={darkMode} key={editEx.rId+"-"+editEx.dIdx+"-"+editEx.eIdx} editEx={editEx} btn={btn} inp={inp} allEx={allEx} es={es} PATS={PATS} msg={msg}
           onSave={async(updatedRaw)=>{
