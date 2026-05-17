@@ -56,7 +56,7 @@ import {
 } from './components/onboarding/OnboardingPrimitives.jsx';
 import OnboardingScreen from './components/onboarding/OnboardingScreen.jsx';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
-import CoachDashboard from './components/CoachDashboard';
+import CoachDashboardMain from './components/coach/CoachDashboardMain.jsx';
 import CoachCalendar from './components/CoachCalendar.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
@@ -100,6 +100,7 @@ import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
 import ToastBanner from './components/ui/ToastBanner.jsx';
 import AppGlobalStyles from './components/layout/AppGlobalStyles.jsx';
+import AppMainScroll from './components/layout/AppMainScroll.jsx';
 import CoachMobileDrawer from './components/layout/CoachMobileDrawer.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
@@ -3648,191 +3649,123 @@ function GymApp() {
         />
       )}
 
-      <div
-        className={
-          "plan-main-scroll relative z-0 overflow-y-auto " +
-          (showCoachDesktopShell && !esAlumno ? "overflow-x-hidden " : "") +
-          (showCoachDesktopShell && !esAlumno
-            ? "px-0 "
-            : esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
-              ? "px-7 "
-              : "px-6 ") +
-          (showCoachDesktopShell && !esAlumno ? "lg:[scrollbar-gutter:stable] " : "") +
-          (!coachSuppressTopNav ? "mt-6 " : "") +
-          (planScrollDiag.planAnimationsGlobalCss === false ? "plan-scroll-diag-no-hov " : "") +
-          (coachSuppressTopNav
-            ? "pt-0 "
-            : esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
-              ? "pt-8 "
-              : tab === "progress"
-                ? "pt-[max(0.75rem,env(safe-area-inset-top,0px))] "
-                : showCoachDesktopShell && !esAlumno
-                  ? "pt-6 "
-                  : "pt-6 ")
-        }
-        ref={function (node) {
+      <AppMainScroll
+        showCoachDesktopShell={showCoachDesktopShell}
+        esAlumno={esAlumno}
+        tab={tab}
+        showAlumnoProgressStack={showAlumnoProgressStack}
+        coachSuppressTopNav={coachSuppressTopNav}
+        coachDesktop1024={coachDesktop1024}
+        planScrollDiag={planScrollDiag}
+        alumnoTopBarFixed={alumnoTopBarFixed}
+        alumnoFullScreenShell={alumnoFullScreenShell}
+        session={session}
+        activeDay={activeDay}
+        darkMode={darkMode}
+        onScrollNode={function (node) {
           scrollRef.current = node;
         }}
-        style={{
-          /** 100svh: viewport estable; 100dvh cambia con la barra de URL en móvil y redimensiona el área → micro saltos. */
-          height:
-            showCoachDesktopShell && !esAlumno
-              ? undefined
-              : alumnoTopBarFixed
-                ? "100svh"
-                : "calc(100svh - 130px)",
-          flex: alumnoFullScreenShell ? 1 : showCoachDesktopShell && !esAlumno ? 1 : undefined,
-          minHeight: alumnoFullScreenShell ? 0 : showCoachDesktopShell && !esAlumno ? 0 : undefined,
-          maxHeight: showCoachDesktopShell && !esAlumno ? "100%" : undefined,
-          display:
-            session && activeDay
-              ? "none"
-              : showCoachDesktopShell && !esAlumno
-                ? "flex"
-                : "block",
-          flexDirection: showCoachDesktopShell && !esAlumno && !(session && activeDay) ? "column" : undefined,
-          paddingBottom: esAlumno
-            ? "calc(150px + env(safe-area-inset-bottom, 0px))"
-            : showCoachDesktopShell
-              ? coachDesktop1024
-                ? "calc(1rem + env(safe-area-inset-bottom, 0px))"
-                : "calc(5.5rem + env(safe-area-inset-bottom, 0px))"
-              : "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
-          paddingLeft:
-            esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
-              ? 20
-              : undefined,
-          paddingRight:
-            esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
-              ? 20
-              : undefined,
-          paddingTop:
-            esAlumno && (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
-              ? alumnoTopBarFixed
-                ? "calc(env(safe-area-inset-top, 0px) + 128px)"
-                : 32
-              : undefined,
-          WebkitOverflowScrolling: "touch",
-          scrollBehavior: "auto",
-          overflowAnchor: "none",
-          overscrollBehavior: "contain",
-          background: darkMode
-            ? esAlumno &&
-                (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
-              ? "#0B1220"
-              : "#0B1120"
-            : showCoachDesktopShell && !esAlumno
-              ? "#ffffff"
-              : "#F1F5F9",
-        }}
       >
-        <div
-          className={
-            showCoachDesktopShell && !esAlumno
-              ? "mx-auto box-border flex min-h-0 w-full min-w-0 max-w-[min(100%,1400px)] flex-1 flex-col px-4 pb-3 pt-0 sm:px-5 lg:px-6 lg:pb-12 lg:pt-6"
-              : "min-w-0 w-full"
-          }
-        >
         {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} darkMode={darkMode} toast2={toast2} msg={msg}/>}
         {(tab==="plan"||tab==="progress")&&!esAlumno&&sessionData?.role==="entrenador"&&(
-              <CoachDashboard
-                activeNav={tab==="progress"?"progreso":"dashboard"}
-                alumnos={alumnosActivosLimpios}
-                sesionesGlobales={sesionesGlobalesLimpias}
-                progresoGlobal={progresoGlobalLimpio}
-                rutinasSBEntrenador={rutinasSBEntrenadorLimpias}
-                allEx={allEx}
-                lang={lang}
-                darkMode={darkMode}
-                currentWeek={currentWeek}
-                coachName={sessionData?.name || ""}
-                onEnviarMensaje={function () {
-                  var first = (alumnos || [])[0];
-                  if (first) {
-                    setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
-                  } else {
-                    toast2(msg("No hay alumnos para contactar", "No athletes to message"));
-                  }
-                }}
-                onCrearRutina={function () {
-                  setTab("routines");
-                }}
-                onRevisarAlumnos={function () {
-                  setTab("alumnos");
-                }}
-                onRevisar={async function (alumnoId) {
-                  var alum = (alumnosActivosLimpios || []).find(function (x) {
-                    return String(x.id) === String(alumnoId);
-                  });
-                  if (!alum) {
-                    return;
-                  }
-                  setAlumnoActivo(alum);
-                  setTab("alumnos");
-                  setLoadingSB(true);
-                  try {
-                    var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
-                    setRutinasSB(r[0] || []);
-                    setAlumnoProgreso(r[1] || []);
-                    setAlumnoSesiones(r[2] || []);
-                  } catch (e) {
-                    console.error("[CoachDashboard onRevisar]", e);
-                  }
-                  setLoadingSB(false);
-                }}
-                onVerPerfil={async function (alumnoId) {
-                  var alum = (alumnosActivosLimpios || []).find(function (x) {
-                    return String(x.id) === String(alumnoId);
-                  });
-                  if (!alum) {
-                    return;
-                  }
-                  setAlumnoActivo(alum);
-                  setTab("alumnos");
-                  setLoadingSB(true);
-                  try {
-                    var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
-                    setRutinasSB(r[0] || []);
-                    setAlumnoProgreso(r[1] || []);
-                    setAlumnoSesiones(r[2] || []);
-                  } catch (e) {
-                    console.error("[CoachDashboard onVerPerfil]", e);
-                  }
-                  setLoadingSB(false);
-                }}
-                onNuevoAlumno={function () {
-                  setTab("alumnos");
-                  setNewAlumnoForm(true);
-                }}
-                onNuevaRutina={function () {
-                  setTab("routines");
-                }}
-                onNuevoEjercicio={function () {
-                  setTab("biblioteca");
-                  setBibOpenNewExerciseTick(function (t) {
-                    return t + 1;
-                  });
-                }}
-                onIrProgreso={function () {
-                  setTab("progress");
-                }}
-                onAbrirChatAlumno={function (alumnoId) {
-                  var alum = (alumnos || []).find(function (x) {
-                    return String(x.id) === String(alumnoId);
-                  });
-                  if (!alum) {
-                    toast2(msg("Alumno no encontrado", "Athlete not found"));
-                    return;
-                  }
-                  setChatModal({
-                    alumnoId: alum.id,
-                    alumnoNombre: alum.nombre || alum.email || "Alumno",
-                  });
-                }}
-                globalSearchData={coachGlobalSearchData}
-                onGlobalSearchNavigate={coachGlobalSearchNavigate}
-                getAlumnoCategoria={coachAlumnoCategoria}
-              />
+          <CoachDashboardMain
+            activeNav={tab==="progress"?"progreso":"dashboard"}
+            alumnos={alumnosActivosLimpios}
+            sesionesGlobales={sesionesGlobalesLimpias}
+            progresoGlobal={progresoGlobalLimpio}
+            rutinasSBEntrenador={rutinasSBEntrenadorLimpias}
+            allEx={allEx}
+            lang={lang}
+            darkMode={darkMode}
+            currentWeek={currentWeek}
+            coachName={sessionData?.name || ""}
+            onEnviarMensaje={function () {
+              var first = (alumnos || [])[0];
+              if (first) {
+                setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
+              } else {
+                toast2(msg("No hay alumnos para contactar", "No athletes to message"));
+              }
+            }}
+            onCrearRutina={function () {
+              setTab("routines");
+            }}
+            onRevisarAlumnos={function () {
+              setTab("alumnos");
+            }}
+            onRevisar={async function (alumnoId) {
+              var alum = (alumnosActivosLimpios || []).find(function (x) {
+                return String(x.id) === String(alumnoId);
+              });
+              if (!alum) {
+                return;
+              }
+              setAlumnoActivo(alum);
+              setTab("alumnos");
+              setLoadingSB(true);
+              try {
+                var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
+                setRutinasSB(r[0] || []);
+                setAlumnoProgreso(r[1] || []);
+                setAlumnoSesiones(r[2] || []);
+              } catch (e) {
+                console.error("[CoachDashboard onRevisar]", e);
+              }
+              setLoadingSB(false);
+            }}
+            onVerPerfil={async function (alumnoId) {
+              var alum = (alumnosActivosLimpios || []).find(function (x) {
+                return String(x.id) === String(alumnoId);
+              });
+              if (!alum) {
+                return;
+              }
+              setAlumnoActivo(alum);
+              setTab("alumnos");
+              setLoadingSB(true);
+              try {
+                var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
+                setRutinasSB(r[0] || []);
+                setAlumnoProgreso(r[1] || []);
+                setAlumnoSesiones(r[2] || []);
+              } catch (e) {
+                console.error("[CoachDashboard onVerPerfil]", e);
+              }
+              setLoadingSB(false);
+            }}
+            onNuevoAlumno={function () {
+              setTab("alumnos");
+              setNewAlumnoForm(true);
+            }}
+            onNuevaRutina={function () {
+              setTab("routines");
+            }}
+            onNuevoEjercicio={function () {
+              setTab("biblioteca");
+              setBibOpenNewExerciseTick(function (t) {
+                return t + 1;
+              });
+            }}
+            onIrProgreso={function () {
+              setTab("progress");
+            }}
+            onAbrirChatAlumno={function (alumnoId) {
+              var alum = (alumnos || []).find(function (x) {
+                return String(x.id) === String(alumnoId);
+              });
+              if (!alum) {
+                toast2(msg("Alumno no encontrado", "Athlete not found"));
+                return;
+              }
+              setChatModal({
+                alumnoId: alum.id,
+                alumnoNombre: alum.nombre || alum.email || "Alumno",
+              });
+            }}
+            globalSearchData={coachGlobalSearchData}
+            onGlobalSearchNavigate={coachGlobalSearchNavigate}
+            getAlumnoCategoria={coachAlumnoCategoria}
+          />
         )}
         {/* ── MOBILE DRAWER (solo entrenador, solo mobile) ── */}
         {tab==="calendar"&&!esAlumno&&sessionData?.role==="entrenador"&&(
@@ -5139,8 +5072,7 @@ function GymApp() {
       />
       <ToastBanner toast={toast} darkMode={darkMode} border={border} textMain={textMain} />
 
-      </div>
-        </div>
+      </AppMainScroll>
       </div>
       </div>
       {/* Modal video: fuera del scroll (display:none con sesi?n ocultaba el overlay) + portal a body */}
