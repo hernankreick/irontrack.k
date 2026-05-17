@@ -491,9 +491,10 @@ export function ProgressChartsPanel({
               className="absolute left-2 top-full z-30 mt-2 max-h-64 w-[200px] max-w-[calc(100vw-40px)] overflow-y-auto rounded-[18px] border px-3 py-2 shadow-2xl"
               style={{
                 borderColor: 'rgba(111, 143, 184, 0.42)',
-                background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.98), rgba(10, 18, 30, 0.98))',
+                background: 'rgba(255,0,0,0.25)',
                 boxShadow: '0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
-                transform: 'translateX(12px)',
+                transform: 'translateX(40px)',
+                outline: '3px solid red',
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -515,7 +516,7 @@ export function ProgressChartsPanel({
                       setMuscleOpen(false)
                     }}
                   >
-                    <span className="min-w-0 flex-1 truncate">{m}</span>
+                    <span className="min-w-0 flex-1 truncate">{m === 'Todos' ? 'TEST - Todos' : m}</span>
                     {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--sp-accent)' }} />}
                   </button>
                 )
@@ -554,9 +555,10 @@ export function ProgressChartsPanel({
               className="absolute left-2 top-full z-30 mt-2 w-[200px] max-w-[calc(100vw-40px)] rounded-[18px] border px-3 py-2 shadow-2xl"
               style={{
                 borderColor: 'rgba(111, 143, 184, 0.42)',
-                background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.98), rgba(10, 18, 30, 0.98))',
+                background: 'rgba(255,0,0,0.25)',
                 boxShadow: '0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
-                transform: 'translateX(12px)',
+                transform: 'translateX(40px)',
+                outline: '3px solid red',
               }}
               onClick={(e) => e.stopPropagation()}
             >
