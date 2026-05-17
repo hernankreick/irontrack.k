@@ -10,6 +10,7 @@ import AlumnoRestTimerBar from './components/student/AlumnoRestTimerBar.jsx';
 import StudentMainView from './components/student/StudentMainView.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
 import { useCoachUIState } from './hooks/useCoachUIState.js';
+import { useStudentUIState } from './hooks/useStudentUIState.js';
 import {
   BIB_MUSCLE_OPTIONS,
   BIB_MUSCLE_ORDER,
@@ -534,6 +535,11 @@ function GymApp() {
     coachRutinaMenuOpen, setCoachRutinaMenuOpen,
     mobileDrawerOpen, setMobileDrawerOpen,
   } = useCoachUIState();
+  const {
+    expandedPlanDay, setExpandedPlanDay,
+    userMenuOpen, setUserMenuOpen,
+    pwaInstallTipOpen, setPwaInstallTipOpen,
+  } = useStudentUIState();
   const [rutinasSB, setRutinasSB] = useState([]);
   const [sesionesGlobales, setSesionesGlobales] = useState([]);
   const [progresoGlobal, setProgresoGlobal] = useState({});
@@ -834,7 +840,6 @@ function GymApp() {
   /** Claves: id de EX (catálogo); p.ej. { sq: "empuje" } — persiste en localStorage `it_pattern_ov` */
   const [patternOverrides, setPatternOverrides] = useState({});
   const [videoModal, setVideoModal] = useState(null); // {url, nombre}
-  const [expandedPlanDay, setExpandedPlanDay] = useState(null); // "rutId-dayIdx"
   const [editEx, setEditEx] = useState(null);
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
@@ -873,8 +878,6 @@ function GymApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileEdit, setProfileEdit] = useState({nombre:"",apellido:"",email:"",phone:"",avatarDataUrl:null});
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [pwaInstallTipOpen, setPwaInstallTipOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(()=>{ try{ const v=localStorage.getItem("it_show_welcome"); if(v){localStorage.removeItem("it_show_welcome");return true;} return false; }catch(e){return false;} });
   const [currentWeek, setCurrentWeek] = useState(() => { try{return parseInt(localStorage.getItem("it_week")||"0")}catch(e){return 0} });
   const [completedDays, setCompletedDays] = useState(() => { try{return JSON.parse(localStorage.getItem("it_cd")||"[]")}catch(e){return []} });
