@@ -69,7 +69,6 @@ import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
-import { TodayWorkoutList } from './components/student-plan/TodayWorkoutList.jsx';
 import { WeeklyPlanDayCard } from './components/student-plan/WeeklyPlanDayCard.jsx';
 import CompletedTodayBanner from './components/student-plan/CompletedTodayBanner.jsx';
 import StudentNoRoutinesEmptyState from './components/student-plan/StudentNoRoutinesEmptyState.jsx';
@@ -3765,6 +3764,7 @@ function GymApp() {
           sessionData={sessionData}
           showCoachDesktopShell={showCoachDesktopShell}
           coachDesktop1024={coachDesktop1024}
+          /* Dashboard / progreso */
           dashboardProps={{
             alumnos: alumnosActivosLimpios,
             sesionesGlobales: sesionesGlobalesLimpias,
@@ -3789,6 +3789,7 @@ function GymApp() {
             onGlobalSearchNavigate: coachGlobalSearchNavigate,
             getAlumnoCategoria: coachAlumnoCategoria,
           }}
+          /* Calendario */
           calendarProps={{
             alumnos: alumnosActivosLimpios,
             rutinas: rutinasCalendarioEntrenador,
@@ -3798,45 +3799,7 @@ function GymApp() {
             entrenadorId: supabaseSessionUserId || null,
             onAssignRoutineToAlumno: assignRoutineToAlumno,
           }}
-          mobileDrawerProps={{
-            open: mobileDrawerOpen,
-            activeTab: tab,
-            sessionData: sessionData,
-            msg: msg,
-            mobileDrawerRef: mobileDrawerRef,
-            onClose: function () { setMobileDrawerOpen(false); },
-            onNavigate: setTab,
-            onLogout: handleCoachLogout,
-            coachInitials: coachInitialsFromFullName(sessionData?.name),
-          }}
-          settingsProps={{
-            onClose: handleCoachSettingsClose,
-            toast2: toast2,
-            setSessionData: setSessionData,
-            syncStateWithLocalStorage: syncStateWithLocalStorage,
-            lang: lang,
-            setLang: setLang,
-            darkMode: darkMode,
-            setDarkMode: setDarkMode,
-            es: es,
-            alumnosCount: alumnos.length,
-            rutinasActivasCount: rutinasSBEntrenador.length,
-            sesionesGlobales: sesionesGlobales,
-            sb: sb,
-            entrenadorId: sessionData?.entrenadorId || "entrenador_principal",
-          }}
-          exercisesProps={{
-            allEx: allEx,
-            setPatternOverrides: setPatternOverrides,
-            darkMode: darkMode,
-            sb: sb,
-            customEx: customEx,
-            setCustomEx: setCustomEx,
-            toast2: toast2,
-            videoOverrides: videoOverrides,
-            setVideoOverrides: setVideoOverrides,
-            openNewExerciseTick: bibOpenNewExerciseTick,
-          }}
+          /* Rutinas */
           routinesProps={{
             setTab: setTab,
             border: border,
@@ -3868,16 +3831,7 @@ function GymApp() {
             rutinasSBEntrenador: rutinasSBEntrenador,
             setRutinasSBEntrenador: setRutinasSBEntrenador,
           }}
-          scannerProps={{
-            darkMode: darkMode,
-            sb: sb,
-            setRoutines: setRoutines,
-            alumnos: alumnosActivosLimpios,
-            toast2: toast2,
-            customEx: customEx,
-            msg: msg,
-            green: green,
-          }}
+          /* Alumnos */
           studentsProps={{
             allEx: allEx,
             alumnoActivo: alumnoActivo,
@@ -3960,6 +3914,58 @@ function GymApp() {
             textMain: textMain,
             textMuted: textMuted,
             toast2: toast2,
+          }}
+          /* Ejercicios / biblioteca */
+          exercisesProps={{
+            allEx: allEx,
+            setPatternOverrides: setPatternOverrides,
+            darkMode: darkMode,
+            sb: sb,
+            customEx: customEx,
+            setCustomEx: setCustomEx,
+            toast2: toast2,
+            videoOverrides: videoOverrides,
+            setVideoOverrides: setVideoOverrides,
+            openNewExerciseTick: bibOpenNewExerciseTick,
+          }}
+          /* Settings / perfil */
+          settingsProps={{
+            onClose: handleCoachSettingsClose,
+            toast2: toast2,
+            setSessionData: setSessionData,
+            syncStateWithLocalStorage: syncStateWithLocalStorage,
+            lang: lang,
+            setLang: setLang,
+            darkMode: darkMode,
+            setDarkMode: setDarkMode,
+            es: es,
+            alumnosCount: alumnos.length,
+            rutinasActivasCount: rutinasSBEntrenador.length,
+            sesionesGlobales: sesionesGlobales,
+            sb: sb,
+            entrenadorId: sessionData?.entrenadorId || "entrenador_principal",
+          }}
+          /* Coach shell */
+          mobileDrawerProps={{
+            open: mobileDrawerOpen,
+            activeTab: tab,
+            sessionData: sessionData,
+            msg: msg,
+            mobileDrawerRef: mobileDrawerRef,
+            onClose: function () { setMobileDrawerOpen(false); },
+            onNavigate: setTab,
+            onLogout: handleCoachLogout,
+            coachInitials: coachInitialsFromFullName(sessionData?.name),
+          }}
+          scannerProps={{
+            darkMode: darkMode,
+            sb: sb,
+            setRoutines: setRoutines,
+            alumnos: alumnosActivosLimpios,
+            toast2: toast2,
+            customEx: customEx,
+            msg: msg,
+            green: green,
           }}
         />
         {tab==="plan"&&esAlumno&&(
@@ -4144,23 +4150,6 @@ function GymApp() {
                         setPreSessionPRs({ ...snap });
                         setSessionPRList([]);
                         setSession({ rId: r0.id, dIdx: nextDayIdx, exIdx: 0, startTime: Date.now() });
-                      }}
-                    />
-                    <TodayWorkoutList
-                      msg={msg}
-                      day={todayDay}
-                      allEx={allEx}
-                      images={IMGS}
-                      currentWeek={currentWeekForStudent}
-                      es={es}
-                      videoOverrides={videoOverrides}
-                      textMain={textMain}
-                      textMuted={textMuted}
-                      border={border}
-                      onExerciseVideo={function (nombre, vUrl) {
-                        var vid = getYTVideoId(vUrl);
-                        if (vid) setVideoModal({ videoId: vid, nombre: nombre });
-                        else window.open(vUrl, "_blank");
                       }}
                     />
                     </>
