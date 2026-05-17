@@ -69,6 +69,7 @@ import {
 } from './components/onboarding/OnboardingPrimitives.jsx';
 import OnboardingScreen from './components/onboarding/OnboardingScreen.jsx';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
+import CoachConfirmDialog from './components/coach/CoachConfirmDialog.jsx';
 import CoachSectionRenderer from './components/coach/CoachSectionRenderer.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
@@ -98,7 +99,6 @@ import {
   countExercisesWithLogToday,
 } from './components/student-plan/studentPlanHelpers.js';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
-import { DeleteConfirmModal } from './components/DeleteConfirmModal.jsx';
 import LoginForm from './components/auth/LoginForm.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
@@ -5077,10 +5077,11 @@ function GymApp() {
     {(() => {
       var cfg = getCoachDialogModalConfig();
       return (
-    <DeleteConfirmModal
-      key="it-coach-confirm"
-      zIndex={10000}
-      open={coachDialog.t !== 'none'}
+    <CoachConfirmDialog
+      dialog={coachDialog}
+      config={cfg}
+      loading={coachDialogLoading}
+      cancelLabel={msg('Cancelar', 'Cancel', 'Cancelar')}
       onCancel={function () {
         if (coachDialogLoading) return;
         setCoachDialog({ t: 'none' });
@@ -5088,17 +5089,6 @@ function GymApp() {
       onConfirm={function () {
         void confirmCoachDialog();
       }}
-      title={cfg.title}
-      message={cfg.message}
-      subjectName={cfg.subjectName}
-      confirmLabel={cfg.confirmLabel}
-      cancelLabel={msg('Cancelar', 'Cancel', 'Cancelar')}
-      tone={cfg.tone}
-      loading={coachDialogLoading}
-      loadingLabel={cfg.loadingLabel}
-      useLogoutIcon={!!cfg.useLogoutIcon}
-      requireAcknowledge={!!cfg.requireAcknowledge}
-      acknowledgeLabel={cfg.acknowledgeLabel}
     />
       );
     })()}
