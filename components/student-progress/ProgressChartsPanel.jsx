@@ -502,7 +502,7 @@ export function ProgressChartsPanel({
                   <button
                     key={m}
                     type="button"
-                    className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2 text-left text-[13px] font-semibold transition-colors hover:bg-[rgba(59,130,246,0.12)]"
+                    className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl px-5 py-2 text-left text-[13px] font-semibold transition-colors hover:bg-[rgba(59,130,246,0.12)]"
                     style={{
                       background: active ? 'rgba(59, 130, 246, 0.22)' : 'transparent',
                       color: active ? 'var(--sp-fg)' : 'rgba(203, 213, 225, 0.86)',
@@ -564,7 +564,7 @@ export function ProgressChartsPanel({
                   <button
                     key={o.value}
                     type="button"
-                    className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2 text-left text-[13px] font-semibold transition-colors hover:bg-[rgba(59,130,246,0.12)]"
+                    className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl px-5 py-2 text-left text-[13px] font-semibold transition-colors hover:bg-[rgba(59,130,246,0.12)]"
                     style={{
                       background: active ? 'rgba(59, 130, 246, 0.22)' : 'transparent',
                       color: active ? 'var(--sp-fg)' : 'rgba(203, 213, 225, 0.86)',
