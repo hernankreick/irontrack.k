@@ -70,7 +70,7 @@ import ScannerRutina from './components/scanner/ScannerRutina.jsx';
 import RecordatoriosPanel, { checkTrainingReminderTick } from './components/student/RecordatoriosPanel.jsx';
 import AlumnoProfileModal from './components/student/AlumnoProfileModal.jsx';
 import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
-import StudentsSection from './components/students/StudentsSection.jsx';
+import CoachStudentsMain from './components/coach/CoachStudentsMain.jsx';
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
@@ -4434,7 +4434,7 @@ function GymApp() {
           </div>
         )}
         {tab==="alumnos"&&sessionData?.role==="entrenador"&&(
-          <StudentsSection
+          <CoachStudentsMain
             allEx={allEx}
             alumnoActivo={alumnoActivo}
             alumnoProgreso={alumnoProgreso}
