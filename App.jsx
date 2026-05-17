@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { PATS, EX, VIDEOS, IMGS } from './lib/exerciseStaticData.js';
+import {
+  getRutinaExerciseIdsForCleanup,
+  sessionBelongsToRoutineForCleanup,
+  sessionBelongsToRoutineWeekForCleanup,
+  uid,
+} from './lib/appPureHelpers.js';
 import { Ic } from './components/Ic.jsx';
 import { LogForm } from './components/LogForm.jsx';
 import ExerciseHistoryModal from './components/routines/ExerciseHistoryModal.jsx';
@@ -393,9 +399,6 @@ const sb = {
     return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
   },
 };
-
-const uid = () => Math.random().toString(36).slice(2,9);
-
 
 /**
  * ── Plan alumno: diagnóstico scroll / micro-saltos (Chrome mobile) ─────────────────
@@ -2395,34 +2398,6 @@ function GymApp() {
       };
     }
     return { tone: 'danger', title: '', message: '', subjectName: null, confirmLabel: 'OK', useLogoutIcon: false, loadingLabel: '…' };
-  }
-
-  function getRutinaExerciseIdsForCleanup(rutina) {
-    var ids = {};
-    var days = rutina && rutina.datos && Array.isArray(rutina.datos.days)
-      ? rutina.datos.days
-      : (rutina && Array.isArray(rutina.days) ? rutina.days : []);
-    (days || []).forEach(function (d) {
-      (d.warmup || []).concat(d.exercises || []).forEach(function (ex) {
-        if (ex && ex.id != null && ex.id !== "") ids[String(ex.id)] = true;
-      });
-    });
-    return Object.keys(ids);
-  }
-
-  function sessionBelongsToRoutineForCleanup(s, alumnoId, rutinaId, rutinaNombre) {
-    if (!s || String(s.alumno_id) !== String(alumnoId)) return false;
-    var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
-    var rname = rutinaNombre != null && rutinaNombre !== "" ? String(rutinaNombre) : "";
-    if (rid && s.rutina_id != null && s.rutina_id !== "") return String(s.rutina_id) === rid;
-    if (rname && (s.rutina_id == null || s.rutina_id === "")) return String(s.rutina_nombre || "") === rname;
-    if (!rid && rname) return String(s.rutina_nombre || "") === rname;
-    return !rid && !rname;
-  }
-
-  function sessionBelongsToRoutineWeekForCleanup(s, alumnoId, rutinaId, rutinaNombre, weekNumber) {
-    if (!sessionBelongsToRoutineForCleanup(s, alumnoId, rutinaId, rutinaNombre)) return false;
-    return Number(s && s.semana) === Number(weekNumber);
   }
 
   async function resetAlumnoRoutineWeek(alumno, rutina, weekIndex) {
