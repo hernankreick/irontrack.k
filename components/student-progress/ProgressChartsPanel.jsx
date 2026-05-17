@@ -126,7 +126,7 @@ function DetailChart({
   if (sorted.length < 2) {
     return (
       <div
-        className="flex min-h-[112px] items-center justify-center rounded-[14px] border px-6 py-11 text-center text-[13px] leading-6"
+        className="flex min-h-[78px] items-center justify-center rounded-[14px] border px-5 py-5 text-center text-[15px] leading-[1.35]"
         style={{
           borderColor: 'rgba(74, 101, 133, 0.42)',
           background: 'rgba(10, 15, 26, 0.32)',
@@ -460,11 +460,11 @@ export function ProgressChartsPanel({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap gap-3.5">
         <div className="relative">
           <button
             type="button"
-            className="inline-flex min-h-[46px] items-center justify-center gap-2.5 rounded-full border px-5 py-2.5 text-[13px] font-medium leading-none"
+            className="inline-flex h-11 max-w-[min(100%,220px)] items-center justify-between gap-3 rounded-full border px-5 py-2 text-[13px] font-medium leading-none"
             style={{
               borderColor: 'rgba(111, 143, 184, 0.52)',
               background: 'linear-gradient(180deg, rgba(36, 55, 82, 0.92), rgba(19, 33, 52, 0.92))',
@@ -514,7 +514,7 @@ export function ProgressChartsPanel({
         <div className="relative">
           <button
             type="button"
-            className="inline-flex min-h-[46px] items-center justify-center gap-2.5 rounded-full border px-5 py-2.5 text-[13px] font-medium leading-none"
+            className="inline-flex h-11 max-w-[min(100%,220px)] items-center justify-between gap-3 rounded-full border px-5 py-2 text-[13px] font-medium leading-none"
             style={{
               borderColor: 'rgba(111, 143, 184, 0.52)',
               background: 'linear-gradient(180deg, rgba(36, 55, 82, 0.92), rgba(19, 33, 52, 0.92))',
