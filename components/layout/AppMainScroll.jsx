@@ -58,7 +58,9 @@ export default function AppMainScroll({
               : "block",
         flexDirection: showCoachDesktopShell && !esAlumno && !(session && activeDay) ? "column" : undefined,
         paddingBottom: esAlumno
-          ? "calc(150px + env(safe-area-inset-bottom, 0px))"
+          ? tab === "plan"
+            ? "calc(180px + env(safe-area-inset-bottom, 0px))"
+            : "calc(150px + env(safe-area-inset-bottom, 0px))"
           : showCoachDesktopShell
             ? coachDesktop1024
               ? "calc(1rem + env(safe-area-inset-bottom, 0px))"
