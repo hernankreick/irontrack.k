@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { PATS, EX, VIDEOS, IMGS } from './lib/exerciseStaticData.js';
 import {
+  cloneRoutineDay,
+  exerciseMatchesLibraryFilter,
+  firstNonEmptyString,
   getRutinaExerciseIdsForCleanup,
   sessionBelongsToRoutineForCleanup,
   sessionBelongsToRoutineWeekForCleanup,
@@ -1845,11 +1848,8 @@ function GymApp() {
     var custom = (customEx || []).map(function (e) { return normalizeLibraryExercise(e, { catalog: false }); });
     return catalog.concat(custom);
   }, [customEx, patternOverrides]);
-  const filteredEx = allEx.filter(e=>{
-    const q=search.toLowerCase();
-    if(filterPat && e.pattern!==filterPat) return false;
-    if(!q) return true;
-    return e.name.toLowerCase().includes(q)||e.nameEn.toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
+  const filteredEx = allEx.filter(function (e) {
+    return exerciseMatchesLibraryFilter(e, search, filterPat, bibMuscleFilterHaystack);
   });
   const detailExHistoryData = React.useMemo(function () {
     return prepareExerciseHistoryModalData({
@@ -3989,15 +3989,8 @@ function GymApp() {
                     return allEx.find(function (info) { return info.id === ex.id; }) || ex;
                   }).filter(Boolean)
                 : [];
-              const firstNonEmpty = function () {
-                for (var i = 0; i < arguments.length; i++) {
-                  var v = arguments[i];
-                  if (typeof v === "string" && v.trim()) return v.trim();
-                }
-                return "";
-              };
               const inferDayTitle = function () {
-                var explicit = firstNonEmpty(
+                var explicit = firstNonEmptyString(
                   todayDay && (todayDay.name || todayDay.title || todayDay.nombre || todayDay.titulo || todayDay.label),
                   todayDay && todayDay.dayName
                 );
@@ -4492,15 +4485,8 @@ function GymApp() {
                 return allEx.find(function (info) { return info.id === ex.id; }) || ex;
               }).filter(Boolean)
             : [];
-          const firstWelcomeText = function () {
-            for (var i = 0; i < arguments.length; i++) {
-              var v = arguments[i];
-              if (typeof v === "string" && v.trim()) return v.trim();
-            }
-            return "";
-          };
           const welcomeDayTitle = (function () {
-            var explicit = firstWelcomeText(
+            var explicit = firstNonEmptyString(
               welcomeDay && (welcomeDay.name || welcomeDay.title || welcomeDay.nombre || welcomeDay.titulo || welcomeDay.label),
               welcomeDay && welcomeDay.dayName
             );
@@ -4825,25 +4811,13 @@ function GymApp() {
                 var appendNewDay = dupDayModal.selected.length===0 && originalDays.length===1;
                 if(dupDayModal.selected.length===0 && !appendNewDay){toast2(msg("Seleccioná al menos un día", "Select at least one day"));return;}
                 var sel=dupDayModal.selected;
-                var cloneDay = function(base, label){
-                  try {
-                    var copy = JSON.parse(JSON.stringify(base || {}));
-                    copy.id = uid();
-                    copy.label = label;
-                    copy.warmup = Array.isArray(copy.warmup) ? copy.warmup : [];
-                    copy.exercises = Array.isArray(copy.exercises) ? copy.exercises : [];
-                    return copy;
-                  } catch(e) {
-                    return {id:uid(),label:label,warmup:(base?.warmup||[]).map(function(x){return {...x};}),exercises:(base?.exercises||[]).map(function(x){return {...x};}),note:base?.note||""};
-                  }
-                };
                 setRoutines(function(p){return p.map(function(rr){
                   if(rr.id!==dupDayModal.rId) return rr;
                   var rrDays = Array.isArray(rr.days) ? rr.days : [];
-                  if(appendNewDay) return {...rr,days:rrDays.concat([cloneDay(src, "Día "+(rrDays.length+1))])};
+                  if(appendNewDay) return {...rr,days:rrDays.concat([cloneRoutineDay(src, "Día "+(rrDays.length+1))])};
                   return {...rr,days:rrDays.map(function(dd,ddi){
                     if(sel.indexOf(ddi)===-1) return dd;
-                    return {...cloneDay(src, dd?.label||("Día "+(ddi+1)))};
+                    return {...cloneRoutineDay(src, dd?.label||("Día "+(ddi+1)))};
                   })};
                 })});
                 toast2(appendNewDay ? msg("Día duplicado ✓", "Day duplicated ✓") : ((msg("Duplicado a ", "Duplicated to "))+sel.map(function(i){return dupDayModal.days[i]?.label||("Día "+(i+1))}).join(", ")+" ✓"));
