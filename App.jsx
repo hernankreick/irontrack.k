@@ -2,7 +2,6 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallba
 import { PATS, EX, VIDEOS, IMGS } from './lib/exerciseStaticData.js';
 import { Ic } from './components/Ic.jsx';
 import { LogForm } from './components/LogForm.jsx';
-import { RutinaView } from './components/RutinaView.jsx';
 import ExerciseHistoryModal from './components/routines/ExerciseHistoryModal.jsx';
 import NewRoutineModal from './components/routines/NewRoutineModal.jsx';
 import { WorkoutScreen } from './components/WorkoutScreen.jsx';
@@ -58,6 +57,7 @@ import {
 import OnboardingScreen from './components/onboarding/OnboardingScreen.jsx';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboardMain from './components/coach/CoachDashboardMain.jsx';
+import CoachRoutinesMain from './components/coach/CoachRoutinesMain.jsx';
 import CoachCalendar from './components/CoachCalendar.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
@@ -4328,8 +4328,7 @@ function GymApp() {
           </div>
         )}
         {tab==="routines"&&!esAlumno&&(
-          <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col">
-          <RutinaView
+          <CoachRoutinesMain
             setTab={setTab}
             border={border}
             textMuted={textMuted}
@@ -4360,7 +4359,6 @@ function GymApp() {
             rutinasSBEntrenador={rutinasSBEntrenador}
             setRutinasSBEntrenador={setRutinasSBEntrenador}
           />
-          </div>
         )}
         {tab==="scanner"&&!esAlumno&&(
           <div className="min-w-0 max-w-full">
