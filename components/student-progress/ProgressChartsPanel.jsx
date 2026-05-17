@@ -488,7 +488,7 @@ export function ProgressChartsPanel({
           </button>
           {muscleOpen && (
             <div
-              className="absolute left-0 top-full z-30 mt-2 max-h-64 w-[200px] max-w-[calc(100vw-40px)] overflow-y-auto rounded-[18px] border p-2 shadow-2xl"
+              className="absolute left-0 top-full z-30 mt-2 max-h-64 w-[200px] max-w-[calc(100vw-40px)] overflow-y-auto rounded-[18px] border px-3 py-2 shadow-2xl"
               style={{
                 borderColor: 'rgba(111, 143, 184, 0.42)',
                 background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.98), rgba(10, 18, 30, 0.98))',
@@ -550,7 +550,7 @@ export function ProgressChartsPanel({
           </button>
           {sortOpen && (
             <div
-              className="absolute left-0 top-full z-30 mt-2 w-[200px] max-w-[calc(100vw-40px)] rounded-[18px] border p-2 shadow-2xl"
+              className="absolute left-0 top-full z-30 mt-2 w-[200px] max-w-[calc(100vw-40px)] rounded-[18px] border px-3 py-2 shadow-2xl"
               style={{
                 borderColor: 'rgba(111, 143, 184, 0.42)',
                 background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.98), rgba(10, 18, 30, 0.98))',
