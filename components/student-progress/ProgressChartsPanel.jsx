@@ -464,7 +464,7 @@ export function ProgressChartsPanel({
         <div className="relative max-w-full">
           <button
             type="button"
-            className="inline-flex h-[46px] items-center justify-between gap-4 rounded-full border px-[22px] py-2 text-[13px] font-medium leading-none"
+            className="inline-flex h-[46px] items-center justify-between gap-4 rounded-full border py-2 pl-6 pr-5 text-[13px] font-medium leading-none"
             style={{
               width: 190,
               maxWidth: '100%',
@@ -481,7 +481,7 @@ export function ProgressChartsPanel({
               setSortOpen(false)
             }}
           >
-            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left" style={{ marginLeft: 4 }}>
               {es ? 'Músculo' : 'Muscle'} · {muscle}
             </span>
             <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
@@ -528,7 +528,7 @@ export function ProgressChartsPanel({
         <div className="relative max-w-full">
           <button
             type="button"
-            className="inline-flex h-[46px] items-center justify-between gap-4 rounded-full border px-[22px] py-2 text-[13px] font-medium leading-none"
+            className="inline-flex h-[46px] items-center justify-between gap-4 rounded-full border py-2 pl-6 pr-5 text-[13px] font-medium leading-none"
             style={{
               width: 190,
               maxWidth: '100%',
@@ -545,7 +545,7 @@ export function ProgressChartsPanel({
               setMuscleOpen(false)
             }}
           >
-            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left" style={{ marginLeft: 4 }}>
               {SORT_OPTS.find((o) => o.value === sortBy)?.[es ? 'labelEs' : 'labelEn']}
             </span>
             <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
