@@ -461,12 +461,12 @@ export function ProgressChartsPanel({
       </div>
 
       <div className="flex flex-wrap gap-x-3.5 gap-y-3">
-        <div className="relative">
+        <div className="relative max-w-full">
           <button
             type="button"
-            className="inline-flex h-11 items-center justify-between gap-[14px] rounded-full border px-[18px] py-2 text-[13px] font-medium leading-none"
+            className="inline-flex h-[46px] items-center justify-between gap-4 rounded-full border px-[22px] py-2 text-[13px] font-medium leading-none"
             style={{
-              width: 165,
+              width: 190,
               maxWidth: '100%',
               borderColor: 'rgba(111, 143, 184, 0.52)',
               background: 'linear-gradient(180deg, rgba(36, 55, 82, 0.92), rgba(19, 33, 52, 0.92))',
@@ -481,12 +481,14 @@ export function ProgressChartsPanel({
               setSortOpen(false)
             }}
           >
-            <span className="shrink-0 whitespace-nowrap">{es ? 'Músculo' : 'Muscle'} · {muscle}</span>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+              {es ? 'Músculo' : 'Muscle'} · {muscle}
+            </span>
+            <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
           </button>
           {muscleOpen && (
             <div
-              className="absolute left-0 top-full z-20 mt-1 max-h-52 min-w-[200px] overflow-y-auto rounded-[12px] border p-1 shadow-xl"
+              className="absolute left-0 top-full z-20 mt-1 max-h-52 w-[190px] max-w-[calc(100vw-40px)] overflow-y-auto rounded-[12px] border p-1.5 shadow-xl"
               style={{
                 borderColor: 'var(--sp-stroke)',
                 background: 'var(--sp-surface-high)',
@@ -497,7 +499,7 @@ export function ProgressChartsPanel({
                 <button
                   key={m}
                   type="button"
-                  className="block w-full rounded-lg px-3 py-2 text-left text-[12px]"
+                  className="block w-full rounded-lg px-4 py-2.5 text-left text-[12px]"
                   style={{
                     background: m === muscle ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
                     color: 'var(--sp-fg)',
@@ -514,12 +516,12 @@ export function ProgressChartsPanel({
           )}
         </div>
 
-        <div className="relative">
+        <div className="relative max-w-full">
           <button
             type="button"
-            className="inline-flex h-11 items-center justify-between gap-[14px] rounded-full border px-[18px] py-2 text-[13px] font-medium leading-none"
+            className="inline-flex h-[46px] items-center justify-between gap-4 rounded-full border px-[22px] py-2 text-[13px] font-medium leading-none"
             style={{
-              width: 170,
+              width: 190,
               maxWidth: '100%',
               borderColor: 'rgba(111, 143, 184, 0.52)',
               background: 'linear-gradient(180deg, rgba(36, 55, 82, 0.92), rgba(19, 33, 52, 0.92))',
@@ -534,14 +536,14 @@ export function ProgressChartsPanel({
               setMuscleOpen(false)
             }}
           >
-            <span className="shrink-0 whitespace-nowrap">
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
               {SORT_OPTS.find((o) => o.value === sortBy)?.[es ? 'labelEs' : 'labelEn']}
             </span>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
+            <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
           </button>
           {sortOpen && (
             <div
-              className="absolute left-0 top-full z-20 mt-1 min-w-[200px] rounded-[12px] border p-1 shadow-xl"
+              className="absolute left-0 top-full z-20 mt-1 w-[190px] max-w-[calc(100vw-40px)] rounded-[12px] border p-1.5 shadow-xl"
               style={{
                 borderColor: 'var(--sp-stroke)',
                 background: 'var(--sp-surface-high)',
@@ -552,7 +554,7 @@ export function ProgressChartsPanel({
                 <button
                   key={o.value}
                   type="button"
-                  className="block w-full rounded-lg px-3 py-2 text-left text-[12px]"
+                  className="block w-full rounded-lg px-4 py-2.5 text-left text-[12px]"
                   style={{
                     background:
                       o.value === sortBy ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
@@ -592,16 +594,15 @@ export function ProgressChartsPanel({
             >
               <button
                 type="button"
-                className="flex w-full flex-col gap-4 text-left"
+                className="flex w-full flex-col gap-4 p-5 text-left sm:p-6"
                 style={{
                   background: 'transparent',
-                  padding: '20px 18px',
                   boxSizing: 'border-box',
                   minHeight: 120,
                 }}
                 onClick={() => setExpandedEx(isOpen ? null : ex.id)}
               >
-                <div className="flex min-w-0 items-start gap-3">
+                <div className="flex min-w-0 items-start gap-5">
                   <div
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border"
                     style={{
