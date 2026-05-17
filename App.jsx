@@ -8,6 +8,7 @@ import NewRoutineModal from './components/routines/NewRoutineModal.jsx';
 import { WorkoutScreen } from './components/WorkoutScreen.jsx';
 import { ChatFlotante } from './components/ChatFlotante.jsx';
 import AlumnoRestTimerBar from './components/student/AlumnoRestTimerBar.jsx';
+import StudentMainView from './components/student/StudentMainView.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
 import {
   BIB_MUSCLE_OPTIONS,
@@ -63,16 +64,13 @@ import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.j
 import IronTrackLogo from './components/IronTrackLogo.jsx';
 import IronTrackAppIcon from './components/IronTrackAppIcon.jsx';
 import IronTrackSplash from './components/IronTrackSplash.jsx';
-import LibraryAlumno from './components/student/LibraryAlumno.jsx';
 import CoachWelcomeOverlay from './components/CoachWelcomeOverlay.jsx';
 import GestionBiblioteca from './components/library/GestionBiblioteca.jsx';
 import ScannerRutina from './components/scanner/ScannerRutina.jsx';
-import PagoAlumno from './components/student/PagoAlumno.jsx';
 import RecordatoriosPanel, { checkTrainingReminderTick } from './components/student/RecordatoriosPanel.jsx';
 import AlumnoProfileModal from './components/student/AlumnoProfileModal.jsx';
 import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
 import StudentsSection from './components/students/StudentsSection.jsx';
-import StudentProgressSection from './components/student-progress/StudentProgressSection.jsx';
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
@@ -3666,7 +3664,31 @@ function GymApp() {
           scrollRef.current = node;
         }}
       >
-        {tab==="plan"&&esAlumno&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} darkMode={darkMode} toast2={toast2} msg={msg}/>}
+        {esAlumno&&(
+          <StudentMainView
+            tab={tab}
+            planScrollDiag={planScrollDiag}
+            aliasData={aliasData}
+            es={es}
+            darkMode={darkMode}
+            toast2={toast2}
+            msg={msg}
+            planView={null}
+            allEx={allEx}
+            routines={routines}
+            videoOverrides={videoOverrides}
+            setVideoModal={setVideoModal}
+            showAlumnoProgressStack={showAlumnoProgressStack}
+            progress={progress}
+            EX={EX}
+            sesiones={sesiones}
+            sessionData={sessionData}
+            sb={sb}
+            sharedParam={sharedParam}
+            routineDaysCount={routineDaysCount}
+            onRegistrarPrimerEntrenamiento={()=>setTab("plan")}
+          />
+        )}
         {(tab==="plan"||tab==="progress")&&!esAlumno&&sessionData?.role==="entrenador"&&(
           <CoachDashboardMain
             activeNav={tab==="progress"?"progreso":"dashboard"}
@@ -3821,8 +3843,8 @@ function GymApp() {
             entrenadorId={sessionData.entrenadorId || "entrenador_principal"}
           />
         )}
-        {tab==="plan"&&(
-          <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : ""}>
+        {tab==="plan"&&esAlumno&&(
+          <div className="mx-auto w-full max-w-[32rem] pt-4">
             {esAlumno&&routines.length>0&&(()=>{
               const r0 = routines[0];
               const hoy = new Date().toLocaleDateString("es-AR");
@@ -4300,10 +4322,9 @@ function GymApp() {
             })}
           </div>
         )}
-        {tab==="library"&&(
-          <div className={esAlumno ? "mx-auto w-full max-w-[32rem] pt-4" : "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto"}>
-            {esAlumno && <LibraryAlumno allEx={allEx} darkMode={darkMode} es={es} routines={routines} videoOverrides={videoOverrides} setVideoModal={setVideoModal} msg={msg}/>}
-            {!esAlumno && <GestionBiblioteca allEx={allEx} setPatternOverrides={setPatternOverrides} darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} openNewExerciseTick={bibOpenNewExerciseTick}/>}
+        {tab==="library"&&!esAlumno&&(
+          <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto">
+            <GestionBiblioteca allEx={allEx} setPatternOverrides={setPatternOverrides} darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} openNewExerciseTick={bibOpenNewExerciseTick}/>
           </div>
         )}
         {tab==="routines"&&!esAlumno&&(
@@ -4350,21 +4371,6 @@ function GymApp() {
           <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto">
             <GestionBiblioteca allEx={allEx} setPatternOverrides={setPatternOverrides} darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} openNewExerciseTick={bibOpenNewExerciseTick}/>
           </div>
-        )}
-        {tab==="progress"&&showAlumnoProgressStack&&(
-          <StudentProgressSection
-            progress={progress}
-            EX={EX}
-            allEx={allEx}
-            sesiones={sesiones}
-            sessionData={sessionData}
-            sb={sb}
-            sharedParam={sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId}))}
-            es={es}
-            expectedDaysPerWeek={routineDaysCount}
-            onRegistrarPrimerEntrenamiento={()=>setTab("plan")}
-            esEntrenador={false}
-          />
         )}
         {tab==="progress"&&!showAlumnoProgressStack&&!(sessionData?.role==="entrenador"&&!esAlumno)&&(
           <div className="mx-auto w-full min-w-0 max-w-[480px] lg:max-w-3xl">
