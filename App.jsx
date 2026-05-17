@@ -57,6 +57,7 @@ import {
 import OnboardingScreen from './components/onboarding/OnboardingScreen.jsx';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachDashboardMain from './components/coach/CoachDashboardMain.jsx';
+import CoachExercisesMain from './components/coach/CoachExercisesMain.jsx';
 import CoachRoutinesMain from './components/coach/CoachRoutinesMain.jsx';
 import CoachCalendar from './components/CoachCalendar.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
@@ -65,7 +66,6 @@ import IronTrackLogo from './components/IronTrackLogo.jsx';
 import IronTrackAppIcon from './components/IronTrackAppIcon.jsx';
 import IronTrackSplash from './components/IronTrackSplash.jsx';
 import CoachWelcomeOverlay from './components/CoachWelcomeOverlay.jsx';
-import GestionBiblioteca from './components/library/GestionBiblioteca.jsx';
 import ScannerRutina from './components/scanner/ScannerRutina.jsx';
 import RecordatoriosPanel, { checkTrainingReminderTick } from './components/student/RecordatoriosPanel.jsx';
 import AlumnoProfileModal from './components/student/AlumnoProfileModal.jsx';
@@ -4323,9 +4323,18 @@ function GymApp() {
           </div>
         )}
         {tab==="library"&&!esAlumno&&(
-          <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto">
-            <GestionBiblioteca allEx={allEx} setPatternOverrides={setPatternOverrides} darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} openNewExerciseTick={bibOpenNewExerciseTick}/>
-          </div>
+          <CoachExercisesMain
+            allEx={allEx}
+            setPatternOverrides={setPatternOverrides}
+            darkMode={darkMode}
+            sb={sb}
+            customEx={customEx}
+            setCustomEx={setCustomEx}
+            toast2={toast2}
+            videoOverrides={videoOverrides}
+            setVideoOverrides={setVideoOverrides}
+            openNewExerciseTick={bibOpenNewExerciseTick}
+          />
         )}
         {tab==="routines"&&!esAlumno&&(
           <CoachRoutinesMain
@@ -4366,9 +4375,18 @@ function GymApp() {
           </div>
         )}
         {tab==="biblioteca"&&!esAlumno&&(
-          <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto">
-            <GestionBiblioteca allEx={allEx} setPatternOverrides={setPatternOverrides} darkMode={darkMode} sb={sb} customEx={customEx} setCustomEx={setCustomEx} toast2={toast2} videoOverrides={videoOverrides} setVideoOverrides={setVideoOverrides} openNewExerciseTick={bibOpenNewExerciseTick}/>
-          </div>
+          <CoachExercisesMain
+            allEx={allEx}
+            setPatternOverrides={setPatternOverrides}
+            darkMode={darkMode}
+            sb={sb}
+            customEx={customEx}
+            setCustomEx={setCustomEx}
+            toast2={toast2}
+            videoOverrides={videoOverrides}
+            setVideoOverrides={setVideoOverrides}
+            openNewExerciseTick={bibOpenNewExerciseTick}
+          />
         )}
         {tab==="progress"&&!showAlumnoProgressStack&&!(sessionData?.role==="entrenador"&&!esAlumno)&&(
           <div className="mx-auto w-full min-w-0 max-w-[480px] lg:max-w-3xl">
