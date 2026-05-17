@@ -386,16 +386,18 @@ export function WorkoutExercisePanel(props) {
                 var rMin=parseInt(prts[0])||8;
                 var rMax=prts[1]?parseInt(prts[1])||rMin:rMin;
                 if(rMax<rMin)rMax=rMin;
-                var lo=Math.max(1,rMin-2),hi=rMax+2;
-                var pills=[];for(var n=lo;n<=hi;n++)pills.push(n);
+                var repStep=isTimedExercise?5:1;
+                var lo=isTimedExercise?Math.max(5,rMin-(repStep*2)):Math.max(1,rMin-2);
+                var hi=isTimedExercise?rMax+(repStep*2):rMax+2;
+                var pills=[];for(var n=lo;n<=hi;n+=repStep)pills.push(n);
                 return(
                   <div
                     onTouchStart={function(e){this._swX=e.touches[0].clientX}}
                     onTouchEnd={function(e){
                       var dx=e.changedTouches[0].clientX-(this._swX||0);
                       var cur=parseInt(reps)||rMin;
-                      if(dx<-30&&cur<hi){setReps(String(cur+1));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}
-                      else if(dx>30&&cur>lo){setReps(String(cur-1));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}
+                      if(dx<-30&&cur<hi){setReps(String(Math.min(hi,cur+repStep)));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}
+                      else if(dx>30&&cur>lo){setReps(String(Math.max(lo,cur-repStep)));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}
                     }}
                     style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
                     {pills.map(function(pn){
