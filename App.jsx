@@ -76,6 +76,7 @@ import StudentProgressSection from './components/student-progress/StudentProgres
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
+import { TodayWorkoutList } from './components/student-plan/TodayWorkoutList.jsx';
 import { WeeklyPlanDayCard } from './components/student-plan/WeeklyPlanDayCard.jsx';
 import CompletedTodayBanner from './components/student-plan/CompletedTodayBanner.jsx';
 import StudentNoRoutinesEmptyState from './components/student-plan/StudentNoRoutinesEmptyState.jsx';
@@ -1361,11 +1362,20 @@ function GymApp() {
 
     // ── Registrar Service Worker (PWA) ───────────────────────────────────
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-          .catch(err => console.error('SW error:', err));
-      });
+    if (typeof window === "undefined") return;
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations()
+        .then(function (regs) {
+          regs.forEach(function (reg) { reg.unregister(); });
+        })
+        .catch(function (err) { console.error("SW cleanup error:", err); });
+    }
+    if ("caches" in window) {
+      window.caches.keys()
+        .then(function (keys) {
+          keys.forEach(function (key) { window.caches.delete(key); });
+        })
+        .catch(function (err) { console.error("Cache cleanup error:", err); });
     }
   }, []);
 
@@ -3911,6 +3921,41 @@ function GymApp() {
                   : pctHero < 100
                     ? msg("Sigue con tu entrenamiento", "Keep going", "Continue o treino")
                     : msg("Casi listo", "Almost there", "Quase pronto");
+              const todayExerciseInfos = todayDay
+                ? [].concat(todayDay.exercises || [], todayDay.warmup || []).map(function (ex) {
+                    return allEx.find(function (info) { return info.id === ex.id; }) || ex;
+                  }).filter(Boolean)
+                : [];
+              const firstNonEmpty = function () {
+                for (var i = 0; i < arguments.length; i++) {
+                  var v = arguments[i];
+                  if (typeof v === "string" && v.trim()) return v.trim();
+                }
+                return "";
+              };
+              const inferDayTitle = function () {
+                var explicit = firstNonEmpty(
+                  todayDay && (todayDay.name || todayDay.title || todayDay.nombre || todayDay.titulo || todayDay.label),
+                  todayDay && todayDay.dayName
+                );
+                if (explicit) return explicit;
+                var patterns = new Set(todayExerciseInfos.map(function (ex) { return ex.pattern; }).filter(Boolean));
+                var muscles = todayExerciseInfos.map(function (ex) { return String(ex.muscle || ""); }).join(" ").toLowerCase();
+                if (patterns.has("empuje") && patterns.has("traccion")) return msg("Torso", "Upper Body", "Torso");
+                if ((patterns.has("rodilla") || patterns.has("bisagra")) && !patterns.has("empuje") && !patterns.has("traccion")) return msg("Piernas", "Lower Body", "Pernas");
+                if (patterns.size === 1 && patterns.has("core")) return "Core";
+                if (patterns.size === 1 && patterns.has("cardio")) return "Cardio";
+                if (muscles.match(/pecho|espalda|hombro|dorsal|biceps|triceps/)) return msg("Torso", "Upper Body", "Torso");
+                return msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1);
+              };
+              const inferWorkoutType = function () {
+                var patterns = new Set(todayExerciseInfos.map(function (ex) { return ex.pattern; }).filter(Boolean));
+                if (patterns.size === 1 && patterns.has("cardio")) return "Cardio";
+                if (patterns.size === 1 && patterns.has("movilidad")) return msg("Movilidad", "Mobility", "Mobilidade");
+                return msg("Fuerza", "Strength", "Forca");
+              };
+              const todayHeroTitle = inferDayTitle();
+              const todayTypeBadge = inferWorkoutType();
               return (
                 <div style={{ marginBottom: 0 }}>
                   {/*
@@ -4001,21 +4046,20 @@ function GymApp() {
 
                   {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
                   {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&(
+                    <>
                     <CurrentWorkoutHero
                       msg={msg}
                       textMain={textMain}
                       textMuted={textMuted}
-                      hoyBadgeText={msg("HOY", "TODAY", "HOJE")}
+                      hoyBadgeText={msg("HOY TOCA", "TODAY", "HOJE")}
                       semDiaLine={
                         msg("Semana", "Week", "Semana") + " " + (currentWeekForStudent + 1) + " · " + msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)
                       }
-                      dayTitle={msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)}
+                      dayTitle={todayHeroTitle}
+                      typeBadgeText={todayTypeBadge}
                       exerciseCount={totalEjHero}
                       durationMinutes={estimateDayMinutes(todayDay, currentWeekForStudent)}
-                      completedExercises={doneEjHero}
-                      totalExercises={totalEjHero}
-                      progressStatusText={progressStatusHero}
-                      ctaLabel={msg("Comenzar entrenamiento", "Start workout", "Começar treino")}
+                      ctaLabel={msg("EMPEZAR", "START", "COMEÇAR")}
                       onStart={function () {
                         const snap = {};
                         [...(todayDay.warmup || []), ...(todayDay.exercises || [])].forEach(function (ex) {
@@ -4026,6 +4070,24 @@ function GymApp() {
                         setSession({ rId: r0.id, dIdx: nextDayIdx, exIdx: 0, startTime: Date.now() });
                       }}
                     />
+                    <TodayWorkoutList
+                      msg={msg}
+                      day={todayDay}
+                      allEx={allEx}
+                      images={IMGS}
+                      currentWeek={currentWeekForStudent}
+                      es={es}
+                      videoOverrides={videoOverrides}
+                      textMain={textMain}
+                      textMuted={textMuted}
+                      border={border}
+                      onExerciseVideo={function (nombre, vUrl) {
+                        var vid = getYTVideoId(vUrl);
+                        if (vid) setVideoModal({ videoId: vid, nombre: nombre });
+                        else window.open(vUrl, "_blank");
+                      }}
+                    />
+                    </>
                   )}
 
                   {/* DÍA YA ENTRENADO */}
@@ -4523,6 +4585,46 @@ function GymApp() {
 {showWelcome&&(()=>{
         const isCoach = sessionData?.role==="entrenador";
         if(!isCoach){
+          const welcomeRoutine = routines[0];
+          const welcomeTotalDays = welcomeRoutine?.days?.length || 0;
+          const welcomeCurrentWeek = studentCurrentWeek || 0;
+          const welcomeCompletedDays = activeStudentRoutinePosition.completedDaysInWeek || 0;
+          const welcomeDayIdx = welcomeCompletedDays < welcomeTotalDays ? welcomeCompletedDays : 0;
+          const welcomeDay = welcomeRoutine?.days?.[welcomeDayIdx] || null;
+          const welcomeExerciseCount = welcomeDay ? (welcomeDay.warmup || []).length + (welcomeDay.exercises || []).length : 0;
+          const welcomeExerciseInfos = welcomeDay
+            ? [].concat(welcomeDay.exercises || [], welcomeDay.warmup || []).map(function (ex) {
+                return allEx.find(function (info) { return info.id === ex.id; }) || ex;
+              }).filter(Boolean)
+            : [];
+          const firstWelcomeText = function () {
+            for (var i = 0; i < arguments.length; i++) {
+              var v = arguments[i];
+              if (typeof v === "string" && v.trim()) return v.trim();
+            }
+            return "";
+          };
+          const welcomeDayTitle = (function () {
+            var explicit = firstWelcomeText(
+              welcomeDay && (welcomeDay.name || welcomeDay.title || welcomeDay.nombre || welcomeDay.titulo || welcomeDay.label),
+              welcomeDay && welcomeDay.dayName
+            );
+            if (explicit) return explicit;
+            var patterns = new Set(welcomeExerciseInfos.map(function (ex) { return ex.pattern; }).filter(Boolean));
+            var muscles = welcomeExerciseInfos.map(function (ex) { return String(ex.muscle || ""); }).join(" ").toLowerCase();
+            if (patterns.has("empuje") && patterns.has("traccion")) return msg("Torso", "Upper Body", "Torso");
+            if ((patterns.has("rodilla") || patterns.has("bisagra")) && !patterns.has("empuje") && !patterns.has("traccion")) return msg("Piernas", "Lower Body", "Pernas");
+            if (patterns.size === 1 && patterns.has("core")) return "Core";
+            if (patterns.size === 1 && patterns.has("cardio")) return "Cardio";
+            if (muscles.match(/pecho|espalda|hombro|dorsal|biceps|triceps/)) return msg("Torso", "Upper Body", "Torso");
+            return msg("Día", "Day", "Dia") + " " + (welcomeDayIdx + 1);
+          })();
+          const welcomeTypeBadge = (function () {
+            var patterns = new Set(welcomeExerciseInfos.map(function (ex) { return ex.pattern; }).filter(Boolean));
+            if (patterns.size === 1 && patterns.has("cardio")) return "Cardio";
+            if (patterns.size === 1 && patterns.has("movilidad")) return msg("Movilidad", "Mobility", "Mobilidade");
+            return msg("Fuerza", "Strength", "Forca");
+          })();
           return(
             <WelcomeModal
               open={true}
@@ -4533,6 +4635,36 @@ function GymApp() {
               border={border}
               textMain={textMain}
               textMuted={textMuted}
+              msg={msg}
+              todayDay={welcomeDay}
+              currentWeek={welcomeCurrentWeek}
+              dayIndex={welcomeDayIdx}
+              dayTitle={welcomeDayTitle}
+              typeBadgeText={welcomeTypeBadge}
+              exerciseCount={welcomeExerciseCount}
+              durationMinutes={estimateDayMinutes(welcomeDay, welcomeCurrentWeek)}
+              allEx={allEx}
+              images={IMGS}
+              videoOverrides={videoOverrides}
+              onExerciseVideo={function (nombre, vUrl) {
+                var vid = getYTVideoId(vUrl);
+                if (vid) setVideoModal({ videoId: vid, nombre: nombre });
+                else window.open(vUrl, "_blank");
+              }}
+              onStartWorkout={function () {
+                if (!welcomeRoutine || !welcomeDay) {
+                  setShowWelcome(false);
+                  return;
+                }
+                var snap = {};
+                [].concat(welcomeDay.warmup || [], welcomeDay.exercises || []).forEach(function (ex) {
+                  snap[ex.id] = progress[ex.id]?.max || 0;
+                });
+                setPreSessionPRs({ ...snap });
+                setSessionPRList([]);
+                setShowWelcome(false);
+                setSession({ rId: welcomeRoutine.id, dIdx: welcomeDayIdx, exIdx: 0, startTime: Date.now() });
+              }}
             />
           );
         }
@@ -4540,7 +4672,7 @@ function GymApp() {
         const setObStep = setOnboardStep;
         const steps = [
           {
-            icon:"👋",title:msg("¡Bienvenido/a!", "Welcome!"),
+            icon:"👋",title:"IRON TRACK",
             subtitle:msg("Configurá tu cuenta en 3 pasos", "Set up your account in 3 steps"),
             body:null,
             items:[
@@ -4943,7 +5075,7 @@ function GymApp() {
                 <button className="hov" style={{...btn("#2563EB22"),color:"#2563EB",width:"100%",padding:"8px"}} onClick={()=>{localStorage.removeItem("it_u");setUser(null);setLoginModal(false);toast2("Sesion cerrada");}}>SALIR</button>
               </div>
             ):(
-              <LoginForm darkMode={darkMode} es={es} btn={btn} inp={inp} lbl={lbl} msg={msg} onLogin={u=>{setUser(u);localStorage.setItem("it_u",JSON.stringify(u));setLoginModal(false);toast2("Bienvenido/a "+u.name+"!");}} onClose={()=>setLoginModal(false)}/>
+              <LoginForm darkMode={darkMode} es={es} btn={btn} inp={inp} lbl={lbl} msg={msg} onLogin={u=>{setUser(u);localStorage.setItem("it_u",JSON.stringify(u));setLoginModal(false);toast2("Hola "+u.name+"!");}} onClose={()=>setLoginModal(false)}/>
             )}
           </div>
         </div>
