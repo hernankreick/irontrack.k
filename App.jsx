@@ -9,6 +9,7 @@ import { ChatFlotante } from './components/ChatFlotante.jsx';
 import AlumnoRestTimerBar from './components/student/AlumnoRestTimerBar.jsx';
 import StudentMainView from './components/student/StudentMainView.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
+import { useCoachUIState } from './hooks/useCoachUIState.js';
 import {
   BIB_MUSCLE_OPTIONS,
   BIB_MUSCLE_ORDER,
@@ -520,18 +521,26 @@ function GymApp() {
     cargarAlumnos,
     notifyAlumno,
   } = useAlumnos({ sb });
+  const {
+    registrosSubTab, setRegistrosSubTab,
+    sugsOpen, setSugsOpen,
+    filtroRut, setFiltroRut,
+    bibOpenNewExerciseTick, setBibOpenNewExerciseTick,
+    coachAlumnosSearch, setCoachAlumnosSearch,
+    coachAlumnosFilter, setCoachAlumnosFilter,
+    coachRoutineDiaIdx, setCoachRoutineDiaIdx,
+    coachDiaSecsOpen, setCoachDiaSecsOpen,
+    coachCardMenuId, setCoachCardMenuId,
+    coachRutinaMenuOpen, setCoachRutinaMenuOpen,
+    mobileDrawerOpen, setMobileDrawerOpen,
+  } = useCoachUIState();
   const [rutinasSB, setRutinasSB] = useState([]);
-  const [registrosSubTab, setRegistrosSubTab] = useState(0);
   const [sesionesGlobales, setSesionesGlobales] = useState([]);
   const [progresoGlobal, setProgresoGlobal] = useState({});
   const [sugerencias, setSugerencias] = useState({});
-  // Estado del dropdown de sugerencias por alumno (para no mostrar listas interminables).
-  const [sugsOpen, setSugsOpen] = useState({});
   const [rutinasSBEntrenador, setRutinasSBEntrenador] = useState([]);
   const [rutinasLoaded, setRutinasLoaded] = useState(false);
-  const [filtroRut, setFiltroRut] = useState("todas");
   /** Incrementar para abrir la pestaña «+ Nuevo» en GestionBiblioteca (ej. desde menú Crear del dashboard). */
-  const [bibOpenNewExerciseTick, setBibOpenNewExerciseTick] = useState(0);
 
   
 
@@ -827,12 +836,6 @@ function GymApp() {
   const [videoModal, setVideoModal] = useState(null); // {url, nombre}
   const [expandedPlanDay, setExpandedPlanDay] = useState(null); // "rutId-dayIdx"
   const [editEx, setEditEx] = useState(null);
-  const [coachAlumnosSearch, setCoachAlumnosSearch] = useState("");
-  const [coachAlumnosFilter, setCoachAlumnosFilter] = useState("todos");
-  const [coachRoutineDiaIdx, setCoachRoutineDiaIdx] = useState(0);
-  const [coachDiaSecsOpen, setCoachDiaSecsOpen] = useState({ warmup: true, main: true });
-  const [coachCardMenuId, setCoachCardMenuId] = useState(null);
-  const [coachRutinaMenuOpen, setCoachRutinaMenuOpen] = useState(false);
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
   const [preSessionPRs, setPreSessionPRs] = useState({});
@@ -868,7 +871,6 @@ function GymApp() {
   const [resumenSesion, setResumenSesion] = useState(null);
   const [chatOpenId, setChatOpenId] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [profileEdit, setProfileEdit] = useState({nombre:"",apellido:"",email:"",phone:"",avatarDataUrl:null});
   const [userMenuOpen, setUserMenuOpen] = useState(false);
