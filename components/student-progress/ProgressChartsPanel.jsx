@@ -464,10 +464,10 @@ export function ProgressChartsPanel({
         <div className="relative">
           <button
             type="button"
-            className="inline-flex h-11 items-center justify-between gap-[14px] rounded-full border px-5 py-2 text-[13px] font-medium leading-none"
+            className="inline-flex h-11 items-center justify-between gap-[14px] rounded-full border px-[18px] py-2 text-[13px] font-medium leading-none"
             style={{
-              minWidth: 132,
-              maxWidth: 'min(100%, 220px)',
+              width: 165,
+              maxWidth: '100%',
               borderColor: 'rgba(111, 143, 184, 0.52)',
               background: 'linear-gradient(180deg, rgba(36, 55, 82, 0.92), rgba(19, 33, 52, 0.92))',
               color: 'var(--sp-fg)',
@@ -481,8 +481,8 @@ export function ProgressChartsPanel({
               setSortOpen(false)
             }}
           >
-            {es ? 'Músculo' : 'Muscle'} · {muscle}
-            <ChevronDown className="ml-2.5 h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
+            <span className="shrink-0 whitespace-nowrap">{es ? 'Músculo' : 'Muscle'} · {muscle}</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
           </button>
           {muscleOpen && (
             <div
@@ -517,10 +517,10 @@ export function ProgressChartsPanel({
         <div className="relative">
           <button
             type="button"
-            className="inline-flex h-11 items-center justify-between gap-[14px] rounded-full border px-5 py-2 text-[13px] font-medium leading-none"
+            className="inline-flex h-11 items-center justify-between gap-[14px] rounded-full border px-[18px] py-2 text-[13px] font-medium leading-none"
             style={{
-              minWidth: 150,
-              maxWidth: 'min(100%, 220px)',
+              width: 170,
+              maxWidth: '100%',
               borderColor: 'rgba(111, 143, 184, 0.52)',
               background: 'linear-gradient(180deg, rgba(36, 55, 82, 0.92), rgba(19, 33, 52, 0.92))',
               color: 'var(--sp-fg)',
@@ -534,8 +534,10 @@ export function ProgressChartsPanel({
               setMuscleOpen(false)
             }}
           >
-            {SORT_OPTS.find((o) => o.value === sortBy)?.[es ? 'labelEs' : 'labelEn']}
-            <ChevronDown className="ml-2.5 h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
+            <span className="shrink-0 whitespace-nowrap">
+              {SORT_OPTS.find((o) => o.value === sortBy)?.[es ? 'labelEs' : 'labelEn']}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.25} />
           </button>
           {sortOpen && (
             <div
