@@ -488,30 +488,37 @@ export function ProgressChartsPanel({
           </button>
           {muscleOpen && (
             <div
-              className="absolute left-0 top-full z-20 mt-1 max-h-52 w-[190px] max-w-[calc(100vw-40px)] overflow-y-auto rounded-[12px] border p-1.5 shadow-xl"
+              className="absolute left-0 top-full z-30 mt-2 max-h-64 w-[200px] max-w-[calc(100vw-40px)] overflow-y-auto rounded-[18px] border p-2 shadow-2xl"
               style={{
-                borderColor: 'var(--sp-stroke)',
-                background: 'var(--sp-surface-high)',
+                borderColor: 'rgba(111, 143, 184, 0.42)',
+                background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.98), rgba(10, 18, 30, 0.98))',
+                boxShadow: '0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {MUSCLE_FILTERS.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className="block w-full rounded-lg px-4 py-2.5 text-left text-[12px]"
-                  style={{
-                    background: m === muscle ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
-                    color: 'var(--sp-fg)',
-                  }}
-                  onClick={() => {
-                    setMuscle(m)
-                    setMuscleOpen(false)
-                  }}
-                >
-                  {m}
-                </button>
-              ))}
+              {MUSCLE_FILTERS.map((m) => {
+                const active = m === muscle
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2 text-left text-[13px] font-semibold transition-colors hover:bg-[rgba(59,130,246,0.12)]"
+                    style={{
+                      background: active ? 'rgba(59, 130, 246, 0.22)' : 'transparent',
+                      color: active ? 'var(--sp-fg)' : 'rgba(203, 213, 225, 0.86)',
+                      border: active ? '1px solid rgba(96, 165, 250, 0.34)' : '1px solid transparent',
+                      boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.05)' : 'none',
+                    }}
+                    onClick={() => {
+                      setMuscle(m)
+                      setMuscleOpen(false)
+                    }}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{m}</span>
+                    {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--sp-accent)' }} />}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
@@ -543,31 +550,37 @@ export function ProgressChartsPanel({
           </button>
           {sortOpen && (
             <div
-              className="absolute left-0 top-full z-20 mt-1 w-[190px] max-w-[calc(100vw-40px)] rounded-[12px] border p-1.5 shadow-xl"
+              className="absolute left-0 top-full z-30 mt-2 w-[200px] max-w-[calc(100vw-40px)] rounded-[18px] border p-2 shadow-2xl"
               style={{
-                borderColor: 'var(--sp-stroke)',
-                background: 'var(--sp-surface-high)',
+                borderColor: 'rgba(111, 143, 184, 0.42)',
+                background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.98), rgba(10, 18, 30, 0.98))',
+                boxShadow: '0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {SORT_OPTS.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  className="block w-full rounded-lg px-4 py-2.5 text-left text-[12px]"
-                  style={{
-                    background:
-                      o.value === sortBy ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
-                    color: 'var(--sp-fg)',
-                  }}
-                  onClick={() => {
-                    setSortBy(o.value)
-                    setSortOpen(false)
-                  }}
-                >
-                  {es ? o.labelEs : o.labelEn}
-                </button>
-              ))}
+              {SORT_OPTS.map((o) => {
+                const active = o.value === sortBy
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    className="flex min-h-10 w-full items-center justify-between gap-3 rounded-xl px-3.5 py-2 text-left text-[13px] font-semibold transition-colors hover:bg-[rgba(59,130,246,0.12)]"
+                    style={{
+                      background: active ? 'rgba(59, 130, 246, 0.22)' : 'transparent',
+                      color: active ? 'var(--sp-fg)' : 'rgba(203, 213, 225, 0.86)',
+                      border: active ? '1px solid rgba(96, 165, 250, 0.34)' : '1px solid transparent',
+                      boxShadow: active ? 'inset 0 1px 0 rgba(255,255,255,0.05)' : 'none',
+                    }}
+                    onClick={() => {
+                      setSortBy(o.value)
+                      setSortOpen(false)
+                    }}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{es ? o.labelEs : o.labelEn}</span>
+                    {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--sp-accent)' }} />}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
