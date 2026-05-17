@@ -197,13 +197,21 @@ export function WorkoutScreen(props) {
   };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:bg, zIndex:80, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+    <div style={{ position:"fixed", inset:0, minHeight:"100svh", background:bg, zIndex:80, display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
       {/* ── Header ── */}
       <div style={{
+        position:"fixed",
+        top:0,
+        left:0,
+        right:0,
+        zIndex:85,
         background:bgCard,
         borderBottom:`2px solid ${blue}`,
-        padding:isCompact ? "7px 16px 7px" : "10px 16px 10px",
+        paddingTop:"calc(env(safe-area-inset-top, 0px) + 10px)",
+        paddingRight:16,
+        paddingBottom:isCompact ? 7 : 10,
+        paddingLeft:16,
         flexShrink:0,
         transform:showHeader ? "translateY(0)" : "translateY(-100%)",
         opacity:showHeader ? 1 : 0,
@@ -217,7 +225,7 @@ export function WorkoutScreen(props) {
             onClick={() => setExitWorkoutOpen(true)}
             style={{
               background:"transparent", border:`1px solid ${border2}`,
-              borderRadius:10, width:isCompact ? 32 : 36, height:isCompact ? 32 : 36,
+              borderRadius:10, width:44, height:44, minWidth:44, minHeight:44,
               display:"flex", alignItems:"center", justifyContent:"center",
               cursor:"pointer", color:textMuted, flexShrink:0,
             }}
@@ -250,6 +258,8 @@ export function WorkoutScreen(props) {
           <div style={{ height:"100%", width:pct+"%", background:blue, borderRadius:2, transition:"width .5s ease" }}/>
         </div>
       </div>
+
+      <div aria-hidden style={{ height:"calc(env(safe-area-inset-top, 0px) + 104px)", minHeight:"calc(env(safe-area-inset-top, 0px) + 104px)", flexShrink:0 }} />
 
       <RestTimer
         active={!!timer}
@@ -294,7 +304,7 @@ export function WorkoutScreen(props) {
       </div>
 
       {/* ── Contenido scrollable ── */}
-      <div onScroll={handleWorkoutScroll} style={{ flex:1, overflowY:"auto", padding:"10px 16px 0", WebkitOverflowScrolling:"touch" }}>
+      <div onScroll={handleWorkoutScroll} style={{ flex:1, minHeight:0, overflowY:"auto", padding:"10px 16px 0", paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))", WebkitOverflowScrolling:"touch" }}>
 
         {ex && (
           <WorkoutExercisePanel
@@ -347,7 +357,7 @@ export function WorkoutScreen(props) {
       </div>
 
       {/* ── Botón finalizar ── */}
-      <div style={{ padding:"10px 16px 24px", flexShrink:0, background:bgCard, borderTop:`1px solid ${border}` }}>
+      <div style={{ padding:"10px 16px calc(24px + env(safe-area-inset-bottom, 0px))", flexShrink:0, background:bgCard, borderTop:`1px solid ${border}` }}>
         <button
           className="hov"
           onClick={finalizarSesion}
