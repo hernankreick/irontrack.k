@@ -56,21 +56,16 @@ import {
 } from './components/onboarding/OnboardingPrimitives.jsx';
 import OnboardingScreen from './components/onboarding/OnboardingScreen.jsx';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
-import CoachDashboardMain from './components/coach/CoachDashboardMain.jsx';
-import CoachExercisesMain from './components/coach/CoachExercisesMain.jsx';
-import CoachRoutinesMain from './components/coach/CoachRoutinesMain.jsx';
-import CoachCalendar from './components/CoachCalendar.jsx';
+import CoachSectionRenderer from './components/coach/CoachSectionRenderer.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import IronTrackLogo from './components/IronTrackLogo.jsx';
 import IronTrackAppIcon from './components/IronTrackAppIcon.jsx';
 import IronTrackSplash from './components/IronTrackSplash.jsx';
 import CoachWelcomeOverlay from './components/CoachWelcomeOverlay.jsx';
-import ScannerRutina from './components/scanner/ScannerRutina.jsx';
 import RecordatoriosPanel, { checkTrainingReminderTick } from './components/student/RecordatoriosPanel.jsx';
 import AlumnoProfileModal from './components/student/AlumnoProfileModal.jsx';
 import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
-import CoachStudentsMain from './components/coach/CoachStudentsMain.jsx';
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
@@ -99,7 +94,6 @@ import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
 import ToastBanner from './components/ui/ToastBanner.jsx';
 import AppGlobalStyles from './components/layout/AppGlobalStyles.jsx';
 import AppMainScroll from './components/layout/AppMainScroll.jsx';
-import CoachMobileDrawer from './components/layout/CoachMobileDrawer.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
@@ -3232,6 +3226,82 @@ function GymApp() {
   const alumnoFullScreenBg = darkMode ? "#0B1220" : "#F1F5F9";
   /** Coach ≥1024: nav inferior global oculta — no reservar 72px extra (dejaba franja vacía bajo el shell). */
   const coachDesktopNavHidden = !!(showCoachDesktopShell && coachDesktop1024);
+  const handleCoachDashboardEnviarMensaje = function () {
+    var first = (alumnos || [])[0];
+    if (first) {
+      setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
+    } else {
+      toast2(msg("No hay alumnos para contactar", "No athletes to message"));
+    }
+  };
+  const handleCoachDashboardCrearRutina = function () {
+    setTab("routines");
+  };
+  const handleCoachDashboardRevisarAlumnos = function () {
+    setTab("alumnos");
+  };
+  const handleCoachDashboardOpenAlumno = async function (alumnoId, logLabel) {
+    var alum = (alumnosActivosLimpios || []).find(function (x) {
+      return String(x.id) === String(alumnoId);
+    });
+    if (!alum) {
+      return;
+    }
+    setAlumnoActivo(alum);
+    setTab("alumnos");
+    setLoadingSB(true);
+    try {
+      var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
+      setRutinasSB(r[0] || []);
+      setAlumnoProgreso(r[1] || []);
+      setAlumnoSesiones(r[2] || []);
+    } catch (e) {
+      console.error(logLabel, e);
+    }
+    setLoadingSB(false);
+  };
+  const handleCoachDashboardRevisar = function (alumnoId) {
+    return handleCoachDashboardOpenAlumno(alumnoId, "[CoachDashboard onRevisar]");
+  };
+  const handleCoachDashboardVerPerfil = function (alumnoId) {
+    return handleCoachDashboardOpenAlumno(alumnoId, "[CoachDashboard onVerPerfil]");
+  };
+  const handleCoachDashboardNuevoAlumno = function () {
+    setTab("alumnos");
+    setNewAlumnoForm(true);
+  };
+  const handleCoachDashboardNuevaRutina = function () {
+    setTab("routines");
+  };
+  const handleCoachDashboardNuevoEjercicio = function () {
+    setTab("biblioteca");
+    setBibOpenNewExerciseTick(function (t) {
+      return t + 1;
+    });
+  };
+  const handleCoachDashboardIrProgreso = function () {
+    setTab("progress");
+  };
+  const handleCoachDashboardAbrirChatAlumno = function (alumnoId) {
+    var alum = (alumnos || []).find(function (x) {
+      return String(x.id) === String(alumnoId);
+    });
+    if (!alum) {
+      toast2(msg("Alumno no encontrado", "Athlete not found"));
+      return;
+    }
+    setChatModal({
+      alumnoId: alum.id,
+      alumnoNombre: alum.nombre || alum.email || "Alumno",
+    });
+  };
+  const handleCoachLogout = function () {
+    clearAllIronTrackPrefixedKeys();
+    syncStateWithLocalStorage();
+  };
+  const handleCoachSettingsClose = function () {
+    setTab("plan");
+  };
 
   return (
     <>
@@ -3689,160 +3759,209 @@ function GymApp() {
             onRegistrarPrimerEntrenamiento={()=>setTab("plan")}
           />
         )}
-        {(tab==="plan"||tab==="progress")&&!esAlumno&&sessionData?.role==="entrenador"&&(
-          <CoachDashboardMain
-            activeNav={tab==="progress"?"progreso":"dashboard"}
-            alumnos={alumnosActivosLimpios}
-            sesionesGlobales={sesionesGlobalesLimpias}
-            progresoGlobal={progresoGlobalLimpio}
-            rutinasSBEntrenador={rutinasSBEntrenadorLimpias}
-            allEx={allEx}
-            lang={lang}
-            darkMode={darkMode}
-            currentWeek={currentWeek}
-            coachName={sessionData?.name || ""}
-            onEnviarMensaje={function () {
-              var first = (alumnos || [])[0];
-              if (first) {
-                setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
-              } else {
-                toast2(msg("No hay alumnos para contactar", "No athletes to message"));
-              }
-            }}
-            onCrearRutina={function () {
-              setTab("routines");
-            }}
-            onRevisarAlumnos={function () {
-              setTab("alumnos");
-            }}
-            onRevisar={async function (alumnoId) {
-              var alum = (alumnosActivosLimpios || []).find(function (x) {
-                return String(x.id) === String(alumnoId);
-              });
-              if (!alum) {
-                return;
-              }
-              setAlumnoActivo(alum);
-              setTab("alumnos");
-              setLoadingSB(true);
-              try {
-                var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
-                setRutinasSB(r[0] || []);
-                setAlumnoProgreso(r[1] || []);
-                setAlumnoSesiones(r[2] || []);
-              } catch (e) {
-                console.error("[CoachDashboard onRevisar]", e);
-              }
-              setLoadingSB(false);
-            }}
-            onVerPerfil={async function (alumnoId) {
-              var alum = (alumnosActivosLimpios || []).find(function (x) {
-                return String(x.id) === String(alumnoId);
-              });
-              if (!alum) {
-                return;
-              }
-              setAlumnoActivo(alum);
-              setTab("alumnos");
-              setLoadingSB(true);
-              try {
-                var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
-                setRutinasSB(r[0] || []);
-                setAlumnoProgreso(r[1] || []);
-                setAlumnoSesiones(r[2] || []);
-              } catch (e) {
-                console.error("[CoachDashboard onVerPerfil]", e);
-              }
-              setLoadingSB(false);
-            }}
-            onNuevoAlumno={function () {
-              setTab("alumnos");
-              setNewAlumnoForm(true);
-            }}
-            onNuevaRutina={function () {
-              setTab("routines");
-            }}
-            onNuevoEjercicio={function () {
-              setTab("biblioteca");
-              setBibOpenNewExerciseTick(function (t) {
-                return t + 1;
-              });
-            }}
-            onIrProgreso={function () {
-              setTab("progress");
-            }}
-            onAbrirChatAlumno={function (alumnoId) {
-              var alum = (alumnos || []).find(function (x) {
-                return String(x.id) === String(alumnoId);
-              });
-              if (!alum) {
-                toast2(msg("Alumno no encontrado", "Athlete not found"));
-                return;
-              }
-              setChatModal({
-                alumnoId: alum.id,
-                alumnoNombre: alum.nombre || alum.email || "Alumno",
-              });
-            }}
-            globalSearchData={coachGlobalSearchData}
-            onGlobalSearchNavigate={coachGlobalSearchNavigate}
-            getAlumnoCategoria={coachAlumnoCategoria}
-          />
-        )}
-        {/* ── MOBILE DRAWER (solo entrenador, solo mobile) ── */}
-        {tab==="calendar"&&!esAlumno&&sessionData?.role==="entrenador"&&(
-          <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-y-auto">
-            <CoachCalendar
-              alumnos={alumnosActivosLimpios}
-              rutinas={rutinasCalendarioEntrenador}
-              lang={lang}
-              dark={darkMode}
-              supabase={supabase}
-              entrenadorId={supabaseSessionUserId || null}
-              onAssignRoutineToAlumno={assignRoutineToAlumno}
-            />
-          </div>
-        )}
-        {showCoachDesktopShell && !coachDesktop1024 && (
-          <CoachMobileDrawer
-            open={mobileDrawerOpen}
-            activeTab={tab}
-            sessionData={sessionData}
-            msg={msg}
-            mobileDrawerRef={mobileDrawerRef}
-            onClose={() => setMobileDrawerOpen(false)}
-            onNavigate={setTab}
-            onLogout={() => {
-              clearAllIronTrackPrefixedKeys();
-              syncStateWithLocalStorage();
-            }}
-            coachInitials={coachInitialsFromFullName(sessionData?.name)}
-          />
-        )}
-        {(tab === "settings" || tab === "perfil") && showCoachDesktopShell && !esAlumno && sessionData?.role === "entrenador" && sessionData && (
-          <SettingsPage
-            key={tab}
-            embedInMainColumn
-            coach={sessionData}
-            onClose={function () {
-              setTab("plan");
-            }}
-            initialSection={tab === "perfil" ? "perfil" : "preferencias"}
-            toast2={toast2}
-            setSessionData={setSessionData}
-            syncStateWithLocalStorage={syncStateWithLocalStorage}
-            lang={lang}
-            setLang={setLang}
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
-            es={es}
-            alumnosCount={alumnos.length}
-            rutinasActivasCount={rutinasSBEntrenador.length}
-            sesionesGlobales={sesionesGlobales}
-            sb={sb}
-            entrenadorId={sessionData.entrenadorId || "entrenador_principal"}
-          />
-        )}
+        <CoachSectionRenderer
+          tab={tab}
+          esAlumno={esAlumno}
+          sessionData={sessionData}
+          showCoachDesktopShell={showCoachDesktopShell}
+          coachDesktop1024={coachDesktop1024}
+          dashboardProps={{
+            alumnos: alumnosActivosLimpios,
+            sesionesGlobales: sesionesGlobalesLimpias,
+            progresoGlobal: progresoGlobalLimpio,
+            rutinasSBEntrenador: rutinasSBEntrenadorLimpias,
+            allEx: allEx,
+            lang: lang,
+            darkMode: darkMode,
+            currentWeek: currentWeek,
+            coachName: sessionData?.name || "",
+            onEnviarMensaje: handleCoachDashboardEnviarMensaje,
+            onCrearRutina: handleCoachDashboardCrearRutina,
+            onRevisarAlumnos: handleCoachDashboardRevisarAlumnos,
+            onRevisar: handleCoachDashboardRevisar,
+            onVerPerfil: handleCoachDashboardVerPerfil,
+            onNuevoAlumno: handleCoachDashboardNuevoAlumno,
+            onNuevaRutina: handleCoachDashboardNuevaRutina,
+            onNuevoEjercicio: handleCoachDashboardNuevoEjercicio,
+            onIrProgreso: handleCoachDashboardIrProgreso,
+            onAbrirChatAlumno: handleCoachDashboardAbrirChatAlumno,
+            globalSearchData: coachGlobalSearchData,
+            onGlobalSearchNavigate: coachGlobalSearchNavigate,
+            getAlumnoCategoria: coachAlumnoCategoria,
+          }}
+          calendarProps={{
+            alumnos: alumnosActivosLimpios,
+            rutinas: rutinasCalendarioEntrenador,
+            lang: lang,
+            dark: darkMode,
+            supabase: supabase,
+            entrenadorId: supabaseSessionUserId || null,
+            onAssignRoutineToAlumno: assignRoutineToAlumno,
+          }}
+          mobileDrawerProps={{
+            open: mobileDrawerOpen,
+            activeTab: tab,
+            sessionData: sessionData,
+            msg: msg,
+            mobileDrawerRef: mobileDrawerRef,
+            onClose: function () { setMobileDrawerOpen(false); },
+            onNavigate: setTab,
+            onLogout: handleCoachLogout,
+            coachInitials: coachInitialsFromFullName(sessionData?.name),
+          }}
+          settingsProps={{
+            onClose: handleCoachSettingsClose,
+            toast2: toast2,
+            setSessionData: setSessionData,
+            syncStateWithLocalStorage: syncStateWithLocalStorage,
+            lang: lang,
+            setLang: setLang,
+            darkMode: darkMode,
+            setDarkMode: setDarkMode,
+            es: es,
+            alumnosCount: alumnos.length,
+            rutinasActivasCount: rutinasSBEntrenador.length,
+            sesionesGlobales: sesionesGlobales,
+            sb: sb,
+            entrenadorId: sessionData?.entrenadorId || "entrenador_principal",
+          }}
+          exercisesProps={{
+            allEx: allEx,
+            setPatternOverrides: setPatternOverrides,
+            darkMode: darkMode,
+            sb: sb,
+            customEx: customEx,
+            setCustomEx: setCustomEx,
+            toast2: toast2,
+            videoOverrides: videoOverrides,
+            setVideoOverrides: setVideoOverrides,
+            openNewExerciseTick: bibOpenNewExerciseTick,
+          }}
+          routinesProps={{
+            setTab: setTab,
+            border: border,
+            textMuted: textMuted,
+            bgCard: bgCard,
+            textMain: textMain,
+            darkMode: darkMode,
+            bgSub: bgSub,
+            lang: lang,
+            es: es,
+            filtroRut: filtroRut,
+            setFiltroRut: setFiltroRut,
+            card: card,
+            setNewR: setNewR,
+            routines: routines,
+            setRoutines: setRoutines,
+            allEx: allEx,
+            toast2: toast2,
+            setAddExModal: setAddExModal,
+            setAddExSearch: setAddExSearch,
+            setAddExPat: setAddExPat,
+            setAddExMuscle: setAddExMuscle,
+            setAddExSelectedIds: setAddExSelectedIds,
+            setDupDayModal: setDupDayModal,
+            alumnos: alumnosActivosLimpios,
+            sb: sb,
+            setAssignRoutineId: setAssignRoutineId,
+            desktopCoachStableLayout: coachDesktopNavHidden,
+            rutinasSBEntrenador: rutinasSBEntrenador,
+            setRutinasSBEntrenador: setRutinasSBEntrenador,
+          }}
+          scannerProps={{
+            darkMode: darkMode,
+            sb: sb,
+            setRoutines: setRoutines,
+            alumnos: alumnosActivosLimpios,
+            toast2: toast2,
+            customEx: customEx,
+            msg: msg,
+            green: green,
+          }}
+          studentsProps={{
+            allEx: allEx,
+            alumnoActivo: alumnoActivo,
+            alumnoProgreso: alumnoProgreso,
+            alumnoSesiones: alumnoSesiones,
+            alumnos: alumnos,
+            bgCard: bgCard,
+            bgSub: bgSub,
+            border: border,
+            cargarAlumnos: cargarAlumnos,
+            cleanActiveCoachAlumnos: cleanActiveCoachAlumnos,
+            coachAluBorderSoft: coachAluBorderSoft,
+            coachAluDropdown: coachAluDropdown,
+            coachAluDropdownShadow: coachAluDropdownShadow,
+            coachAluGhostBtn: coachAluGhostBtn,
+            coachAluShell: coachAluShell,
+            coachAluSubtle: coachAluSubtle,
+            coachAluSurface: coachAluSurface,
+            coachAluTrack: coachAluTrack,
+            coachAlumnosCounts: coachAlumnosCounts,
+            coachAlumnosFilter: coachAlumnosFilter,
+            coachAlumnosListaFiltrada: coachAlumnosListaFiltrada,
+            coachAlumnosSearch: coachAlumnosSearch,
+            coachCardMenuId: coachCardMenuId,
+            coachDiaSecsOpen: coachDiaSecsOpen,
+            coachRoutineDiaIdx: coachRoutineDiaIdx,
+            coachRutinaMenuOpen: coachRutinaMenuOpen,
+            completedDays: completedDays,
+            currentWeek: currentWeek,
+            darkMode: darkMode,
+            ENTRENADOR_ID: ENTRENADOR_ID,
+            es: es,
+            EX: EX,
+            generarSugerenciasAlumno: generarSugerenciasAlumno,
+            getRutinaAsignadaAlumno: getRutinaAsignadaAlumno,
+            loadingSB: loadingSB,
+            mergeRutinasAsignadas: mergeRutinasAsignadas,
+            msg: msg,
+            newAlumnoData: newAlumnoData,
+            newAlumnoErrors: newAlumnoErrors,
+            newAlumnoForm: newAlumnoForm,
+            notaDiaInput: notaDiaInput,
+            routineForAssign: routineForAssign,
+            routines: routines,
+            rutinasLoaded: rutinasLoaded,
+            sb: sb,
+            setAddExModal: setAddExModal,
+            setAddExMuscle: setAddExMuscle,
+            setAddExPat: setAddExPat,
+            setAddExSearch: setAddExSearch,
+            setAddExSelectedIds: setAddExSelectedIds,
+            setAliasModal: setAliasModal,
+            setAlumnoActivo: setAlumnoActivo,
+            setAlumnoProgreso: setAlumnoProgreso,
+            setAlumnoSesiones: setAlumnoSesiones,
+            setAlumnos: setAlumnos,
+            setAssignRoutineId: setAssignRoutineId,
+            setCoachAlumnosFilter: setCoachAlumnosFilter,
+            setCoachAlumnosSearch: setCoachAlumnosSearch,
+            setCoachCardMenuId: setCoachCardMenuId,
+            setChatModal: setChatModal,
+            setCoachDiaSecsOpen: setCoachDiaSecsOpen,
+            setCoachDialog: setCoachDialog,
+            setCoachRoutineDiaIdx: setCoachRoutineDiaIdx,
+            setCoachRutinaMenuOpen: setCoachRutinaMenuOpen,
+            setEditEx: setEditEx,
+            setLoadingSB: setLoadingSB,
+            setNewAlumnoData: setNewAlumnoData,
+            setNewAlumnoErrors: setNewAlumnoErrors,
+            setNewAlumnoForm: setNewAlumnoForm,
+            setNotaDiaInput: setNotaDiaInput,
+            setRegistrosSubTab: setRegistrosSubTab,
+            setRutinasSB: setRutinasSB,
+            setRutinasSBEntrenador: setRutinasSBEntrenador,
+            sesionesGlobales: sesionesGlobalesLimpias,
+            progresoGlobal: progresoGlobalLimpio,
+            showCoachDesktopShell: showCoachDesktopShell,
+            sugsOpen: sugsOpen,
+            setSugsOpen: setSugsOpen,
+            textMain: textMain,
+            textMuted: textMuted,
+            toast2: toast2,
+          }}
+        />
         {tab==="plan"&&esAlumno&&(
           <div className="mx-auto w-full max-w-[32rem] pt-4">
             {esAlumno&&routines.length>0&&(()=>{
@@ -4322,72 +4441,6 @@ function GymApp() {
             })}
           </div>
         )}
-        {tab==="library"&&!esAlumno&&(
-          <CoachExercisesMain
-            allEx={allEx}
-            setPatternOverrides={setPatternOverrides}
-            darkMode={darkMode}
-            sb={sb}
-            customEx={customEx}
-            setCustomEx={setCustomEx}
-            toast2={toast2}
-            videoOverrides={videoOverrides}
-            setVideoOverrides={setVideoOverrides}
-            openNewExerciseTick={bibOpenNewExerciseTick}
-          />
-        )}
-        {tab==="routines"&&!esAlumno&&(
-          <CoachRoutinesMain
-            setTab={setTab}
-            border={border}
-            textMuted={textMuted}
-            bgCard={bgCard}
-            textMain={textMain}
-            darkMode={darkMode}
-            bgSub={bgSub}
-            lang={lang}
-            es={es}
-            filtroRut={filtroRut}
-            setFiltroRut={setFiltroRut}
-            card={card}
-            setNewR={setNewR}
-            routines={routines}
-            setRoutines={setRoutines}
-            allEx={allEx}
-            toast2={toast2}
-            setAddExModal={setAddExModal}
-            setAddExSearch={setAddExSearch}
-            setAddExPat={setAddExPat}
-            setAddExMuscle={setAddExMuscle}
-            setAddExSelectedIds={setAddExSelectedIds}
-            setDupDayModal={setDupDayModal}
-            alumnos={alumnosActivosLimpios}
-            sb={sb}
-            setAssignRoutineId={setAssignRoutineId}
-            desktopCoachStableLayout={coachDesktopNavHidden}
-            rutinasSBEntrenador={rutinasSBEntrenador}
-            setRutinasSBEntrenador={setRutinasSBEntrenador}
-          />
-        )}
-        {tab==="scanner"&&!esAlumno&&(
-          <div className="min-w-0 max-w-full">
-            <ScannerRutina darkMode={darkMode} sb={sb} setRoutines={setRoutines} alumnos={alumnosActivosLimpios} toast2={toast2} customEx={customEx} msg={msg} green={green}/>
-          </div>
-        )}
-        {tab==="biblioteca"&&!esAlumno&&(
-          <CoachExercisesMain
-            allEx={allEx}
-            setPatternOverrides={setPatternOverrides}
-            darkMode={darkMode}
-            sb={sb}
-            customEx={customEx}
-            setCustomEx={setCustomEx}
-            toast2={toast2}
-            videoOverrides={videoOverrides}
-            setVideoOverrides={setVideoOverrides}
-            openNewExerciseTick={bibOpenNewExerciseTick}
-          />
-        )}
         {tab==="progress"&&!showAlumnoProgressStack&&!(sessionData?.role==="entrenador"&&!esAlumno)&&(
           <div className="mx-auto w-full min-w-0 max-w-[480px] lg:max-w-3xl">
             <GraficoProgreso allEx={allEx} es={es} darkMode={darkMode} progress={progress} EX={EX} readOnly={readOnly||esAlumno} sharedParam={sharedParam} sb={sb} sessionData={sessionData} sesiones={sesiones}/>
@@ -4450,91 +4503,6 @@ function GymApp() {
               </div>
             )}
           </div>
-        )}
-        {tab==="alumnos"&&sessionData?.role==="entrenador"&&(
-          <CoachStudentsMain
-            allEx={allEx}
-            alumnoActivo={alumnoActivo}
-            alumnoProgreso={alumnoProgreso}
-            alumnoSesiones={alumnoSesiones}
-            alumnos={alumnos}
-            bgCard={bgCard}
-            bgSub={bgSub}
-            border={border}
-            cargarAlumnos={cargarAlumnos}
-            cleanActiveCoachAlumnos={cleanActiveCoachAlumnos}
-            coachAluBorderSoft={coachAluBorderSoft}
-            coachAluDropdown={coachAluDropdown}
-            coachAluDropdownShadow={coachAluDropdownShadow}
-            coachAluGhostBtn={coachAluGhostBtn}
-            coachAluShell={coachAluShell}
-            coachAluSubtle={coachAluSubtle}
-            coachAluSurface={coachAluSurface}
-            coachAluTrack={coachAluTrack}
-            coachAlumnosCounts={coachAlumnosCounts}
-            coachAlumnosFilter={coachAlumnosFilter}
-            coachAlumnosListaFiltrada={coachAlumnosListaFiltrada}
-            coachAlumnosSearch={coachAlumnosSearch}
-            coachCardMenuId={coachCardMenuId}
-            coachDiaSecsOpen={coachDiaSecsOpen}
-            coachRoutineDiaIdx={coachRoutineDiaIdx}
-            coachRutinaMenuOpen={coachRutinaMenuOpen}
-            completedDays={completedDays}
-            currentWeek={currentWeek}
-            darkMode={darkMode}
-            ENTRENADOR_ID={ENTRENADOR_ID}
-            es={es}
-            EX={EX}
-            generarSugerenciasAlumno={generarSugerenciasAlumno}
-            getRutinaAsignadaAlumno={getRutinaAsignadaAlumno}
-            loadingSB={loadingSB}
-            mergeRutinasAsignadas={mergeRutinasAsignadas}
-            msg={msg}
-            newAlumnoData={newAlumnoData}
-            newAlumnoErrors={newAlumnoErrors}
-            newAlumnoForm={newAlumnoForm}
-            notaDiaInput={notaDiaInput}
-            routineForAssign={routineForAssign}
-            routines={routines}
-            rutinasLoaded={rutinasLoaded}
-            sb={sb}
-            setAddExModal={setAddExModal}
-            setAddExMuscle={setAddExMuscle}
-            setAddExPat={setAddExPat}
-            setAddExSearch={setAddExSearch}
-            setAddExSelectedIds={setAddExSelectedIds}
-            setAliasModal={setAliasModal}
-            setAlumnoActivo={setAlumnoActivo}
-            setAlumnoProgreso={setAlumnoProgreso}
-            setAlumnoSesiones={setAlumnoSesiones}
-            setAlumnos={setAlumnos}
-            setAssignRoutineId={setAssignRoutineId}
-            setCoachAlumnosFilter={setCoachAlumnosFilter}
-            setCoachAlumnosSearch={setCoachAlumnosSearch}
-            setCoachCardMenuId={setCoachCardMenuId}
-            setChatModal={setChatModal}
-            setCoachDiaSecsOpen={setCoachDiaSecsOpen}
-            setCoachDialog={setCoachDialog}
-            setCoachRoutineDiaIdx={setCoachRoutineDiaIdx}
-            setCoachRutinaMenuOpen={setCoachRutinaMenuOpen}
-            setEditEx={setEditEx}
-            setLoadingSB={setLoadingSB}
-            setNewAlumnoData={setNewAlumnoData}
-            setNewAlumnoErrors={setNewAlumnoErrors}
-            setNewAlumnoForm={setNewAlumnoForm}
-            setNotaDiaInput={setNotaDiaInput}
-            setRegistrosSubTab={setRegistrosSubTab}
-            setRutinasSB={setRutinasSB}
-            setRutinasSBEntrenador={setRutinasSBEntrenador}
-            sesionesGlobales={sesionesGlobalesLimpias}
-            progresoGlobal={progresoGlobalLimpio}
-            showCoachDesktopShell={showCoachDesktopShell}
-            sugsOpen={sugsOpen}
-            setSugsOpen={setSugsOpen}
-            textMain={textMain}
-            textMuted={textMuted}
-            toast2={toast2}
-          />
         )}
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
         <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
