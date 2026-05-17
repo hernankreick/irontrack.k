@@ -493,6 +493,7 @@ export function ProgressChartsPanel({
                 borderColor: 'rgba(111, 143, 184, 0.42)',
                 background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.98), rgba(10, 18, 30, 0.98))',
                 boxShadow: '0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
+                transform: 'translateX(12px)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -555,6 +556,7 @@ export function ProgressChartsPanel({
                 borderColor: 'rgba(111, 143, 184, 0.42)',
                 background: 'linear-gradient(180deg, rgba(28, 47, 72, 0.98), rgba(10, 18, 30, 0.98))',
                 boxShadow: '0 18px 42px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
+                transform: 'translateX(12px)',
               }}
               onClick={(e) => e.stopPropagation()}
             >
