@@ -573,7 +573,7 @@ export function ProgressChartsPanel({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 px-1">
         {limited.map(({ ex, datos, datosAsc, pr, ultimo, pct, trend, name, kgSeries, atPR }) => {
           const isOpen = expandedEx === ex.id
           const hist = [...datos].reverse()
@@ -594,15 +594,16 @@ export function ProgressChartsPanel({
             >
               <button
                 type="button"
-                className="flex w-full flex-col gap-4 p-5 text-left sm:p-6"
+                className="flex w-full flex-col gap-4 text-left"
                 style={{
                   background: 'transparent',
+                  padding: '20px 18px',
                   boxSizing: 'border-box',
                   minHeight: 120,
                 }}
                 onClick={() => setExpandedEx(isOpen ? null : ex.id)}
               >
-                <div className="flex min-w-0 items-start gap-5">
+                <div className="flex min-w-0 items-start gap-3">
                   <div
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border"
                     style={{
