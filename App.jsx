@@ -81,7 +81,6 @@ import RecordatoriosPanel, { checkTrainingReminderTick } from './components/stud
 import AlumnoProfileModal from './components/student/AlumnoProfileModal.jsx';
 import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
 import AlumnoUserMenu from './components/student/AlumnoUserMenu.jsx';
-import AlumnoPWAInstallControl from './components/student/AlumnoPWAInstallControl.jsx';
 import AlumnoPlanHeaderDayLabel from './components/student/AlumnoPlanHeaderDayLabel.jsx';
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
@@ -110,6 +109,7 @@ import AppGlobalStyles from './components/layout/AppGlobalStyles.jsx';
 import AppMainScroll from './components/layout/AppMainScroll.jsx';
 import GlobalBottomNav from './components/layout/GlobalBottomNav.jsx';
 import AppHeaderBrand from './components/layout/AppHeaderBrand.jsx';
+import AppHeaderActions from './components/layout/AppHeaderActions.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
@@ -3449,28 +3449,18 @@ function GymApp() {
             />
           )}
         </div>
-        <div className="relative flex flex-shrink-0 items-center gap-3">
-          {session&&<span style={{...tag("#22C55E"),fontSize:13}}>✓ Sesion activa</span>}
-          {esAlumno &&
-            (tab === "plan" || tab === "library" || tab === "progress") &&
-            canInstallPWA &&
-            <AlumnoPWAInstallControl
-              coachDesktop1024={coachDesktop1024}
-              pwaInstallTipOpen={pwaInstallTipOpen}
-              setPwaInstallTipOpen={setPwaInstallTipOpen}
-              installPWA={installPWA}
-              msg={msg}
-            />}
-          <button className="hov" style={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setSettingsOpen(true)}><Ic name="settings" size={18} color={textMuted}/></button>
-          {sessionData&&esAlumno
-            ? <button className="hov" style={{width:36,height:36,background:"linear-gradient(135deg,#1E3A5F,#2563EB)",border:"none",borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:13,fontWeight:800,color:"#fff"}} onClick={()=>setUserMenuOpen(!userMenuOpen)}>
-                {(sessionData.name||"U").slice(0,2).toUpperCase()}
-              </button>
-            : sessionData
-              ? <button className="hov" style={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}>SALIR</button>
-              : <button className="hov" style={{...btn(),padding:"4px 8px",fontSize:13}} onClick={()=>setLoginModal(true)}><Ic name="user" size={18}/></button>
-          }
-        </div>
+        <AppHeaderActions
+          session={session} sessionActiveStyle={{...tag("#22C55E"),fontSize:13}}
+          showPWAInstall={esAlumno && (tab === "plan" || tab === "library" || tab === "progress") && canInstallPWA}
+          coachDesktop1024={coachDesktop1024} pwaInstallTipOpen={pwaInstallTipOpen} setPwaInstallTipOpen={setPwaInstallTipOpen}
+          installPWA={installPWA} msg={msg}
+          settingsButtonStyle={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} textMuted={textMuted}
+          onSettings={() => setSettingsOpen(true)} sessionData={sessionData} esAlumno={esAlumno}
+          avatarLabel={(sessionData?.name||"U").slice(0,2).toUpperCase()} userMenuOpen={userMenuOpen} onToggleUserMenu={setUserMenuOpen}
+          coachLogoutButtonStyle={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+          onCoachLogout={()=>{clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}
+          loginButtonStyle={{...btn(),padding:"4px 8px",fontSize:13}} onLogin={()=>setLoginModal(true)}
+        />
       </div>
       )}
       {alumnoTopBarFixed && (
