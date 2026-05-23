@@ -82,6 +82,7 @@ import RecordatoriosPanel, { checkTrainingReminderTick } from './components/stud
 import AlumnoProfileModal from './components/student/AlumnoProfileModal.jsx';
 import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
 import AlumnoUserMenu from './components/student/AlumnoUserMenu.jsx';
+import StudentWelcomeModalHost from './components/student/StudentWelcomeModalHost.jsx';
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
@@ -101,7 +102,6 @@ import {
   countExercisesWithLogToday,
 } from './components/student-plan/studentPlanHelpers.js';
 import { buildStudentWorkoutLabelTexts, inferStudentWorkoutLabels } from './components/student-plan/studentWorkoutLabels.js';
-import { WelcomeModal } from './components/WelcomeModal.jsx';
 import LoginForm from './components/auth/LoginForm.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
@@ -4070,65 +4070,40 @@ function GymApp() {
 {showWelcome&&(()=>{
         const isCoach = sessionData?.role==="entrenador";
         if(!isCoach){
-          const welcomeRoutine = routines[0];
-          const welcomeTotalDays = welcomeRoutine?.days?.length || 0;
-          const welcomeCurrentWeek = studentCurrentWeek || 0;
-          const welcomeCompletedDays = activeStudentRoutinePosition.completedDaysInWeek || 0;
-          const welcomeDayIdx = welcomeCompletedDays < welcomeTotalDays ? welcomeCompletedDays : 0;
-          const welcomeDay = welcomeRoutine?.days?.[welcomeDayIdx] || null;
-          const welcomeExerciseCount = welcomeDay ? (welcomeDay.warmup || []).length + (welcomeDay.exercises || []).length : 0;
-          const welcomeExerciseInfos = welcomeDay
-            ? [].concat(welcomeDay.exercises || [], welcomeDay.warmup || []).map(function (ex) {
-                return allEx.find(function (info) { return info.id === ex.id; }) || ex;
-              }).filter(Boolean)
-            : [];
-          const welcomeWorkoutLabels = inferStudentWorkoutLabels({
-            day: welcomeDay,
-            exerciseInfos: welcomeExerciseInfos,
-            dayIndex: welcomeDayIdx,
-            labels: buildStudentWorkoutLabelTexts(msg),
-          });
-          const welcomeDayTitle = welcomeWorkoutLabels.title;
-          const welcomeTypeBadge = welcomeWorkoutLabels.typeBadge;
           return(
-            <WelcomeModal
-              open={true}
-              onOpenChange={(v)=>{if(!v)setShowWelcome(false);}}
-              userName={sessionData?.name}
+            <StudentWelcomeModalHost
+              routines={routines}
+              studentCurrentWeek={studentCurrentWeek}
+              activeStudentRoutinePosition={activeStudentRoutinePosition}
+              allEx={allEx}
+              sessionData={sessionData}
               es={es}
               bgCard={bgCard}
               border={border}
               textMain={textMain}
               textMuted={textMuted}
               msg={msg}
-              todayDay={welcomeDay}
-              currentWeek={welcomeCurrentWeek}
-              dayIndex={welcomeDayIdx}
-              dayTitle={welcomeDayTitle}
-              typeBadgeText={welcomeTypeBadge}
-              exerciseCount={welcomeExerciseCount}
-              durationMinutes={estimateDayMinutes(welcomeDay, welcomeCurrentWeek)}
-              allEx={allEx}
               images={IMGS}
               videoOverrides={videoOverrides}
+              onOpenChange={(v)=>{if(!v)setShowWelcome(false);}}
               onExerciseVideo={function (nombre, vUrl) {
                 var vid = getYTVideoId(vUrl);
                 if (vid) setVideoModal({ videoId: vid, nombre: nombre });
                 else window.open(vUrl, "_blank");
               }}
-              onStartWorkout={function () {
-                if (!welcomeRoutine || !welcomeDay) {
+              onStartWorkout={function ({ routine, day, dayIndex }) {
+                if (!routine || !day) {
                   setShowWelcome(false);
                   return;
                 }
                 var snap = {};
-                [].concat(welcomeDay.warmup || [], welcomeDay.exercises || []).forEach(function (ex) {
+                [].concat(day.warmup || [], day.exercises || []).forEach(function (ex) {
                   snap[ex.id] = progress[ex.id]?.max || 0;
                 });
                 setPreSessionPRs({ ...snap });
                 setSessionPRList([]);
                 setShowWelcome(false);
-                setSession({ rId: welcomeRoutine.id, dIdx: welcomeDayIdx, exIdx: 0, startTime: Date.now() });
+                setSession({ rId: routine.id, dIdx: dayIndex, exIdx: 0, startTime: Date.now() });
               }}
             />
           );
