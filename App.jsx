@@ -70,6 +70,7 @@ import OnboardingScreen from './components/onboarding/OnboardingScreen.jsx';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachConfirmDialog from './components/coach/CoachConfirmDialog.jsx';
 import { getCoachDialogModalConfig } from './components/coach/coachDialogConfig.js';
+import { buildCoachWelcomeSteps } from './components/coach/coachWelcomeSteps.js';
 import CoachEditStudentModal from './components/coach/CoachEditStudentModal.jsx';
 import CoachSectionRenderer from './components/coach/CoachSectionRenderer.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
@@ -4134,39 +4135,21 @@ function GymApp() {
         }
         const obStep = onboardStep||0;
         const setObStep = setOnboardStep;
-        const steps = [
-          {
-            icon:"👋",title:"IRON TRACK",
-            subtitle:msg("Configurá tu cuenta en 3 pasos", "Set up your account in 3 steps"),
-            body:null,
-            items:[
-              {n:1,text:msg("Creá tu primera rutina", "Create your first routine"),done:routines.length>0},
-              {n:2,text:msg("Agregá un alumno", "Add an athlete"),done:alumnos.length>0},
-              {n:3,text:msg("Asignale la rutina", "Assign the routine"),done:false},
-            ],
-            cta:msg("EMPEZAR →", "GET STARTED →"),action:()=>setObStep(1)
-          },{
-            icon:"📋",title:msg("Paso 1 — Rutina", "Step 1 — Routine"),
-            subtitle:msg("Creá tu primera rutina", "Create your first routine"),
-            body:msg("Organizá los días, ejercicios y series. La podés editar cuando quieras.", "Organize days, exercises and sets. You can edit it anytime."),
-            cta:routines.length>0?(msg("Rutina lista ✓ → Siguiente", "Routine ready ✓ → Next")):(msg("CREAR RUTINA →", "CREATE ROUTINE →")),
-            action:()=>{if(routines.length===0){setShowWelcome(false);setOnboardStep(1);setTab("routines");}else setObStep(2);},
-            skip:()=>setObStep(2)
-          },{
-            icon:"👥",title:msg("Paso 2 — Alumno", "Step 2 — Athlete"),
-            subtitle:msg("Agregá tu primer alumno", "Add your first athlete"),
-            body:msg("Creá su acceso con email y contraseña. Desde ALUMNOS podés ver su historial.", "Create their access. From ATHLETES you can see their history."),
-            cta:alumnos.length>0?(msg("Alumno listo ✓ → Siguiente", "Athlete ready ✓ → Next")):(msg("AGREGAR ALUMNO →", "ADD ATHLETE →")),
-            action:()=>{if(alumnos.length===0){setShowWelcome(false);setOnboardStep(2);setTab("alumnos");setNewAlumnoForm(true);}else setObStep(3);},
-            skip:()=>setObStep(3)
-          },{
-            icon:"🚀",title:msg("¡Todo listo!", "All set!"),
-            subtitle:msg("Ya podés usar IRON TRACK", "You're ready to use IRON TRACK"),
-            body:msg("Desde el dashboard vas a ver la actividad de tus alumnos y quién necesita atención.", "From the dashboard see your athletes' activity and who needs attention."),
-            cta:msg("ABRIR IRON TRACK 💪", "OPEN IRON TRACK 💪"),
-            action:()=>setShowWelcome(false)
-          }
-        ];
+        const routinesReady = routines.length > 0;
+        const alumnosReady = alumnos.length > 0;
+        const steps = buildCoachWelcomeSteps({
+          msg,
+          routinesReady,
+          alumnosReady,
+          actions: {
+            start: () => setObStep(1),
+            routine: () => { if(!routinesReady){setShowWelcome(false);setOnboardStep(1);setTab("routines");} else setObStep(2); },
+            skipRoutine: () => setObStep(2),
+            alumno: () => { if(!alumnosReady){setShowWelcome(false);setOnboardStep(2);setTab("alumnos");setNewAlumnoForm(true);} else setObStep(3); },
+            skipAlumno: () => setObStep(3),
+            finish: () => setShowWelcome(false),
+          },
+        });
         const step = steps[Math.min(obStep,steps.length-1)];
         return(
           <CoachWelcomeOverlay
