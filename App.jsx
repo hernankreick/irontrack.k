@@ -98,7 +98,7 @@ import {
   estimateDayMinutes,
   countExercisesWithLogToday,
 } from './components/student-plan/studentPlanHelpers.js';
-import { inferStudentWorkoutLabels } from './components/student-plan/studentWorkoutLabels.js';
+import { buildStudentWorkoutLabelTexts, inferStudentWorkoutLabels } from './components/student-plan/studentWorkoutLabels.js';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import LoginForm from './components/auth/LoginForm.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
@@ -3736,13 +3736,7 @@ function GymApp() {
                 day: todayDay,
                 exerciseInfos: todayExerciseInfos,
                 dayIndex: nextDayIdx,
-                labels: {
-                  upperBody: msg("Torso", "Upper Body", "Torso"),
-                  lowerBody: msg("Piernas", "Lower Body", "Pernas"),
-                  dayPrefix: msg("Día", "Day", "Dia"),
-                  mobility: msg("Movilidad", "Mobility", "Mobilidade"),
-                  strength: msg("Fuerza", "Strength", "Forca"),
-                },
+                labels: buildStudentWorkoutLabelTexts(msg),
               });
               const todayHeroTitle = todayWorkoutLabels.title;
               const todayTypeBadge = todayWorkoutLabels.typeBadge;
@@ -4223,13 +4217,7 @@ function GymApp() {
             day: welcomeDay,
             exerciseInfos: welcomeExerciseInfos,
             dayIndex: welcomeDayIdx,
-            labels: {
-              upperBody: msg("Torso", "Upper Body", "Torso"),
-              lowerBody: msg("Piernas", "Lower Body", "Pernas"),
-              dayPrefix: msg("Día", "Day", "Dia"),
-              mobility: msg("Movilidad", "Mobility", "Mobilidade"),
-              strength: msg("Fuerza", "Strength", "Forca"),
-            },
+            labels: buildStudentWorkoutLabelTexts(msg),
           });
           const welcomeDayTitle = welcomeWorkoutLabels.title;
           const welcomeTypeBadge = welcomeWorkoutLabels.typeBadge;

@@ -23,3 +23,13 @@ export function inferStudentWorkoutLabels({ day, exerciseInfos, dayIndex, labels
 
   return { title: title, typeBadge: typeBadge };
 }
+
+export function buildStudentWorkoutLabelTexts(msg) {
+  return {
+    upperBody: msg("Torso", "Upper Body", "Torso"),
+    lowerBody: msg("Piernas", "Lower Body", "Pernas"),
+    dayPrefix: msg("Día", "Day", "Dia"),
+    mobility: msg("Movilidad", "Mobility", "Mobilidade"),
+    strength: msg("Fuerza", "Strength", "Forca"),
+  };
+}
