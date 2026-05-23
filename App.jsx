@@ -81,7 +81,6 @@ import RecordatoriosPanel, { checkTrainingReminderTick } from './components/stud
 import AlumnoProfileModal from './components/student/AlumnoProfileModal.jsx';
 import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
 import AlumnoUserMenu from './components/student/AlumnoUserMenu.jsx';
-import AlumnoPlanHeaderDayLabel from './components/student/AlumnoPlanHeaderDayLabel.jsx';
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
@@ -108,8 +107,7 @@ import ToastBanner from './components/ui/ToastBanner.jsx';
 import AppGlobalStyles from './components/layout/AppGlobalStyles.jsx';
 import AppMainScroll from './components/layout/AppMainScroll.jsx';
 import GlobalBottomNav from './components/layout/GlobalBottomNav.jsx';
-import AppHeaderBrand from './components/layout/AppHeaderBrand.jsx';
-import AppHeaderActions from './components/layout/AppHeaderActions.jsx';
+import AppTopBar from './components/layout/AppTopBar.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
@@ -3389,79 +3387,37 @@ function GymApp() {
           style={showCoachDesktopShell ? undefined : { display: "contents" }}
         >
       {!coachSuppressTopNav && !hideAlumnoTopBarForSession && (
-      <div
+      <AppTopBar
         ref={alumnoAppHeaderRef}
-        className={
-          (alumnoTopBarFixed ? "relative flex w-full min-w-0 items-center justify-between gap-1 pb-3 pt-3 " : "relative z-50 flex w-full min-w-0 items-center justify-between gap-1 pb-3 pt-4 ") +
-          (alumnoTopBarFixed
-            ? ""
-            : darkMode
-              ? "border-b border-[#2D4057] bg-[#0F1923]"
-              : showCoachDesktopShell && !esAlumno
-                ? "border-b border-slate-200 bg-white"
-                : "border-b border-[#2D4057] bg-[#F0F4F8]")
-        }
-        style={{
-          position: alumnoTopBarFixed ? "fixed" : "relative",
-          top: alumnoTopBarFixed ? 0 : undefined,
-          left: alumnoTopBarFixed ? 0 : undefined,
-          right: alumnoTopBarFixed ? 0 : undefined,
-          zIndex: alumnoTopBarFixed ? 95 : undefined,
-          paddingLeft: esAlumno ? 20 : 16,
-          paddingRight: esAlumno ? 20 : 16,
-          paddingTop: alumnoTopBarFixed ? "env(safe-area-inset-top, 0px)" : undefined,
-          height: undefined,
-          minHeight: alumnoTopBarFixed ? alumnoTopBarHeight : undefined,
-          boxSizing: "border-box",
-          background: alumnoTopBarFixed ? "#0A0F1A" : undefined,
-          borderBottom: alumnoTopBarFixed ? "1px solid #2d4057" : undefined,
-          backdropFilter: alumnoTopBarFixed ? "none" : undefined,
-          WebkitBackdropFilter: alumnoTopBarFixed ? "none" : undefined,
-          boxShadow: alumnoTopBarFixed ? "0 8px 24px rgba(0,0,0,.18)" : undefined,
-        }}
-      >
-        <AppHeaderBrand
-          showCoachDesktopShell={showCoachDesktopShell}
-          coachDesktop1024={coachDesktop1024}
-          darkMode={darkMode}
-          esAlumno={esAlumno}
-          readOnly={readOnly}
-          sessionData={sessionData}
-          msg={msg}
-          onOpenMobileDrawer={() => setMobileDrawerOpen(true)}
-        />
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            paddingLeft: 4,
-            paddingRight: 4,
-          }}
-        >
-          {esAlumno && tab === "plan" && alumnoPlanHeaderDayNum != null && (
-            <AlumnoPlanHeaderDayLabel
-              alumnoPlanHeaderDayNum={alumnoPlanHeaderDayNum}
-              textMuted={textMuted}
-              msg={msg}
-            />
-          )}
-        </div>
-        <AppHeaderActions
-          session={session} sessionActiveStyle={{...tag("#22C55E"),fontSize:13}}
-          showPWAInstall={esAlumno && (tab === "plan" || tab === "library" || tab === "progress") && canInstallPWA}
-          coachDesktop1024={coachDesktop1024} pwaInstallTipOpen={pwaInstallTipOpen} setPwaInstallTipOpen={setPwaInstallTipOpen}
-          installPWA={installPWA} msg={msg}
-          settingsButtonStyle={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}} textMuted={textMuted}
-          onSettings={() => setSettingsOpen(true)} sessionData={sessionData} esAlumno={esAlumno}
-          avatarLabel={(sessionData?.name||"U").slice(0,2).toUpperCase()} userMenuOpen={userMenuOpen} onToggleUserMenu={setUserMenuOpen}
-          coachLogoutButtonStyle={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
-          onCoachLogout={()=>{clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}
-          loginButtonStyle={{...btn(),padding:"4px 8px",fontSize:13}} onLogin={()=>setLoginModal(true)}
-        />
-      </div>
+        alumnoTopBarFixed={alumnoTopBarFixed}
+        alumnoTopBarHeight={alumnoTopBarHeight}
+        darkMode={darkMode}
+        showCoachDesktopShell={showCoachDesktopShell}
+        esAlumno={esAlumno}
+        coachDesktop1024={coachDesktop1024}
+        readOnly={readOnly}
+        sessionData={sessionData}
+        msg={msg}
+        onOpenMobileDrawer={() => setMobileDrawerOpen(true)}
+        showPlanHeaderLabel={esAlumno && tab === "plan" && alumnoPlanHeaderDayNum != null}
+        alumnoPlanHeaderDayNum={alumnoPlanHeaderDayNum}
+        textMuted={textMuted}
+        session={session}
+        sessionActiveStyle={{...tag("#22C55E"),fontSize:13}}
+        showPWAInstall={esAlumno && (tab === "plan" || tab === "library" || tab === "progress") && canInstallPWA}
+        pwaInstallTipOpen={pwaInstallTipOpen}
+        setPwaInstallTipOpen={setPwaInstallTipOpen}
+        installPWA={installPWA}
+        settingsButtonStyle={{...btn(),padding:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}
+        onSettings={() => setSettingsOpen(true)}
+        avatarLabel={(sessionData?.name||"U").slice(0,2).toUpperCase()}
+        userMenuOpen={userMenuOpen}
+        onToggleUserMenu={setUserMenuOpen}
+        coachLogoutButtonStyle={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
+        onCoachLogout={()=>{clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}
+        loginButtonStyle={{...btn(),padding:"4px 8px",fontSize:13}}
+        onLogin={()=>setLoginModal(true)}
+      />
       )}
       {alumnoTopBarFixed && (
         <div ref={alumnoTopBarSpacerRef} style={{ height: 0, minHeight: 0, flexShrink: 0, overflow: "hidden", transition: "none", background: alumnoFullScreenBg, border: "none", boxShadow: "none" }} aria-hidden />
