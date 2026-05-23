@@ -73,7 +73,7 @@ import CoachConfirmDialog from './components/coach/CoachConfirmDialog.jsx';
 import CoachEditStudentModal from './components/coach/CoachEditStudentModal.jsx';
 import CoachSectionRenderer from './components/coach/CoachSectionRenderer.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
-import DesktopSidebar, { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
+import { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import IronTrackAppIcon from './components/IronTrackAppIcon.jsx';
 import IronTrackSplash from './components/IronTrackSplash.jsx';
 import CoachWelcomeOverlay from './components/CoachWelcomeOverlay.jsx';
@@ -108,6 +108,7 @@ import AppGlobalStyles from './components/layout/AppGlobalStyles.jsx';
 import AppMainScroll from './components/layout/AppMainScroll.jsx';
 import GlobalBottomNav from './components/layout/GlobalBottomNav.jsx';
 import AppTopBar from './components/layout/AppTopBar.jsx';
+import CoachDesktopShellFrame from './components/layout/CoachDesktopShellFrame.jsx';
 import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
@@ -3357,35 +3358,12 @@ function GymApp() {
           )}
         </div>
       )}
-      <div
-        className={showCoachDesktopShell ? "flex w-full min-h-0 flex-1 flex-col self-stretch items-stretch lg:flex-row" : undefined}
-        style={showCoachDesktopShell ? undefined : { display: "contents" }}
+      <CoachDesktopShellFrame
+        showCoachDesktopShell={showCoachDesktopShell} tab={tab} onNavigate={setTab}
+        onSettings={function () { setTab("settings"); }} onPerfil={function () { setTab("perfil"); }}
+        onLogout={function () { clearAllIronTrackPrefixedKeys(); syncStateWithLocalStorage(); }}
+        coachAvatarUrl={sessionData?.avatarUrl} coachName={sessionData?.name} darkMode={darkMode}
       >
-        {showCoachDesktopShell ? (
-          <div style={{ display: (tab === "settings" || tab === "perfil") ? "none" : "flex" }}>
-            <DesktopSidebar
-              activeTab={tab}
-              onNavigate={setTab}
-              onSettings={function () {
-                setTab("settings");
-              }}
-              onPerfil={function () {
-                setTab("perfil");
-              }}
-              onLogout={function () {
-                clearAllIronTrackPrefixedKeys();
-                syncStateWithLocalStorage();
-              }}
-              coachAvatarUrl={sessionData?.avatarUrl}
-              coachName={sessionData?.name}
-              darkMode={darkMode}
-            />
-          </div>
-        ) : null}
-        <div
-          className={showCoachDesktopShell ? "flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden" : undefined}
-          style={showCoachDesktopShell ? undefined : { display: "contents" }}
-        >
       {!coachSuppressTopNav && !hideAlumnoTopBarForSession && (
       <AppTopBar
         ref={alumnoAppHeaderRef}
@@ -4714,8 +4692,7 @@ function GymApp() {
       <ToastBanner toast={toast} darkMode={darkMode} border={border} textMain={textMain} />
 
       </AppMainScroll>
-      </div>
-      </div>
+      </CoachDesktopShellFrame>
       {/* Modal video: fuera del scroll (display:none con sesi?n ocultaba el overlay) + portal a body */}
       <VideoModal videoModal={videoModal} setVideoModal={setVideoModal} />
       {session&&activeDay&&(
