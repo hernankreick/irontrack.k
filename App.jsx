@@ -3,7 +3,6 @@ import { PATS, EX, VIDEOS, IMGS } from './lib/exerciseStaticData.js';
 import {
   cloneRoutineDay,
   exerciseMatchesLibraryFilter,
-  firstNonEmptyString,
   getRutinaExerciseIdsForCleanup,
   sessionBelongsToRoutineForCleanup,
   sessionBelongsToRoutineWeekForCleanup,
@@ -99,6 +98,7 @@ import {
   estimateDayMinutes,
   countExercisesWithLogToday,
 } from './components/student-plan/studentPlanHelpers.js';
+import { inferStudentWorkoutLabels } from './components/student-plan/studentWorkoutLabels.js';
 import { WelcomeModal } from './components/WelcomeModal.jsx';
 import LoginForm from './components/auth/LoginForm.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
@@ -3732,29 +3732,20 @@ function GymApp() {
                     return allEx.find(function (info) { return info.id === ex.id; }) || ex;
                   }).filter(Boolean)
                 : [];
-              const inferDayTitle = function () {
-                var explicit = firstNonEmptyString(
-                  todayDay && (todayDay.name || todayDay.title || todayDay.nombre || todayDay.titulo || todayDay.label),
-                  todayDay && todayDay.dayName
-                );
-                if (explicit) return explicit;
-                var patterns = new Set(todayExerciseInfos.map(function (ex) { return ex.pattern; }).filter(Boolean));
-                var muscles = todayExerciseInfos.map(function (ex) { return String(ex.muscle || ""); }).join(" ").toLowerCase();
-                if (patterns.has("empuje") && patterns.has("traccion")) return msg("Torso", "Upper Body", "Torso");
-                if ((patterns.has("rodilla") || patterns.has("bisagra")) && !patterns.has("empuje") && !patterns.has("traccion")) return msg("Piernas", "Lower Body", "Pernas");
-                if (patterns.size === 1 && patterns.has("core")) return "Core";
-                if (patterns.size === 1 && patterns.has("cardio")) return "Cardio";
-                if (muscles.match(/pecho|espalda|hombro|dorsal|biceps|triceps/)) return msg("Torso", "Upper Body", "Torso");
-                return msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1);
-              };
-              const inferWorkoutType = function () {
-                var patterns = new Set(todayExerciseInfos.map(function (ex) { return ex.pattern; }).filter(Boolean));
-                if (patterns.size === 1 && patterns.has("cardio")) return "Cardio";
-                if (patterns.size === 1 && patterns.has("movilidad")) return msg("Movilidad", "Mobility", "Mobilidade");
-                return msg("Fuerza", "Strength", "Forca");
-              };
-              const todayHeroTitle = inferDayTitle();
-              const todayTypeBadge = inferWorkoutType();
+              const todayWorkoutLabels = inferStudentWorkoutLabels({
+                day: todayDay,
+                exerciseInfos: todayExerciseInfos,
+                dayIndex: nextDayIdx,
+                labels: {
+                  upperBody: msg("Torso", "Upper Body", "Torso"),
+                  lowerBody: msg("Piernas", "Lower Body", "Pernas"),
+                  dayPrefix: msg("Día", "Day", "Dia"),
+                  mobility: msg("Movilidad", "Mobility", "Mobilidade"),
+                  strength: msg("Fuerza", "Strength", "Forca"),
+                },
+              });
+              const todayHeroTitle = todayWorkoutLabels.title;
+              const todayTypeBadge = todayWorkoutLabels.typeBadge;
               return (
                 <div style={{ marginBottom: 0 }}>
                   {/*
@@ -4228,27 +4219,20 @@ function GymApp() {
                 return allEx.find(function (info) { return info.id === ex.id; }) || ex;
               }).filter(Boolean)
             : [];
-          const welcomeDayTitle = (function () {
-            var explicit = firstNonEmptyString(
-              welcomeDay && (welcomeDay.name || welcomeDay.title || welcomeDay.nombre || welcomeDay.titulo || welcomeDay.label),
-              welcomeDay && welcomeDay.dayName
-            );
-            if (explicit) return explicit;
-            var patterns = new Set(welcomeExerciseInfos.map(function (ex) { return ex.pattern; }).filter(Boolean));
-            var muscles = welcomeExerciseInfos.map(function (ex) { return String(ex.muscle || ""); }).join(" ").toLowerCase();
-            if (patterns.has("empuje") && patterns.has("traccion")) return msg("Torso", "Upper Body", "Torso");
-            if ((patterns.has("rodilla") || patterns.has("bisagra")) && !patterns.has("empuje") && !patterns.has("traccion")) return msg("Piernas", "Lower Body", "Pernas");
-            if (patterns.size === 1 && patterns.has("core")) return "Core";
-            if (patterns.size === 1 && patterns.has("cardio")) return "Cardio";
-            if (muscles.match(/pecho|espalda|hombro|dorsal|biceps|triceps/)) return msg("Torso", "Upper Body", "Torso");
-            return msg("Día", "Day", "Dia") + " " + (welcomeDayIdx + 1);
-          })();
-          const welcomeTypeBadge = (function () {
-            var patterns = new Set(welcomeExerciseInfos.map(function (ex) { return ex.pattern; }).filter(Boolean));
-            if (patterns.size === 1 && patterns.has("cardio")) return "Cardio";
-            if (patterns.size === 1 && patterns.has("movilidad")) return msg("Movilidad", "Mobility", "Mobilidade");
-            return msg("Fuerza", "Strength", "Forca");
-          })();
+          const welcomeWorkoutLabels = inferStudentWorkoutLabels({
+            day: welcomeDay,
+            exerciseInfos: welcomeExerciseInfos,
+            dayIndex: welcomeDayIdx,
+            labels: {
+              upperBody: msg("Torso", "Upper Body", "Torso"),
+              lowerBody: msg("Piernas", "Lower Body", "Pernas"),
+              dayPrefix: msg("Día", "Day", "Dia"),
+              mobility: msg("Movilidad", "Mobility", "Mobilidade"),
+              strength: msg("Fuerza", "Strength", "Forca"),
+            },
+          });
+          const welcomeDayTitle = welcomeWorkoutLabels.title;
+          const welcomeTypeBadge = welcomeWorkoutLabels.typeBadge;
           return(
             <WelcomeModal
               open={true}
