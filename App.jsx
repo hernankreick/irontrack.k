@@ -119,6 +119,7 @@ import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from 
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
 import { buildCoachGlobalSearchData } from './lib/coachGlobalSearchSelectors.js';
+import { selectAppShellLayoutState } from './lib/appShellLayoutSelectors.js';
 import {
   buildRutinaInsertBody,
   cleanRutinaWriteBody,
@@ -147,7 +148,6 @@ import {
   updateExerciseProgressRecord,
 } from './lib/workoutSession.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
-import { Calendar as CalNavIcon, CalendarDays, Dumbbell, TrendingUp as TrendNavIcon } from 'lucide-react';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
 
 
@@ -1954,19 +1954,35 @@ function GymApp() {
     },
     [esAlumno, tab, routines, activeStudentRoutinePosition]
   );
-  const showAlumnoProgressStack = (readOnly||esAlumno)&&(sharedParam||sessionData?.alumnoId);
   const coachDesktop1024 = useDesktopMin1024();
-  /** Shell coach (sidebar App + dashboard embebido): todos los anchos; la barra lateral se oculta por CSS por debajo de lg. */
-  const showCoachDesktopShell = !esAlumno && sessionData?.role === "entrenador";
-  /** Tabs coach desktop sin barra superior global (misma envolvente que plan / progreso). */
-  const coachDesktopBleedTab =
-    tab === "plan" || tab === "calendar" || tab === "progress" || tab === "settings" || tab === "perfil";
-  /** Coach: ocultar header global (logo + settings + salir) cuando la sidebar ya concentra esa navegación. En desktop, Alumnos/Rutinas/Ejercicios se alinean con Plan (sin barra duplicada). En móvil siguen mostrando el header en esas tabs (sidebar no visible). */
-  const coachSuppressTopNav =
-    showCoachDesktopShell &&
-    !esAlumno &&
-    (coachDesktopBleedTab ||
-      (coachDesktop1024 && (tab === "alumnos" || tab === "calendar" || tab === "routines" || tab === "biblioteca")));
+  const {
+    showAlumnoProgressStack,
+    showCoachDesktopShell,
+    coachSuppressTopNav,
+    routineDaysCount,
+    tabs2,
+    hideGlobalBottomNavCoachDash,
+    hideAlumnoTopBarForSession,
+    alumnoTopBarFixed,
+    alumnoTopBarHeight,
+    planScrollCtx,
+    alumnoFullScreenShell,
+    alumnoFullScreenBg,
+    coachDesktopNavHidden,
+  } = selectAppShellLayoutState({
+    esAlumno: esAlumno,
+    readOnly: readOnly,
+    sharedParam: sharedParam,
+    alumnoId: sessionData?.alumnoId,
+    sessionRole: sessionData?.role,
+    tab: tab,
+    coachDesktop1024: coachDesktop1024,
+    session: session,
+    routineDaysLength: routines[0]?.days?.length,
+    darkMode: darkMode,
+    msg: msg,
+    planScrollDiag: planScrollDiag,
+  });
   useEffect(() => {
     if (coachDesktop1024) return; // solo mobile
     const appEl = document.getElementById("app-root") || document.body;
@@ -2022,36 +2038,7 @@ function GymApp() {
       appEl.removeEventListener("touchend", onTouchEnd);
     };
   }, [coachDesktop1024, mobileDrawerOpen]);
-  const routineDaysCount = Math.max(1, (routines[0]?.days?.length)||3);
-  const tabs2 = esAlumno
-    ? [
-        {k:"plan",    icon:(c)=><CalNavIcon size={20} color={c} strokeWidth={2}/>,      lbl:msg("PLAN", "PLAN")},
-        {k:"library", icon:(c)=><Dumbbell size={20} color={c} strokeWidth={2}/>, lbl:msg("EJERCICIOS", "EXERCISES")},
-        {k:"progress",icon:(c)=><TrendNavIcon size={20} color={c} strokeWidth={2}/>,  lbl:msg("PROGRESO", "PROGRESS")}
-      ]
-    : [
-        {k:"plan",      icon:(c)=><Ic name="bar-chart-2" size={20} color={c}/>, lbl:msg("DASHBOARD", "DASHBOARD")},
-        {k:"calendar",  icon:(c)=><CalendarDays size={20} color={c} strokeWidth={2}/>, lbl:msg("CALENDARIO", "CALENDAR")},
-        {k:"routines",  icon:(c)=><Ic name="file-text" size={20} color={c}/>,  lbl:msg("RUTINAS", "ROUTINES")},
-        {k:"biblioteca",icon:(c)=><Ic name="activity" size={20} color={c}/>, lbl:msg("EJERCICIOS", "EXERCISES")},
-        {k:"alumnos",   icon:(c)=><Ic name="users" size={20} color={c}/>,  lbl:msg("ALUMNOS", "ATHLETES")}
-      ];
-
-  /** En desktop el coach usa sidebar App; en móvil necesita la bottom nav también en Dashboard. */
-  const hideGlobalBottomNavCoachDash =
-    !esAlumno && sessionData?.role === "entrenador" && coachDesktopBleedTab && coachDesktop1024;
-  const hideAlumnoTopBarForSession = !!(esAlumno && session);
-  const alumnoTopBarFixed = !!(esAlumno && !hideAlumnoTopBarForSession && (tab === "plan" || tab === "library" || tab === "progress"));
-  const alumnoTopBarHeight = alumnoTopBarFixed ? "calc(env(safe-area-inset-top, 0px) + 96px)" : "0px";
-
-  planScrollCtxRef.current = {
-    alumnoPlan: !!(esAlumno && tab === "plan"),
-    /** Modo alumno: nunca colapsar el bloque HOY/expandido por gesto scroll. */
-    headerCollapse:
-      !!(planScrollDiag.headerCollapseOnScroll && !esAlumno),
-    alumnoFixedTabs: !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress")),
-    alumnoTopBarPx: alumnoTopBarHeight,
-  };
+  planScrollCtxRef.current = planScrollCtx;
 
   /** Al cambiar de pestaña, restaurar barra superior (por si quedó oculta al final del scroll). */
   useLayoutEffect(
@@ -2988,10 +2975,6 @@ function GymApp() {
     </>
   );
 
-  const alumnoFullScreenShell = !!(esAlumno && (tab === "plan" || tab === "library" || tab === "progress"));
-  const alumnoFullScreenBg = darkMode ? "#0B1220" : "#F1F5F9";
-  /** Coach ≥1024: nav inferior global oculta — no reservar 72px extra (dejaba franja vacía bajo el shell). */
-  const coachDesktopNavHidden = !!(showCoachDesktopShell && coachDesktop1024);
   const handleCoachDashboardEnviarMensaje = function () {
     var first = (alumnos || [])[0];
     if (first) {
