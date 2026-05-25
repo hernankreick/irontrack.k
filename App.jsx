@@ -72,19 +72,17 @@ import OnboardingScreen from './components/onboarding/OnboardingScreen.jsx';
 import AtencionHoy from "./components/AtencionHoy/AtencionHoy";
 import CoachConfirmDialog from './components/coach/CoachConfirmDialog.jsx';
 import { getCoachDialogModalConfig } from './components/coach/coachDialogConfig.js';
-import { buildCoachWelcomeSteps } from './components/coach/coachWelcomeSteps.js';
 import CoachEditStudentModal from './components/coach/CoachEditStudentModal.jsx';
 import CoachSectionRenderer from './components/coach/CoachSectionRenderer.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import IronTrackAppIcon from './components/IronTrackAppIcon.jsx';
 import IronTrackSplash from './components/IronTrackSplash.jsx';
-import CoachWelcomeOverlay from './components/CoachWelcomeOverlay.jsx';
+import CoachWelcomeModalHost from './components/CoachWelcomeModalHost.jsx';
 import RecordatoriosPanel, { checkTrainingReminderTick } from './components/student/RecordatoriosPanel.jsx';
 import StudentProfileModalHost from './components/student/StudentProfileModalHost.jsx';
 import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
 import AlumnoUserMenu from './components/student/AlumnoUserMenu.jsx';
-import StudentWelcomeModalHost from './components/student/StudentWelcomeModalHost.jsx';
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
@@ -3853,79 +3851,50 @@ function GymApp() {
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
         <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
       )}
-{showWelcome&&(()=>{
-        const isCoach = sessionData?.role==="entrenador";
-        if(!isCoach){
-          return(
-            <StudentWelcomeModalHost
-              routines={routines}
-              studentCurrentWeek={studentCurrentWeek}
-              activeStudentRoutinePosition={activeStudentRoutinePosition}
-              allEx={allEx}
-              sessionData={sessionData}
-              es={es}
-              bgCard={bgCard}
-              border={border}
-              textMain={textMain}
-              textMuted={textMuted}
-              msg={msg}
-              images={IMGS}
-              videoOverrides={videoOverrides}
-              onOpenChange={(v)=>{if(!v)setShowWelcome(false);}}
-              onExerciseVideo={function (nombre, vUrl) {
-                var vid = getYTVideoId(vUrl);
-                if (vid) setVideoModal({ videoId: vid, nombre: nombre });
-                else window.open(vUrl, "_blank");
-              }}
-              onStartWorkout={function ({ routine, day, dayIndex }) {
-                if (!routine || !day) {
-                  setShowWelcome(false);
-                  return;
-                }
-                var snap = {};
-                [].concat(day.warmup || [], day.exercises || []).forEach(function (ex) {
-                  snap[ex.id] = progress[ex.id]?.max || 0;
-                });
-                setPreSessionPRs({ ...snap });
-                setSessionPRList([]);
-                setShowWelcome(false);
-                setSession({ rId: routine.id, dIdx: dayIndex, exIdx: 0, startTime: Date.now() });
-              }}
-            />
-          );
-        }
-        const obStep = onboardStep||0;
-        const setObStep = setOnboardStep;
-        const routinesReady = routines.length > 0;
-        const alumnosReady = alumnos.length > 0;
-        const steps = buildCoachWelcomeSteps({
-          msg,
-          routinesReady,
-          alumnosReady,
-          actions: {
-            start: () => setObStep(1),
-            routine: () => { if(!routinesReady){setShowWelcome(false);setOnboardStep(1);setTab("routines");} else setObStep(2); },
-            skipRoutine: () => setObStep(2),
-            alumno: () => { if(!alumnosReady){setShowWelcome(false);setOnboardStep(2);setTab("alumnos");setNewAlumnoForm(true);} else setObStep(3); },
-            skipAlumno: () => setObStep(3),
-            finish: () => setShowWelcome(false),
-          },
-        });
-        const step = steps[Math.min(obStep,steps.length-1)];
-        return(
-          <CoachWelcomeOverlay
-            isCoach={isCoach}
-            steps={steps}
-            obStep={obStep}
-            step={step}
-            bgCard={bgCard}
-            border={border}
-            textMain={textMain}
-            textMuted={textMuted}
-            msg={msg}
-          />
-        );
-      })()}
+      <CoachWelcomeModalHost
+        open={showWelcome}
+        sessionData={sessionData}
+        routines={routines}
+        alumnos={alumnos}
+        onboardStep={onboardStep}
+        studentCurrentWeek={studentCurrentWeek}
+        activeStudentRoutinePosition={activeStudentRoutinePosition}
+        allEx={allEx}
+        es={es}
+        bgCard={bgCard}
+        border={border}
+        textMain={textMain}
+        textMuted={textMuted}
+        msg={msg}
+        images={IMGS}
+        videoOverrides={videoOverrides}
+        onStudentOpenChange={function (v) { if (!v) setShowWelcome(false); }}
+        onStudentExerciseVideo={function (nombre, vUrl) {
+          var vid = getYTVideoId(vUrl);
+          if (vid) setVideoModal({ videoId: vid, nombre: nombre });
+          else window.open(vUrl, "_blank");
+        }}
+        onStudentStartWorkout={function ({ routine, day, dayIndex }) {
+          if (!routine || !day) {
+            setShowWelcome(false);
+            return;
+          }
+          var snap = {};
+          [].concat(day.warmup || [], day.exercises || []).forEach(function (ex) {
+            snap[ex.id] = progress[ex.id]?.max || 0;
+          });
+          setPreSessionPRs({ ...snap });
+          setSessionPRList([]);
+          setShowWelcome(false);
+          setSession({ rId: routine.id, dIdx: dayIndex, exIdx: 0, startTime: Date.now() });
+        }}
+        onCoachStart={function () { setOnboardStep(1); }}
+        onCoachRoutine={function (routinesReady) { if (!routinesReady) { setShowWelcome(false); setOnboardStep(1); setTab("routines"); } else setOnboardStep(2); }}
+        onCoachSkipRoutine={function () { setOnboardStep(2); }}
+        onCoachAlumno={function (alumnosReady) { if (!alumnosReady) { setShowWelcome(false); setOnboardStep(2); setTab("alumnos"); setNewAlumnoForm(true); } else setOnboardStep(3); }}
+        onCoachSkipAlumno={function () { setOnboardStep(3); }}
+        onCoachFinish={function () { setShowWelcome(false); }}
+      />
       <StudentProfileModalHost
           open={profileModalOpen}
           esAlumno={esAlumno}
