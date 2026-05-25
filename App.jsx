@@ -80,7 +80,7 @@ import IronTrackAppIcon from './components/IronTrackAppIcon.jsx';
 import IronTrackSplash from './components/IronTrackSplash.jsx';
 import CoachWelcomeOverlay from './components/CoachWelcomeOverlay.jsx';
 import RecordatoriosPanel, { checkTrainingReminderTick } from './components/student/RecordatoriosPanel.jsx';
-import AlumnoProfileModal from './components/student/AlumnoProfileModal.jsx';
+import StudentProfileModalHost from './components/student/StudentProfileModalHost.jsx';
 import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
 import AlumnoUserMenu from './components/student/AlumnoUserMenu.jsx';
 import StudentWelcomeModalHost from './components/student/StudentWelcomeModalHost.jsx';
@@ -4002,9 +4002,9 @@ function GymApp() {
           />
         );
       })()}
-      {profileModalOpen && sessionData && esAlumno && (
-        <AlumnoProfileModal
+      <StudentProfileModalHost
           open={profileModalOpen}
+          esAlumno={esAlumno}
           sessionData={sessionData}
           profileEdit={profileEdit}
           setProfileEdit={setProfileEdit}
@@ -4025,7 +4025,6 @@ function GymApp() {
             } catch (err) { toast2("Error"); }
           }}
         />
-      )}
       {settingsOpen && !esAlumno && sessionData && tab !== "settings" && tab !== "perfil" && (
         <SettingsPage
           coach={sessionData}
