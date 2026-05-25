@@ -117,6 +117,7 @@ import SettingsPage, { applyItPrefsToDocument } from './components/settings/Sett
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
+import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
 import {
   buildRutinaInsertBody,
   cleanRutinaWriteBody,
@@ -125,7 +126,6 @@ import {
   getRutinaAsignadaAlumno as getRutinaAsignadaAlumnoFromStore,
   getRutinaAlumnoId,
   getRutinaBadgeConfig,
-  hasAlumnoRutina,
   mergeRutinasAsignadas,
   normalizeRutinaLocalForAssignment,
   resolveAlumnoId,
@@ -1648,61 +1648,21 @@ function GymApp() {
     };
   }, []);
 
-  const coachAlumnoCategoria = React.useCallback(function (a) {
-    if (!hasAlumnoRutina(a, rutinasUnificadas)) return "sin_rutina";
-    var cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000;
-    var ses = sesionesGlobalesLimpias || [];
-    for (var i = 0; i < ses.length; i++) {
-      if (String(ses[i].alumno_id) !== String(a.id)) continue;
-      var raw = ses[i].created_at || "";
-      if (!raw) continue;
-      var d = new Date(raw.slice(0, 10));
-      if (!isNaN(d.getTime()) && d.getTime() >= cutoff) return "activo";
-    }
-    var plist = progresoGlobalLimpio[String(a.id)] || progresoGlobalLimpio[a.id];
-    if (plist && plist.length) {
-      for (var j = 0; j < plist.length; j++) {
-        var fecha = plist[j].fecha || "";
-        if (!fecha) continue;
-        var d2;
-        if (fecha.indexOf("/") >= 0) {
-          var p = fecha.split("/");
-          d2 = new Date(parseInt(p[2], 10), parseInt(p[1], 10) - 1, parseInt(p[0], 10));
-        } else {
-          d2 = new Date(fecha.slice(0, 10));
-        }
-        if (!isNaN(d2.getTime()) && d2.getTime() >= cutoff) return "activo";
-      }
-    }
-    return "inactivo";
-  }, [rutinasUnificadas, sesionesGlobalesLimpias, progresoGlobalLimpio]);
-
-  const coachAlumnosCounts = React.useMemo(function () {
-    var c = { todos: alumnosActivosLimpios.length, activos: 0, inactivos: 0, sin_rutina: 0 };
-    alumnosActivosLimpios.forEach(function (a) {
-      var cat = coachAlumnoCategoria(a);
-      if (cat === "sin_rutina") c.sin_rutina++;
-      else if (cat === "activo") c.activos++;
-      else c.inactivos++;
+  const {
+    coachAlumnoCategoria,
+    coachAlumnosCounts,
+    coachAlumnosListaFiltrada,
+  } = React.useMemo(function () {
+    return selectCoachStudentListState({
+      alumnosActivosLimpios: alumnosActivosLimpios,
+      rutinasUnificadas: rutinasUnificadas,
+      sesionesGlobalesLimpias: sesionesGlobalesLimpias,
+      progresoGlobalLimpio: progresoGlobalLimpio,
+      coachAlumnosSearch: coachAlumnosSearch,
+      coachAlumnosFilter: coachAlumnosFilter,
+      nowMs: Date.now(),
     });
-    return c;
-  }, [alumnosActivosLimpios, coachAlumnoCategoria]);
-
-  const coachAlumnosListaFiltrada = React.useMemo(function () {
-    var q = coachAlumnosSearch.trim().toLowerCase();
-    return alumnosActivosLimpios.filter(function (a) {
-      if (q) {
-        var hay = ((a.nombre || "") + " " + (a.email || "")).toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      var cat = coachAlumnoCategoria(a);
-      if (coachAlumnosFilter === "todos") return true;
-      if (coachAlumnosFilter === "sin_rutina") return cat === "sin_rutina";
-      if (coachAlumnosFilter === "activos") return cat === "activo";
-      if (coachAlumnosFilter === "inactivos") return cat === "inactivo";
-      return true;
-    });
-  }, [alumnosActivosLimpios, coachAlumnosSearch, coachAlumnosFilter, coachAlumnoCategoria]);
+  }, [alumnosActivosLimpios, rutinasUnificadas, sesionesGlobalesLimpias, progresoGlobalLimpio, coachAlumnosSearch, coachAlumnosFilter]);
 
   React.useEffect(function () {
     setCoachRoutineDiaIdx(0);
