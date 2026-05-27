@@ -6,6 +6,7 @@ export default function CoachExercisesMain({
   setPatternOverrides,
   darkMode,
   sb,
+  entrenadorId,
   customEx,
   setCustomEx,
   toast2,
@@ -20,6 +21,7 @@ export default function CoachExercisesMain({
         setPatternOverrides={setPatternOverrides}
         darkMode={darkMode}
         sb={sb}
+        entrenadorId={entrenadorId}
         customEx={customEx}
         setCustomEx={setCustomEx}
         toast2={toast2}

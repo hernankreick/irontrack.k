@@ -12,7 +12,7 @@ import { localeForSort, pickExerciseName } from '../../lib/irontrackMsg.js';
 import { useIronTrackI18n } from '../../contexts/IronTrackI18nContext.jsx';
 import { Ic } from '../Ic.jsx';
 
-export default function GestionBiblioteca({allEx, setPatternOverrides, sb, customEx, setCustomEx, toast2, darkMode, videoOverrides, setVideoOverrides, openNewExerciseTick = 0}) {
+export default function GestionBiblioteca({allEx, setPatternOverrides, sb, entrenadorId, customEx, setCustomEx, toast2, darkMode, videoOverrides, setVideoOverrides, openNewExerciseTick = 0}) {
   const { msg, lang } = useIronTrackI18n();
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
@@ -44,6 +44,7 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, custo
   const [sortModo, setSortModo] = React.useState(0);
   const [newEquip, setNewEquip] = React.useState("");
   const [newYT, setNewYT] = React.useState("");
+  const [newSaveLoading, setNewSaveLoading] = React.useState(false);
   const [borrarId, setBorrarId] = React.useState(null);
   const ytOverrides = videoOverrides || {};
   const [libNarrow, setLibNarrow] = React.useState(function () {
@@ -70,6 +71,22 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, custo
   const BIB_PATTERN_EDIT_KEYS = { empuje: 1, traccion: 1, rodilla: 1, bisagra: 1, core: 1, movilidad: 1, cardio: 1, oly: 1 };
   const patKeysEditList = ["empuje", "traccion", "rodilla", "bisagra", "core", "movilidad", "cardio", "oly"];
   const normalizeEditPattern = function (p) { return p && BIB_PATTERN_EDIT_KEYS[p] ? p : "empuje"; };
+  const normalizeNameKey = function (value) {
+    return String(value || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+  };
+  const mapCustomRow = function (row, fallback) {
+    var src = row || fallback || {};
+    return sanitizeExerciseSnapshotForWrite({
+      id: src.id,
+      name: src.name || src.nombre || fallback?.name || "",
+      nameEn: src.name_en || src.nameEn || src.name || fallback?.nameEn || fallback?.name || "",
+      pattern: src.pattern || fallback?.pattern || "empuje",
+      muscle: src.muscle || fallback?.muscle || "",
+      equip: src.equip || fallback?.equip || "Libre",
+      video_url: src.video_url || src.youtube_url || src.youtube || src.videoUrl || fallback?.video_url || null,
+      isCustom: src.is_custom != null ? !!src.is_custom : true,
+    });
+  };
 
   const exFiltrados = allEx.filter(e=>{
     const nombre = pickExerciseName(e, lang);
@@ -108,13 +125,11 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, custo
             ? sanitizeExerciseSnapshotForWrite({ ...e, name: editNombre, nameEn: editNombre, video_url: (editYT || "").trim(), pattern: canPat })
             : sanitizeExerciseSnapshotForWrite(e)
         );
-        setCustomEx(updated);
         const row = updated.find(c => c.id === editModal.id);
         if (row) {
-          try {
-            await sb.updateCustomEx(editModal.id, { name: row.name, name_en: row.nameEn, video_url: row.video_url, pattern: canPat });
-          } catch (e) {}
+          await sb.updateCustomEx(editModal.id, { name: row.name, name_en: row.nameEn, video_url: row.video_url, pattern: canPat }, entrenadorId);
         }
+        setCustomEx(updated);
       } else if (setPatternOverrides) {
         const orig = EX.find(function (x) { return x.id === editModal.id; });
         const basePat = orig && BIB_PATTERN_EDIT_KEYS[orig.pattern] ? orig.pattern : "empuje";
@@ -136,28 +151,47 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, custo
       }
       setEditModal(null);
       toast2(msg("Ejercicio actualizado ✓", "Exercise updated ✓"));
+    } catch (e) {
+      console.error("[customExercises DEBUG] update failed", e);
+      toast2(msg("No se pudo guardar el ejercicio personalizado en Supabase", "Could not save custom exercise in Supabase"));
     } finally {
       setEditSaveLoading(false);
     }
   };
   const borrarEjercicio = async (id) => {
-    const updated = customEx.filter(e=>e.id!==id);
-    setCustomEx(updated);
-    try { await sb.deleteCustomEx(id); } catch(e){}
-    setBorrarId(null); toast2(msg("Ejercicio eliminado ✓", "Exercise deleted ✓"));
+    try {
+      await sb.deleteCustomEx(id, entrenadorId);
+      const updated = customEx.filter(e=>e.id!==id);
+      setCustomEx(updated);
+      setBorrarId(null); toast2(msg("Ejercicio eliminado ✓", "Exercise deleted ✓"));
+    } catch (e) {
+      console.error("[customExercises DEBUG] delete failed", e);
+      toast2(msg("No se pudo eliminar el ejercicio personalizado en Supabase", "Could not delete custom exercise in Supabase"));
+    }
   };
   const agregarEjercicio = async () => {
     if(!newNombre.trim()){toast2(msg("Ingresa un nombre", "Enter a name"));return;}
+    if(!entrenadorId){toast2(msg("No se pudo identificar al entrenador para guardar en Supabase", "Could not identify the coach to save in Supabase"));return;}
+    if(newSaveLoading) return;
     var muscleStored = newMusKeys.length ? JSON.stringify(BIB_MUSCLE_ORDER.filter(function (k) { return newMusKeys.indexOf(k) >= 0; })) : "";
     const newEx = sanitizeExerciseSnapshotForWrite({id:"custom_"+Date.now(), name:newNombre, nameEn:newNombre, pattern:newPat, muscle:muscleStored, equip:newEquip||"Libre", video_url:(newYT||"").trim(), isCustom:true});
-    const updated = [...(customEx||[]), newEx];
-    setCustomEx(updated);
-    // Guardar en Supabase
+    var nameKey = normalizeNameKey(newEx.name);
+    var duplicate = (allEx || []).some(function (e) { return normalizeNameKey(e.name || e.nameEn) === nameKey; });
+    if (duplicate) { toast2(msg("Ese ejercicio ya existe en la biblioteca", "That exercise already exists in the library")); return; }
+    setNewSaveLoading(true);
     try {
-      await sb.addCustomEx({id:newEx.id, name:newEx.name, name_en:newEx.nameEn, pattern:newEx.pattern, muscle:newEx.muscle, equip:newEx.equip, video_url:newEx.video_url!=null?newEx.video_url:null, entrenador_id:"entrenador_principal"});
-    } catch(e){ console.error("[addCustomEx]",e); }
-    setNewNombre(""); setNewPat("empuje"); setNewMusKeys([]); setNewEquip(""); setNewYT("");
-    setTab(0); toast2(msg("Ejercicio agregado ✓", "Exercise added ✓"));
+      var created = await sb.addCustomEx({id:newEx.id, name:newEx.name, name_en:newEx.nameEn, pattern:newEx.pattern, muscle:newEx.muscle, equip:newEx.equip, video_url:newEx.video_url!=null?newEx.video_url:null, entrenador_id:entrenadorId, is_custom:true});
+      const persistedEx = mapCustomRow(created, newEx);
+      const updated = [...(customEx||[]), persistedEx];
+      setCustomEx(updated);
+      setNewNombre(""); setNewPat("empuje"); setNewMusKeys([]); setNewEquip(""); setNewYT("");
+      setTab(0); toast2(msg("Ejercicio agregado ✓", "Exercise added ✓"));
+    } catch(e){
+      console.error("[customExercises DEBUG] insert failed", e);
+      toast2(msg("No se pudo guardar el ejercicio personalizado en Supabase", "Could not save custom exercise in Supabase"));
+    } finally {
+      setNewSaveLoading(false);
+    }
   };
   const inpS = {background:bg,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",color:textMain,fontSize:15,width:"100%",fontFamily:"inherit",outline:"none",marginBottom:8};
   const cardBorder = _dm ? "rgba(45, 64, 87, 0.9)" : border;
@@ -552,8 +586,8 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, custo
               <div style={{marginTop:8,fontSize:13,color:"#22C55E",fontWeight:700}}>▶️ {msg("Link valido ✓", "Valid link ✓")}</div>
             )}
           </div>
-          <button onClick={agregarEjercicio} style={{width:"100%",padding:12,background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-            {msg("+ AGREGAR EJERCICIO", "+ ADD EXERCISE")}
+          <button disabled={newSaveLoading} onClick={agregarEjercicio} style={{width:"100%",padding:12,background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:newSaveLoading?"not-allowed":"pointer",fontFamily:"inherit",opacity:newSaveLoading?0.85:1}}>
+            {newSaveLoading ? msg("GUARDANDO...", "SAVING...") : msg("+ AGREGAR EJERCICIO", "+ ADD EXERCISE")}
           </button>
         </div>
       )}
