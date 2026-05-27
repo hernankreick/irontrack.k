@@ -103,8 +103,8 @@ import PaymentInfoModal from './components/modals/PaymentInfoModal.jsx';
 import {
   estimateDayMinutes,
   countExercisesWithLogToday,
+  buildStudentDayPresentation,
 } from './components/student-plan/studentPlanHelpers.js';
-import { buildStudentWorkoutLabelTexts, inferStudentWorkoutLabels } from './components/student-plan/studentWorkoutLabels.js';
 import LoginForm from './components/auth/LoginForm.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
@@ -161,6 +161,75 @@ function getStoredEntrenadorId() {
   } catch (e) {
     return "entrenador_principal";
   }
+}
+
+function normalizeExerciseNameKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function mapCustomExerciseRow(row) {
+  var rawName = row && row.name != null && row.name !== "" ? row.name : (row && row.nombre != null ? row.nombre : "");
+  var rawEn = row && row.name_en != null && row.name_en !== "" ? row.name_en : (row && row.nameEn != null ? row.nameEn : rawName);
+  var rawVu = row ? String(row.video_url || row.youtube || row.youtube_url || row.videoUrl || "").trim() : "";
+  var vuStore = rawVu && isValidHttpUrlString(rawVu) ? rawVu : null;
+  var isCust = row && row.is_custom != null ? !!row.is_custom : true;
+  return sanitizeExerciseSnapshotForWrite({
+    id: row && row.id,
+    name: rawName,
+    nameEn: rawEn || rawName,
+    pattern: row && row.pattern ? row.pattern : "empuje",
+    muscle: row && row.muscle ? row.muscle : "",
+    equip: row && row.equip ? row.equip : "Libre",
+    video_url: vuStore,
+    isCustom: isCust,
+  }, { silent: true });
+}
+
+function buildCustomExerciseDbPayload(exercise, entrenadorId) {
+  var clean = sanitizeExerciseSnapshotForWrite(exercise || {}, { silent: true });
+  return {
+    id: clean.id,
+    entrenador_id: entrenadorId,
+    name: clean.name,
+    name_en: clean.nameEn || clean.name,
+    pattern: clean.pattern || "empuje",
+    muscle: clean.muscle || "",
+    equip: clean.equip || "Libre",
+    video_url: clean.video_url != null ? clean.video_url : null,
+    is_custom: true,
+  };
+}
+
+function readLocalCustomExercisesForMigration() {
+  if (typeof localStorage === "undefined") return [];
+  var out = [];
+  ["it_cex", "it_customEx"].forEach(function (key) {
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return;
+      var parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      parsed.forEach(function (e) {
+        var clean = sanitizeExerciseSnapshotForWrite({
+          ...e,
+          isCustom: e && e.isCustom != null ? e.isCustom : true,
+        }, { silent: true });
+        if (clean && clean.name) out.push(clean);
+      });
+    } catch (e) {}
+  });
+  var seen = {};
+  return out.filter(function (e) {
+    var key = normalizeExerciseNameKey(e.name || e.nameEn);
+    if (!key || seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
 }
 
 async function getActiveSupabaseSession() {
@@ -395,10 +464,33 @@ const sb = {
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
   getVideoOverrides: () => sbFetch("video_overrides?select=ejercicio_id,youtube_url"),
-  getCustomEx: (entId) => sbFetch("ejercicios_custom?entrenador_id=eq."+(entId||"entrenador_principal")+"&select=*"),
-  addCustomEx: (data) => sbFetch("ejercicios_custom", "POST", data),
-  deleteCustomEx: (id) => sbFetch("ejercicios_custom?id=eq."+id, "DELETE"),
-  updateCustomEx: (id, data) => sbFetch("ejercicios_custom?id=eq."+id, "PATCH", data),
+  getCustomEx: async (entId) => {
+    const { data, error } = await supabase
+      .from("ejercicios_custom")
+      .select("*")
+      .eq("entrenador_id", String(entId || getStoredEntrenadorId()));
+    if (error) throw error;
+    return data || [];
+  },
+  addCustomEx: async (data) => {
+    const { data: row, error } = await supabase.from("ejercicios_custom").insert(data).select().single();
+    if (error) throw error;
+    return row;
+  },
+  deleteCustomEx: async (id, entId) => {
+    var q = supabase.from("ejercicios_custom").delete().eq("id", id);
+    if (entId) q = q.eq("entrenador_id", String(entId));
+    const { error } = await q;
+    if (error) throw error;
+    return true;
+  },
+  updateCustomEx: async (id, data, entId) => {
+    var q = supabase.from("ejercicios_custom").update(data).eq("id", id);
+    if (entId) q = q.eq("entrenador_id", String(entId));
+    const { data: rows, error } = await q.select();
+    if (error) throw error;
+    return rows || [];
+  },
   setVideoOverride: async (ejercicioId, url) => {
     try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
     try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
@@ -1495,36 +1587,74 @@ function GymApp() {
         if (pOb && typeof pOb === "object") setPatternOverrides(pOb);
       }
     } catch (e) {}
-    // Cargar ejercicios custom desde Supabase
-    var entId = (()=>{ try{ return JSON.parse(localStorage.getItem("it_session")||"null")?.entrenadorId || "entrenador_principal"; }catch(e){ return "entrenador_principal"; } })();
-    sb.getCustomEx(entId).then(function(res){
-      if(res && Array.isArray(res) && res.length > 0) {
-        var exs = res.map(function(e){
-          var rawName = e.name != null && e.name !== "" ? e.name : (e.nombre != null ? e.nombre : "");
-          var rawEn = e.name_en != null && e.name_en !== "" ? e.name_en : (e.nameEn != null ? e.nameEn : rawName);
-          var rawVu = (e.video_url || e.youtube || e.youtube_url || e.videoUrl || "").trim();
-          var vuStore = rawVu && isValidHttpUrlString(rawVu) ? rawVu : null;
-          var isCust = e.is_custom != null ? !!e.is_custom : true;
-          return {
-            id: e.id,
-            name: rawName,
-            nameEn: rawEn || rawName,
-            pattern: e.pattern || "empuje",
-            muscle: e.muscle || "",
-            equip: e.equip || "Libre",
-            video_url: vuStore,
-            isCustom: isCust,
-          };
-        });
-        setCustomEx(function(prev){
-          // Merge: Supabase tiene prioridad, agregar locales que no estén
-          var ids = new Set(exs.map(function(e){return e.id}));
-          var locales = (prev||[]).filter(function(e){return !ids.has(e.id)});
-          return [...exs, ...locales];
-        });
-      }
-    }).catch(function(){});
+    // Los ejercicios custom se cargan en un efecto separado, atado al auth user real.
   }, []);
+
+  useEffect(function () {
+    if (readOnly || sessionData?.role !== "entrenador") return;
+    var coachId = supabaseSessionUserId || sessionData?.entrenadorId;
+    if (!coachId || coachId === "entrenador_principal") return;
+    var cancelled = false;
+
+    (async function () {
+      try {
+        var remoteRows = await sb.getCustomEx(coachId);
+        var remote = (remoteRows || []).map(mapCustomExerciseRow).filter(function (e) { return !!(e && e.name); });
+        var names = {};
+        var staticNames = {};
+        remote.forEach(function (e) { names[normalizeExerciseNameKey(e.name)] = true; });
+        EX.forEach(function (e) { staticNames[normalizeExerciseNameKey(e.name)] = true; });
+
+        var migrationKey = "it_cex_migrated_" + coachId;
+        var migrationDone = false;
+        try { migrationDone = localStorage.getItem(migrationKey) === "1"; } catch (e) {}
+        var inserted = [];
+
+        if (!migrationDone) {
+          var localItems = readLocalCustomExercisesForMigration();
+          var toInsert = localItems.filter(function (e) {
+            var key = normalizeExerciseNameKey(e.name || e.nameEn);
+            return key && !names[key] && !staticNames[key];
+          });
+          for (var i = 0; i < toInsert.length; i++) {
+            var item = toInsert[i];
+            var payload = buildCustomExerciseDbPayload({
+              ...item,
+              id: item.id || ("custom_" + Date.now() + "_" + i),
+            }, coachId);
+            var row = await sb.addCustomEx(payload);
+            var mapped = mapCustomExerciseRow(row || payload);
+            inserted.push(mapped);
+            names[normalizeExerciseNameKey(mapped.name)] = true;
+          }
+          try { localStorage.setItem(migrationKey, "1"); } catch (e) {}
+          if (toInsert.length > 0) {
+            console.info("[customExercises DEBUG] migrados a Supabase", { count: toInsert.length, entrenador_id: coachId });
+          }
+        }
+
+        if (cancelled) return;
+        setCustomEx(function () {
+          var merged = [];
+          var seen = {};
+          remote.concat(inserted).forEach(function (e) {
+            var key = normalizeExerciseNameKey(e.name || e.nameEn);
+            if (!key || seen[key] || staticNames[key]) return;
+            seen[key] = true;
+            merged.push(e);
+          });
+          return merged;
+        });
+      } catch (e) {
+        console.error("[customExercises DEBUG] error cargando/migrando", e);
+        if (!cancelled) toast2(msg("No se pudieron cargar los ejercicios personalizados desde Supabase", "Could not load custom exercises from Supabase"));
+      }
+    })();
+
+    return function () {
+      cancelled = true;
+    };
+  }, [readOnly, sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, msg, toast2]);
 
   /** Recordatorios de entrenamiento (alumno): comprobar hora mientras la app está abierta. */
   React.useEffect(function () {
@@ -1647,7 +1777,20 @@ function GymApp() {
       if (p && BIB_PAT[p]) return { ...n, pattern: p };
       return n;
     });
-    var custom = (customEx || []).map(function (e) { return normalizeLibraryExercise(e, { catalog: false }); });
+    var seenNames = {};
+    var seenIds = {};
+    catalog.forEach(function (e) {
+      seenIds[String(e.id)] = true;
+      seenNames[normalizeExerciseNameKey(e.name)] = true;
+    });
+    var custom = (customEx || []).map(function (e) { return normalizeLibraryExercise(e, { catalog: false }); }).filter(function (e) {
+      var id = String(e && e.id);
+      var nameKey = normalizeExerciseNameKey(e && e.name);
+      if (!id || seenIds[id] || !nameKey || seenNames[nameKey]) return false;
+      seenIds[id] = true;
+      seenNames[nameKey] = true;
+      return true;
+    });
     return catalog.concat(custom);
   }, [customEx, patternOverrides]);
   const filteredEx = allEx.filter(function (e) {
@@ -3139,6 +3282,7 @@ function GymApp() {
             setPatternOverrides: setPatternOverrides,
             darkMode: darkMode,
             sb: sb,
+            entrenadorId: supabaseSessionUserId || sessionData?.entrenadorId || null,
             customEx: customEx,
             setCustomEx: setCustomEx,
             toast2: toast2,
@@ -3212,7 +3356,13 @@ function GymApp() {
               const weeklyPct = totalDays > 0 ? Math.min(100, Math.round((daysCompletedThisWeek / totalDays) * 100)) : 0;
               const todayDay = nextDayIdx !== null ? r0?.days?.[nextDayIdx] : null;
               const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeekForStudent)));
-              const totalEjHero = todayDay ? (todayDay.warmup || []).length + (todayDay.exercises || []).length : 0;
+              const todayDayPresentation = buildStudentDayPresentation({
+                day: todayDay,
+                dayIndex: nextDayIdx,
+                allEx: allEx,
+                msg: msg,
+              });
+              const totalEjHero = todayDayPresentation.exerciseCount;
               const doneEjHero = todayDay ? countExercisesWithLogToday(todayDay, progress, hoy, currentWeekForStudent) : 0;
               const pctHero = totalEjHero > 0 ? Math.min(100, Math.round((100 * doneEjHero) / totalEjHero)) : 0;
               const progressStatusHero =
@@ -3221,19 +3371,8 @@ function GymApp() {
                   : pctHero < 100
                     ? msg("Sigue con tu entrenamiento", "Keep going", "Continue o treino")
                     : msg("Casi listo", "Almost there", "Quase pronto");
-              const todayExerciseInfos = todayDay
-                ? [].concat(todayDay.exercises || [], todayDay.warmup || []).map(function (ex) {
-                    return allEx.find(function (info) { return info.id === ex.id; }) || ex;
-                  }).filter(Boolean)
-                : [];
-              const todayWorkoutLabels = inferStudentWorkoutLabels({
-                day: todayDay,
-                exerciseInfos: todayExerciseInfos,
-                dayIndex: nextDayIdx,
-                labels: buildStudentWorkoutLabelTexts(msg),
-              });
-              const todayHeroTitle = todayWorkoutLabels.title;
-              const todayTypeBadge = todayWorkoutLabels.typeBadge;
+              const todayHeroTitle = todayDayPresentation.dayTitle;
+              const todayTypeBadge = todayDayPresentation.typeBadgeText;
               return (
                 <div style={{ marginBottom: 0 }}>
                   {/*

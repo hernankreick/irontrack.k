@@ -1,3 +1,5 @@
+import { firstNonEmptyString } from '../../lib/appPureHelpers.js';
+
 /**
  * Helpers puros para la vista Plan (modo alumno): duración estimada, músculos, PRs pendientes.
  * No side effects; mismos datos que el resto de App (día de rutina, progress, currentWeek).
@@ -75,6 +77,43 @@ export function countExercisesWithLogToday(day, progress, hoy, currentWeek) {
     }
   });
   return n;
+}
+
+export function buildStudentDayPresentation({ day, dayIndex, allEx, msg }) {
+  const exerciseInfos = day
+    ? []
+        .concat(day.exercises || [], day.warmup || [])
+        .map(function (ex) {
+          return (allEx || []).find(function (info) { return info.id === ex.id; }) || ex;
+        })
+        .filter(Boolean)
+    : [];
+  const patterns = new Set(exerciseInfos.map(function (ex) { return ex.pattern; }).filter(Boolean));
+  const muscles = exerciseInfos.map(function (ex) { return String(ex.muscle || ""); }).join(" ").toLowerCase();
+  const explicit = firstNonEmptyString(
+    day && (day.name || day.title || day.nombre || day.titulo || day.label),
+    day && day.dayName
+  );
+  const dayNumber = (Number(dayIndex) || 0) + 1;
+  const dayTitle = explicit
+    || (patterns.has("empuje") && patterns.has("traccion") ? msg("Torso", "Upper Body", "Torso") : "")
+    || ((patterns.has("rodilla") || patterns.has("bisagra")) && !patterns.has("empuje") && !patterns.has("traccion") ? msg("Piernas", "Lower Body", "Pernas") : "")
+    || (patterns.size === 1 && patterns.has("core") ? "Core" : "")
+    || (patterns.size === 1 && patterns.has("cardio") ? "Cardio" : "")
+    || (muscles.match(/pecho|espalda|hombro|dorsal|biceps|triceps/) ? msg("Torso", "Upper Body", "Torso") : "")
+    || (msg("Día", "Day", "Dia") + " " + dayNumber);
+  const typeBadgeText = patterns.size === 1 && patterns.has("cardio")
+    ? "Cardio"
+    : patterns.size === 1 && patterns.has("movilidad")
+      ? msg("Movilidad", "Mobility", "Mobilidade")
+      : msg("Fuerza", "Strength", "Forca");
+
+  return {
+    dayTitle,
+    typeBadgeText,
+    exerciseCount: day ? (day.warmup || []).length + (day.exercises || []).length : 0,
+    exerciseInfos,
+  };
 }
 
 /**
