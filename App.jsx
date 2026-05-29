@@ -105,7 +105,7 @@ import {
   countExercisesWithLogToday,
   buildStudentDayPresentation,
 } from './components/student-plan/studentPlanHelpers.js';
-import LoginForm from './components/auth/LoginForm.jsx';
+import LoginModalHost from './components/LoginModalHost.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
 import ToastBanner from './components/ui/ToastBanner.jsx';
@@ -4114,22 +4114,13 @@ function GymApp() {
           }}
           onClose={()=>setEditEx(null)}
         />
-      {loginModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:130,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 20px"}} onClick={()=>setLoginModal(false)}>
-          <div style={{background:bgCard,borderRadius:16,padding:"24px 20px",width:"100%",maxWidth:360,animation:"fadeIn 0.25s ease"}} onClick={e=>e.stopPropagation()}>
-            {user?(
-              <div style={{textAlign:"center"}}>
-                <div style={{fontSize:48,marginBottom:8}}>👤</div>
-                <div style={{fontSize:22,fontWeight:700,marginBottom:4}}>{user.name}</div>
-                <div style={{fontSize:15,color:textMuted,marginBottom:16}}>{user.email}</div>
-                <button className="hov" style={{...btn("#2563EB22"),color:"#2563EB",width:"100%",padding:"8px"}} onClick={()=>{localStorage.removeItem("it_u");setUser(null);setLoginModal(false);toast2("Sesion cerrada");}}>SALIR</button>
-              </div>
-            ):(
-              <LoginForm darkMode={darkMode} es={es} btn={btn} inp={inp} lbl={lbl} msg={msg} onLogin={u=>{setUser(u);localStorage.setItem("it_u",JSON.stringify(u));setLoginModal(false);toast2("Hola "+u.name+"!");}} onClose={()=>setLoginModal(false)}/>
-            )}
-          </div>
-        </div>
-      )}
+      <LoginModalHost
+        open={loginModal} user={user} bgCard={bgCard} textMuted={textMuted}
+        darkMode={darkMode} es={es} btn={btn} inp={inp} lbl={lbl} msg={msg}
+        onClose={()=>setLoginModal(false)}
+        onLogout={()=>{localStorage.removeItem("it_u");setUser(null);setLoginModal(false);toast2("Sesion cerrada");}}
+        onLogin={u=>{setUser(u);localStorage.setItem("it_u",JSON.stringify(u));setLoginModal(false);toast2("Hola "+u.name+"!");}}
+      />
       {aliasModal&&(
         <PaymentInfoModal
           form={aliasForm}
