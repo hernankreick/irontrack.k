@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import { WorkoutExercisePanel } from './WorkoutExercisePanel.jsx';
 import { resolveExerciseTitle } from '../lib/exerciseResolve.js';
+import WorkoutExitConfirmModal from './workout/WorkoutExitConfirmModal.jsx';
 import RestTimer from './workout/RestTimer.jsx';
 import WorkoutFinishSection from './workout/WorkoutFinishSection.jsx';
 import WorkoutHeader from './workout/WorkoutHeader.jsx';
@@ -314,10 +314,9 @@ export function WorkoutScreen(props) {
           />
         )}
       </div>
-      <DeleteConfirmModal
-        zIndex={10000}
+      <WorkoutExitConfirmModal
         open={exitWorkoutOpen}
-        tone="caution"
+        es={es}
         onCancel={function () {
           setExitWorkoutOpen(false);
         }}
@@ -325,16 +324,6 @@ export function WorkoutScreen(props) {
           setExitWorkoutOpen(false);
           setSession(null);
         }}
-        title={es ? 'Salir del entrenamiento' : 'Exit workout'}
-        message={
-          es
-            ? 'Vas a salir sin finalizar. Los sets aún no guardados en almacenamiento local se pueden perder.'
-            : "You'll leave without finishing. Sets not yet stored locally may be lost."
-        }
-        confirmLabel={es ? 'Salir' : 'Exit'}
-        cancelLabel={es ? 'Cancelar' : 'Cancel'}
-        variant="workoutExit"
-        loading={false}
       />
     </div>
   );
