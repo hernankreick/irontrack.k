@@ -5,6 +5,7 @@ export default function CoachDashboardMain({
   activeNav,
   alumnos,
   sesionesGlobales,
+  mensajesEntrenadorPendientes,
   progresoGlobal,
   rutinasSBEntrenador,
   allEx,
@@ -31,6 +32,7 @@ export default function CoachDashboardMain({
       activeNav={activeNav}
       alumnos={alumnos}
       sesionesGlobales={sesionesGlobales}
+      mensajesEntrenadorPendientes={mensajesEntrenadorPendientes}
       progresoGlobal={progresoGlobal}
       rutinasSBEntrenador={rutinasSBEntrenador}
       allEx={allEx}

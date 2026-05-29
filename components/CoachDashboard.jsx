@@ -402,10 +402,51 @@ function weeklyTargetFromRutinas(alumnos, rutinasSBEntrenador) {
  * Alertas derivadas solo de datos reales (sin inventar alumnos).
  * Prioridad: sin rutina > rutina terminada > a 1 sesión > inactivo > poca actividad en la semana (con rutina).
  */
-function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, P, currentWeek) {
+function buildChatMessageAlerts(alumnos, mensajesPendientes, lang, P) {
+  if (!Array.isArray(alumnos) || alumnos.length === 0 || !Array.isArray(mensajesPendientes)) return [];
+  var byAlumno = {};
+  mensajesPendientes.forEach(function (m) {
+    if (!m || m.de_entrenador === true) return;
+    var alumnoId = m.alumno_id != null ? String(m.alumno_id) : "";
+    if (!alumnoId || m.leido === true) return;
+    var t = new Date(m.created_at || 0).getTime() || 0;
+    var prev = byAlumno[alumnoId];
+    if (!prev || t > prev.atMs) byAlumno[alumnoId] = { msg: m, atMs: t };
+  });
+
+  var pal = P || coachThemePalette(true);
+  return alumnos
+    .map(function (a) {
+      var alumnoId = a && a.id != null ? String(a.id) : "";
+      var pending = byAlumno[alumnoId];
+      if (!pending) return null;
+      var name = coachDisplayName(a) || (pending.msg && pending.msg.nombre) || M(lang, "Alumno", "Athlete", "Aluno");
+      var msgId = pending.msg && pending.msg.id != null ? String(pending.msg.id) : String(pending.atMs || Date.now());
+      return {
+        key: "chat-" + alumnoId + "-" + msgId,
+        alumnoId: alumnoId,
+        chatId: msgId,
+        tipo: "chat_message",
+        initials: coachInitials(a),
+        name: name,
+        badge: M(lang, "Nuevo mensaje", "New message", "Nova mensagem"),
+        bc: pal.blue,
+        bd: pal.blueDim,
+        desc: name + M(lang, " te envió un mensaje.", " sent you a message.", " enviou uma mensagem para você."),
+        severity: 0,
+        category: "mensaje",
+        primaryLabel: M(lang, "ABRIR CHAT", "OPEN CHAT", "ABRIR CHAT"),
+        primaryAction: "chat",
+        atMs: pending.atMs || null,
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, P, currentWeek, mensajesPendientes) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
   var ses = sesionesGlobales || [];
-  var out = [];
+  var out = buildChatMessageAlerts(alumnos, mensajesPendientes, lang, P);
   var now = Date.now();
   var pal = P || coachThemePalette(true);
   alumnos.forEach(function (a) {
@@ -529,6 +570,7 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
   });
   out.sort(function (x, y) {
     if (x.severity !== y.severity) return x.severity - y.severity;
+    if (x.atMs != null || y.atMs != null) return (y.atMs || 0) - (x.atMs || 0);
     return String(x.name).localeCompare(String(y.name), localeForSort(lang));
   });
   return out.slice(0, 12);
@@ -587,6 +629,7 @@ export default function CoachDashboard({
   activeNav = "dashboard",
   alumnos = [],
   sesionesGlobales = [],
+  mensajesEntrenadorPendientes = [],
   progresoGlobal = {},
   rutinasSBEntrenador = [],
   allEx = [],
@@ -632,9 +675,9 @@ export default function CoachDashboard({
 
   var coachAlertsReal = React.useMemo(
     function () {
-      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C, currentWeek);
+      return buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C, currentWeek, mensajesEntrenadorPendientes);
     },
-    [alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C, currentWeek]
+    [alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, C, currentWeek, mensajesEntrenadorPendientes]
   );
 
   var coachActiveRows = React.useMemo(

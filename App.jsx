@@ -652,6 +652,7 @@ function GymApp() {
   const [rutinasSB, setRutinasSB] = useState([]);
   const [sesionesGlobales, setSesionesGlobales] = useState([]);
   const [progresoGlobal, setProgresoGlobal] = useState({});
+  const [mensajesEntrenadorPendientes, setMensajesEntrenadorPendientes] = useState([]);
   const [sugerencias, setSugerencias] = useState({});
   const [rutinasSBEntrenador, setRutinasSBEntrenador] = useState([]);
   const [rutinasLoaded, setRutinasLoaded] = useState(false);
@@ -760,6 +761,7 @@ function GymApp() {
       var results = await Promise.all([
         sbFetch('sesiones?alumno_id=in.(' + idsStr + ')&select=*&order=created_at.desc&limit=500'),
         sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=alumno_id,ejercicio_id,kg,reps,fecha&order=created_at.desc&limit=3000'),
+        sbFetch('mensajes?alumno_id=in.(' + idsStr + ')&de_entrenador=eq.false&or=(leido.is.null,leido.eq.false)&select=*&order=created_at.desc&limit=200'),
       ]);
       if(results[0] && Array.isArray(results[0])) setSesionesGlobales(results[0]);
       if(results[1] && Array.isArray(results[1])) {
@@ -770,6 +772,7 @@ function GymApp() {
         });
         setProgresoGlobal(idx2);
       }
+      if(results[2] && Array.isArray(results[2])) setMensajesEntrenadorPendientes(results[2]);
     } catch(e) { console.error('[cargarSesionesGlobales]', e); }
   }, [alumnosActivosLimpios, ENTRENADOR_ID]);
 
@@ -1155,6 +1158,7 @@ function GymApp() {
     setAlumnoProgreso([]);
     setSesionesGlobales([]);
     setProgresoGlobal({});
+    setMensajesEntrenadorPendientes([]);
     setRutinasSBEntrenador([]);
     setRutinasSB([]);
     setLoadingSB(false);
@@ -3129,6 +3133,7 @@ function GymApp() {
           dashboardProps={{
             alumnos: alumnosActivosLimpios,
             sesionesGlobales: sesionesGlobalesLimpias,
+            mensajesEntrenadorPendientes: mensajesEntrenadorPendientes,
             progresoGlobal: progresoGlobalLimpio,
             rutinasSBEntrenador: rutinasSBEntrenadorLimpias,
             allEx: allEx,
@@ -4050,6 +4055,13 @@ function GymApp() {
         textMain={textMain}
         textMuted={textMuted}
         msg={msg}
+        onMensajesLeidos={(alumnoId)=>{
+          setMensajesEntrenadorPendientes(function(prev) {
+            return (prev || []).filter(function(m) {
+              return String(m && m.alumno_id) !== String(alumnoId);
+            });
+          });
+        }}
         onClose={()=>setChatModal(null)}
       />
       <EditExerciseModalHost

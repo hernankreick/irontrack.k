@@ -12,6 +12,7 @@ export default function CoachChatModal({
   textMain,
   textMuted,
   msg,
+  onMensajesLeidos,
   onClose,
 }) {
   if (!chatModal) return null;
@@ -32,7 +33,7 @@ export default function CoachChatModal({
           <button onClick={onClose} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer",padding:"4px"}}><Ic name="x" size={18}/></button>
         </div>
         <div style={{flex:1,overflow:"hidden"}}>
-          <Chat darkMode={darkMode} es={es} alumnoId={chatModal.alumnoId} alumnoNombre={chatModal.alumnoNombre} esEntrenador={true} sb={sb}/>
+          <Chat darkMode={darkMode} es={es} alumnoId={chatModal.alumnoId} alumnoNombre={chatModal.alumnoNombre} esEntrenador={true} sb={sb} onMensajesLeidos={onMensajesLeidos}/>
         </div>
       </div>
     </div>

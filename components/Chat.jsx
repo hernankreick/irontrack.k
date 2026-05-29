@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { formatChatTime } from '../lib/chatTimeFormat.js';
 
-export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es}) {
+export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, onMensajesLeidos}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
@@ -22,6 +22,7 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es}) {
 
     if (sb.marcarMensajesLeidos) {
       await sb.marcarMensajesLeidos(alumnoId, esEntrenador);
+      if (esEntrenador && typeof onMensajesLeidos === "function") onMensajesLeidos(alumnoId);
 
       // volver a traer mensajes ya actualizados
       const m2 = await sb.getMensajes(alumnoId);
