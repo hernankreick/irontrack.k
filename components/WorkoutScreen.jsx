@@ -4,6 +4,7 @@ import { WorkoutExercisePanel } from './WorkoutExercisePanel.jsx';
 import { resolveExerciseTitle } from '../lib/exerciseResolve.js';
 import RestTimer from './workout/RestTimer.jsx';
 import WorkoutHeader from './workout/WorkoutHeader.jsx';
+import WorkoutProgressStrip from './workout/WorkoutProgressStrip.jsx';
 import {
   buildCompletedDayKey,
   buildSessionPayload,
@@ -236,34 +237,21 @@ export function WorkoutScreen(props) {
         onSkip={() => startTimer(0)}
       />
 
-      {/* ── Dots — progreso por ejercicio ── */}
-      <div style={{ display:"flex", gap:6, padding:"10px 16px 4px", flexShrink:0, overflowX:"auto" }}>
-        {exercises.map((e, i) => {
-          const done = getWorkoutExerciseStatus({
-            exercise: e,
-            progress: progress,
-            date: hoy,
-            currentWeek: currentWeek,
-            checkWeek: false,
-          }).isDone;
-          const active = i === activeExIdx;
-          return (
-            <button
-              key={i}
-              onClick={() => setActiveExIdx(i)}
-              style={{
-                flexShrink:0,
-                height:5, borderRadius:3,
-                width: active ? 24 : done ? 24 : 14,
-                border:"none", cursor:"pointer",
-                background: done ? green : active ? blue : (_dm ? "rgba(45,64,87,.8)" : "#CBD5E1"),
-                transition:"all .25s ease",
-                padding:0,
-              }}
-            />
-          );
+      <WorkoutProgressStrip
+        exercises={exercises}
+        activeExIdx={activeExIdx}
+        setActiveExIdx={setActiveExIdx}
+        getExerciseStatus={(e) => getWorkoutExerciseStatus({
+          exercise: e,
+          progress: progress,
+          date: hoy,
+          currentWeek: currentWeek,
+          checkWeek: false,
         })}
-      </div>
+        green={green}
+        blue={blue}
+        darkModeResolved={_dm}
+      />
 
       {/* ── Contenido scrollable ── */}
       <div onScroll={handleWorkoutScroll} style={{ flex:1, minHeight:0, overflowY:"auto", padding:"10px 16px 0", paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))", WebkitOverflowScrolling:"touch" }}>
