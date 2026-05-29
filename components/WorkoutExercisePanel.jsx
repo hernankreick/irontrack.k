@@ -322,8 +322,7 @@ export function WorkoutExercisePanel(props) {
 
           <div style={{padding:"14px"}}>
             {/* Header progreso */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <div style={{fontSize:10,fontWeight:800,color:"#2563EB",letterSpacing:2}}>SET {setActualNum} {es?"DE":"OF"} {totalSets}</div>
+            <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",marginBottom:8}}>
               <div style={{fontSize:10,fontWeight:600,color:"#475569"}}>{es?"Ej":"Ex"} {activeExIdx+1}/{exercises.length}</div>
             </div>
             <div style={{height:2,borderRadius:1,background:"#1a2535",marginBottom:12}}>

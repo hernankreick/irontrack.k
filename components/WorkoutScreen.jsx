@@ -67,6 +67,7 @@ export function WorkoutScreen(props) {
   const dayProgress = calculateDayProgress(exercises, progress, hoy, currentWeek, { checkWeek: false });
   const totalExDone = dayProgress.done;
   const pct = dayProgress.pct;
+  const workoutReadyToFinish = exercises.length > 0 && totalExDone >= exercises.length;
 
   const nextEx   = exercises[activeExIdx + 1];
   const nextInfo = nextEx ? allEx.find(e => e.id === nextEx.id) : null;
@@ -354,29 +355,30 @@ export function WorkoutScreen(props) {
             </svg>
           </div>
         )}
-      </div>
 
-      {/* ── Botón finalizar ── */}
-      <div style={{ padding:"10px 16px calc(24px + env(safe-area-inset-bottom, 0px))", flexShrink:0, background:bgCard, borderTop:`1px solid ${border}` }}>
-        <button
-          className="hov"
-          onClick={finalizarSesion}
-          style={{
-            width:"100%", padding:"16px",
-            background:blue, color:"#fff",
-            border:"none", borderRadius:14,
-            fontSize:16, fontWeight:900,
-            cursor:"pointer", fontFamily:"inherit",
-            letterSpacing:.5, textTransform:"uppercase",
-            display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-            minHeight:56,
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          {es ? "FINALIZAR ENTRENAMIENTO" : "FINISH WORKOUT"}
-        </button>
+        {workoutReadyToFinish && (
+          <div style={{ padding:"10px 0 calc(24px + env(safe-area-inset-bottom, 0px))" }}>
+            <button
+              className="hov"
+              onClick={finalizarSesion}
+              style={{
+                width:"100%", padding:"16px",
+                background:blue, color:"#fff",
+                border:"none", borderRadius:14,
+                fontSize:16, fontWeight:900,
+                cursor:"pointer", fontFamily:"inherit",
+                letterSpacing:.5, textTransform:"uppercase",
+                display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                minHeight:56,
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              {es ? "FINALIZAR ENTRENAMIENTO" : "FINISH WORKOUT"}
+            </button>
+          </div>
+        )}
       </div>
       <DeleteConfirmModal
         zIndex={10000}
