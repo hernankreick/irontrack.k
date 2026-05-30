@@ -7,6 +7,7 @@ import CoachCalendar from '../CoachCalendar.jsx';
 import CoachMobileDrawer from '../layout/CoachMobileDrawer.jsx';
 import SettingsPage from '../settings/SettingsPage.jsx';
 import ScannerRutina from '../scanner/ScannerRutina.jsx';
+import CoachMessagesMain from './CoachMessagesMain.jsx';
 
 export default function CoachSectionRenderer({
   tab,
@@ -20,6 +21,7 @@ export default function CoachSectionRenderer({
   studentsProps,
   exercisesProps,
   settingsProps,
+  messagesProps,
   mobileDrawerProps,
   scannerProps,
 }) {
@@ -47,6 +49,10 @@ export default function CoachSectionRenderer({
 
       {tab === "alumnos" && sessionData?.role === "entrenador" && (
         <CoachStudentsMain {...studentsProps} />
+      )}
+
+      {tab === "mensajes" && isCoach && (
+        <CoachMessagesMain {...messagesProps} />
       )}
 
       {/* Exercise library aliases */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { formatChatTime } from '../lib/chatTimeFormat.js';
+import { formatChatTime } from '../lib/timeFormat.js';
 
 export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, onMensajesLeidos}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
@@ -75,7 +75,7 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, on
                 </div>
                 <div style={{fontSize:15,color:textMain,lineHeight:1.4}}>{m.texto}</div>
                 <div style={{fontSize:11,color:"rgba(255,255,255,0.5)",marginTop:4,textAlign:"right"}}>
-                  {formatChatTime(m.created_at)}
+                  {formatChatTime(m.created_at, es ? "es-AR" : "en-US")}
                 </div>
               </div>
             </div>

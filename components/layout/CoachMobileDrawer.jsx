@@ -117,6 +117,7 @@ export default function CoachMobileDrawer({
           {[
             { k: "plan", icon: "calendar", label: msg("Dashboard", "Dashboard"), sub: null },
             { k: "calendar", icon: "calendar", label: msg("Calendario", "Calendar"), sub: msg("Programar rutinas", "Schedule routines") },
+            { k: "mensajes", icon: "message-circle", label: msg("Mensajes", "Messages"), sub: msg("Chats con alumnos", "Athlete chats") },
             { k: "alumnos", icon: "users", label: msg("Alumnos", "Athletes"), sub: msg("Gestionar equipo", "Manage team") },
             { k: "routines", icon: "file-text", label: msg("Rutinas", "Routines"), sub: null },
             { k: "biblioteca", icon: "activity", label: msg("Ejercicios", "Exercises"), sub: null },

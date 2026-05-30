@@ -8,6 +8,7 @@ import {
   Dumbbell,
   LayoutDashboard,
   LogOut,
+  MessageCircle,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -153,6 +154,7 @@ export default function DesktopSidebar({
       return [
         { id: "plan", label: M(lang, "Dashboard", "Dashboard", "Painel"), icon: LayoutDashboard },
         { id: "calendar", label: M(lang, "Calendario", "Calendar", "Calendario"), icon: CalendarDays },
+        { id: "mensajes", label: M(lang, "Mensajes", "Messages", "Mensagens"), icon: MessageCircle },
         { id: "alumnos", label: M(lang, "Alumnos", "Athletes", "Alunos"), icon: Users },
         { id: "routines", label: M(lang, "Rutinas", "Routines", "Rotinas"), icon: ClipboardList },
         { id: "biblioteca", label: M(lang, "Ejercicios", "Exercises", "Exercícios"), icon: Dumbbell },

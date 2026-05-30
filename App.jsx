@@ -440,6 +440,13 @@ const sb = {
   getConfig: () => sbFetch("config?id=eq.pagos&select=*"),
   saveConfig: (data) => sbFetch("config?id=eq.pagos", "PATCH", data),
   getMensajes: (alumnoId) => sbFetch("mensajes?alumno_id=eq."+alumnoId+"&select=*&order=created_at.asc&limit=50"),
+  getMensajesConversaciones: async (alumnoIds) => {
+    var ids = Array.from(new Set((alumnoIds || []).filter(Boolean).map(String)));
+    if (!ids.length) return [];
+    const { data, error } = await supabase.from("mensajes").select("*").in("alumno_id", ids).order("created_at", { ascending: false }).limit(1000);
+    if (error) { console.error("[mensajes conversaciones SELECT ERROR]", error); return null; }
+    return data || [];
+  },
   addMensaje: (data) => sbFetch("mensajes", "POST", data),
   marcarMensajesLeidos: async (alumnoId, esEntrenador) => {
   const deQuien = esEntrenador ? "false" : "true";
@@ -2954,6 +2961,12 @@ function GymApp() {
       alumnoNombre: alum.nombre || alum.email || "Alumno",
     });
   };
+  const handleCoachMessagesOpenConversation = function (alumnoId, alumnoNombre) {
+    setChatModal({
+      alumnoId: alumnoId,
+      alumnoNombre: alumnoNombre || "Alumno",
+    });
+  };
   const handleCoachLogout = function () {
     clearAllIronTrackPrefixedKeys();
     syncStateWithLocalStorage();
@@ -3311,6 +3324,13 @@ function GymApp() {
             sesionesGlobales: sesionesGlobales,
             sb: sb,
             entrenadorId: sessionData?.entrenadorId || "entrenador_principal",
+          }}
+          messagesProps={{
+            alumnos: alumnosActivosLimpios,
+            sb: sb,
+            darkMode: darkMode,
+            lang: lang,
+            onOpenConversation: handleCoachMessagesOpenConversation,
           }}
           /* Coach shell */
           mobileDrawerProps={{
