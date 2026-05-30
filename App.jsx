@@ -10,7 +10,6 @@ import {
 } from './lib/appPureHelpers.js';
 import { Ic } from './components/Ic.jsx';
 import { LogForm } from './components/LogForm.jsx';
-import ExerciseHistoryModal from './components/routines/ExerciseHistoryModal.jsx';
 import DuplicateDayModal from './components/routines/DuplicateDayModal.jsx';
 import NewRoutineModal from './components/routines/NewRoutineModal.jsx';
 import { WorkoutScreen } from './components/WorkoutScreen.jsx';
@@ -94,7 +93,7 @@ import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyPr
 import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import WorkoutSessionSummary from './components/workout/WorkoutSessionSummary.jsx';
-import EditExerciseModalHost from './components/routines/EditExerciseModalHost.jsx';
+import AppExerciseModals from './components/AppExerciseModals.jsx';
 import AddExerciseModal from './components/modals/AddExerciseModal.jsx';
 import CoachChatModal from './components/modals/CoachChatModal.jsx';
 import PaymentInfoModal from './components/modals/PaymentInfoModal.jsx';
@@ -3940,33 +3939,69 @@ function GymApp() {
         onClose={()=>setResumenSesion(null)}
         onShareImage={shareSessionSummaryImage}
       />
-      {detailEx&&(
-        <ExerciseHistoryModal
-          exercise={detailExHistoryData.exercise}
-          history={detailExHistoryData.history}
-          pattern={detailExHistoryData.pattern}
-          imageSrc={detailExHistoryData.imageSrc}
-          videoSrc={detailExHistoryData.videoSrc}
-          canAddToRoutine={!!(expandedR&&selDay!==null)}
-          darkMode={darkMode}
-          es={es}
-          msg={msg}
-          btn={btn}
-          lbl={lbl}
-          tag={tag}
-          bgCard={bgCard}
-          textMain={textMain}
-          textMuted={textMuted}
-          onClose={()=>setDetailEx(null)}
-          onLogSet={()=>{setLogModal({...detailEx});setDetailEx(null);}}
-          onAddToRoutine={()=>{
+      <AppExerciseModals
+        detailEx={detailEx}
+        detailProps={{
+          exercise: detailExHistoryData.exercise,
+          history: detailExHistoryData.history,
+          pattern: detailExHistoryData.pattern,
+          imageSrc: detailExHistoryData.imageSrc,
+          videoSrc: detailExHistoryData.videoSrc,
+          canAddToRoutine: !!(expandedR&&selDay!==null),
+          darkMode, es, msg, btn, lbl, tag, bgCard, textMain, textMuted,
+          onClose: ()=>setDetailEx(null),
+          onLogSet: ()=>{setLogModal({...detailEx});setDetailEx(null);},
+          onAddToRoutine: ()=>{
             setRoutines(p=>p.map(r=>r.id===expandedR?{...r,days:r.days.map((d,i)=>i===selDay?{...d,exercises:[...d.exercises,{id:detailEx.id,sets:"3",reps:"8-10",kg:"",pause:90,note:"",weeks:[]}]}:d)}:r));
             toast2("Ejercicio agregado");
             setDetailEx(null);
             setTab("plan");
-          }}
-        />
-      )}
+          },
+        }}
+        editProps={{
+          editEx, darkMode, btn, inp, allEx, es, PATS, msg,
+          onSave: async(updatedRaw)=>{
+            const updated = sanitizeExerciseSnapshotForWrite(updatedRaw);
+            const blq = editEx.bloque||"exercises";
+            const replaceExerciseInDays = function(days){
+              return (days||[]).map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
+            };
+            const updateRutinaRowsLocal = function(rowId, days){
+              if(!rowId) return;
+              const diasActualizados = sanitizeRoutineDaysForWrite(days);
+              const updateRow = function(r){
+                return String(r.id)===String(rowId)?{...r,datos:{...(r.datos||{}),days:diasActualizados}}:r;
+              };
+              setRutinasSB(prev=>(prev||[]).map(updateRow));
+              setRutinasSBEntrenador(prev=>(prev||[]).map(updateRow));
+            };
+            // Actualizar routines locales
+            setRoutines(p=>(p||[]).map(r=>r.id===editEx.rId?{...r,days:replaceExerciseInDays(r.days)}:r));
+            // Auto-guardar en Supabase inmediatamente
+            try {
+              const rActual = routines.find(x=>x.id===editEx.rId);
+              if(rActual) {
+                const updatedDays = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rActual.days));
+                updateRutinaRowsLocal(rActual.id, updatedDays);
+                const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
+                if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
+                else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
+              } else {
+                // Buscar en rutinasSB (ediciÃ³n desde vista alumno)
+                const rSB = (rutinasSBEntrenador||[]).find(x=>String(x.id)===String(editEx.rId)) || (rutinasSB||[]).find(x=>String(x.id)===String(editEx.rId));
+                if(rSB) {
+                  const diasActualizados = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rSB.datos?.days||[]));
+                  const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:"entrenador_principal"};
+                  updateRutinaRowsLocal(rSB.id, diasActualizados);
+                  await sb.updateRutina(rSB.id, payloadSB);
+                }
+              }
+            } catch(e){ console.error("Auto-save error:",e); }
+            setEditEx(null);toast2("Guardado âœ“");
+          },
+          onClose: ()=>setEditEx(null),
+        }}
+      />
       {false&&logModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:110,display:"flex",alignItems:"flex-end"}} onClick={()=>setLogModal(null)}>
           <LogForm darkMode={darkMode} ex={logModal} btn={btn} inp={inp} lbl={lbl} tag={tag} fmtP={fmtP} progress={progress}
@@ -4052,56 +4087,6 @@ function GymApp() {
         }}
         onClose={()=>setChatModal(null)}
       />
-      <EditExerciseModalHost
-        editEx={editEx}
-        darkMode={darkMode}
-        btn={btn}
-        inp={inp}
-        allEx={allEx}
-        es={es}
-        PATS={PATS}
-        msg={msg}
-          onSave={async(updatedRaw)=>{
-            const updated = sanitizeExerciseSnapshotForWrite(updatedRaw);
-            const blq = editEx.bloque||"exercises";
-            const replaceExerciseInDays = function(days){
-              return (days||[]).map((d,di)=>di===editEx.dIdx?{...d,[blq]:(d[blq]||[]).map((ex,ei)=>ei===editEx.eIdx?updated:ex)}:d);
-            };
-            const updateRutinaRowsLocal = function(rowId, days){
-              if(!rowId) return;
-              const diasActualizados = sanitizeRoutineDaysForWrite(days);
-              const updateRow = function(r){
-                return String(r.id)===String(rowId)?{...r,datos:{...(r.datos||{}),days:diasActualizados}}:r;
-              };
-              setRutinasSB(prev=>(prev||[]).map(updateRow));
-              setRutinasSBEntrenador(prev=>(prev||[]).map(updateRow));
-            };
-            // Actualizar routines locales
-            setRoutines(p=>(p||[]).map(r=>r.id===editEx.rId?{...r,days:replaceExerciseInDays(r.days)}:r));
-            // Auto-guardar en Supabase inmediatamente
-            try {
-              const rActual = routines.find(x=>x.id===editEx.rId);
-              if(rActual) {
-                const updatedDays = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rActual.days));
-                updateRutinaRowsLocal(rActual.id, updatedDays);
-                const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
-                if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
-                else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
-              } else {
-                // Buscar en rutinasSB (edición desde vista alumno)
-                const rSB = (rutinasSBEntrenador||[]).find(x=>String(x.id)===String(editEx.rId)) || (rutinasSB||[]).find(x=>String(x.id)===String(editEx.rId));
-                if(rSB) {
-                  const diasActualizados = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rSB.datos?.days||[]));
-                  const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:"entrenador_principal"};
-                  updateRutinaRowsLocal(rSB.id, diasActualizados);
-                  await sb.updateRutina(rSB.id, payloadSB);
-                }
-              }
-            } catch(e){ console.error("Auto-save error:",e); }
-            setEditEx(null);toast2("Guardado ✓");
-          }}
-          onClose={()=>setEditEx(null)}
-        />
       <LoginModalHost
         open={loginModal} user={user} bgCard={bgCard} textMuted={textMuted}
         darkMode={darkMode} es={es} btn={btn} inp={inp} lbl={lbl} msg={msg}
