@@ -78,12 +78,10 @@ import CoachEditStudentModal from './components/coach/CoachEditStudentModal.jsx'
 import CoachSectionRenderer from './components/coach/CoachSectionRenderer.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
+import AppShellModals from './components/AppShellModals.jsx';
 import IronTrackAppIcon from './components/IronTrackAppIcon.jsx';
 import IronTrackSplash from './components/IronTrackSplash.jsx';
-import CoachWelcomeModalHost from './components/CoachWelcomeModalHost.jsx';
-import RecordatoriosPanel, { checkTrainingReminderTick } from './components/student/RecordatoriosPanel.jsx';
-import StudentProfileModalHost from './components/student/StudentProfileModalHost.jsx';
-import AlumnoSettingsModal from './components/student/AlumnoSettingsModal.jsx';
+import { checkTrainingReminderTick } from './components/student/RecordatoriosPanel.jsx';
 import AlumnoUserMenu from './components/student/AlumnoUserMenu.jsx';
 import FotosSlider from './components/student-progress/FotosSlider.jsx';
 import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
@@ -114,7 +112,7 @@ import AppMainScroll from './components/layout/AppMainScroll.jsx';
 import GlobalBottomNav from './components/layout/GlobalBottomNav.jsx';
 import AppTopBar from './components/layout/AppTopBar.jsx';
 import CoachDesktopShellFrame from './components/layout/CoachDesktopShellFrame.jsx';
-import SettingsPage, { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
+import { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
@@ -3856,63 +3854,45 @@ function GymApp() {
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
         <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
       )}
-      <CoachWelcomeModalHost
-        open={showWelcome}
-        sessionData={sessionData}
-        routines={routines}
-        alumnos={alumnos}
-        onboardStep={onboardStep}
-        studentCurrentWeek={studentCurrentWeek}
-        activeStudentRoutinePosition={activeStudentRoutinePosition}
-        allEx={allEx}
-        es={es}
-        bgCard={bgCard}
-        border={border}
-        textMain={textMain}
-        textMuted={textMuted}
-        msg={msg}
-        images={IMGS}
-        videoOverrides={videoOverrides}
-        onStudentOpenChange={function (v) { if (!v) setShowWelcome(false); }}
-        onStudentExerciseVideo={function (nombre, vUrl) {
-          var vid = getYTVideoId(vUrl);
-          if (vid) setVideoModal({ videoId: vid, nombre: nombre });
-          else window.open(vUrl, "_blank");
-        }}
-        onStudentStartWorkout={function ({ routine, day, dayIndex }) {
-          if (!routine || !day) {
+      <AppShellModals
+        welcomeProps={{
+          open: showWelcome, sessionData, routines, alumnos, onboardStep,
+          studentCurrentWeek, activeStudentRoutinePosition, allEx, es,
+          bgCard, border, textMain, textMuted, msg,
+          images: IMGS,
+          videoOverrides,
+          onStudentOpenChange: function (v) { if (!v) setShowWelcome(false); },
+          onStudentExerciseVideo: function (nombre, vUrl) {
+            var vid = getYTVideoId(vUrl);
+            if (vid) setVideoModal({ videoId: vid, nombre: nombre });
+            else window.open(vUrl, "_blank");
+          },
+          onStudentStartWorkout: function ({ routine, day, dayIndex }) {
+            if (!routine || !day) {
+              setShowWelcome(false);
+              return;
+            }
+            var snap = {};
+            [].concat(day.warmup || [], day.exercises || []).forEach(function (ex) {
+              snap[ex.id] = progress[ex.id]?.max || 0;
+            });
+            setPreSessionPRs({ ...snap });
+            setSessionPRList([]);
             setShowWelcome(false);
-            return;
-          }
-          var snap = {};
-          [].concat(day.warmup || [], day.exercises || []).forEach(function (ex) {
-            snap[ex.id] = progress[ex.id]?.max || 0;
-          });
-          setPreSessionPRs({ ...snap });
-          setSessionPRList([]);
-          setShowWelcome(false);
-          setSession({ rId: routine.id, dIdx: dayIndex, exIdx: 0, startTime: Date.now() });
+            setSession({ rId: routine.id, dIdx: dayIndex, exIdx: 0, startTime: Date.now() });
+          },
+          onCoachStart: function () { setOnboardStep(1); },
+          onCoachRoutine: function (routinesReady) { if (!routinesReady) { setShowWelcome(false); setOnboardStep(1); setTab("routines"); } else setOnboardStep(2); },
+          onCoachSkipRoutine: function () { setOnboardStep(2); },
+          onCoachAlumno: function (alumnosReady) { if (!alumnosReady) { setShowWelcome(false); setOnboardStep(2); setTab("alumnos"); setNewAlumnoForm(true); } else setOnboardStep(3); },
+          onCoachSkipAlumno: function () { setOnboardStep(3); },
+          onCoachFinish: function () { setShowWelcome(false); },
         }}
-        onCoachStart={function () { setOnboardStep(1); }}
-        onCoachRoutine={function (routinesReady) { if (!routinesReady) { setShowWelcome(false); setOnboardStep(1); setTab("routines"); } else setOnboardStep(2); }}
-        onCoachSkipRoutine={function () { setOnboardStep(2); }}
-        onCoachAlumno={function (alumnosReady) { if (!alumnosReady) { setShowWelcome(false); setOnboardStep(2); setTab("alumnos"); setNewAlumnoForm(true); } else setOnboardStep(3); }}
-        onCoachSkipAlumno={function () { setOnboardStep(3); }}
-        onCoachFinish={function () { setShowWelcome(false); }}
-      />
-      <StudentProfileModalHost
-          open={profileModalOpen}
-          esAlumno={esAlumno}
-          sessionData={sessionData}
-          profileEdit={profileEdit}
-          setProfileEdit={setProfileEdit}
-          profileFileRef={profileFileRef}
-          bgSub={bgSub}
-          border={border}
-          textMain={textMain}
-          msg={msg}
-          onClose={function () { setProfileModalOpen(false); }}
-          onSave={function () {
+        profileProps={{
+          open: profileModalOpen, esAlumno, sessionData, profileEdit,
+          setProfileEdit, profileFileRef, bgSub, border, textMain, msg,
+          onClose: function () { setProfileModalOpen(false); },
+          onSave: function () {
             try {
               var fullName = [profileEdit.nombre, profileEdit.apellido].filter(Boolean).join(" ").trim() || profileEdit.email || "Atleta";
               var next = { ...sessionData, name: fullName, email: profileEdit.email, phone: profileEdit.phone, avatarUrl: profileEdit.avatarDataUrl || sessionData.avatarUrl };
@@ -3921,42 +3901,30 @@ function GymApp() {
               setProfileModalOpen(false);
               toast2(msg("Perfil guardado ✓", "Profile saved ✓"));
             } catch (err) { toast2("Error"); }
-          }}
-        />
-      {settingsOpen && !esAlumno && sessionData && tab !== "settings" && tab !== "perfil" && (
-        <SettingsPage
-          coach={sessionData}
-          onClose={()=>setSettingsOpen(false)}
-          toast2={toast2}
-          setSessionData={setSessionData}
-          syncStateWithLocalStorage={syncStateWithLocalStorage}
-          lang={lang}
-          setLang={setLang}
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-          es={es}
-          alumnosCount={alumnos.length}
-          rutinasActivasCount={rutinasSBEntrenador.length}
-          sesionesGlobales={sesionesGlobales}
-          sb={sb}
-          entrenadorId={sessionData.entrenadorId || "entrenador_principal"}
-        />
-      )}
-      {settingsOpen && esAlumno && (
-        <AlumnoSettingsModal
-          open={settingsOpen}
-          darkMode={darkMode}
-          lang={lang}
-          msg={msg}
-          es={es}
-          toast2={toast2}
-          onClose={function () { setSettingsOpen(false); }}
-          onToggleDarkMode={function () { var v = !darkMode; setDarkMode(v); localStorage.setItem("it_dark", v ? "true" : "false"); }}
-          onChangeLang={function (code) { setLang(code); localStorage.setItem("it_lang", code); }}
-          onLogoutSettings={function () { setCoachDialog({ t: 'logoutSettings' }); }}
-          RecordatoriosPanel={RecordatoriosPanel}
-        />
-      )}
+          },
+        }}
+        settingsOpen={settingsOpen}
+        esAlumno={esAlumno}
+        sessionData={sessionData}
+        tab={tab}
+        coachSettingsProps={{
+          coach: sessionData,
+          onClose: ()=>setSettingsOpen(false),
+          toast2, setSessionData, syncStateWithLocalStorage,
+          lang, setLang, darkMode, setDarkMode, es,
+          alumnosCount: alumnos.length,
+          rutinasActivasCount: rutinasSBEntrenador.length,
+          sesionesGlobales, sb,
+          entrenadorId: sessionData?.entrenadorId || "entrenador_principal",
+        }}
+        alumnoSettingsProps={{
+          open: settingsOpen, darkMode, lang, msg, es, toast2,
+          onClose: function () { setSettingsOpen(false); },
+          onToggleDarkMode: function () { var v = !darkMode; setDarkMode(v); localStorage.setItem("it_dark", v ? "true" : "false"); },
+          onChangeLang: function (code) { setLang(code); localStorage.setItem("it_lang", code); },
+          onLogoutSettings: function () { setCoachDialog({ t: 'logoutSettings' }); },
+        }}
+      />
       <PRCelebrationOverlay prCelebration={prCelebration} setPrCelebration={setPrCelebration} msg={msg} />
       <WorkoutSessionSummary
         resumenSesion={resumenSesion}
