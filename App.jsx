@@ -92,6 +92,7 @@ import RoutinePdfDownloadButton from './components/student-plan/RoutinePdfDownlo
 import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyProgressCard.jsx';
 import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
 import StudentExerciseSparkline from './components/student-plan/StudentExerciseSparkline.jsx';
+import StudentPlanExerciseRows from './components/student-plan/StudentPlanExerciseRows.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import WorkoutSessionSummary from './components/workout/WorkoutSessionSummary.jsx';
 import AppExerciseModals from './components/AppExerciseModals.jsx';
@@ -3646,64 +3647,29 @@ function GymApp() {
                         success="#22C55E"
                         children={isOpen?(
                           <div style={{paddingTop:4}}>
-                            {(d.warmup||[]).length>0&&(
-                              <div style={{marginTop:12,marginBottom:12}}>
-                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-                                  <span style={{width:3,height:12,borderRadius:2,background:"#F59E0B"}}/>
-                                  <span style={{fontSize:11,fontWeight:700,color:"#F59E0B",letterSpacing:1}}>{msg("ENTRADA EN CALOR", "WARM-UP")}</span>
-                                </div>
-                                {(d.warmup||[]).map(function(ex,ei){
-                                  var inf=allEx.find(function(e){return e.id===ex.id});
-                                  var nombre=resolveExerciseTitle(inf||null,ex,es);
-                                  var vUrl=resolveVideoUrl(inf||null,ex,videoOverrides);
-                                  return(
-                                    <div key={r.id+"-d"+di+"-wu-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:10,padding:"14px 0",borderBottom:ei<(d.warmup||[]).length-1?"1px solid "+border:"none"}}>
-                                      <div style={{width:3,height:20,borderRadius:2,background:"#F59E0B44",flexShrink:0}}/>
-                                      <div style={{flex:1,fontSize:16,fontWeight:700,color:textMain}}>{nombre}</div>
-                                      <span style={{fontSize:13,color:"#A3B4CC",fontWeight:600}}>{ex.sets||"-"}×{ex.reps||"-"}</span>
-                                      <ExerciseVideoPlayButton
-                                        hasVideo={!!vUrl}
-                                        onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:nombre});else window.open(vUrl,"_blank")}}
-                                        ariaLabel={msg("Ver video del ejercicio","View exercise video")}
-                                        ariaLabelDisabled={msg("Video no disponible","No video available")}
-                                      />
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            <div style={{marginBottom:12}}>
-                              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
-                                <span style={{width:3,height:12,borderRadius:2,background:"#2563EB"}}/>
-                                <span style={{fontSize:11,fontWeight:700,color:"#2563EB",letterSpacing:1}}>{msg("BLOQUE PRINCIPAL", "MAIN BLOCK")}</span>
-                              </div>
-                              {d.exercises.map(function(ex,ei){
-                                var inf=allEx.find(function(e){return e.id===ex.id});
-                                var nombre=resolveExerciseTitle(inf||null,ex,es);
+                            <StudentPlanExerciseRows
+                              day={d}
+                              routineId={r.id}
+                              dayIndex={di}
+                              allEx={allEx}
+                              currentWeekForRoutine={currentWeekForRoutine}
+                              border={border}
+                              textMain={textMain}
+                              msg={msg}
+                              es={es}
+                              fmtP={fmtP}
+                              renderExerciseVideoButton={function(inf, ex, nombre){
                                 var vUrl=resolveVideoUrl(inf||null,ex,videoOverrides);
-                                var w=((ex.weeks||[])[currentWeekForRoutine])||{};
-                                var s=w.sets||ex.sets||"-";
-                                var rp=w.reps||ex.reps||"-";
-                                var kg2=w.kg||ex.kg||"";
-                                return(
-                                  <div key={r.id+"-d"+di+"-ex-"+(ex.id||"ex")+"-"+ei} style={{display:"flex",alignItems:"center",gap:10,padding:"16px 0",borderBottom:ei<d.exercises.length-1?"1px solid "+border:"none"}}>
-                                    <div style={{width:3,height:24,borderRadius:2,background:border,flexShrink:0}}/>
-                                    <div style={{flex:1,minWidth:0}}>
-                                      <div style={{fontSize:17,fontWeight:800,color:textMain}}>{nombre}</div>
-                                      <div style={{fontSize:13,color:"#A3B4CC",fontWeight:500,marginTop:2,display:"flex",gap:6,flexWrap:"wrap"}}>
-                                        <span style={{fontWeight:700}}>{s}×{rp}</span>{kg2&&<span>{kg2}kg</span>}{ex.pause&&<span>⏱ {fmtP(ex.pause)}</span>}
-                                      </div>
-                                    </div>
-                                    <ExerciseVideoPlayButton
-                                      hasVideo={!!vUrl}
-                                      onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:nombre});else window.open(vUrl,"_blank")}}
-                                      ariaLabel={msg("Ver video del ejercicio","View exercise video")}
-                                      ariaLabelDisabled={msg("Video no disponible","No video available")}
-                                    />
-                                  </div>
+                                return (
+                                  <ExerciseVideoPlayButton
+                                    hasVideo={!!vUrl}
+                                    onClick={function(){var vid=getYTVideoId(vUrl);if(vid)setVideoModal({videoId:vid,nombre:nombre});else window.open(vUrl,"_blank")}}
+                                    ariaLabel={msg("Ver video del ejercicio","View exercise video")}
+                                    ariaLabelDisabled={msg("Video no disponible","No video available")}
+                                  />
                                 );
-                              })}
-                            </div>
+                              }}
+                            />
                             {/* Botón iniciar/estado del día */}
                             {isDayDone&&(
                               <div style={{textAlign:"center",padding:"8px",color:"#22C55E",fontSize:13,fontWeight:700}}>
