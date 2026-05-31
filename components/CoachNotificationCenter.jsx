@@ -79,6 +79,10 @@ function mapAlertsToNotifications(alertRows) {
     return {
       id: "real-" + a.key,
       category: cat,
+      tipo: a.tipo || null,
+      rutinaId: a.rutinaId != null ? String(a.rutinaId) : null,
+      dayIndex: a.dayIndex != null ? a.dayIndex : null,
+      fecha: a.fecha || null,
       important: important,
       alumnoName: a.name,
       alumnoId: a.alumnoId != null ? String(a.alumnoId) : null,

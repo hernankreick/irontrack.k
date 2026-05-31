@@ -443,10 +443,89 @@ function buildChatMessageAlerts(alumnos, mensajesPendientes, lang, P) {
     .filter(Boolean);
 }
 
+function parseSessionAlertMs(session) {
+  if (!session) return 0;
+  var created = new Date(session.created_at || session.updated_at || 0).getTime();
+  if (created) return created;
+  var rawFecha = String(session.fecha || "").trim();
+  if (!rawFecha) return 0;
+  var parts = rawFecha.split(/[\/-]/);
+  if (parts.length === 3) {
+    var dd = parseInt(parts[0], 10);
+    var mm = parseInt(parts[1], 10);
+    var yyyy = parseInt(parts[2], 10);
+    if (yyyy < 100) yyyy += 2000;
+    var rawHora = String(session.hora || "00:00").trim();
+    var hp = rawHora.split(":");
+    var hh = parseInt(hp[0], 10) || 0;
+    var min = parseInt(hp[1], 10) || 0;
+    var local = new Date(yyyy, Math.max(0, mm - 1), dd, hh, min).getTime();
+    if (local) return local;
+  }
+  return new Date(rawFecha).getTime() || 0;
+}
+
+function buildWorkoutCompletedAlerts(alumnos, sesionesGlobales, lang, P) {
+  if (!Array.isArray(alumnos) || alumnos.length === 0 || !Array.isArray(sesionesGlobales)) return [];
+  var pal = P || coachThemePalette(true);
+  var byAlumno = {};
+  alumnos.forEach(function (a) {
+    if (a && a.id != null) byAlumno[String(a.id)] = a;
+  });
+  var seen = {};
+  return sesionesGlobales
+    .map(function (s) {
+      if (!s || s.alumno_id == null) return null;
+      var alumnoId = String(s.alumno_id);
+      var alumno = byAlumno[alumnoId];
+      if (!alumno) return null;
+      var dayIndex = s.dia_idx != null ? s.dia_idx : null;
+      var rutinaId = s.rutina_id != null ? String(s.rutina_id) : "";
+      var fecha = s.fecha || "";
+      var dedupeKey = [
+        alumnoId,
+        rutinaId || s.rutina_nombre || "",
+        dayIndex != null ? String(dayIndex) : "",
+        s.semana != null ? String(s.semana) : "",
+        fecha,
+      ].join("|");
+      if (seen[dedupeKey]) return null;
+      seen[dedupeKey] = true;
+      var atMs = parseSessionAlertMs(s);
+      var sessionId = s.id != null ? String(s.id) : dedupeKey;
+      var name = coachDisplayName(alumno) || M(lang, "Alumno", "Athlete", "Aluno");
+      return {
+        key: "workout-completed-" + sessionId,
+        tipo: "workout_completed",
+        alumnoId: alumnoId,
+        rutinaId: rutinaId || null,
+        dayIndex: dayIndex,
+        fecha: fecha,
+        initials: coachInitials(alumno),
+        name: name,
+        badge: M(lang, "Entrenamiento completo", "Workout completed", "Treino concluÃ­do"),
+        bc: pal.green,
+        bd: pal.greenDim,
+        desc: name + M(lang, " completÃ³ el entrenamiento.", " completed the workout.", " concluiu o treino."),
+        severity: 1,
+        category: "logro",
+        primaryLabel: M(lang, "VER PERFIL", "VIEW PROFILE", "VER PERFIL"),
+        primaryAction: "review",
+        atMs: atMs || null,
+      };
+    })
+    .filter(Boolean)
+    .sort(function (a, b) {
+      return (b.atMs || 0) - (a.atMs || 0);
+    })
+    .slice(0, 8);
+}
+
 function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, P, currentWeek, mensajesPendientes) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
   var ses = sesionesGlobales || [];
   var out = buildChatMessageAlerts(alumnos, mensajesPendientes, lang, P);
+  out = out.concat(buildWorkoutCompletedAlerts(alumnos, ses, lang, P));
   var now = Date.now();
   var pal = P || coachThemePalette(true);
   alumnos.forEach(function (a) {
