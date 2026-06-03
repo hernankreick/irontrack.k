@@ -17,6 +17,7 @@ import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import GlobalSearch from "./GlobalSearch.jsx";
 import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
+import CoachDashboardAttentionCard from "./coach/CoachDashboardAttentionCard.jsx";
 import { coachType as T, coachSpace as S, coachFirstNameFromFullName } from "./coachUiScale.js";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
@@ -901,6 +902,38 @@ export default function CoachDashboard({
   var dashCardSoft = darkMode ? "#101A2D" : C.cardDark;
   var dashBorder = darkMode ? "rgba(148,163,184,0.16)" : C.brd;
   var dashMuted = darkMode ? "#94A3B8" : C.t2;
+  var attentionItems = [
+    {
+      key: "sin-rutina",
+      Icon: Target,
+      count: sinRutinaCount,
+      color: C.red,
+      cta: M(lang, "Asignar ahora", "Assign now", "Atribuir agora"),
+      onClick: onCrearRutina,
+      title: M(lang, "alumnos sin rutina", "athletes without routine", "alunos sem rotina"),
+      sub: M(lang, "Asignales una rutina para que comiencen", "Assign routines so they can start", "Atribua rotinas para começarem"),
+    },
+    {
+      key: "inactivos",
+      Icon: Clock3,
+      count: inactivosCount,
+      color: C.yel,
+      cta: M(lang, "Enviar mensaje", "Send message", "Enviar mensagem"),
+      onClick: onEnviarMensaje,
+      title: M(lang, "alumnos inactivos", "inactive athletes", "alunos inativos"),
+      sub: M(lang, "Hace más de 21 días sin actividad", "No activity in over 21 days", "Mais de 21 dias sem atividade"),
+    },
+    {
+      key: "baja",
+      Icon: AlertCircle,
+      count: bajaActividadCount,
+      color: C.yel,
+      cta: M(lang, "Ver y revisar", "View and review", "Ver e revisar"),
+      onClick: onRevisarAlumnos,
+      title: M(lang, "alumnos con baja actividad", "athletes with low activity", "alunos com baixa atividade"),
+      sub: M(lang, "Menos del 30% de cumplimiento", "Under 30% compliance", "Menos de 30% de cumprimento"),
+    },
+  ];
 
   return (
     <>
@@ -1057,129 +1090,17 @@ export default function CoachDashboard({
             background: dashBg,
           }}
         >
-          <div
-            className="cd-card"
-            style={{
-              background: dashCard,
-              border: `1px solid ${dashBorder}`,
-              borderRadius: 16,
-              padding: isMobile ? 14 : 18,
-              boxSizing: "border-box",
-              boxShadow: darkMode ? "0 14px 40px rgba(0,0,0,0.18)" : "0 12px 32px rgba(15,23,42,0.06)",
-            }}
-          >
-            <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 14 }}>
-              {M(lang, "ATENCIÓN HOY", "TODAY'S ATTENTION", "ATENÇÃO HOJE")}
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
-                gap: isMobile ? 10 : 14,
-              }}
-            >
-              {[
-                {
-                  key: "sin-rutina",
-                  Icon: Target,
-                  count: sinRutinaCount,
-                  color: C.red,
-                  bg: C.redDim,
-                  cta: M(lang, "Asignar ahora", "Assign now", "Atribuir agora"),
-                  onClick: onCrearRutina,
-                  title: M(lang, "alumnos sin rutina", "athletes without routine", "alunos sem rotina"),
-                  sub: M(lang, "Asignales una rutina para que comiencen", "Assign routines so they can start", "Atribua rotinas para começarem"),
-                },
-                {
-                  key: "inactivos",
-                  Icon: Clock3,
-                  count: inactivosCount,
-                  color: C.yel,
-                  bg: C.yelDim,
-                  cta: M(lang, "Enviar mensaje", "Send message", "Enviar mensagem"),
-                  onClick: onEnviarMensaje,
-                  title: M(lang, "alumnos inactivos", "inactive athletes", "alunos inativos"),
-                  sub: M(lang, "Hace más de 21 días sin actividad", "No activity in over 21 days", "Mais de 21 dias sem atividade"),
-                },
-                {
-                  key: "baja",
-                  Icon: AlertCircle,
-                  count: bajaActividadCount,
-                  color: C.yel,
-                  bg: C.yelDim,
-                  cta: M(lang, "Ver y revisar", "View and review", "Ver e revisar"),
-                  onClick: onRevisarAlumnos,
-                  title: M(lang, "alumnos con baja actividad", "athletes with low activity", "alunos com baixa atividade"),
-                  sub: M(lang, "Menos del 30% de cumplimiento", "Under 30% compliance", "Menos de 30% de cumprimento"),
-                },
-              ].map(function (item) {
-                var Icon = item.Icon;
-                return (
-                  <div
-                    key={item.key}
-                    className="cd-attention-block"
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "44px minmax(0, 1fr)",
-                      gap: 12,
-                      alignItems: "center",
-                      minWidth: 0,
-                      padding: 12,
-                      borderRadius: 13,
-                      border: "1px solid " + dashBorder,
-                      background: dashCardSoft,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 12,
-                        background: "transparent",
-                        border: "1px solid " + dashBorder,
-                        color: item.color,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Icon size={20} color={item.color} strokeWidth={2.25} />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ ...T.bodyLg, color: C.t, fontWeight: 800 }}>
-                        {item.count} {item.title}
-                      </div>
-                      <div style={{ ...T.body, color: C.t2, marginTop: 3 }}>
-                        {item.sub}
-                      </div>
-                      <button
-                        type="button"
-                        className="cd-btn"
-                        style={{
-                          marginTop: 10,
-                          height: 32,
-                          padding: "0 12px",
-                          borderRadius: 8,
-                          border: "1px solid " + dashBorder,
-                          background: "transparent",
-                          color: C.blue,
-                          fontSize: 12,
-                          fontWeight: 800,
-                          cursor: typeof item.onClick === "function" ? "pointer" : "default",
-                        }}
-                        onClick={function () {
-                          if (typeof item.onClick === "function") item.onClick();
-                        }}
-                      >
-                        {item.cta}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <CoachDashboardAttentionCard
+            title={M(lang, "ATENCIÓN HOY", "TODAY'S ATTENTION", "ATENÇÃO HOJE")}
+            items={attentionItems}
+            isMobile={isMobile}
+            dashCard={dashCard}
+            dashBorder={dashBorder}
+            dashCardSoft={dashCardSoft}
+            dashMuted={dashMuted}
+            colors={{ ...C, darkMode: darkMode }}
+            type={T}
+          />
           {isMobile ? (
             <div
               style={{
