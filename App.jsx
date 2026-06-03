@@ -2975,7 +2975,15 @@ function GymApp() {
       alumnoNombre: alum.nombre || alum.email || "Alumno",
     });
   };
+  const handleCoachMensajesLeidos = function (alumnoId) {
+    setMensajesEntrenadorPendientes(function(prev) {
+      return (prev || []).filter(function(m) {
+        return String(m && m.alumno_id) !== String(alumnoId);
+      });
+    });
+  };
   const handleCoachMessagesOpenConversation = function (alumnoId, alumnoNombre) {
+    handleCoachMensajesLeidos(alumnoId);
     setChatModal({
       alumnoId: alumnoId,
       alumnoNombre: alumnoNombre || "Alumno",
@@ -3178,6 +3186,7 @@ function GymApp() {
         sb: sb,
         darkMode: darkMode,
         lang: lang,
+        onMensajesLeidos: handleCoachMensajesLeidos,
         onOpenConversation: handleCoachMessagesOpenConversation,
       },
       mobileDrawerProps: {
@@ -3990,13 +3999,7 @@ function GymApp() {
         textMain={textMain}
         textMuted={textMuted}
         msg={msg}
-        onMensajesLeidos={(alumnoId)=>{
-          setMensajesEntrenadorPendientes(function(prev) {
-            return (prev || []).filter(function(m) {
-              return String(m && m.alumno_id) !== String(alumnoId);
-            });
-          });
-        }}
+        onMensajesLeidos={handleCoachMensajesLeidos}
         onClose={()=>setChatModal(null)}
       />
       <LoginModalHost

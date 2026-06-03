@@ -53,6 +53,7 @@ export default function CoachMessagesMain({
   sb,
   darkMode,
   lang,
+  onMensajesLeidos,
   onOpenConversation,
 }) {
   var C = React.useMemo(function () {
@@ -105,6 +106,9 @@ export default function CoachMessagesMain({
         return r.alumnoId === row.alumnoId ? Object.assign({}, r, { unreadCount: 0 }) : r;
       });
     });
+    if (typeof onMensajesLeidos === "function") {
+      onMensajesLeidos(row.alumnoId);
+    }
     if (typeof onOpenConversation === "function") {
       onOpenConversation(row.alumnoId, row.alumnoNombre);
     }
