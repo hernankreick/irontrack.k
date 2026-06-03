@@ -113,6 +113,7 @@ import AppMainScroll from './components/layout/AppMainScroll.jsx';
 import GlobalBottomNav from './components/layout/GlobalBottomNav.jsx';
 import AppTopBar from './components/layout/AppTopBar.jsx';
 import CoachDesktopShellFrame from './components/layout/CoachDesktopShellFrame.jsx';
+import OfflineSyncBanner from './components/layout/OfflineSyncBanner.jsx';
 import { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
@@ -3225,20 +3226,10 @@ function GymApp() {
 
       <div className="app-inner" style={alumnoFullScreenShell ? {display:"flex",flexDirection:"column",flex:1,minHeight:0} : showCoachDesktopShell ? {display:"flex",flexDirection:"column",minHeight:"100vh",width:"100%",flex:1,maxWidth:"none",margin:0} : undefined}>
       {!isOnline&&(
-        <div style={{
-          background:"#1f1500",borderBottom:"1px solid #F59E0B44",
-          padding:"8px 16px",display:"flex",alignItems:"center",gap:8,
-          fontSize:12,color:"#fbbf24",fontWeight:500,
-          animation:"slideUpFade .3s ease"
-        }}>
-          <div style={{width:7,height:7,borderRadius:"50%",background:"#F59E0B",flexShrink:0}}/>
-          <span>{msg("Sin conexión — sets guardados localmente", "Offline — sets saved locally")}</span>
-          {pendingSync.length>0&&(
-            <span style={{marginLeft:"auto",background:"#F59E0B22",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>
-              {pendingSync.length} pendiente{pendingSync.length>1?"s":""}
-            </span>
-          )}
-        </div>
+        <OfflineSyncBanner
+          message={msg("Sin conexión — sets guardados localmente", "Offline — sets saved locally")}
+          pendingCount={pendingSync.length}
+        />
       )}
       <CoachDesktopShellFrame
         showCoachDesktopShell={showCoachDesktopShell} tab={tab} onNavigate={setTab}
