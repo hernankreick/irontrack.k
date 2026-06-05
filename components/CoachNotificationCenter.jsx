@@ -73,6 +73,9 @@ function mapAlertsToNotifications(alertRows) {
     var important = a.severity <= 1;
     var cat = a.category || (a.severity === 2 ? "seguimiento" : "adherencia");
     var action = a.alumnoId != null ? { kind: "alumno", alumnoId: String(a.alumnoId) } : { kind: "tab", tab: "alumnos" };
+    if (a.tipo === "workout_completed" && a.alumnoId != null) {
+      action = { kind: "profile", alumnoId: String(a.alumnoId) };
+    }
     if (a.primaryAction === "chat" && a.alumnoId != null) {
       action = { kind: "alumno", alumnoId: String(a.alumnoId) };
     }
@@ -132,6 +135,7 @@ export default function CoachNotificationCenter({
   /** Misma forma que devuelve buildCoachAlerts en CoachDashboard */
   alertRows = [],
   onRevisarAlumno,
+  onVerPerfilAlumno,
   onIrAlumnos,
   onIrProgreso,
   /** Opcional: abrir chat con un alumno (p. ej. mensajes entrantes). */
@@ -248,6 +252,10 @@ export default function CoachNotificationCenter({
     }
     var act = item.action;
     if (!act) return;
+    if (act.kind === "profile" && act.alumnoId && typeof onVerPerfilAlumno === "function") {
+      onVerPerfilAlumno(act.alumnoId);
+      return;
+    }
     if (act.kind === "alumno" && act.alumnoId && typeof onRevisarAlumno === "function") {
       onRevisarAlumno(act.alumnoId);
       return;

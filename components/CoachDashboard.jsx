@@ -1041,6 +1041,7 @@ export default function CoachDashboard({
               lang={lang}
               alertRows={coachAlertsReal}
               onRevisarAlumno={onRevisar}
+              onVerPerfilAlumno={onVerPerfil}
               onIrAlumnos={onRevisarAlumnos}
               onIrProgreso={onIrProgreso}
               onAbrirChatAlumno={onAbrirChatAlumno}
