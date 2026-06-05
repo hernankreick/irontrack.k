@@ -153,6 +153,7 @@ export default function CoachNotificationCenter({
 
   var [open, setOpen] = React.useState(false);
   var [filter, setFilter] = React.useState("all");
+  var [bellHover, setBellHover] = React.useState(false);
   var storageKey = React.useMemo(buildReadStorageKey, []);
   var [readIds, setReadIds] = React.useState(function () {
     return loadReadIds(storageKey);
@@ -463,14 +464,20 @@ export default function CoachNotificationCenter({
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={M(lang, "Notificaciones", "Notifications", "Notificações")}
+        onMouseEnter={function () {
+          setBellHover(true);
+        }}
+        onMouseLeave={function () {
+          setBellHover(false);
+        }}
         onClick={function () {
           setOpen(function (v) {
             return !v;
           });
         }}
         style={{
-          background: "#0D1424",
-          border: "none",
+          background: darkMode ? "#0D1424" : bellHover ? "#F1F5F9" : "#F8FAFC",
+          border: darkMode ? "none" : "1px solid " + C.brd,
           borderRadius: 14,
           padding: 10,
           minWidth: 40,
@@ -481,10 +488,11 @@ export default function CoachNotificationCenter({
           boxSizing: "border-box",
           position: "relative",
           cursor: "pointer",
-          transition: "transform 0.15s ease, background 0.2s ease",
+          boxShadow: darkMode ? "none" : "0 1px 2px rgba(15,23,42,0.04)",
+          transition: "transform 0.15s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
         }}
       >
-        <Bell size={20} color={unreadCount > 0 ? "#2563EB" : "#64748b"} strokeWidth={2} />
+        <Bell size={20} color={unreadCount > 0 ? "#2563EB" : darkMode ? "#64748b" : "#334155"} strokeWidth={2} />
         {unreadCount > 0 ? (
           <span
             style={{
