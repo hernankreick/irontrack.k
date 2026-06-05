@@ -735,6 +735,8 @@ export default function CoachDashboard({
   currentWeek = 0,
   /** Nombre del entrenador (session) para saludo e iniciales en la shell. */
   coachName = "",
+  supabase = null,
+  entrenadorId = null,
 }) {
   var C = React.useMemo(
     function () {
@@ -1047,6 +1049,8 @@ export default function CoachDashboard({
               onAbrirChatAlumno={onAbrirChatAlumno}
               useFixedMobilePanel={isMobile}
               darkMode={darkMode}
+              supabase={supabase}
+              entrenadorId={entrenadorId}
             />
             <GlobalCreateMenu
               lang={lang}

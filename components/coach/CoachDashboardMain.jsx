@@ -26,6 +26,8 @@ export default function CoachDashboardMain({
   globalSearchData,
   onGlobalSearchNavigate,
   getAlumnoCategoria,
+  supabase,
+  entrenadorId,
 }) {
   return (
     <CoachDashboard
@@ -53,6 +55,8 @@ export default function CoachDashboardMain({
       globalSearchData={globalSearchData}
       onGlobalSearchNavigate={onGlobalSearchNavigate}
       getAlumnoCategoria={getAlumnoCategoria}
+      supabase={supabase}
+      entrenadorId={entrenadorId}
     />
   );
 }

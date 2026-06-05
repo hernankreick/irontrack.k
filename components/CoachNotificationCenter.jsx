@@ -6,11 +6,15 @@ import { coachThemePalette } from "./coachThemePalette.js";
 
 const LS_READ_LEGACY = "it_coach_notif_read_v1";
 const LS_READ_PREFIX = "irontrack_coach_notif_read_v2";
+const REMOTE_READS_TABLE = "coach_notification_reads";
 
 /** @typedef {{ key: string, alumnoId?: string, name: string, badge: string, desc: string, severity: number }} CoachAlertRow */
 
-function buildReadStorageKey() {
+function buildReadStorageKey(entrenadorId) {
   try {
+    if (entrenadorId != null && String(entrenadorId).trim()) {
+      return LS_READ_PREFIX + "_coach_id_" + encodeURIComponent(String(entrenadorId).trim());
+    }
     if (typeof localStorage === "undefined") return LS_READ_PREFIX + "_anon";
     var raw = localStorage.getItem("it_session");
     if (!raw) return LS_READ_PREFIX + "_anon";
@@ -30,6 +34,22 @@ function buildReadStorageKey() {
   }
 }
 
+function normalizeReadIds(ids) {
+  var seen = {};
+  var out = [];
+  (ids || []).forEach(function (id) {
+    var key = id != null ? String(id) : "";
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    out.push(key);
+  });
+  return out;
+}
+
+function mergeReadIds(a, b) {
+  return normalizeReadIds([].concat(a || [], b || []));
+}
+
 function loadReadIds(storageKey) {
   try {
     var raw = localStorage.getItem(storageKey);
@@ -39,11 +59,12 @@ function loadReadIds(storageKey) {
       if (!legacyRaw) return [];
       var legacyParsed = JSON.parse(legacyRaw);
       if (!Array.isArray(legacyParsed)) return [];
-      localStorage.setItem(storageKey, JSON.stringify(legacyParsed));
-      return legacyParsed;
+      var legacyIds = normalizeReadIds(legacyParsed);
+      localStorage.setItem(storageKey, JSON.stringify(legacyIds));
+      return legacyIds;
     }
     var p = JSON.parse(raw);
-    return Array.isArray(p) ? p : [];
+    return Array.isArray(p) ? normalizeReadIds(p) : [];
   } catch (e) {
     return [];
   }
@@ -51,8 +72,38 @@ function loadReadIds(storageKey) {
 
 function saveReadIds(storageKey, ids) {
   try {
-    localStorage.setItem(storageKey, JSON.stringify(ids));
+    localStorage.setItem(storageKey, JSON.stringify(normalizeReadIds(ids)));
   } catch (e) {}
+}
+
+async function loadRemoteReadIds(supabase, entrenadorId) {
+  if (!supabase || !entrenadorId) return [];
+  var res = await supabase
+    .from(REMOTE_READS_TABLE)
+    .select("notification_id")
+    .eq("entrenador_id", String(entrenadorId));
+  if (res.error) throw res.error;
+  return normalizeReadIds((res.data || []).map(function (row) {
+    return row.notification_id;
+  }));
+}
+
+async function saveRemoteReadIds(supabase, entrenadorId, ids) {
+  var normalized = normalizeReadIds(ids);
+  if (!supabase || !entrenadorId || normalized.length === 0) return false;
+  var now = new Date().toISOString();
+  var rows = normalized.map(function (id) {
+    return {
+      entrenador_id: String(entrenadorId),
+      notification_id: id,
+      read_at: now,
+    };
+  });
+  var res = await supabase
+    .from(REMOTE_READS_TABLE)
+    .upsert(rows, { onConflict: "entrenador_id,notification_id" });
+  if (res.error) throw res.error;
+  return true;
 }
 
 function formatRelative(atMs, lang) {
@@ -143,6 +194,8 @@ export default function CoachNotificationCenter({
   /** Coach mobile: panel anclado a viewport para que no se corte a la izquierda. */
   useFixedMobilePanel = false,
   darkMode = true,
+  supabase = null,
+  entrenadorId = null,
 }) {
   var C = React.useMemo(
     function () {
@@ -154,7 +207,12 @@ export default function CoachNotificationCenter({
   var [open, setOpen] = React.useState(false);
   var [filter, setFilter] = React.useState("all");
   var [bellHover, setBellHover] = React.useState(false);
-  var storageKey = React.useMemo(buildReadStorageKey, []);
+  var storageKey = React.useMemo(
+    function () {
+      return buildReadStorageKey(entrenadorId);
+    },
+    [entrenadorId]
+  );
   var [readIds, setReadIds] = React.useState(function () {
     return loadReadIds(storageKey);
   });
@@ -163,10 +221,46 @@ export default function CoachNotificationCenter({
 
   React.useEffect(
     function () {
-      setReadIds(loadReadIds(storageKey));
+      var cancelled = false;
+      var localIds = loadReadIds(storageKey);
+      setReadIds(localIds);
+      if (!supabase || !entrenadorId) {
+        return undefined;
+      }
+      (async function () {
+        try {
+          var remoteIds = await loadRemoteReadIds(supabase, entrenadorId);
+          if (cancelled) return;
+          var merged = mergeReadIds(localIds, remoteIds);
+          setReadIds(merged);
+          saveReadIds(storageKey, merged);
+          if (merged.length > remoteIds.length) {
+            saveRemoteReadIds(supabase, entrenadorId, merged).catch(function (e) {
+              console.warn("[CoachNotificationCenter] Remote read migration failed", e);
+            });
+          }
+        } catch (e) {
+          if (cancelled) return;
+          console.warn("[CoachNotificationCenter] Supabase read state failed, using localStorage fallback", e);
+          setReadIds(loadReadIds(storageKey));
+        }
+      })();
+      return function () {
+        cancelled = true;
+      };
     },
-    [storageKey]
+    [storageKey, supabase, entrenadorId]
   );
+
+  function persistReadIds(ids) {
+    var next = normalizeReadIds(ids);
+    saveReadIds(storageKey, next);
+    if (supabase && entrenadorId) {
+      saveRemoteReadIds(supabase, entrenadorId, next).catch(function (e) {
+        console.warn("[CoachNotificationCenter] Remote read save failed", e);
+      });
+    }
+  }
 
   var allItems = React.useMemo(
     function () {
@@ -229,7 +323,7 @@ export default function CoachNotificationCenter({
     setReadIds(function (prev) {
       if (prev.indexOf(id) >= 0) return prev;
       var next = prev.concat([id]);
-      saveReadIds(storageKey, next);
+      persistReadIds(next);
       return next;
     });
   }
@@ -239,7 +333,7 @@ export default function CoachNotificationCenter({
       var next = allItems.map(function (x) {
         return x.id;
       });
-      saveReadIds(storageKey, next);
+      persistReadIds(next);
       return next;
     });
   }

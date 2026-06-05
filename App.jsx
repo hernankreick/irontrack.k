@@ -3028,6 +3028,8 @@ function GymApp() {
         globalSearchData: coachGlobalSearchData,
         onGlobalSearchNavigate: coachGlobalSearchNavigate,
         getAlumnoCategoria: coachAlumnoCategoria,
+        supabase: supabase,
+        entrenadorId: supabaseSessionUserId || sessionData?.entrenadorId || null,
       },
       calendarProps: {
         alumnos: alumnosActivosLimpios,
