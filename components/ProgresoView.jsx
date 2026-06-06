@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart2,
-  CheckCircle,
   ChevronDown,
   PieChart,
-  Star,
   TrendingUp,
   Users,
 } from "lucide-react";
 import { buildCoachProgresoModel, getRoutineForAlumno } from "./coachProgresoMetrics.js";
 import { coachType as T, coachSpace as S } from "./coachUiScale.js";
+import ProgressAdherenceCard from "./progreso/ProgressAdherenceCard.jsx";
+import ProgressRecentPrsCard from "./progreso/ProgressRecentPrsCard.jsx";
 import { useIronTrackI18n } from "../contexts/IronTrackI18nContext.jsx";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
@@ -738,149 +738,21 @@ export default function ProgresoView({
             ) : null}
           </div>
 
-          <div
-            style={{
-              background: C.card,
-              border: "1px solid " + C.brd,
-              borderRadius: 12,
-              padding: S.cardPadding,
-              minWidth: 0,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGapLoose }}>
-              <CheckCircle size={16} color={C.green} strokeWidth={2} />
-              <span style={{ ...T.cardTitle, color: C.t }}>
-                {M(lang, "Adherencia al plan", "Plan adherence")}
-              </span>
-            </div>
-            {model.adherenciaRows.length === 0 ? (
-              emptyBox(lang, M(lang, "Ningún alumno tiene rutina asignada", "No athletes with an assigned plan", "Nenhum aluno tem rotina atribuída"), C)
-            ) : (
-              model.adherenciaRows.map(function (row) {
-                return (
-                  <div
-                    key={row.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <div
-                      style={{
-                        ...T.bodySemibold,
-                        color: "#fff",
-                        width: 128,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {row.n}
-                    </div>
-                    <div
-                      style={{
-                        flex: 1,
-                        height: 10,
-                        background: C.brd,
-                        borderRadius: 5,
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: row.p + "%",
-                          height: "100%",
-                          background: row.color,
-                          borderRadius: 5,
-                          transition: "width 0.5s ease",
-                        }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        ...T.bodySemibold,
-                        fontWeight: 700,
-                        width: 40,
-                        textAlign: "right",
-                        fontFamily: "ui-monospace, monospace",
-                        color: row.color,
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
-                      {row.p}%
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <ProgressAdherenceCard
+            rows={model.adherenciaRows}
+            C={C}
+            lang={lang}
+            emptyBox={emptyBox}
+          />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: S.gridGapTight }}>
-          <div
-            style={{
-              background: C.card,
-              border: "1px solid " + C.brd,
-              borderRadius: 12,
-              padding: S.cardPadding,
-              minWidth: 0,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
-              <Star size={16} color={C.yel} strokeWidth={2} />
-              <span style={{ ...T.cardTitle, color: C.t }}>
-                {M(lang, "PRs recientes", "Recent PRs")}
-              </span>
-            </div>
-            {model.prsRecientes.length === 0 ? (
-              emptyBox(lang, M(lang, "Todavía no hay PRs registrados", "No PRs logged yet", "Ainda não há PRs registrados"), C)
-            ) : (
-              model.prsRecientes.slice(0, 4).map(function (row, idx) {
-                var list = model.prsRecientes.slice(0, 4);
-                return (
-                  <div
-                    key={row.initials + row.ex + row.date + idx}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "11px 0",
-                      borderBottom: idx < list.length - 1 ? "1px solid #1e1e2e44" : "none",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        background: row.color + "22",
-                        color: row.color,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {row.initials}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ ...T.bodySemibold, color: C.t }}>{row.n}</div>
-                      <div style={{ ...T.subtitle, color: C.t2, marginTop: 2 }}>{row.ex}</div>
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ ...T.numberStatSm, color: C.green }}>{row.val}</div>
-                      <div style={{ ...T.subtitle, color: C.green, marginTop: 2 }}>{row.delta}</div>
-                      <div style={{ ...T.subtitle, color: C.t2, marginTop: 2 }}>{row.date}</div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <ProgressRecentPrsCard
+            prs={model.prsRecientes}
+            C={C}
+            lang={lang}
+            emptyBox={emptyBox}
+          />
 
           <div
             style={{
