@@ -6,9 +6,7 @@ import {
   Clock3,
   Eye,
   FilePlus,
-  Info,
   MessageSquare,
-  Star,
   Target,
 } from "lucide-react";
 import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
@@ -17,6 +15,7 @@ import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
 import CoachDashboardAttentionCard from "./coach/CoachDashboardAttentionCard.jsx";
 import CoachDesktopPerformanceCard from "./coach/CoachDesktopPerformanceCard.jsx";
+import CoachDesktopWeeklySummaryCard from "./coach/CoachDesktopWeeklySummaryCard.jsx";
 import CoachMobileKpiCard from "./coach/CoachMobileKpiCard.jsx";
 import CoachQuickActions from "./coach/CoachQuickActions.jsx";
 import { coachType as T, coachSpace as S, coachFirstNameFromFullName } from "./coachUiScale.js";
@@ -1201,115 +1200,35 @@ export default function CoachDashboard({
                 alignItems: "stretch",
               }}
             >
-              <div
-                className="cd-card"
-                style={{
-                  background: dashCard,
-                  border: `1px solid ${dashBorder}`,
-                  borderRadius: 16,
-                  padding: 22,
-                  minWidth: 0,
-                  boxSizing: "border-box",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
-                  <Info size={16} color={C.t2} strokeWidth={2} />
-                  <span style={{ ...T.cardTitleSemibold, color: C.t }}>
-                    {M(lang, "Cumplimiento semanal", "Weekly completion", "Cumprimento semanal")}
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 18, flexWrap: "wrap" }}>
-                  <div style={{ ...T.numberHero, color: C.t }}>
-                    {sesionesCompletadas} / {sesionesTotales}
-                  </div>
-                  <div style={{ fontSize: 34, lineHeight: 1, fontWeight: 850, color: C.t }}>
-                    {pctSemana}%
-                  </div>
-                </div>
-                <div style={{ ...T.subtitle, color: C.t2, marginTop: 6 }}>
-                  {M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
-                </div>
-                <div
-                  style={{
-                    marginTop: S.blockGap,
-                    display: "inline-block",
-                    background: deltaSemana >= 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
-                    color: deltaSemana >= 0 ? C.green : C.red,
-                    borderRadius: 99,
-                    padding: "5px 12px",
-                    ...T.bodySemibold,
-                  }}
-                >
-                  {deltaSemana >= 0 ? "+" : ""}{deltaSemana}% {M(lang, "vs semana pasada", "vs last week", "vs semana passada")}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 14,
-                    alignItems: "flex-start",
-                    marginTop: 10,
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{height:10,background:darkMode ? "rgba(148,163,184,0.14)" : C.brd,borderRadius:999,overflow:"hidden",marginBottom:14}}>
-                      <div className="cd-progress-fill" style={{width:pctSemana+"%",height:"100%",background:C.blue,borderRadius:999}} />
-                    </div>
-                    <div style={{background:dashCardSoft,border:"1px solid "+dashBorder,borderRadius:14,padding:"14px 16px",marginBottom:10}}>
-                      <div style={{...T.sectionEyebrow,color:dashMuted,marginBottom:8,letterSpacing:1.4}}>
-                        {M(lang, "Insight del día", "Today's insight", "Insight do dia")}
-                      </div>
-                      <div style={{display:"flex",alignItems:"center",gap:8,...T.bodySemibold,color:pctSemana >= objetivoSemanalPct ? C.green : C.yel}}>
-                        <Star size={16} color={C.blue} strokeWidth={2}/>
-                        {diagnosticoPrincipal}
-                      </div>
-                      <div style={{...T.body,color:C.t2,marginTop:6}}>
-                        {faltanObjetivo > 0
-                          ? M(lang, "Te faltan " + faltanObjetivo + " sesiones para el objetivo", faltanObjetivo + " sessions left for the target", "Faltam " + faltanObjetivo + " sessões para o objetivo")
-                          : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcançado")}
-                      </div>
-                    </div>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                      <button className="cd-btn" type="button" onClick={accionPrincipalHandler} style={{background:C.blue,color:"#fff",border:"none",borderRadius:8,padding:"10px 12px",fontSize:13,fontWeight:800,cursor:"pointer"}}>
-                        {M(lang, "Acción recomendada", "Recommended action", "Ação recomendada")}
-                      </button>
-                      <button className="cd-btn" type="button" onClick={onRevisarAlumnos} style={{background:"transparent",color:C.t,border:"1px solid "+dashBorder,borderRadius:8,padding:"10px 12px",fontSize:13,fontWeight:800,cursor:"pointer"}}>
-                        {M(lang, "Ver equipo", "View team", "Ver equipe")}
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ position: "relative", width: 88, height: 88, flexShrink: 0 }}>
-                    <svg width={88} height={88} viewBox="0 0 80 80" style={{ display: "block" }}>
-                      <circle r={30} cx={40} cy={40} stroke={C.brd} strokeWidth={8} fill="none" />
-                      <circle
-                        r={30}
-                        cx={40}
-                        cy={40}
-                        stroke={C.blue}
-                        strokeWidth={8}
-                        fill="none"
-                        strokeDasharray="188.5"
-                        strokeDashoffset={188.5 * (1 - pctSemana / 100)}
-                        strokeLinecap="round"
-                        transform="rotate(-90 40 40)"
-                      />
-                    </svg>
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        ...T.numberGauge,
-                        color: C.t,
-                        pointerEvents: "none",
-                      }}
-                    >
-                      {pctSemana}%
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <CoachDesktopWeeklySummaryCard
+                title={M(lang, "Cumplimiento semanal", "Weekly completion", "Cumprimento semanal")}
+                completedText={sesionesCompletadas + " / " + sesionesTotales}
+                pctText={pctSemana + "%"}
+                subtitle={M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
+                deltaText={(deltaSemana >= 0 ? "+" : "") + deltaSemana + "% " + M(lang, "vs semana pasada", "vs last week", "vs semana passada")}
+                deltaBg={deltaSemana >= 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)"}
+                deltaColor={deltaSemana >= 0 ? C.green : C.red}
+                progressPct={pctSemana}
+                trackBg={darkMode ? "rgba(148,163,184,0.14)" : C.brd}
+                insightTitle={M(lang, "Insight del día", "Today's insight", "Insight do dia")}
+                insightText={diagnosticoPrincipal}
+                insightColor={pctSemana >= objetivoSemanalPct ? C.green : C.yel}
+                goalText={faltanObjetivo > 0
+                  ? M(lang, "Te faltan " + faltanObjetivo + " sesiones para el objetivo", faltanObjetivo + " sessions left for the target", "Faltam " + faltanObjetivo + " sessões para o objetivo")
+                  : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcançado")}
+                primaryLabel={M(lang, "Acción recomendada", "Recommended action", "Ação recomendada")}
+                secondaryLabel={M(lang, "Ver equipo", "View team", "Ver equipe")}
+                onPrimary={accionPrincipalHandler}
+                onSecondary={onRevisarAlumnos}
+                gaugeOffset={188.5 * (1 - pctSemana / 100)}
+                colors={C}
+                type={T}
+                dashCard={dashCard}
+                dashBorder={dashBorder}
+                dashCardSoft={dashCardSoft}
+                dashMuted={dashMuted}
+                blockGap={S.blockGap}
+              />
 
               <div
                 className="cd-card"
