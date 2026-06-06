@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext, useMemo, createContext } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
+import SettingsSubscriptionTab from './SettingsSubscriptionTab.jsx';
 
 // ── PALETA (alineada con `getTheme` de App.jsx) ─────────────────────────────
 const SettingsPaletteContext = createContext(null);
@@ -635,45 +636,14 @@ function TabSuscripcion({ alumnosCount, rutinasActivasCount, t, lang }) {
   const renewal = new Date(new Date().setMonth(new Date().getMonth() + 1))
     .toLocaleDateString(localeForSettingsDates(lang || 'es'), { day: 'numeric', month: 'short', year: 'numeric' });
 
-  function Bar({ label, current, max, color }) {
-    const pct = max > 0 ? Math.min(100, Math.round((current / max) * 100)) : 0;
-    return (
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 13 }}>
-          <span style={{ color: C.muted }}>{label}</span>
-          <span style={{ color: C.text, fontWeight: 600 }}>{current} / {max}</span>
-        </div>
-        <div style={{ height: 8, background: C.border, borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4, transition: 'width .8s ease' }} />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <SectionTitle>{t.currentPlan}</SectionTitle>
-      <div style={{
-        background: C.subscriptionBanner,
-        border: `1px solid ${C.blue}`, borderRadius: 14, padding: '20px 22px', marginBottom: 20,
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1px', background: C.blue, color: '#fff', display: 'inline-flex', padding: '2px 10px', borderRadius: 20, marginBottom: 10 }}>{t.active}</div>
-        <div style={{ fontSize: 24, fontFamily: 'Bebas Neue, sans-serif', letterSpacing: 2, color: C.text }}>IRONTRACK PRO</div>
-        <div style={{ fontSize: 28, fontFamily: 'DM Mono, monospace', color: C.blueL, marginTop: 4 }}>$29 <span style={{ fontSize: 13, color: C.muted }}>{t.perMonth}</span></div>
-        <div style={{ fontSize: 12, color: C.muted, marginTop: 10 }}>{t.nextRenewal}: {renewal}</div>
-      </div>
-
-      <SectionTitle>{t.planUsage}</SectionTitle>
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '16px 18px', marginBottom: 6 }}>
-        <Bar label={t.athletes} current={alumnosCount || 0} max={50} color={C.blue} />
-        <Bar label={t.activeRoutines} current={rutinasActivasCount || 0} max={40} color={C.blueL} />
-      </div>
-
-      <SectionTitle>{t.billing}</SectionTitle>
-      <Row label={t.paymentMethod} desc={t.paymentMethodDesc}>
-        <button type="button" style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 14px', fontSize: 12, color: C.muted, cursor: 'pointer', fontFamily: 'inherit' }}>{t.update}</button>
-      </Row>
-    </div>
+    <SettingsSubscriptionTab
+      C={C}
+      t={t}
+      renewal={renewal}
+      alumnosCount={alumnosCount}
+      rutinasActivasCount={rutinasActivasCount}
+    />
   );
 }
 
