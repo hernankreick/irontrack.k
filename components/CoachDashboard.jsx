@@ -15,11 +15,8 @@ import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
 import CoachActiveStudentsCard from "./coach/CoachActiveStudentsCard.jsx";
 import CoachDashboardAttentionCard from "./coach/CoachDashboardAttentionCard.jsx";
-import CoachDesktopPerformanceCard from "./coach/CoachDesktopPerformanceCard.jsx";
-import CoachDesktopWeeklySummaryCard from "./coach/CoachDesktopWeeklySummaryCard.jsx";
-import CoachMobileKpiCard from "./coach/CoachMobileKpiCard.jsx";
+import CoachDashboardSummaryGrid from "./coach/CoachDashboardSummaryGrid.jsx";
 import CoachQuickActions from "./coach/CoachQuickActions.jsx";
-import CoachRecommendationCard from "./coach/CoachRecommendationCard.jsx";
 import { coachType as T, coachSpace as S, coachFirstNameFromFullName } from "./coachUiScale.js";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
@@ -1193,123 +1190,90 @@ export default function CoachDashboard({
             colors={{ ...C, darkMode: darkMode }}
             type={T}
           />
-          {isMobile ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: 10,
-                alignItems: "stretch",
-              }}
-            >
-              <CoachRecommendationCard
-                eyebrow={M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL")}
-                title={accionRecomendada}
-                description={diagnosticoPrincipal}
-                impactLabel={M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO")}
-                impactText={impactoEstimado}
-                ctaLabel={accionRecomendada}
-                onAction={accionPrincipalHandler}
-                colors={C}
-                type={T}
-                dashCard={dashCard}
-                dashBorder={dashBorder}
-                dashMuted={dashMuted}
-              />
-
-              <CoachMobileKpiCard
-                label={M(lang, "Esta semana", "This week", "Esta semana")}
-                value={sesionesCompletadas + "/" + sesionesTotales}
-                subtitle={M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
-                progress={pctSemana}
-                accent="#2563EB"
-                colors={C}
-                type={T}
-                blockGap={S.blockGap}
-              />
-              <CoachMobileKpiCard
-                label={M(lang, "Rendimiento", "Performance", "Desempenho")}
-                value={rendimientoScore}
-                suffix="/100"
-                deltaText={"+" + rendimientoDeltaPts + " " + M(lang, "pts vs sem. ant.", "pts vs last wk", "pts vs sem. ant.")}
-                progress={rendimientoScore}
-                accent="#22C55E"
-                colors={C}
-                type={T}
-                blockGap={S.blockGap}
-              />
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 2fr) minmax(240px, 1fr) minmax(240px, 1fr)",
-                gap: S.gridGap,
-                alignItems: "stretch",
-              }}
-            >
-              <CoachDesktopWeeklySummaryCard
-                title={M(lang, "Cumplimiento semanal", "Weekly completion", "Cumprimento semanal")}
-                completedText={sesionesCompletadas + " / " + sesionesTotales}
-                pctText={pctSemana + "%"}
-                subtitle={M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
-                deltaText={(deltaSemana >= 0 ? "+" : "") + deltaSemana + "% " + M(lang, "vs semana pasada", "vs last week", "vs semana passada")}
-                deltaBg={deltaSemana >= 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)"}
-                deltaColor={deltaSemana >= 0 ? C.green : C.red}
-                progressPct={pctSemana}
-                trackBg={darkMode ? "rgba(148,163,184,0.14)" : C.brd}
-                insightTitle={M(lang, "Insight del día", "Today's insight", "Insight do dia")}
-                insightText={diagnosticoPrincipal}
-                insightColor={pctSemana >= objetivoSemanalPct ? C.green : C.yel}
-                goalText={faltanObjetivo > 0
-                  ? M(lang, "Te faltan " + faltanObjetivo + " sesiones para el objetivo", faltanObjetivo + " sessions left for the target", "Faltam " + faltanObjetivo + " sessões para o objetivo")
-                  : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcançado")}
-                primaryLabel={M(lang, "Acción recomendada", "Recommended action", "Ação recomendada")}
-                secondaryLabel={M(lang, "Ver equipo", "View team", "Ver equipe")}
-                onPrimary={accionPrincipalHandler}
-                onSecondary={onRevisarAlumnos}
-                gaugeOffset={188.5 * (1 - pctSemana / 100)}
-                colors={C}
-                type={T}
-                dashCard={dashCard}
-                dashBorder={dashBorder}
-                dashCardSoft={dashCardSoft}
-                dashMuted={dashMuted}
-                blockGap={S.blockGap}
-              />
-
-              <CoachRecommendationCard
-                eyebrow={M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL")}
-                title={accionRecomendada}
-                description={diagnosticoPrincipal}
-                impactLabel={M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO")}
-                impactText={impactoEstimado}
-                ctaLabel={accionRecomendada}
-                onAction={accionPrincipalHandler}
-                colors={C}
-                type={T}
-                dashCard={dashCard}
-                dashBorder={dashBorder}
-                dashMuted={dashMuted}
-              />
-
-              <CoachDesktopPerformanceCard
-                title={M(lang, "Tu rendimiento", "Your performance", "Seu desempenho")}
-                score={rendimientoScore}
-                deltaText={(rendimientoDeltaPts >= 0 ? "+" : "") + rendimientoDeltaPts + " " + M(lang, "pts vs semana pasada", "pts vs last week", "pts vs semana passada")}
-                metrics={[
-                  { label: M(lang, "Sesiones esta semana", "Sessions this week", "Sessões esta semana"), value: sesionesTotales },
-                  { label: M(lang, "Sesiones completadas", "Completed sessions", "Sessões concluídas"), value: sesionesCompletadas },
-                  { label: M(lang, "Racha actual", "Current streak", "Sequência atual"), value: rachaActual + " " + M(lang, "días", "days", "dias") },
-                ]}
-                colors={C}
-                type={T}
-                dashCard={dashCard}
-                dashBorder={dashBorder}
-                blockGap={S.blockGap}
-              />
-            </div>
-          )}
+          <CoachDashboardSummaryGrid
+            isMobile={isMobile}
+            mobileGap={10}
+            desktopGap={S.gridGap}
+            recommendationProps={{
+              eyebrow: M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL"),
+              title: accionRecomendada,
+              description: diagnosticoPrincipal,
+              impactLabel: M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO"),
+              impactText: impactoEstimado,
+              ctaLabel: accionRecomendada,
+              onAction: accionPrincipalHandler,
+              colors: C,
+              type: T,
+              dashCard: dashCard,
+              dashBorder: dashBorder,
+              dashMuted: dashMuted,
+            }}
+            mobileWeekKpiProps={{
+              label: M(lang, "Esta semana", "This week", "Esta semana"),
+              value: sesionesCompletadas + "/" + sesionesTotales,
+              subtitle: M(lang, "sesiones completadas", "sessions completed", "sessões concluídas"),
+              progress: pctSemana,
+              accent: "#2563EB",
+              colors: C,
+              type: T,
+              blockGap: S.blockGap,
+            }}
+            mobilePerformanceKpiProps={{
+              label: M(lang, "Rendimiento", "Performance", "Desempenho"),
+              value: rendimientoScore,
+              suffix: "/100",
+              deltaText: "+" + rendimientoDeltaPts + " " + M(lang, "pts vs sem. ant.", "pts vs last wk", "pts vs sem. ant."),
+              progress: rendimientoScore,
+              accent: "#22C55E",
+              colors: C,
+              type: T,
+              blockGap: S.blockGap,
+            }}
+            desktopWeeklyProps={{
+              title: M(lang, "Cumplimiento semanal", "Weekly completion", "Cumprimento semanal"),
+              completedText: sesionesCompletadas + " / " + sesionesTotales,
+              pctText: pctSemana + "%",
+              subtitle: M(lang, "sesiones completadas", "sessions completed", "sessões concluídas"),
+              deltaText: (deltaSemana >= 0 ? "+" : "") + deltaSemana + "% " + M(lang, "vs semana pasada", "vs last week", "vs semana passada"),
+              deltaBg: deltaSemana >= 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+              deltaColor: deltaSemana >= 0 ? C.green : C.red,
+              progressPct: pctSemana,
+              trackBg: darkMode ? "rgba(148,163,184,0.14)" : C.brd,
+              insightTitle: M(lang, "Insight del día", "Today's insight", "Insight do dia"),
+              insightText: diagnosticoPrincipal,
+              insightColor: pctSemana >= objetivoSemanalPct ? C.green : C.yel,
+              goalText: faltanObjetivo > 0
+                ? M(lang, "Te faltan " + faltanObjetivo + " sesiones para el objetivo", faltanObjetivo + " sessions left for the target", "Faltam " + faltanObjetivo + " sessões para o objetivo")
+                : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcançado"),
+              primaryLabel: M(lang, "Acción recomendada", "Recommended action", "Ação recomendada"),
+              secondaryLabel: M(lang, "Ver equipo", "View team", "Ver equipe"),
+              onPrimary: accionPrincipalHandler,
+              onSecondary: onRevisarAlumnos,
+              gaugeOffset: 188.5 * (1 - pctSemana / 100),
+              colors: C,
+              type: T,
+              dashCard: dashCard,
+              dashBorder: dashBorder,
+              dashCardSoft: dashCardSoft,
+              dashMuted: dashMuted,
+              blockGap: S.blockGap,
+            }}
+            desktopPerformanceProps={{
+              title: M(lang, "Tu rendimiento", "Your performance", "Seu desempenho"),
+              score: rendimientoScore,
+              deltaText: (rendimientoDeltaPts >= 0 ? "+" : "") + rendimientoDeltaPts + " " + M(lang, "pts vs semana pasada", "pts vs last week", "pts vs semana passada"),
+              metrics: [
+                { label: M(lang, "Sesiones esta semana", "Sessions this week", "Sessões esta semana"), value: sesionesTotales },
+                { label: M(lang, "Sesiones completadas", "Completed sessions", "Sessões concluídas"), value: sesionesCompletadas },
+                { label: M(lang, "Racha actual", "Current streak", "Sequência atual"), value: rachaActual + " " + M(lang, "días", "days", "dias") },
+              ],
+              colors: C,
+              type: T,
+              dashCard: dashCard,
+              dashBorder: dashBorder,
+              blockGap: S.blockGap,
+            }}
+          />
 
           <div
             style={{
