@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
+import coachSettingsPalette from './coachSettingsPalette.js';
+import coachUiStrings from './coachUiStrings.js';
 import {
   BtnGroup,
   Input,
@@ -14,60 +16,6 @@ import SettingsProfileSummaryCard from './SettingsProfileSummaryCard.jsx';
 import SettingsShell from './SettingsShell.jsx';
 import SettingsSubscriptionTab from './SettingsSubscriptionTab.jsx';
 
-// ── PALETA (alineada con `getTheme` de App.jsx) ─────────────────────────────
-/** Paleta de la pantalla coach Settings según `darkMode` de la app. */
-function coachSettingsPalette(darkMode) {
-  const dm = darkMode !== false;
-  if (dm) {
-    return {
-      bg: '#0B0E11',
-      card: '#111827',
-      border: '#1A2535',
-      blue: '#2563EB',
-      blueL: '#3B82F6',
-      green: '#22C55E',
-      red: '#EF4444',
-      text: '#F1F5F9',
-      muted: '#64748B',
-      sub: '#94A3B8',
-      chrome: '#0D1117',
-      navActiveBg: '#1D2D50',
-      navInactiveDangerText: '#FCA5A5',
-      currencySelBg: '#1D2D50',
-      proBadgeBg: '#1A2E1A',
-      proBadgeBorder: '#166534',
-      subscriptionBanner: 'linear-gradient(135deg, #1D2D50 0%, #0F1829 100%)',
-      deleteDisabledBg: '#4B1A1A',
-      deleteBtnDisabledFg: '#fff',
-      deleteWarnText: '#FCA5A5',
-      dangerCardBorder: '#4B1A1A',
-    };
-  }
-  return {
-    bg: '#F0F4F8',
-    card: '#FFFFFF',
-    border: '#E2E8F0',
-    blue: '#2563EB',
-    blueL: '#2563EB',
-    green: '#16A34A',
-    red: '#DC2626',
-    text: '#0F1923',
-    muted: '#64748B',
-    sub: '#475569',
-    chrome: '#FFFFFF',
-    navActiveBg: 'rgba(37,99,235,0.12)',
-    navInactiveDangerText: '#B91C1C',
-    currencySelBg: 'rgba(37,99,235,0.12)',
-    proBadgeBg: '#DCFCE7',
-    proBadgeBorder: '#166534',
-    subscriptionBanner: 'linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 100%)',
-    deleteDisabledBg: '#FECACA',
-    deleteBtnDisabledFg: '#991b1b',
-    deleteWarnText: '#B91C1C',
-    dangerCardBorder: '#FECACA',
-  };
-}
-
 const SUPPORTED_LANGS = ['es', 'en', 'pt'];
 
 /** Locale BCP 47 para fechas según idioma de la app. */
@@ -75,145 +23,6 @@ function localeForSettingsDates(lang) {
   if (lang === 'pt') return 'pt-BR';
   if (lang === 'en') return 'en-US';
   return 'es-AR';
-}
-
-/** Textos de la pantalla de configuración coach según idioma (es / en / pt). */
-function coachUiStrings(lang) {
-  const es = lang === 'es';
-  const pt = lang === 'pt';
-  return {
-    settingsHeader: es ? 'Configuración' : pt ? 'Configuração' : 'Settings',
-    coachMode: es ? 'MODO ENTRENADOR' : pt ? 'MODO TREINADOR' : 'COACH MODE',
-    close: es ? 'CERRAR' : pt ? 'FECHAR' : 'CLOSE',
-    sectionLabels: {
-      perfil: es ? 'Perfil' : pt ? 'Perfil' : 'Profile',
-      preferencias: es ? 'Preferencias' : pt ? 'Preferências' : 'Preferences',
-      negocio: es ? 'Negocio' : pt ? 'Negócio' : 'Business',
-      suscripcion: es ? 'Suscripción' : pt ? 'Assinatura' : 'Subscription',
-      notificaciones: es ? 'Notificaciones' : pt ? 'Notificações' : 'Notifications',
-      riesgo: es ? 'Zona de riesgo' : pt ? 'Zona de perigo' : 'Danger zone',
-    },
-    prefs: {
-      appearance: es ? 'Apariencia' : pt ? 'Aparência' : 'Appearance',
-      language: es ? 'Idioma' : pt ? 'Idioma' : 'Language',
-      languageDesc: es ? 'Afecta textos de la app donde aplique' : pt ? 'Afeta os textos do app quando aplicável' : 'Affects in-app text where available',
-      langEs: es ? 'ES Español' : pt ? 'ES Espanhol' : 'ES Spanish',
-      langEn: es ? 'EN Inglés' : pt ? 'EN Inglês' : 'EN English',
-      langPt: es ? 'PT Portugués' : pt ? 'PT Português' : 'PT Portuguese',
-      theme: es ? 'Tema' : pt ? 'Tema' : 'Theme',
-      themeDesc: es ? 'Claro, oscuro o siguiendo al sistema' : pt ? 'Claro, escuro ou seguindo o sistema' : 'Light, dark, or match system',
-      night: es ? 'Noche' : pt ? 'Noite' : 'Night',
-      day: es ? 'Día' : pt ? 'Dia' : 'Day',
-      system: es ? 'Sistema' : pt ? 'Sistema' : 'System',
-      behavior: es ? 'Comportamiento' : pt ? 'Comportamento' : 'Behavior',
-      timezone: es ? 'Zona horaria' : pt ? 'Fuso horário' : 'Time zone',
-      timezoneDesc: es ? 'Referencia para calendarios y recordatorios' : pt ? 'Referência para calendários e lembretes' : 'Reference for calendars and reminders',
-      timezones: [
-        { id: 'America/Argentina/Buenos_Aires', label: es ? 'Buenos Aires (ART)' : pt ? 'Buenos Aires (ART)' : 'Buenos Aires (ART)' },
-        { id: 'America/Santiago', label: es ? 'Santiago (CLT)' : pt ? 'Santiago (CLT)' : 'Santiago (CLT)' },
-        { id: 'America/Lima', label: es ? 'Lima (PET)' : pt ? 'Lima (PET)' : 'Lima (PET)' },
-        { id: 'America/Bogota', label: es ? 'Bogotá (COT)' : pt ? 'Bogotá (COT)' : 'Bogotá (COT)' },
-        { id: 'America/Mexico_City', label: es ? 'Ciudad de México (CST)' : pt ? 'Cidade do México (CST)' : 'Mexico City (CST)' },
-        { id: 'Europe/Madrid', label: es ? 'Madrid (CET)' : pt ? 'Madrid (CET)' : 'Madrid (CET)' },
-      ],
-      saved: es ? 'Guardado ✓' : pt ? 'Salvo ✓' : 'Saved ✓',
-      save: es ? 'GUARDAR' : pt ? 'SALVAR' : 'SAVE',
-      savedBtn: es ? 'GUARDADO ✓' : pt ? 'SALVO ✓' : 'SAVED ✓',
-      toastSaved: es ? 'Preferencias guardadas ✓' : pt ? 'Preferências salvas ✓' : 'Preferences saved ✓',
-    },
-    perfil: {
-      proActive: es ? 'Pro Activo' : pt ? 'Pro Ativo' : 'Pro Active',
-      personal: es ? 'Datos personales' : pt ? 'Dados pessoais' : 'Personal details',
-      fullName: es ? 'Nombre completo' : pt ? 'Nome completo' : 'Full name',
-      fullNamePh: es ? 'Nombre y apellido' : pt ? 'Nome e sobrenome' : 'First and last name',
-      professionalTitle: es ? 'Título profesional' : pt ? 'Título profissional' : 'Professional title',
-      professionalTitlePh: es ? 'Ej: Entrenador · Fuerza' : pt ? 'Ex.: Treinador · Força' : 'e.g. Coach · Strength',
-      email: es ? 'Email' : pt ? 'E-mail' : 'Email',
-      emailPh: es ? 'correo@ejemplo.com' : pt ? 'email@exemplo.com' : 'you@example.com',
-      phone: es ? 'Teléfono' : pt ? 'Telefone' : 'Phone',
-      phonePh: es ? '+54 9 11 ...' : pt ? '+55 ...' : '+1 ...',
-      password: es ? 'Contraseña' : pt ? 'Senha' : 'Password',
-      newPassword: es ? 'Nueva contraseña' : pt ? 'Nova senha' : 'New password',
-      newPasswordPh: es ? 'Mínimo 6 caracteres' : pt ? 'Mínimo 6 caracteres' : 'At least 6 characters',
-      confirmPassword: es ? 'Confirmar contraseña' : pt ? 'Confirmar senha' : 'Confirm password',
-      confirmPasswordPh: es ? 'Repetí la nueva' : pt ? 'Repita a nova senha' : 'Repeat new password',
-      errPassword: es ? 'Error al cambiar contraseña' : pt ? 'Erro ao alterar senha' : 'Could not change password',
-      passwordOk: es ? 'Contraseña actualizada ✓' : pt ? 'Senha atualizada ✓' : 'Password updated ✓',
-      passwordsMismatch: es ? 'Las contraseñas no coinciden' : pt ? 'As senhas não coincidem' : 'Passwords do not match',
-      profileSaved: es ? 'Perfil guardado ✓' : pt ? 'Perfil salvo ✓' : 'Profile saved ✓',
-      saveLabel: es ? 'GUARDAR' : pt ? 'SALVAR' : 'SAVE',
-      saveHint: es ? 'Guardado ✓' : pt ? 'Salvo ✓' : 'Saved ✓',
-      saveDone: es ? 'GUARDADO ✓' : pt ? 'SALVO ✓' : 'SAVED ✓',
-    },
-    negocio: {
-      identity: es ? 'Identidad' : pt ? 'Identidade' : 'Identity',
-      gymName: es ? 'Nombre del gimnasio / marca' : pt ? 'Nome da academia / marca' : 'Gym / brand name',
-      gymNamePh: 'Iron Track Gym',
-      commercialPhone: es ? 'Teléfono comercial' : pt ? 'Telefone comercial' : 'Business phone',
-      commercialPhonePh: es ? '+54 ...' : pt ? '+55 ...' : '+1 ...',
-      operation: es ? 'Operación' : pt ? 'Operação' : 'Operations',
-      maxCapacity: es ? 'Capacidad máxima de alumnos' : pt ? 'Capacidade máxima de alunos' : 'Max athletes capacity',
-      free: es ? 'Libres' : pt ? 'Livres' : 'Free',
-      current: es ? 'Actuales' : pt ? 'Atuais' : 'Current',
-      currency: es ? 'Moneda' : pt ? 'Moeda' : 'Currency',
-      currencyDesc: es ? 'Para montos y reportes' : pt ? 'Para valores e relatórios' : 'For amounts and reports',
-      saved: es ? 'Negocio guardado ✓' : pt ? 'Negócio salvo ✓' : 'Business settings saved ✓',
-      saveLabel: es ? 'GUARDAR' : pt ? 'SALVAR' : 'SAVE',
-      saveHint: es ? 'Guardado ✓' : pt ? 'Salvo ✓' : 'Saved ✓',
-      saveDone: es ? 'GUARDADO ✓' : pt ? 'SALVO ✓' : 'SAVED ✓',
-    },
-    suscripcion: {
-      currentPlan: es ? 'Plan actual' : pt ? 'Plano atual' : 'Current plan',
-      active: es ? 'ACTIVO' : pt ? 'ATIVO' : 'ACTIVE',
-      perMonth: es ? '/ mes' : pt ? '/ mês' : '/ month',
-      nextRenewal: es ? 'Próxima renovación' : pt ? 'Próxima renovação' : 'Next renewal',
-      planUsage: es ? 'Uso del plan' : pt ? 'Uso do plano' : 'Plan usage',
-      athletes: es ? 'Alumnos' : pt ? 'Alunos' : 'Athletes',
-      activeRoutines: es ? 'Rutinas activas' : pt ? 'Rotinas ativas' : 'Active routines',
-      billing: es ? 'Facturación' : pt ? 'Faturamento' : 'Billing',
-      paymentMethod: es ? 'Método de pago' : pt ? 'Método de pagamento' : 'Payment method',
-      paymentMethodDesc: es ? 'Visa •••• 4242 — expira 08/27' : pt ? 'Visa •••• 4242 — expira 08/27' : 'Visa •••• 4242 — exp. 08/27',
-      update: es ? 'Actualizar' : pt ? 'Atualizar' : 'Update',
-    },
-    notificaciones: {
-      control: es ? 'Control' : pt ? 'Controle' : 'Control',
-      activateAll: es ? 'Activar todas' : pt ? 'Ativar todas' : 'Enable all',
-      activateAllDesc: (n, total) =>
-        es ? `${n} de ${total} activas` : pt ? `${n} de ${total} ativas` : `${n} of ${total} on`,
-      byCategory: es ? 'Por categoría' : pt ? 'Por categoria' : 'By category',
-      items: [
-        { id: 'alumno', label: es ? 'Nuevos alumnos' : pt ? 'Novos alunos' : 'New athletes', desc: es ? 'Alta o aceptación de invitación' : pt ? 'Cadastro ou aceite de convite' : 'Signup or invite accepted' },
-        { id: 'mensaje', label: es ? 'Mensajes' : pt ? 'Mensagens' : 'Messages', desc: es ? 'Mensajes nuevos en el chat' : pt ? 'Novas mensagens no chat' : 'New chat messages' },
-        { id: 'sesion', label: es ? 'Sesiones completadas' : pt ? 'Sessões concluídas' : 'Completed sessions', desc: es ? 'Cuando un alumno finaliza entreno' : pt ? 'Quando um aluno termina o treino' : 'When an athlete finishes a workout' },
-        { id: 'rutina', label: es ? 'Cambios en rutinas' : pt ? 'Alterações em rotinas' : 'Routine changes', desc: es ? 'Rutinas asignadas o completadas' : pt ? 'Rotinas atribuídas ou concluídas' : 'Routines assigned or completed' },
-        { id: 'pago', label: es ? 'Pagos y vencimientos' : pt ? 'Pagamentos e vencimentos' : 'Payments & due dates', desc: es ? 'Recordatorios de cuotas' : pt ? 'Lembretes de mensalidades' : 'Fee reminders' },
-        { id: 'sistema', label: es ? 'Sistema' : pt ? 'Sistema' : 'System', desc: es ? 'Actualizaciones de la plataforma' : pt ? 'Atualizações da plataforma' : 'Platform updates' },
-      ],
-    },
-    riesgo: {
-      session: es ? 'Sesión' : pt ? 'Sessão' : 'Session',
-      logOut: es ? 'Cerrar sesión' : pt ? 'Sair' : 'Log out',
-      logOutDesc: es ? 'Salir del dispositivo actual sin borrar datos' : pt ? 'Sair deste dispositivo sem apagar dados' : 'Sign out on this device without erasing data',
-      data: es ? 'Datos' : pt ? 'Dados' : 'Data',
-      exportData: es ? 'Exportar mis datos' : pt ? 'Exportar meus dados' : 'Export my data',
-      exportDataDesc: es ? 'Descargá tus datos en JSON' : pt ? 'Baixe seus dados em JSON' : 'Download your data as JSON',
-      export: es ? 'Exportar' : pt ? 'Exportar' : 'Export',
-      exportOk: es ? 'Exportación lista ✓' : pt ? 'Exportação pronta ✓' : 'Export ready ✓',
-      exportErr: es ? 'Error al exportar' : pt ? 'Erro ao exportar' : 'Export failed',
-      permanentDeletion: es ? 'Eliminación permanente' : pt ? 'Exclusão permanente' : 'Permanent deletion',
-      deleteAccount: es ? 'Eliminar cuenta' : pt ? 'Excluir conta' : 'Delete account',
-      deleteAccountDesc: es ? 'Acción irreversible — borra todos tus datos' : pt ? 'Ação irreversível — apaga todos os seus dados' : 'Irreversible — deletes all your data',
-      deleteAccountBtn: es ? 'Eliminar cuenta' : pt ? 'Excluir conta' : 'Delete account',
-      deleteWord: es ? 'ELIMINAR' : pt ? 'EXCLUIR' : 'DELETE',
-      deleteAccountFinal: es ? 'ELIMINAR CUENTA' : pt ? 'EXCLUIR CONTA' : 'DELETE ACCOUNT',
-      confirmHtml: es
-        ? ['Escribí ', ' para confirmar. Esta acción no se puede deshacer.']
-        : pt
-          ? ['Digite ', ' para confirmar. Esta ação não pode ser desfeita.']
-          : ['Type ', ' to confirm. This action cannot be undone.'],
-      cancel: es ? 'Cancelar' : pt ? 'Cancelar' : 'Cancel',
-    },
-  };
 }
 
 function buildSections(ui) {
