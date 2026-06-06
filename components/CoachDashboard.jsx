@@ -17,6 +17,7 @@ import GlobalSearch from "./GlobalSearch.jsx";
 import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
 import CoachDashboardAttentionCard from "./coach/CoachDashboardAttentionCard.jsx";
+import CoachMobileKpiCard from "./coach/CoachMobileKpiCard.jsx";
 import CoachQuickActions from "./coach/CoachQuickActions.jsx";
 import { coachType as T, coachSpace as S, coachFirstNameFromFullName } from "./coachUiScale.js";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
@@ -1169,105 +1170,27 @@ export default function CoachDashboard({
                 </button>
               </div>
 
-              <div
-                style={{
-                  background: C.mobileStatBg,
-                  border: "1px solid " + C.mobileStatBorder,
-                  borderRadius: 14,
-                  padding: 14,
-                  minWidth: 0,
-                  boxSizing: "border-box",
-                  borderLeft: "3px solid #2563EB",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <span style={{ ...T.labelMd, color: C.mobileStatMuted }}>{M(lang, "Esta semana", "This week", "Esta semana")}</span>
-                <div
-                  style={{
-                    ...T.numberStat,
-                    color: C.mobileStatText,
-                    marginTop: 6,
-                    letterSpacing: -0.02,
-                  }}
-                >
-                  {sesionesCompletadas}/{sesionesTotales}
-                </div>
-                <div style={{ ...T.subtitle, color: C.mobileStatMuted, marginTop: 4 }}>
-                  {M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
-                </div>
-                <div style={{ flex: 1, minHeight: S.blockGap }} />
-                <div
-                  style={{
-                    height: 6,
-                    background: C.mobileTrack,
-                    borderRadius: 3,
-                    overflow: "hidden",
-                    marginTop: S.blockGap,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: pctSemana + "%",
-                      height: "100%",
-                      background: "#2563EB",
-                      borderRadius: 3,
-                    }}
-                  />
-                </div>
-              </div>
-              <div
-                style={{
-                  background: C.mobileStatBg,
-                  border: "1px solid " + C.mobileStatBorder,
-                  borderRadius: 14,
-                  padding: 14,
-                  minWidth: 0,
-                  boxSizing: "border-box",
-                  borderLeft: "3px solid #22C55E",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <span style={{ ...T.labelMd, color: C.mobileStatMuted }}>{M(lang, "Rendimiento", "Performance", "Desempenho")}</span>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
-                  <span style={{ ...T.numberStat, color: C.mobileStatText }}>{rendimientoScore}</span>
-                  <span style={{ ...T.cardTitleSemibold, color: C.mobileStatMuted, fontSize: 15 }}>/100</span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginTop: 6,
-                    ...T.meta,
-                    color: "#22C55E",
-                    fontWeight: 600,
-                  }}
-                >
-                  <ArrowUp size={13} strokeWidth={2.5} />
-                  +{rendimientoDeltaPts} {M(lang, "pts vs sem. ant.", "pts vs last wk", "pts vs sem. ant.")}
-                </div>
-                <div style={{ flex: 1, minHeight: S.blockGap }} />
-                <div
-                  style={{
-                    height: 6,
-                    background: C.mobileTrack,
-                    borderRadius: 3,
-                    overflow: "hidden",
-                    marginTop: S.blockGap,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: rendimientoScore + "%",
-                      height: "100%",
-                      background: "#22C55E",
-                      borderRadius: 3,
-                    }}
-                  />
-                </div>
-              </div>
+              <CoachMobileKpiCard
+                label={M(lang, "Esta semana", "This week", "Esta semana")}
+                value={sesionesCompletadas + "/" + sesionesTotales}
+                subtitle={M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")}
+                progress={pctSemana}
+                accent="#2563EB"
+                colors={C}
+                type={T}
+                blockGap={S.blockGap}
+              />
+              <CoachMobileKpiCard
+                label={M(lang, "Rendimiento", "Performance", "Desempenho")}
+                value={rendimientoScore}
+                suffix="/100"
+                deltaText={"+" + rendimientoDeltaPts + " " + M(lang, "pts vs sem. ant.", "pts vs last wk", "pts vs sem. ant.")}
+                progress={rendimientoScore}
+                accent="#22C55E"
+                colors={C}
+                type={T}
+                blockGap={S.blockGap}
+              />
             </div>
           ) : (
             <div
