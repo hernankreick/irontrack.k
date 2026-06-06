@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext, useMemo, createContext } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
+import SettingsProfileSummaryCard from './SettingsProfileSummaryCard.jsx';
 import SettingsSubscriptionTab from './SettingsSubscriptionTab.jsx';
 
 // ── PALETA (alineada con `getTheme` de App.jsx) ─────────────────────────────
@@ -424,29 +425,13 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
 
   return (
     <div>
-      {/* Avatar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 16,
-        background: C.card, border: `1px solid ${C.border}`,
-        borderRadius: 12, padding: '16px 18px', marginBottom: 20,
-      }}>
-        <div style={{
-          width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
-          background: `linear-gradient(135deg, ${C.blue}, #7C3AED)`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 22, fontWeight: 800, color: '#fff', fontFamily: 'Bebas Neue, sans-serif',
-        }}>{initials(fullName || coach?.name)}</div>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>{fullName || coach?.name}</div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{email || coach?.email}</div>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            background: C.proBadgeBg, border: `1px solid ${C.proBadgeBorder}`,
-            borderRadius: 20, padding: '2px 10px', marginTop: 6,
-            fontSize: 11, fontWeight: 600, color: C.green,
-          }}>{t.proActive}</div>
-        </div>
-      </div>
+      <SettingsProfileSummaryCard
+        C={C}
+        initialsText={initials(fullName || coach?.name)}
+        displayName={fullName || coach?.name}
+        email={email || coach?.email}
+        proActiveLabel={t.proActive}
+      />
 
       <SectionTitle>{t.personal}</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
