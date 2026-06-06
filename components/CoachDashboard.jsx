@@ -18,6 +18,7 @@ import CoachDesktopPerformanceCard from "./coach/CoachDesktopPerformanceCard.jsx
 import CoachDesktopWeeklySummaryCard from "./coach/CoachDesktopWeeklySummaryCard.jsx";
 import CoachMobileKpiCard from "./coach/CoachMobileKpiCard.jsx";
 import CoachQuickActions from "./coach/CoachQuickActions.jsx";
+import CoachRecommendationCard from "./coach/CoachRecommendationCard.jsx";
 import { coachType as T, coachSpace as S, coachFirstNameFromFullName } from "./coachUiScale.js";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
@@ -1115,59 +1116,20 @@ export default function CoachDashboard({
                 alignItems: "stretch",
               }}
             >
-              <div
-                className="cd-card"
-                style={{
-                  background: dashCard,
-                  border: `1px solid ${dashBorder}`,
-                  borderRadius: 16,
-                  padding: 20,
-                  minWidth: 0,
-                  boxSizing: "border-box",
-                  alignSelf: "stretch",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 14 }}>
-                  {M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL")}
-                </div>
-                <div style={{ fontSize: 24, lineHeight: 1.12, fontWeight: 850, color: C.t, letterSpacing: -0.2 }}>
-                  {accionRecomendada}
-                </div>
-                <div style={{ ...T.body, color: dashMuted, marginTop: 10, lineHeight: 1.5 }}>
-                  {diagnosticoPrincipal}
-                </div>
-                <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid " + dashBorder }}>
-                  <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 8 }}>
-                    {M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO")}
-                  </div>
-                  <div style={{ ...T.bodySemibold, color: C.t, lineHeight: 1.45 }}>
-                    {impactoEstimado}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="cd-btn"
-                  style={{
-                    width: "100%",
-                    minHeight: 42,
-                    marginTop: "auto",
-                    border: "none",
-                    borderRadius: 10,
-                    background: C.blue,
-                    color: "#fff",
-                    fontSize: 14,
-                    fontWeight: 850,
-                    cursor: "pointer",
-                  }}
-                  onClick={function () {
-                    if (typeof accionPrincipalHandler === "function") accionPrincipalHandler();
-                  }}
-                >
-                  {accionRecomendada}
-                </button>
-              </div>
+              <CoachRecommendationCard
+                eyebrow={M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL")}
+                title={accionRecomendada}
+                description={diagnosticoPrincipal}
+                impactLabel={M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO")}
+                impactText={impactoEstimado}
+                ctaLabel={accionRecomendada}
+                onAction={accionPrincipalHandler}
+                colors={C}
+                type={T}
+                dashCard={dashCard}
+                dashBorder={dashBorder}
+                dashMuted={dashMuted}
+              />
 
               <CoachMobileKpiCard
                 label={M(lang, "Esta semana", "This week", "Esta semana")}
@@ -1230,59 +1192,20 @@ export default function CoachDashboard({
                 blockGap={S.blockGap}
               />
 
-              <div
-                className="cd-card"
-                style={{
-                  background: dashCard,
-                  border: `1px solid ${dashBorder}`,
-                  borderRadius: 16,
-                  padding: 20,
-                  minWidth: 0,
-                  boxSizing: "border-box",
-                  alignSelf: "stretch",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 14 }}>
-                  {M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL")}
-                </div>
-                <div style={{ fontSize: 24, lineHeight: 1.12, fontWeight: 850, color: C.t, letterSpacing: -0.2 }}>
-                  {accionRecomendada}
-                </div>
-                <div style={{ ...T.body, color: dashMuted, marginTop: 10, lineHeight: 1.5 }}>
-                  {diagnosticoPrincipal}
-                </div>
-                <div style={{ marginTop: 22, paddingTop: 16, borderTop: "1px solid " + dashBorder }}>
-                  <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 8 }}>
-                    {M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO")}
-                  </div>
-                  <div style={{ ...T.bodySemibold, color: C.t, lineHeight: 1.45 }}>
-                    {impactoEstimado}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="cd-btn"
-                  style={{
-                    width: "100%",
-                    minHeight: 42,
-                    marginTop: "auto",
-                    border: "none",
-                    borderRadius: 10,
-                    background: C.blue,
-                    color: "#fff",
-                    fontSize: 14,
-                    fontWeight: 850,
-                    cursor: "pointer",
-                  }}
-                  onClick={function () {
-                    if (typeof accionPrincipalHandler === "function") accionPrincipalHandler();
-                  }}
-                >
-                  {accionRecomendada}
-                </button>
-              </div>
+              <CoachRecommendationCard
+                eyebrow={M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL")}
+                title={accionRecomendada}
+                description={diagnosticoPrincipal}
+                impactLabel={M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO")}
+                impactText={impactoEstimado}
+                ctaLabel={accionRecomendada}
+                onAction={accionPrincipalHandler}
+                colors={C}
+                type={T}
+                dashCard={dashCard}
+                dashBorder={dashBorder}
+                dashMuted={dashMuted}
+              />
 
               <CoachDesktopPerformanceCard
                 title={M(lang, "Tu rendimiento", "Your performance", "Seu desempenho")}
