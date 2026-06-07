@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Save, Pencil, MoreVertical, ChevronDown, ClipboardList } from 'lucide-react';
+import { Pencil, MoreVertical, ChevronDown, ClipboardList } from 'lucide-react';
 import { Ic } from '../Ic.jsx';
 import { DaySection } from '../DaySection.jsx';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
 import { coachType as T, coachSpace as S } from '../coachUiScale.js';
 import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
+import RoutineCardActionMenu from './RoutineCardActionMenu.jsx';
 import RoutineDeleteConfirmModals from './RoutineDeleteConfirmModals.jsx';
 import './routines-ui.css';
 
@@ -397,21 +398,6 @@ export function RoutineCard({
 
   const bgHeader = darkMode ? '#111C2B' : '#EEF2F7';
 
-  const ghostBtn = () => ({
-    background: 'transparent',
-    border: `1px solid ${border}`,
-    borderRadius: 8,
-    padding: '7px 9px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: textMuted,
-    minWidth: 36,
-    minHeight: 36,
-    transition: 'background .15s, border-color .15s, color .15s',
-  });
-
   const openEditRoutine = useCallback(
     function () {
       setMenuOpen(false);
@@ -448,6 +434,21 @@ export function RoutineCard({
     setAssignRoutineId(copia.id);
     toast2(M(lang, 'Rutina duplicada', 'Routine duplicated', 'Rotina duplicada') + ' ✓');
   };
+
+  function requestDeleteRoutine() {
+    setMenuOpen(false);
+    var onServer =
+      !!r.saved ||
+      (Array.isArray(rutinasSBEntrenador) &&
+        rutinasSBEntrenador.some(function (rs) {
+          return rs && String(rs.id) === String(r.id);
+        }));
+    setDeleteRoutineTarget({
+      id: r.id,
+      name: String(nombreLocal || r.name || '').trim() || null,
+      saved: onServer,
+    });
+  }
 
   function runDeleteDay() {
     if (!pendingDeleteDay) return;
@@ -681,153 +682,30 @@ export function RoutineCard({
           </div>
 
           <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'flex-start' }}>
-            <div ref={menuRef} style={{ position: 'relative' }}>
-              <button
-                type="button"
-                className="it-routine-btn hov"
-                style={ghostBtn()}
-                aria-expanded={menuOpen}
-                aria-haspopup="true"
-                onClick={() => setMenuOpen((o) => !o)}
-                title={M(lang, 'Más acciones', 'More actions', 'Mais ações')}
-              >
-                <MoreVertical size={18} color={textMuted} />
-              </button>
-            </div>
-            {menuOpen && menuPopCoords && typeof document !== 'undefined' &&
-              createPortal(
-                <div
-                  ref={menuDropdownRef}
-                  className="it-routine-menu-pop is-open it-routine-menu-pop--portal"
-                  style={{
-                    position: 'fixed',
-                    top: menuPopCoords.top,
-                    left: menuPopCoords.left,
-                    width: menuPopCoords.width,
-                    minWidth: menuPopCoords.width,
-                    background: darkMode ? '#0f172a' : '#fff',
-                    border: `1px solid ${border}`,
-                    borderRadius: 10,
-                    boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
-                    padding: 4,
-                    zIndex: 100,
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="it-routine-menu-item hov"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      border: 'none',
-                      borderRadius: 8,
-                      background: 'transparent',
-                      color: textMain,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                    onClick={openEditRoutine}
-                  >
-                    <ClipboardList size={14} color={textMuted} />
-                    {M(lang, 'Editar rutina', 'Edit routine', 'Editar rotina')}
-                  </button>
-                  <button
-                    type="button"
-                    className="it-routine-menu-item hov"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      border: 'none',
-                      borderRadius: 8,
-                      background: 'transparent',
-                      color: textMain,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setEditandoNombre(true);
-                    }}
-                  >
-                    <Pencil size={14} color={textMuted} />
-                    {M(lang, 'Editar nombre', 'Edit name', 'Editar nome')}
-                  </button>
-                  <button
-                    type="button"
-                    className="it-routine-menu-item hov"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      border: 'none',
-                      borderRadius: 8,
-                      background: 'transparent',
-                      color: textMain,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                    onClick={duplicateRoutine}
-                  >
-                    <Ic name="copy" size={14} color={textMuted} />
-                    {M(lang, 'Duplicar rutina', 'Duplicate routine', 'Duplicar rotina')}
-                  </button>
-                  <button
-                    type="button"
-                    className="it-routine-menu-item it-routine-menu-item--danger hov"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      border: 'none',
-                      borderRadius: 8,
-                      background: 'transparent',
-                      color: '#f87171',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      var onServer =
-                        !!r.saved ||
-                        (Array.isArray(rutinasSBEntrenador) &&
-                          rutinasSBEntrenador.some(function (rs) {
-                            return rs && String(rs.id) === String(r.id);
-                          }));
-                      setDeleteRoutineTarget({
-                        id: r.id,
-                        name: String(nombreLocal || r.name || '').trim() || null,
-                        saved: onServer,
-                      });
-                    }}
-                  >
-                    <Ic name="trash-2" size={14} color="#f87171" />
-                    {M(lang, 'Eliminar rutina', 'Delete routine', 'Excluir rotina')}
-                  </button>
-                </div>,
-                document.body
-              )}
+            <RoutineCardActionMenu
+              menuOpen={menuOpen}
+              menuPopCoords={menuPopCoords}
+              menuRef={menuRef}
+              menuDropdownRef={menuDropdownRef}
+              darkMode={darkMode}
+              border={border}
+              textMain={textMain}
+              textMuted={textMuted}
+              lang={lang}
+              M={M}
+              Ic={Ic}
+              MoreVertical={MoreVertical}
+              Pencil={Pencil}
+              ClipboardList={ClipboardList}
+              onToggleMenu={() => setMenuOpen((o) => !o)}
+              onEditRoutine={openEditRoutine}
+              onEditName={() => {
+                setMenuOpen(false);
+                setEditandoNombre(true);
+              }}
+              onDuplicate={duplicateRoutine}
+              onRequestDelete={requestDeleteRoutine}
+            />
 
             <button
               type="button"
