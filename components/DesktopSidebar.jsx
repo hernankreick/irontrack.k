@@ -17,6 +17,7 @@ import {
 import { desktopSidebarTheme } from "./coachThemePalette.js";
 import { coachInitialsFromFullName } from "./coachUiScale.js";
 import DesktopSidebarNavItem from "./layout/DesktopSidebarNavItem.jsx";
+import DesktopSidebarProfileRow from "./layout/DesktopSidebarProfileRow.jsx";
 
 const LS_KEY = "irontrack_desktop_sidebar_collapsed";
 
@@ -353,73 +354,18 @@ export default function DesktopSidebar({
           <Settings size={20} strokeWidth={2} style={{ flexShrink: 0 }} color={activeTab === "settings" ? DS.primaryLight : undefined} />
           {!collapsed ? <span>{footerLabels.settings}</span> : null}
         </button>
-        <button
-          type="button"
-          title={collapsed ? footerLabels.perfil : undefined}
+        <DesktopSidebarProfileRow
+          coachAvatarUrl={coachAvatarUrl}
+          coachName={coachName}
+          coachInitials={coachInitialsFromFullName(coachName)}
+          collapsed={collapsed}
+          label={footerLabels.perfil}
+          active={activeTab === "perfil"}
+          DS={DS}
           onClick={function () {
             if (typeof onPerfil === "function") onPerfil();
           }}
-          style={Object.assign(getRowButtonStyle({ collapsed: collapsed }), {
-            background: activeTab === "perfil" ? DS.activeBg : "transparent",
-            color: activeTab === "perfil" ? DS.text : DS.muted,
-            fontWeight: activeTab === "perfil" ? 600 : 500,
-            boxShadow: activeTab === "perfil" ? "inset 0 0 0 1px rgba(59,130,246,0.25)" : "none",
-            transition: "background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
-            position: "relative",
-          })}
-          onMouseEnter={function (e) {
-            if (activeTab !== "perfil") {
-              e.currentTarget.style.background = DS.hover;
-              e.currentTarget.style.color = DS.text;
-            }
-          }}
-          onMouseLeave={function (e) {
-            if (activeTab !== "perfil") {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = DS.muted;
-            } else {
-              e.currentTarget.style.background = DS.activeBg;
-              e.currentTarget.style.color = DS.text;
-            }
-          }}
-        >
-          {activeTab === "perfil" ? (
-            <span
-              style={{
-                position: "absolute",
-                left: -12,
-                top: "50%",
-                width: 3,
-                height: 22,
-                marginTop: -11,
-                borderRadius: "0 4px 4px 0",
-                background: DS.primary,
-              }}
-            />
-          ) : null}
-          {coachAvatarUrl ? (
-            <img src={coachAvatarUrl} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-          ) : (
-            <div
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg,#1e3a5f,#2563eb)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 800,
-                fontSize: 10,
-                color: "#fff",
-                flexShrink: 0,
-              }}
-            >
-              {coachInitialsFromFullName(coachName)}
-            </div>
-          )}
-          {!collapsed ? <span>{footerLabels.perfil}</span> : null}
-        </button>
+        />
         {typeof onLogout === "function" ? (
           <button
             type="button"
