@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Save, Pencil, MoreVertical, ChevronDown, ClipboardList } from 'lucide-react';
-import { DeleteConfirmModal } from '../DeleteConfirmModal.jsx';
 import { Ic } from '../Ic.jsx';
 import { DaySection } from '../DaySection.jsx';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
 import { coachType as T, coachSpace as S } from '../coachUiScale.js';
 import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
+import RoutineDeleteConfirmModals from './RoutineDeleteConfirmModals.jsx';
 import './routines-ui.css';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -1226,49 +1226,16 @@ export function RoutineCard({
           document.body
         )}
 
-      <DeleteConfirmModal
-        open={!!deleteRoutineTarget}
-        zIndex={10000}
-        tone="danger"
-        onCancel={function () {
-          if (deleteRoutineSubmitting) return;
-          setDeleteRoutineTarget(null);
-        }}
-        onConfirm={function () {
-          void confirmDeleteRoutine();
-        }}
-        title={M(lang, 'Eliminar rutina', 'Delete routine', 'Excluir rotina')}
-        message={M(
-          lang,
-          'Esta acción no se puede deshacer. La rutina se eliminará definitivamente.',
-          'This action cannot be undone. The routine will be permanently deleted.',
-          'Esta ação não pode ser desfeita. A rotina será excluída permanentemente.'
-        )}
-        subjectName={deleteRoutineTarget && deleteRoutineTarget.name}
-        confirmLabel={M(lang, 'Eliminar', 'Delete', 'Excluir')}
-        cancelLabel={M(lang, 'Cancelar', 'Cancel', 'Cancelar')}
-        loading={deleteRoutineSubmitting}
-        loadingLabel={M(lang, 'Eliminando…', 'Deleting…', 'Excluindo…')}
-      />
-
-      <DeleteConfirmModal
-        open={!!pendingDeleteDay}
-        zIndex={10000}
-        tone="danger"
-        onCancel={function () {
-          setPendingDeleteDay(null);
-        }}
-        onConfirm={runDeleteDay}
-        title={M(lang, 'Eliminar día', 'Delete day', 'Excluir dia')}
-        message={M(
-          lang,
-          'Esta acción no se puede deshacer. El día se quitará de la rutina.',
-          'This action cannot be undone. The day will be removed from the routine.',
-          'Esta ação não pode ser desfeita. O dia será removido da rotina.'
-        )}
-        subjectName={pendingDeleteDay ? pendingDeleteDay.dayLabel : ''}
-        confirmLabel={M(lang, 'Eliminar', 'Delete', 'Excluir')}
-        cancelLabel={M(lang, 'Cancelar', 'Cancel', 'Cancelar')}
+      <RoutineDeleteConfirmModals
+        deleteRoutineTarget={deleteRoutineTarget}
+        deleteRoutineSubmitting={deleteRoutineSubmitting}
+        pendingDeleteDay={pendingDeleteDay}
+        confirmDeleteRoutine={confirmDeleteRoutine}
+        setDeleteRoutineTarget={setDeleteRoutineTarget}
+        runDeleteDay={runDeleteDay}
+        setPendingDeleteDay={setPendingDeleteDay}
+        M={M}
+        lang={lang}
       />
     </div>
   );
