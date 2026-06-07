@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardList, Dumbbell, FileText, Search, Users } from "lucide-react";
 import { globalSearchTheme } from "./coachThemePalette.js";
+import GlobalSearchKeyboardHint from "./search/GlobalSearchKeyboardHint.jsx";
 
 const FILTERS = [
   { id: "todo", label: "Todo" },
@@ -605,56 +606,7 @@ export default function GlobalSearch({
             })
           )}
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              padding: "8px 12px",
-              borderTop: "1px solid " + th.footerBorder,
-              fontSize: 11,
-              color: th.sectionLabel,
-              fontFamily: "'DM Sans',sans-serif",
-            }}
-          >
-            <kbd
-              style={{
-                background: th.kbdBg,
-                border: "1px solid " + th.kbdBorder,
-                borderRadius: 4,
-                padding: "2px 6px",
-                fontSize: 10,
-                fontFamily: "'DM Mono',monospace",
-              }}
-            >
-              ↑↓
-            </kbd>
-            <kbd
-              style={{
-                background: th.kbdBg,
-                border: "1px solid " + th.kbdBorder,
-                borderRadius: 4,
-                padding: "2px 6px",
-                fontSize: 10,
-                fontFamily: "'DM Mono',monospace",
-              }}
-            >
-              ↵
-            </kbd>
-            <kbd
-              style={{
-                background: th.kbdBg,
-                border: "1px solid " + th.kbdBorder,
-                borderRadius: 4,
-                padding: "2px 6px",
-                fontSize: 10,
-                fontFamily: "'DM Mono',monospace",
-              }}
-            >
-              Esc
-            </kbd>
-          </div>
+          <GlobalSearchKeyboardHint th={th} />
         </div>
       ) : null}
     </div>
