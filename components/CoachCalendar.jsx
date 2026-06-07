@@ -1,6 +1,7 @@
 import React from "react";
 import { CalendarDays, ChevronDown, Search, Trash2, X } from "lucide-react";
 import { irontrackMsg as M } from "../lib/irontrackMsg.js";
+import CoachCalendarAssignmentRow from "./calendar/CoachCalendarAssignmentRow.jsx";
 
 const LS_KEY = "it_calendar_assignments_v1";
 const MONTH_NAMES_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -413,15 +414,15 @@ export default function CoachCalendar({
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {selectedAssignments.map(function (item) {
                       return (
-                        <div key={item.id} style={{ background: P.card, border: "1px solid " + P.border, borderRadius: 16, padding: 12, display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ color: P.text, fontSize: 15, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.alumno_nombre}</div>
-                            <div style={{ color: P.muted, fontSize: 13, fontWeight: 700, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.rutina_nombre}</div>
-                          </div>
-                          <button type="button" className="hov" onClick={function () { deleteAssignment(item.id); }} style={{ width: 38, height: 38, borderRadius: 12, border: "none", background: "rgba(239,68,68,0.12)", color: P.danger, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }} aria-label={M(lang, "Eliminar", "Delete", "Excluir")}>
-                            <Trash2 size={17} />
-                          </button>
-                        </div>
+                        <CoachCalendarAssignmentRow
+                          key={item.id}
+                          item={item}
+                          P={P}
+                          Trash2={Trash2}
+                          M={M}
+                          lang={lang}
+                          onDelete={function () { deleteAssignment(item.id); }}
+                        />
                       );
                     })}
                   </div>
