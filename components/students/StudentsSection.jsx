@@ -5,6 +5,7 @@ import { getRutinaAlumnoId } from '../../lib/routineStore.js';
 import { getActiveStudentRoutinePosition } from '../../lib/studentWeeklyProgress.js';
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
+import StudentsSectionStates from './StudentsSectionStates.jsx';
 
 export default function StudentsSection(props) {
   const {
@@ -22,6 +23,17 @@ export default function StudentsSection(props) {
   const assignedRoutineFor = typeof getRutinaAsignadaAlumno === "function"
     ? getRutinaAsignadaAlumno
     : function () { return null; };
+  const studentsStateProps = {
+    loadingSB,
+    alumnosLength: alumnos.length,
+    filteredLength: coachAlumnosListaFiltrada.length,
+    bgCard,
+    border,
+    textMuted,
+    textMain,
+    msg,
+    Ic,
+  };
   const sesionesForAlumno = React.useCallback(function (a) {
     var aid = String(a && a.id != null ? a.id : a);
     var byGlobal = (sesionesGlobales || []).filter(function (s) {
@@ -164,36 +176,13 @@ export default function StudentsSection(props) {
             )}
 
             {loadingSB&&(
-              <div>
-                {[1,2,3].map(i=>(
-                  <div key={"alumno-list-skel-"+i} style={{background:bgCard,borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid "+border}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                      <div style={{flex:1}}>
-                        <div className="sk" style={{height:16,width:"55%",marginBottom:8}}/>
-                        <div className="sk" style={{height:12,width:"35%"}}/>
-                      </div>
-                      <div style={{display:"flex",gap:8}}>
-                        <div className="sk" style={{width:32,height:32,borderRadius:8}}/>
-                        <div className="sk" style={{width:52,height:32,borderRadius:8}}/>
-                        <div className="sk" style={{width:32,height:32,borderRadius:8}}/>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <StudentsSectionStates {...studentsStateProps} />
             )}
             {alumnos.length===0&&!loadingSB&&(
-              <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
-                <div style={{fontSize:36,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                  <Ic name="users" size={34} color={textMuted}/>
-                </div>
-                <div style={{fontSize:15,fontWeight:700,color:textMain}}>{msg("Sin alumnos aún", "No athletes yet")}</div>
-              </div>
+              <StudentsSectionStates {...studentsStateProps} />
             )}
             {alumnos.length>0 && coachAlumnosListaFiltrada.length===0 && !loadingSB && (
-              <div style={{textAlign:"center",padding:"24px 12px",color:textMuted,fontSize:15,fontWeight:600}}>
-                {msg("No hay alumnos que coincidan con la búsqueda o el filtro.", "No athletes match your search or filter.")}
-              </div>
+              <StudentsSectionStates {...studentsStateProps} />
             )}
 
             {coachAlumnosListaFiltrada.map(a=>{
