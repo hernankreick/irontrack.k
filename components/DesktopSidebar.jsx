@@ -18,6 +18,7 @@ import { desktopSidebarTheme } from "./coachThemePalette.js";
 import { coachInitialsFromFullName } from "./coachUiScale.js";
 import DesktopSidebarNavItem from "./layout/DesktopSidebarNavItem.jsx";
 import DesktopSidebarProfileRow from "./layout/DesktopSidebarProfileRow.jsx";
+import DesktopSidebarSettingsRow from "./layout/DesktopSidebarSettingsRow.jsx";
 
 const LS_KEY = "irontrack_desktop_sidebar_collapsed";
 
@@ -307,53 +308,17 @@ export default function DesktopSidebar({
           boxSizing: "border-box",
         }}
       >
-        <button
-          type="button"
-          title={collapsed ? footerLabels.settings : undefined}
+        <DesktopSidebarSettingsRow
+          collapsed={collapsed}
+          label={footerLabels.settings}
+          active={activeTab === "settings"}
+          DS={DS}
+          getRowButtonStyle={getRowButtonStyle}
+          Settings={Settings}
           onClick={function () {
             if (typeof onSettings === "function") onSettings();
           }}
-          style={Object.assign(getRowButtonStyle({ collapsed: collapsed }), {
-            background: activeTab === "settings" ? DS.activeBg : "transparent",
-            color: activeTab === "settings" ? DS.text : DS.muted,
-            fontWeight: activeTab === "settings" ? 600 : 500,
-            boxShadow: activeTab === "settings" ? "inset 0 0 0 1px rgba(59,130,246,0.25)" : "none",
-            transition: "background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease",
-            position: "relative",
-          })}
-          onMouseEnter={function (e) {
-            if (activeTab !== "settings") {
-              e.currentTarget.style.background = DS.hover;
-              e.currentTarget.style.color = DS.text;
-            }
-          }}
-          onMouseLeave={function (e) {
-            if (activeTab !== "settings") {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = DS.muted;
-            } else {
-              e.currentTarget.style.background = DS.activeBg;
-              e.currentTarget.style.color = DS.text;
-            }
-          }}
-        >
-          {activeTab === "settings" ? (
-            <span
-              style={{
-                position: "absolute",
-                left: -12,
-                top: "50%",
-                width: 3,
-                height: 22,
-                marginTop: -11,
-                borderRadius: "0 4px 4px 0",
-                background: DS.primary,
-              }}
-            />
-          ) : null}
-          <Settings size={20} strokeWidth={2} style={{ flexShrink: 0 }} color={activeTab === "settings" ? DS.primaryLight : undefined} />
-          {!collapsed ? <span>{footerLabels.settings}</span> : null}
-        </button>
+        />
         <DesktopSidebarProfileRow
           coachAvatarUrl={coachAvatarUrl}
           coachName={coachName}
