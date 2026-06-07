@@ -1,6 +1,7 @@
 import React from 'react';
 import { Ic } from './Ic.jsx';
 import { ExerciseVideoPlayButton } from './ExerciseVideoPlayButton.jsx';
+import { WorkoutExerciseCompletedState } from './workout/WorkoutExerciseCompletedState.jsx';
 import { WorkoutTodaySetsList } from './workout/WorkoutTodaySetsList.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
@@ -169,6 +170,7 @@ export function WorkoutExercisePanel(props) {
 
   const displayName = resolveExerciseTitle(info, ex, es);
   const videoUrlResolved = resolveVideoUrl(info, ex, videoOverrides);
+  const completedVolumeText = setsHoy.length + " sets · " + calculateSetsVolume(setsHoy).toLocaleString() + " kg";
 
   const handleLogSet = () => {
     if(!canLogWorkoutSet(validationExercise, kg, reps)) return;
@@ -477,26 +479,17 @@ export function WorkoutExercisePanel(props) {
         </div>
         </div>
       ):(
-        /* Ejercicio completado */
-        <div style={{background:"#22c55e15",border:"1px solid #22c55e33",borderRadius:12,
-          padding:"16px",marginBottom:12,textAlign:"center"}}>
-          <div style={{fontSize:36,marginBottom:4}}><Ic name="check-circle" size={22} color="#22C55E"/></div>
-          <div style={{fontSize:18,fontWeight:900,color:"#22C55E"}}>
-            {es?"Ejercicio completado":"Exercise complete"}
-          </div>
-          <div style={{fontSize:13,color:textMuted,marginTop:4}}>
-            {hasSuggestedLoad
-              ? setsHoy.length + " sets · " + calculateSetsVolume(setsHoy).toLocaleString() + " kg"
-              : setsHoy.length + " sets"}
-          </div>
-          {activeExIdx<exercises.length-1&&(
-            <button className="hov" onClick={()=>setActiveExIdx(activeExIdx+1)}
-              style={{marginTop:12,padding:"8px 24px",background:"#22C55E",color:"#fff",
-                border:"none",borderRadius:12,fontSize:15,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-              {es?"Siguiente ejercicio →":"Next exercise →"}
-            </button>
-          )}
-        </div>
+        <WorkoutExerciseCompletedState
+          es={es}
+          textMuted={textMuted}
+          hasSuggestedLoad={hasSuggestedLoad}
+          setsHoy={setsHoy}
+          volumeText={completedVolumeText}
+          activeExIdx={activeExIdx}
+          totalExercises={exercises.length}
+          onNextExercise={() => setActiveExIdx(activeExIdx + 1)}
+          Ic={Ic}
+        />
       )}
       <div style={{display:"flex",gap:8,marginBottom:10}}>
         {activeExIdx>0&&(
