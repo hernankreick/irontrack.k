@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ChevronDown,
-  PieChart,
   TrendingUp,
 } from "lucide-react";
 import { buildCoachProgresoModel, getRoutineForAlumno } from "./coachProgresoMetrics.js";
 import { coachType as T, coachSpace as S } from "./coachUiScale.js";
 import ProgressAdherenceCard from "./progreso/ProgressAdherenceCard.jsx";
+import ProgressMovementPatternVolumeCard from "./progreso/ProgressMovementPatternVolumeCard.jsx";
 import ProgressRankingCard from "./progreso/ProgressRankingCard.jsx";
 import ProgressRecentPrsCard from "./progreso/ProgressRecentPrsCard.jsx";
 import ProgressWeeklyVolumeCard from "./progreso/ProgressWeeklyVolumeCard.jsx";
@@ -778,223 +777,15 @@ export default function ProgresoView({
           />
         </div>
 
-        <div
-          style={{
-            background: C.card,
-            border: "1px solid " + C.brd,
-            borderRadius: 12,
-            padding: S.cardPadding,
-            width: "100%",
-            boxSizing: "border-box",
-          }}
-        >
-          <div style={{ marginBottom: S.blockGapLoose }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-              <PieChart size={16} color={C.blue} strokeWidth={2} />
-              <span style={{ ...T.cardTitle, color: C.t }}>
-                {M(lang, "Volumen por patrón muscular", "Volume by movement pattern")}
-              </span>
-            </div>
-            <p style={{ ...T.subtitle, color: C.t2, margin: 0, paddingLeft: 26 }}>
-              {M(lang, "Bloque actual · 4 semanas", "Current block · 4 weeks")}
-            </p>
-          </div>
-          {(model.patronTotalVol == null ? 0 : model.patronTotalVol) <= 0 ? (
-            <p
-              style={{
-                ...T.subtitle,
-                color: C.t2,
-                margin: "0 0 14px 0",
-                padding: "10px 12px",
-                background: C.cardDark,
-                borderRadius: 8,
-                border: "1px solid " + C.brd,
-              }}
-            >
-              {M(
-                lang,
-                "Sin volumen registrado en el bloque para estos patrones (últimas 4 semanas).",
-                "No volume logged in this block for these patterns (last 4 weeks).",
-                "Sem volume registrado no bloco para estes padrões (últimas 4 semanas)."
-              )}
-            </p>
-          ) : null}
-          <div style={{ display: "flex", flexDirection: "column", gap: S.blockGapLoose }}>
-            {(model.patronPatterns || []).map(function (g) {
-              var totalV = model.patronTotalVol != null ? model.patronTotalVol : 0;
-              var fillPct =
-                totalV > 0 ? Math.min(100, (100 * g.vol) / totalV) : 0;
-              var isOpen = !!patronExpanded[g.key];
-              return (
-                <div key={g.key}>
-                  <button
-                    type="button"
-                    onClick={function () {
-                      togglePatronRow(g.key);
-                    }}
-                    style={{
-                      width: "100%",
-                      margin: 0,
-                      padding: 0,
-                      border: "none",
-                      background: "transparent",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      textAlign: "left",
-                      color: "inherit",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 10,
-                        flexWrap: "wrap",
-                        marginBottom: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          minWidth: 0,
-                          flex: "1 1 140px",
-                        }}
-                      >
-                        <ChevronDown
-                          size={18}
-                          color={C.t2}
-                          strokeWidth={2}
-                          style={{
-                            flexShrink: 0,
-                            transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
-                            transition: "transform 0.18s ease",
-                          }}
-                        />
-                        <span style={{ ...T.bodySemibold, fontWeight: 700, color: C.t, letterSpacing: 0.02 }}>
-                          {g.label}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "baseline",
-                          gap: 10,
-                          flexShrink: 0,
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        <span style={{ ...T.bodySemibold, fontWeight: 700, color: C.t }}>
-                          {formatWeeklyVolKgAbbrev(g.vol)}
-                        </span>
-                        <span
-                          style={{
-                            ...T.bodySemibold,
-                            fontWeight: 700,
-                            color: g.color,
-                            minWidth: 44,
-                            textAlign: "right",
-                          }}
-                        >
-                          {g.p}%
-                        </span>
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        height: 10,
-                        background: "#15151f",
-                        borderRadius: 6,
-                        overflow: "hidden",
-                        border: "1px solid #252536",
-                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: fillPct + "%",
-                          height: "100%",
-                          borderRadius: 6,
-                          background:
-                            "linear-gradient(90deg, " + g.color + "99 0%, " + g.color + " 55%, " + g.color + "dd 100%)",
-                          boxShadow: "0 0 12px " + g.color + "33",
-                        }}
-                      />
-                    </div>
-                  </button>
-                  {isOpen ? (
-                    <div
-                      style={{
-                        marginTop: 10,
-                        marginLeft: 26,
-                        paddingLeft: 12,
-                        borderLeft: "2px solid " + C.brd,
-                      }}
-                    >
-                      {(g.exercises || []).length === 0 ? (
-                        <div style={{ ...T.subtitle, color: C.t2 }}>
-                          {M(lang, "Sin series registradas en este bloque.", "No sets logged in this block.")}
-                        </div>
-                      ) : (
-                        (g.exercises || []).map(function (ex, exi) {
-                          var exList = g.exercises || [];
-                          return (
-                            <div
-                              key={g.key + "-" + ex.ejercicio_id}
-                              style={{
-                                display: "flex",
-                                alignItems: "baseline",
-                                justifyContent: "space-between",
-                                gap: 10,
-                                padding: "6px 0",
-                                borderBottom:
-                                  exi < exList.length - 1 ? "1px solid #1e1e2e44" : "none",
-                              }}
-                            >
-                              <span
-                                style={{
-                                  ...T.subtitle,
-                                  color: C.t,
-                                  flex: 1,
-                                  minWidth: 0,
-                                }}
-                              >
-                                {ex.name}
-                              </span>
-                              <span
-                                style={{
-                                  ...T.labelMd,
-                                  color: C.t2,
-                                  whiteSpace: "nowrap",
-                                  fontVariantNumeric: "tabular-nums",
-                                }}
-                              >
-                                {ex.series}{" "}
-                                {lang === "es"
-                                  ? ex.series === 1
-                                    ? "serie"
-                                    : "series"
-                                  : lang === "pt"
-                                    ? ex.series === 1
-                                      ? "série"
-                                      : "séries"
-                                    : ex.series === 1
-                                      ? "set"
-                                      : "sets"}
-                              </span>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <ProgressMovementPatternVolumeCard
+          patterns={model.patronPatterns}
+          totalVol={model.patronTotalVol}
+          patronExpanded={patronExpanded}
+          togglePatronRow={togglePatronRow}
+          C={C}
+          lang={lang}
+          formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
+        />
       </div>
     </div>
   );
