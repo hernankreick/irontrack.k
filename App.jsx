@@ -3704,7 +3704,7 @@ function GymApp() {
                   )}
 
                   {/* Sparkline de tendencia 30 días */}
-                <StudentExerciseSparkline progress={progress} _dm={_dm} textMuted={textMuted} msg={msg} />
+                <StudentExerciseSparkline progress={progress} _dm={darkMode} textMuted={textMuted} msg={msg} />
                 </div>
               );
             })}
