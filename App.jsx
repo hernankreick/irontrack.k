@@ -3181,7 +3181,7 @@ function GymApp() {
         rutinasActivasCount: rutinasSBEntrenador.length,
         sesionesGlobales: sesionesGlobales,
         sb: sb,
-        entrenadorId: sessionData?.entrenadorId || "entrenador_principal",
+        entrenadorId: supabaseSessionUserId || sessionData?.entrenadorId || null,
       },
       messagesProps: {
         alumnos: alumnosActivosLimpios,

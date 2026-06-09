@@ -62,6 +62,7 @@ export default function coachUiStrings(lang) {
       passwordOk: es ? 'Contraseña actualizada ✓' : pt ? 'Senha atualizada ✓' : 'Password updated ✓',
       passwordsMismatch: es ? 'Las contraseñas no coinciden' : pt ? 'As senhas não coincidem' : 'Passwords do not match',
       profileSaved: es ? 'Perfil guardado ✓' : pt ? 'Perfil salvo ✓' : 'Profile saved ✓',
+      saveError: es ? 'No se pudo guardar el perfil' : pt ? 'Não foi possível salvar o perfil' : 'Could not save profile',
       saveLabel: es ? 'GUARDAR' : pt ? 'SALVAR' : 'SAVE',
       saveHint: es ? 'Guardado ✓' : pt ? 'Salvo ✓' : 'Saved ✓',
       saveDone: es ? 'GUARDADO ✓' : pt ? 'SALVO ✓' : 'SAVED ✓',

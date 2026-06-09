@@ -66,9 +66,47 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
   const [passNew,  setPassNew]  = useState('');
   const [passConf, setPassConf] = useState('');
   const [saved,    setSaved]    = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const onSave = async () => {
     const next = { ...coach, name: fullName.trim(), titulo: titulo.trim(), email: email.trim(), phone: phone.trim() };
+    setSaveError('');
+    if (passNew && passNew !== passConf) {
+      toast2(t.passwordsMismatch);
+      return;
+    }
+    if (!supabase) {
+      setSaveError(t.saveError || 'No se pudo guardar el perfil.');
+      toast2(t.saveError || 'No se pudo guardar el perfil.');
+      return;
+    }
+    try {
+      let uid = entrenadorId && entrenadorId !== 'entrenador_principal' ? String(entrenadorId) : '';
+      if (!uid) {
+        const { data: userData } = await supabase.auth.getUser();
+        uid = userData && userData.user && userData.user.id ? String(userData.user.id) : '';
+      }
+      if (!uid) throw new Error('No coach id available');
+      const { error: rowErr } = await supabase
+        .from('entrenadores')
+        .update({
+          nombre: fullName.trim() || null,
+          titulo_profesional: titulo.trim() || null,
+          telefono: phone.trim() || null,
+        })
+        .eq('id', uid);
+      if (rowErr) throw rowErr;
+    } catch (e) {
+      console.error('[TabPerfil] entrenadores update', e);
+      setSaveError(t.saveError || 'No se pudo guardar el perfil.');
+      toast2(t.saveError || 'No se pudo guardar el perfil.');
+      return;
+    }
+    if (passNew && passNew === passConf && passNew.length >= 6 && supabase) {
+      const { error } = await supabase.auth.updateUser({ password: passNew });
+      if (error) toast2(t.errPassword);
+      else { toast2(t.passwordOk); setPassNew(''); setPassConf(''); }
+    }
     try { localStorage.setItem('it_session', JSON.stringify(next)); } catch (e) {}
     try {
       localStorage.setItem(
@@ -77,35 +115,6 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
       );
     } catch (e) {}
     setSessionData(next);
-    if (supabase) {
-      try {
-        const { data: userData } = await supabase.auth.getUser();
-        const uid = userData && userData.user && userData.user.id;
-        if (uid) {
-          const { error: rowErr } = await supabase
-            .from('entrenadores')
-            .update({
-              nombre: fullName.trim() || null,
-              titulo_profesional: titulo.trim() || null,
-              telefono: phone.trim() || null,
-            })
-            .eq('id', uid);
-          if (rowErr) {
-            console.error('[TabPerfil] entrenadores update', rowErr);
-          }
-        }
-      } catch (e) {
-        console.error('[TabPerfil] supabase', e);
-      }
-    }
-    if (passNew && passNew === passConf && passNew.length >= 6 && supabase) {
-      const { error } = await supabase.auth.updateUser({ password: passNew });
-      if (error) toast2(t.errPassword);
-      else { toast2(t.passwordOk); setPassNew(''); setPassConf(''); }
-    } else if (passNew && passNew !== passConf) {
-      toast2(t.passwordsMismatch);
-      return;
-    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2200);
     toast2(t.profileSaved);
@@ -128,6 +137,7 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
         <Input label={t.email} value={email} onChange={setEmail} type="email" placeholder={t.emailPh} />
         <Input label={t.phone} value={phone} onChange={setPhone} type="tel" placeholder={t.phonePh} />
       </div>
+      {saveError ? <div style={{ color: C.red, fontSize: 13, fontWeight: 700, marginTop: 10 }}>{saveError}</div> : null}
 
       <SectionTitle>{t.password}</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>

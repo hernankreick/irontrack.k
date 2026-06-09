@@ -50,6 +50,26 @@ function mergeReadIds(a, b) {
   return normalizeReadIds([].concat(a || [], b || []));
 }
 
+function legacyReadStorageKeys(canonicalKey) {
+  var keys = [
+    LS_READ_PREFIX + "_anon",
+    LS_READ_PREFIX + "_coach",
+    LS_READ_PREFIX + "_coach_" + encodeURIComponent("coach"),
+    LS_READ_PREFIX + "_coach_" + encodeURIComponent("entrenador"),
+  ];
+  try {
+    if (typeof localStorage !== "undefined") {
+      var raw = localStorage.getItem("it_session");
+      var sess = raw ? JSON.parse(raw) : null;
+      var name = sess && typeof sess.name === "string" ? sess.name.trim().toLowerCase() : "";
+      if (name) keys.push(LS_READ_PREFIX + "_coach_" + encodeURIComponent(name));
+    }
+  } catch (e) {}
+  return normalizeReadIds(keys).filter(function (key) {
+    return key && key !== canonicalKey;
+  });
+}
+
 function loadReadIds(storageKey) {
   try {
     var raw = localStorage.getItem(storageKey);
@@ -74,6 +94,15 @@ function saveReadIds(storageKey, ids) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(normalizeReadIds(ids)));
   } catch (e) {}
+}
+
+function migrateReadIdsToCanonical(storageKey) {
+  var merged = loadReadIds(storageKey);
+  legacyReadStorageKeys(storageKey).forEach(function (key) {
+    merged = mergeReadIds(merged, loadReadIds(key));
+  });
+  saveReadIds(storageKey, merged);
+  return merged;
 }
 
 async function loadRemoteReadIds(supabase, entrenadorId) {
@@ -222,7 +251,7 @@ export default function CoachNotificationCenter({
   React.useEffect(
     function () {
       var cancelled = false;
-      var localIds = loadReadIds(storageKey);
+      var localIds = entrenadorId ? migrateReadIdsToCanonical(storageKey) : loadReadIds(storageKey);
       setReadIds(localIds);
       if (!supabase || !entrenadorId) {
         return undefined;
