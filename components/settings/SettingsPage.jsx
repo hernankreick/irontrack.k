@@ -91,8 +91,6 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
         .from('entrenadores')
         .update({
           nombre: fullName.trim() || null,
-          titulo_profesional: titulo.trim() || null,
-          telefono: phone.trim() || null,
         })
         .eq('id', uid);
       if (rowErr) throw rowErr;

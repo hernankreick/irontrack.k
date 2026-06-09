@@ -3837,7 +3837,7 @@ function GymApp() {
           alumnosCount: alumnos.length,
           rutinasActivasCount: rutinasSBEntrenador.length,
           sesionesGlobales, sb,
-          entrenadorId: sessionData?.entrenadorId || "entrenador_principal",
+          entrenadorId: supabaseSessionUserId || sessionData?.entrenadorId || null,
         }}
         alumnoSettingsProps={{
           open: settingsOpen, darkMode, lang, msg, es, toast2,
