@@ -1390,7 +1390,7 @@ function GymApp() {
       if(!alumnoIdSync) return;
       pending.forEach(item => {
         try {
-          sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date));
+          sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana));
         } catch(e) {}
       });
       localStorage.removeItem('it_pending_sync');
@@ -1734,12 +1734,12 @@ function GymApp() {
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     if(alumnoIdSync) {
       if(!isOnline) {
-        const item = buildPendingProgressItem(exId, kg, reps, note, d);
+        const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet);
         const updated = [...pendingSync, item];
         setPendingSync(updated);
         try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
       } else {
-        sb.addProgreso(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d)).catch(function(e){console.error("[PROGRESO] ERR",e)});
+        sb.addProgreso(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet)).catch(function(e){console.error("[PROGRESO] ERR",e)});
       }
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
