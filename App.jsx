@@ -3925,7 +3925,7 @@ function GymApp() {
               if(rActual) {
                 const updatedDays = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rActual.days));
                 updateRutinaRowsLocal(rActual.id, updatedDays);
-                const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:"entrenador_principal"};
+                const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:rActual.entrenador_id};
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
                 else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
               } else {
@@ -3933,7 +3933,7 @@ function GymApp() {
                 const rSB = (rutinasSBEntrenador||[]).find(x=>String(x.id)===String(editEx.rId)) || (rutinasSB||[]).find(x=>String(x.id)===String(editEx.rId));
                 if(rSB) {
                   const diasActualizados = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rSB.datos?.days||[]));
-                  const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:"entrenador_principal"};
+                  const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:rSB.entrenador_id};
                   updateRutinaRowsLocal(rSB.id, diasActualizados);
                   await sb.updateRutina(rSB.id, payloadSB);
                 }
@@ -4109,7 +4109,7 @@ function GymApp() {
                 if(i!==dIdx) return d;
                 return {...d,[blk]:[...(d[blk]||[]),...newExs]};
               }));
-              await sb.updateRutina(rSB.id,{nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:"entrenador_principal"});
+              await sb.updateRutina(rSB.id,{nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:rSB.entrenador_id});
               setRutinasSB(function(prev){return prev.map(function(rw){return rw.id===rSB.id?{...rw,datos:{...rw.datos,days:diasAct}}:rw;});});
             }catch(e){console.error("Add batch save error:",e);}
           }

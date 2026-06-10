@@ -184,7 +184,7 @@ export function WorkoutScreen(props) {
           await sb.updateRutina(r.id, {
             nombre: r.name || r.nombre || "Rutina",
             alumno_id: sessionData.alumnoId,
-            entrenador_id: r.entrenador_id || sessionData.entrenadorId || "entrenador_principal",
+            entrenador_id: r.entrenador_id,
             datos: Object.assign({}, r.datos || {}, {
               days: r.days || (r.datos && r.datos.days) || [],
               semana_activa: currentWeek + 2,
