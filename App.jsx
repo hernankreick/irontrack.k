@@ -1381,21 +1381,40 @@ function GymApp() {
 
   // ── Detectar online/offline y sincronizar cola ─────────────────────────
   useEffect(()=>{
-    const goOnline = () => {
+    const goOnline = async () => {
       setIsOnline(true);
       // Sincronizar sets pendientes
-      const pending = JSON.parse(localStorage.getItem('it_pending_sync')||'[]');
+      let pending = [];
+      try {
+        pending = JSON.parse(localStorage.getItem('it_pending_sync')||'[]');
+      } catch(e) {
+        console.warn('[offline sync] it_pending_sync corrupto; se conserva sin sincronizar', e);
+        return;
+      }
+      if(!Array.isArray(pending)) {
+        console.warn('[offline sync] it_pending_sync no es una lista; se conserva sin sincronizar');
+        return;
+      }
       if(pending.length === 0) return;
       const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
       if(!alumnoIdSync) return;
-      pending.forEach(item => {
-        try {
-          sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana));
-        } catch(e) {}
+      const results = await Promise.allSettled(pending.map(item => {
+        return Promise.resolve().then(function() {
+          return sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana));
+        });
+      }));
+      const failed = pending.filter(function(item, idx) {
+        var res = results[idx];
+        return !res || res.status !== 'fulfilled' || res.value == null;
       });
-      localStorage.removeItem('it_pending_sync');
-      setPendingSync([]);
-      if(pending.length > 0) toast2(pending.length+' set'+(pending.length>1?'s':'')+' sincronizados ✓');
+      if(failed.length > 0) {
+        try{localStorage.setItem('it_pending_sync', JSON.stringify(failed));}catch(e){}
+      } else {
+        localStorage.removeItem('it_pending_sync');
+      }
+      setPendingSync(failed);
+      const syncedCount = pending.length - failed.length;
+      if(syncedCount > 0) toast2(syncedCount+' set'+(syncedCount>1?'s':'')+' sincronizados ✓');
     };
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online',  goOnline);
