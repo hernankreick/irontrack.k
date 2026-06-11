@@ -5,17 +5,29 @@ export default function AlumnoPlanHeaderDayLabel({ alumnoPlanHeaderDayNum, textM
     <p
       style={{
         margin: 0,
-        fontSize: 14,
-        fontWeight: 600,
         textAlign: "center",
-        lineHeight: 1.25,
-        maxWidth: "100%",
+        lineHeight: 1.3,
       }}
     >
-      <span style={{ color: textMuted, fontWeight: 500 }}>{msg("Hoy toca:", "Today:", "Hoje é:")}</span>{" "}
-      <span style={{ color: "#3B82F6", fontWeight: 800, letterSpacing: 0.3 }}>
-        {String(msg("Día", "Day", "Dia")).toUpperCase()}{" "}
-        {alumnoPlanHeaderDayNum}
+      <span style={{
+        display: "block",
+        color: textMuted,
+        fontWeight: 500,
+        fontSize: 10,
+        letterSpacing: 0.8,
+        textTransform: "uppercase",
+      }}>
+        {msg("Hoy toca", "Today", "Hoje")}
+      </span>
+      <span style={{
+        display: "block",
+        color: "#3B82F6",
+        fontWeight: 800,
+        fontSize: 15,
+        letterSpacing: 0.3,
+        whiteSpace: "nowrap",
+      }}>
+        {String(msg("Día", "Day", "Dia")).toUpperCase()}{" "}{alumnoPlanHeaderDayNum}
       </span>
     </p>
   );
