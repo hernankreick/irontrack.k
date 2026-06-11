@@ -1128,6 +1128,19 @@ function GymApp() {
     [esAlumno, tab]
   );
 
+  /** Al cambiar de tab, asegurar que el bottom nav siempre sea visible. */
+  useLayoutEffect(
+    function () {
+      var nav = globalBottomNavRef.current;
+      if (!nav) return;
+      nav.style.transform = "";
+      nav.style.opacity = "";
+      nav.style.transition = "";
+      nav.style.pointerEvents = "";
+    },
+    [tab]
+  );
+
   /** Después de login/logout (localStorage ya actualizado): sincroniza sesión y datos persistidos sin recargar. */
   function syncStateWithLocalStorage() {
     var sess = null;
