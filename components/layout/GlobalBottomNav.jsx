@@ -1,8 +1,8 @@
 import React from 'react';
 
-export default function GlobalBottomNav({ darkMode, esAlumno, tabs2, tab, setTab }) {
+const GlobalBottomNav = React.forwardRef(function GlobalBottomNav({ darkMode, esAlumno, tabs2, tab, setTab }, ref) {
   return (
-    <nav style={{
+    <nav ref={ref} style={{
       position:"fixed",bottom:0,left:0,right:0,
       background: darkMode ? "rgba(15,25,35,0.96)" : "rgba(255,255,255,0.96)",
       backdropFilter: "blur(12px)",
@@ -48,4 +48,6 @@ export default function GlobalBottomNav({ darkMode, esAlumno, tabs2, tab, setTab
       })}
     </nav>
   );
-}
+});
+
+export default GlobalBottomNav;

@@ -11,6 +11,7 @@ export function useAlumnoPlanHeaderScrollController({
   alumnoTopBarSpacerRef,
   headerCollapsedRef,
   applyAlumnoHeaderLayerStyles,
+  globalBottomNavRef,
 }) {
   /** Plan alumno: scroll via requestAnimationFrame + listener pasivo (sin setState en el hilo de scroll). */
   useLayoutEffect(function () {
@@ -76,6 +77,28 @@ export function useAlumnoPlanHeaderScrollController({
           sp0.style.willChange = "";
         }
       }
+      var bottomNav = globalBottomNavRef && globalBottomNavRef.current;
+      if (bottomNav && ctx.alumnoPlan) {
+        var hideBottom = y > 80 && dir && delta > 6;
+        var showBottom = (!dir && delta > 6) || y < 12;
+        if (hideBottom) {
+          bottomNav.style.transform = "translateY(100%)";
+          bottomNav.style.opacity = "0";
+          bottomNav.style.transition = "transform 0.25s ease, opacity 0.2s ease";
+          bottomNav.style.pointerEvents = "none";
+        } else if (showBottom) {
+          bottomNav.style.transform = "translateY(0)";
+          bottomNav.style.opacity = "1";
+          bottomNav.style.transition = "transform 0.25s ease, opacity 0.2s ease";
+          bottomNav.style.pointerEvents = "";
+        }
+      } else if (bottomNav && !ctx.alumnoPlan) {
+        bottomNav.style.transform = "";
+        bottomNav.style.opacity = "";
+        bottomNav.style.transition = "";
+        bottomNav.style.pointerEvents = "";
+      }
+      if (ctx.alumnoPlan) lastScrollY.current = y;
       if (!ctx.headerCollapse || !ctx.alumnoPlan) {
         tickingRef.current = false;
         return;

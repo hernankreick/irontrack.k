@@ -995,6 +995,7 @@ function GymApp() {
   const tickingRef = useRef(false);
   const scrollRafIdRef = useRef(null);
   const lastAppliedHeaderStateRef = useRef(null);
+  const globalBottomNavRef = useRef(null);
   /** Actualizado cada render tras conocer tab/esAlumno: el scroll handler no debe depender de closure viejo. */
   const planScrollCtxRef = useRef({ alumnoPlan: false, headerCollapse: true });
   const [resumenSesion, setResumenSesion] = useState(null);
@@ -1114,6 +1115,7 @@ function GymApp() {
     alumnoTopBarSpacerRef: alumnoTopBarSpacerRef,
     headerCollapsedRef: headerCollapsedRef,
     applyAlumnoHeaderLayerStyles: applyAlumnoHeaderLayerStyles,
+    globalBottomNavRef: globalBottomNavRef,
   });
 
   /** Alumno / pestaña plan: fuerza expansión visible (sin capa mini por scroll/refs viejos). */
@@ -4164,6 +4166,7 @@ function GymApp() {
       )}
       {!resumenSesion && !hideGlobalBottomNavCoachDash && !(showCoachDesktopShell && coachDesktop1024) && (
         <GlobalBottomNav
+          ref={globalBottomNavRef}
           darkMode={darkMode}
           esAlumno={esAlumno}
           tabs2={tabs2}
