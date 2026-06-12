@@ -4179,11 +4179,36 @@ function GymApp() {
       )}
       </div>
     </div>
+    {(coachDialog.t === 'logout' || coachDialog.t === 'logoutSettings') && (
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}}
+        onClick={function(){if(!coachDialogLoading)setCoachDialog({t:'none'});}}>
+        <div style={{background:"#111827",borderRadius:16,padding:"24px 20px",width:"calc(100% - 48px)",maxWidth:320,margin:"0 auto",display:"flex",flexDirection:"column",gap:12}}
+          onClick={function(e){e.stopPropagation();}}>
+          <div style={{textAlign:"center"}}>
+            <div style={{width:44,height:44,borderRadius:"50%",background:"rgba(59,130,246,0.15)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 12px"}}>
+              <Ic name="log-out" size={20} color="#60a5fa"/>
+            </div>
+            <div style={{fontSize:20,fontWeight:800,color:"#fff",marginBottom:6}}>{msg('¿Cerrar sesión?','Log out?','Encerrar sessão?')}</div>
+            <div style={{fontSize:14,color:"#94a3b8",lineHeight:1.5}}>{msg('Vas a salir y tendrás que volver a iniciar sesión.','You\'ll sign out and will need to sign in again.','Você sairá e precisará entrar de novo.')}</div>
+          </div>
+          <button style={{padding:"13px 0",borderRadius:10,fontSize:14,fontWeight:600,width:"100%",cursor:"pointer",background:"linear-gradient(135deg,#3b82f6,#2563eb)",color:"#fff",border:"none",fontFamily:"inherit"}}
+            disabled={coachDialogLoading}
+            onClick={function(){void confirmCoachDialog();}}>
+            {coachDialogLoading ? msg('Cerrando…','Signing out…','Saindo…') : msg('Cerrar sesión','Log out','Sair')}
+          </button>
+          <button style={{padding:"13px 0",borderRadius:10,fontSize:14,fontWeight:600,width:"100%",cursor:"pointer",background:"rgba(148,163,184,0.08)",color:"#fff",border:"1px solid rgba(148,163,184,0.32)",fontFamily:"inherit"}}
+            disabled={coachDialogLoading}
+            onClick={function(){if(!coachDialogLoading)setCoachDialog({t:'none'});}}>
+            {msg('Cancelar','Cancel','Cancelar')}
+          </button>
+        </div>
+      </div>
+    )}
     {(() => {
       var cfg = getCoachDialogModalConfig(coachDialog, msg, es);
       return (
     <CoachConfirmDialog
-      dialog={coachDialog}
+      dialog={(coachDialog.t === 'logout' || coachDialog.t === 'logoutSettings') ? {t:'none'} : coachDialog}
       config={cfg}
       loading={coachDialogLoading}
       cancelLabel={msg('Cancelar', 'Cancel', 'Cancelar')}
