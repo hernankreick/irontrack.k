@@ -9,7 +9,6 @@ import {
   uid,
 } from './lib/appPureHelpers.js';
 import { Ic } from './components/Ic.jsx';
-import { LogForm } from './components/LogForm.jsx';
 import DuplicateDayModal from './components/routines/DuplicateDayModal.jsx';
 import NewRoutineModal from './components/routines/NewRoutineModal.jsx';
 import { WorkoutScreen } from './components/WorkoutScreen.jsx';
@@ -822,7 +821,6 @@ function GymApp() {
   const [search, setSearch] = useState("");
   const [filterPat, setFilterPat] = useState(null);
   const [detailEx, setDetailEx] = useState(null);
-  const [logModal, setLogModal] = useState(null);
   const [activeExIdx, setActiveExIdx] = useState(0); // ejercicio activo en modo entrenamiento
   const [expandedR, setExpandedR] = useState(null);
   const [selDay, setSelDay] = useState(null);
@@ -3907,7 +3905,6 @@ function GymApp() {
           canAddToRoutine: !!(expandedR&&selDay!==null),
           darkMode, es, msg, btn, lbl, tag, bgCard, textMain, textMuted,
           onClose: ()=>setDetailEx(null),
-          onLogSet: ()=>{setLogModal({...detailEx});setDetailEx(null);},
           onAddToRoutine: ()=>{
             setRoutines(p=>p.map(r=>r.id===expandedR?{...r,days:r.days.map((d,i)=>i===selDay?{...d,exercises:[...d.exercises,{id:detailEx.id,sets:"3",reps:"8-10",kg:"",pause:90,note:"",weeks:[]}]}:d)}:r));
             toast2("Ejercicio agregado");
@@ -3959,13 +3956,6 @@ function GymApp() {
           onClose: ()=>setEditEx(null),
         }}
       />
-      {false&&logModal&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:110,display:"flex",alignItems:"flex-end"}} onClick={()=>setLogModal(null)}>
-          <LogForm darkMode={darkMode} ex={logModal} btn={btn} inp={inp} lbl={lbl} tag={tag} fmtP={fmtP} progress={progress}
-            onLog={(kg,reps,note,pause,rpe)=>{logSet(logModal.id,kg,reps,note,rpe);if(pause>0)startTimer(pause,PATS[logModal.pattern]?.color);setLogModal(null);}}
-            onClose={()=>setLogModal(null)}/>
-        </div>
-      )}
       <CoachEditStudentModal
         editAlumnoModal={editAlumnoModal}
         editAlumnoEmail={editAlumnoEmail}
