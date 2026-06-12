@@ -850,48 +850,48 @@ export function RoutineCard({
                   setHasUnsaved(true);
                 }}
                 onReorderWarmup={async (newList) => {
-                  const updatedDays = r.days.map((dd, ddi) =>
-                    ddi !== di ? dd : { ...dd, warmup: newList }
-                  );
+                  let savedDays;
                   setRoutines((p) =>
-                    p.map((rr) =>
-                      rr.id !== r.id
-                        ? rr
-                        : { ...rr, days: updatedDays }
-                    )
+                    p.map((rr) => {
+                      if (rr.id !== r.id) return rr;
+                      savedDays = rr.days.map((dd, ddi) =>
+                        ddi !== di ? dd : { ...dd, warmup: newList }
+                      );
+                      return { ...rr, days: savedDays };
+                    })
                   );
                   setHasUnsaved(true);
                   if (r.saved && sb) {
-                    console.log('Saving reorder to Supabase:', updatedDays);
+                    console.log('Saving reorder to Supabase:', savedDays);
                     try {
                       await sb.updateRutina(r.id, {
                         nombre: r.name,
                         alumno_id: r.alumno_id || null,
-                        datos: { days: sanitizeRoutineDaysForWrite(updatedDays), alumno: r.alumno || '', note: r.note || '' },
+                        datos: { days: sanitizeRoutineDaysForWrite(savedDays), alumno: r.alumno || '', note: r.note || '' },
                         entrenador_id: 'entrenador_principal',
                       });
                     } catch (e) { console.error('[onReorderWarmup] persist error', e); }
                   }
                 }}
                 onReorderExercises={async (newList) => {
-                  const updatedDays = r.days.map((dd, ddi) =>
-                    ddi !== di ? dd : { ...dd, exercises: newList }
-                  );
+                  let savedDays;
                   setRoutines((p) =>
-                    p.map((rr) =>
-                      rr.id !== r.id
-                        ? rr
-                        : { ...rr, days: updatedDays }
-                    )
+                    p.map((rr) => {
+                      if (rr.id !== r.id) return rr;
+                      savedDays = rr.days.map((dd, ddi) =>
+                        ddi !== di ? dd : { ...dd, exercises: newList }
+                      );
+                      return { ...rr, days: savedDays };
+                    })
                   );
                   setHasUnsaved(true);
                   if (r.saved && sb) {
-                    console.log('Saving reorder to Supabase:', updatedDays);
+                    console.log('Saving reorder to Supabase:', savedDays);
                     try {
                       await sb.updateRutina(r.id, {
                         nombre: r.name,
                         alumno_id: r.alumno_id || null,
-                        datos: { days: sanitizeRoutineDaysForWrite(updatedDays), alumno: r.alumno || '', note: r.note || '' },
+                        datos: { days: sanitizeRoutineDaysForWrite(savedDays), alumno: r.alumno || '', note: r.note || '' },
                         entrenador_id: 'entrenador_principal',
                       });
                     } catch (e) { console.error('[onReorderExercises] persist error', e); }
