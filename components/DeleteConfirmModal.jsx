@@ -161,7 +161,7 @@ export function DeleteConfirmModal({
         'aria-describedby': message ? descId : undefined,
       }}
       contentStyle={{
-          width: isLogout ? 'calc(100% - 48px)' : 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
+          width: isLogout ? 'min(320px, calc(100vw - 48px))' : 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
           maxWidth: isLogout ? 320 : 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
           margin: isLogout ? '0 auto' : undefined,
           background: 'rgba(15, 23, 42, 0.92)',
