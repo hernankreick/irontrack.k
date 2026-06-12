@@ -2871,9 +2871,11 @@ function GymApp() {
                 setLoginPass("");
               } else setLoginError("Email o contraseña incorrectos");
             } else {
-              const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmail)+"&password=eq."+encodeURIComponent(loginPass)+"&select=*");
-              if(res&&res.length>0){
-                const alumno=res[0];
+              const authAlumno = await supabase.auth.signInWithPassword({ email: loginEmailNorm, password: loginPass });
+              if(authAlumno.error){ setLoginError("Email o contraseña incorrectos"); } else {
+              const alumnoRows = await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmailNorm)+"&select=id,nombre,entrenador_id");
+              if(alumnoRows&&alumnoRows.length>0){
+                const alumno=alumnoRows[0];
                 const rutsRaw=await sb.getRutinas(alumno.id);
                 const ruts=(rutsRaw || []).slice().sort(function(a,b){return new Date(b.created_at||0)-new Date(a.created_at||0);}).slice(0,1);
                 clearIronTrackStorageForNewLogin();
@@ -2894,6 +2896,7 @@ function GymApp() {
                 setLoginEmail("");
                 setLoginPass("");
               } else setLoginError("Email o contraseña incorrectos");
+              }
             }
           } finally {
             setLoginLoading(false);
