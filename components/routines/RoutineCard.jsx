@@ -850,34 +850,46 @@ export function RoutineCard({
                   setHasUnsaved(true);
                 }}
                 onReorderWarmup={(newList) => {
+                  const updatedDays = r.days.map((dd, ddi) =>
+                    ddi !== di ? dd : { ...dd, warmup: newList }
+                  );
                   setRoutines((p) =>
                     p.map((rr) =>
                       rr.id !== r.id
                         ? rr
-                        : {
-                            ...rr,
-                            days: rr.days.map((dd, ddi) =>
-                              ddi !== di ? dd : { ...dd, warmup: newList }
-                            ),
-                          }
+                        : { ...rr, days: updatedDays }
                     )
                   );
                   setHasUnsaved(true);
+                  if (r.saved && sb) {
+                    sb.updateRutina(r.id, {
+                      nombre: r.name,
+                      alumno_id: r.alumno_id || null,
+                      datos: { days: sanitizeRoutineDaysForWrite(updatedDays), alumno: r.alumno || '', note: r.note || '' },
+                      entrenador_id: 'entrenador_principal',
+                    }).catch((e) => console.error('[onReorderWarmup] persist error', e));
+                  }
                 }}
                 onReorderExercises={(newList) => {
+                  const updatedDays = r.days.map((dd, ddi) =>
+                    ddi !== di ? dd : { ...dd, exercises: newList }
+                  );
                   setRoutines((p) =>
                     p.map((rr) =>
                       rr.id !== r.id
                         ? rr
-                        : {
-                            ...rr,
-                            days: rr.days.map((dd, ddi) =>
-                              ddi !== di ? dd : { ...dd, exercises: newList }
-                            ),
-                          }
+                        : { ...rr, days: updatedDays }
                     )
                   );
                   setHasUnsaved(true);
+                  if (r.saved && sb) {
+                    sb.updateRutina(r.id, {
+                      nombre: r.name,
+                      alumno_id: r.alumno_id || null,
+                      datos: { days: sanitizeRoutineDaysForWrite(updatedDays), alumno: r.alumno || '', note: r.note || '' },
+                      entrenador_id: 'entrenador_principal',
+                    }).catch((e) => console.error('[onReorderExercises] persist error', e));
+                  }
                 }}
               />
             );
