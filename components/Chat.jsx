@@ -65,7 +65,7 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, on
         {mensajes.map((m,i)=>{
           const esMio = esEntrenador ? m.de_entrenador : !m.de_entrenador;
           return (
-            <div key={i} style={{display:"flex",justifyContent:esMio?"flex-end":"flex-start",marginBottom:8}}>
+            <div key={m.id} style={{display:"flex",justifyContent:esMio?"flex-end":"flex-start",marginBottom:8}}>
               <div style={{maxWidth:"78%",
                 background:m.de_entrenador?"#2563EB":"#16A34A",
                 borderRadius:esMio?"14px 14px 2px 14px":"14px 14px 14px 2px",
