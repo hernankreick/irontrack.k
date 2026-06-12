@@ -20,7 +20,7 @@ import DesktopSidebarNavItem from "./layout/DesktopSidebarNavItem.jsx";
 import DesktopSidebarProfileRow from "./layout/DesktopSidebarProfileRow.jsx";
 import DesktopSidebarSettingsRow from "./layout/DesktopSidebarSettingsRow.jsx";
 
-const LS_KEY = "irontrack_desktop_sidebar_collapsed";
+const LS_KEY = "it_desktop_sidebar_collapsed";
 
 const EXPANDED_W = 240;
 const COLLAPSED_W = 72;
@@ -64,6 +64,10 @@ function useDesktopSidebarFonts() {
 
 function readCollapsed() {
   try {
+    if (localStorage.getItem("irontrack_desktop_sidebar_collapsed")) {
+      localStorage.setItem(LS_KEY, localStorage.getItem("irontrack_desktop_sidebar_collapsed"));
+      localStorage.removeItem("irontrack_desktop_sidebar_collapsed");
+    }
     return localStorage.getItem(LS_KEY) === "1";
   } catch (e) {
     return false;

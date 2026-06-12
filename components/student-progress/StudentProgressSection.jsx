@@ -84,7 +84,11 @@ export default function StudentProgressSection({
   const [subView, setSubView] = React.useState('main')
   const [seenAch, setSeenAch] = React.useState(() => {
     try {
-      const raw = localStorage.getItem('irontrack_sp_ach_seen')
+      if (localStorage.getItem('irontrack_sp_ach_seen')) {
+        localStorage.setItem('it_sp_ach_seen', localStorage.getItem('irontrack_sp_ach_seen'));
+        localStorage.removeItem('irontrack_sp_ach_seen');
+      }
+      const raw = localStorage.getItem('it_sp_ach_seen')
       const j = JSON.parse(raw || '[]')
       return new Set(Array.isArray(j) ? j : [])
     } catch {
@@ -145,7 +149,7 @@ export default function StudentProgressSection({
       const n = new Set(prev)
       n.add(id)
       try {
-        localStorage.setItem('irontrack_sp_ach_seen', JSON.stringify([...n]))
+        localStorage.setItem('it_sp_ach_seen', JSON.stringify([...n]))
       } catch {
         /* noop */
       }
