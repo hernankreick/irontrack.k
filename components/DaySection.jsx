@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  DndContext, PointerSensor, useSensor, useSensors, DragOverlay, closestCenter,
+  DndContext, PointerSensor, useSensor, useSensors, DragOverlay, pointerWithin,
 } from '@dnd-kit/core';
 import {
   SortableContext, verticalListSortingStrategy, arrayMove,
@@ -80,7 +80,7 @@ function SortableBlock({
       {/* Sortable exercises */}
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={pointerWithin}
         onDragStart={({ active }) => setActiveId(active.id)}
         onDragEnd={({ active, over }) => {
           setActiveId(null);
