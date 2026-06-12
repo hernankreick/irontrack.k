@@ -136,7 +136,7 @@ export function DeleteConfirmModal({
 
   var titleFont = isWorkoutExit ? 18 : narrow ? 21 : 24;
   var py = isWorkoutExit ? 18 : narrow ? 24 : 32;
-  var maxW = isWorkoutExit ? 320 : 520;
+  var maxW = (isWorkoutExit || isLogout) ? 320 : 520;
   var confirmDisabled = loading || (requireAcknowledge && !acknowledged);
 
   return (
