@@ -34,7 +34,7 @@ export default function AddExerciseModal({
       <div
         role="presentation"
         style={{
-          position:"fixed",inset:0,zIndex:150,
+          position:"fixed",inset:0,zIndex:1000,
           display:"flex",flexDirection:"column",
           height:"100dvh",maxHeight:"100dvh",minHeight:0,
           boxSizing:"border-box",

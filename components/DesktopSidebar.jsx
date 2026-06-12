@@ -208,7 +208,7 @@ export default function DesktopSidebar({
         alignSelf: "stretch",
         transition: "width 0.22s ease, min-width 0.22s ease",
         overflow: "hidden",
-        zIndex: 30,
+        zIndex: 100,
       }}
     >
       <div style={{ padding: "12px " + INNER_PAD_X + "px 10px", borderBottom: "1px solid " + DS.border, flexShrink: 0 }}>
