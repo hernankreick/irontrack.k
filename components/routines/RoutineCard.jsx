@@ -849,7 +849,7 @@ export function RoutineCard({
                   );
                   setHasUnsaved(true);
                 }}
-                onReorderWarmup={(newList) => {
+                onReorderWarmup={async (newList) => {
                   const updatedDays = r.days.map((dd, ddi) =>
                     ddi !== di ? dd : { ...dd, warmup: newList }
                   );
@@ -862,15 +862,18 @@ export function RoutineCard({
                   );
                   setHasUnsaved(true);
                   if (r.saved && sb) {
-                    sb.updateRutina(r.id, {
-                      nombre: r.name,
-                      alumno_id: r.alumno_id || null,
-                      datos: { days: sanitizeRoutineDaysForWrite(updatedDays), alumno: r.alumno || '', note: r.note || '' },
-                      entrenador_id: 'entrenador_principal',
-                    }).catch((e) => console.error('[onReorderWarmup] persist error', e));
+                    console.log('Saving reorder to Supabase:', updatedDays);
+                    try {
+                      await sb.updateRutina(r.id, {
+                        nombre: r.name,
+                        alumno_id: r.alumno_id || null,
+                        datos: { days: sanitizeRoutineDaysForWrite(updatedDays), alumno: r.alumno || '', note: r.note || '' },
+                        entrenador_id: 'entrenador_principal',
+                      });
+                    } catch (e) { console.error('[onReorderWarmup] persist error', e); }
                   }
                 }}
-                onReorderExercises={(newList) => {
+                onReorderExercises={async (newList) => {
                   const updatedDays = r.days.map((dd, ddi) =>
                     ddi !== di ? dd : { ...dd, exercises: newList }
                   );
@@ -883,12 +886,15 @@ export function RoutineCard({
                   );
                   setHasUnsaved(true);
                   if (r.saved && sb) {
-                    sb.updateRutina(r.id, {
-                      nombre: r.name,
-                      alumno_id: r.alumno_id || null,
-                      datos: { days: sanitizeRoutineDaysForWrite(updatedDays), alumno: r.alumno || '', note: r.note || '' },
-                      entrenador_id: 'entrenador_principal',
-                    }).catch((e) => console.error('[onReorderExercises] persist error', e));
+                    console.log('Saving reorder to Supabase:', updatedDays);
+                    try {
+                      await sb.updateRutina(r.id, {
+                        nombre: r.name,
+                        alumno_id: r.alumno_id || null,
+                        datos: { days: sanitizeRoutineDaysForWrite(updatedDays), alumno: r.alumno || '', note: r.note || '' },
+                        entrenador_id: 'entrenador_principal',
+                      });
+                    } catch (e) { console.error('[onReorderExercises] persist error', e); }
                   }
                 }}
               />
