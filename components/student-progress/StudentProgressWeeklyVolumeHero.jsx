@@ -16,7 +16,7 @@ export function StudentProgressWeeklyVolumeHero({
           <span
             className="num leading-none tabular-nums"
             style={{
-              fontFamily: "'Barlow Condensed',sans-serif",
+              fontFamily: "'DM Mono',monospace",
               fontSize: 56,
               fontWeight: 800,
               letterSpacing: '-0.02em',
@@ -77,7 +77,7 @@ export function StudentProgressWeeklyVolumeHero({
           <div
             className="num tabular-nums leading-none"
             style={{
-              fontFamily: "'Barlow Condensed',sans-serif",
+              fontFamily: "'DM Mono',monospace",
               fontSize: 18,
               fontWeight: 800,
               color: 'var(--sp-fg)',

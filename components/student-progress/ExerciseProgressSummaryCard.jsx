@@ -96,7 +96,7 @@ export default function ExerciseProgressSummaryCard({
           <span
             className="num block tabular-nums leading-none"
             style={{
-              fontFamily: "'Barlow Condensed',sans-serif",
+              fontFamily: "'DM Mono',monospace",
               fontSize: 38,
               fontWeight: 800,
               color: 'var(--sp-fg)',

@@ -30,7 +30,7 @@ export function StudentProgressKpiStrip({ kpiRows }) {
           <div
             className="num mt-1 tabular-nums leading-none"
             style={{
-              fontFamily: "'Barlow Condensed',sans-serif",
+              fontFamily: "'DM Mono',monospace",
               fontSize: 22,
               fontWeight: 800,
               letterSpacing: '-0.02em',
