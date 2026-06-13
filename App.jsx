@@ -2878,6 +2878,7 @@ function GymApp() {
                 syncStateWithLocalStorage();
                 setLoginEmail("");
                 setLoginPass("");
+                setShowPassword(false);
               } else setLoginError("Email o contraseña incorrectos");
             } else {
               const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmailNorm)+"&select=id,nombre,entrenador_id");
@@ -2902,6 +2903,7 @@ function GymApp() {
                 syncStateWithLocalStorage();
                 setLoginEmail("");
                 setLoginPass("");
+                setShowPassword(false);
               } else setLoginError("Email o contraseña incorrectos");
             }
           } finally {
