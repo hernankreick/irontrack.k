@@ -3952,7 +3952,7 @@ function GymApp() {
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
                 else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
               } else {
-                // Buscar en rutinasSB (ediciÃ³n desde vista alumno)
+                // Buscar en rutinasSB (edición desde vista alumno)
                 const rSB = (rutinasSBEntrenador||[]).find(x=>String(x.id)===String(editEx.rId)) || (rutinasSB||[]).find(x=>String(x.id)===String(editEx.rId));
                 if(rSB) {
                   const diasActualizados = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rSB.datos?.days||[]));
