@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Ic } from '../Ic.jsx';
 import { PATS } from '../../lib/exerciseStaticData.js';
-import { bibMuscleFilterHaystack, BIB_MUSCLE_OPTIONS } from '../../lib/appHelpers.js';
+import { bibMuscleFilterHaystack, formatBibMuscleDisplay, BIB_MUSCLE_OPTIONS } from '../../lib/appHelpers.js';
 
 export default function AddExerciseModal({
   addExModal,
