@@ -34,7 +34,7 @@ export default function AddExerciseModal({
       <div
         role="presentation"
         style={{
-          position:"fixed",top:0,right:0,bottom:0,left:coachDesktopNavHidden?260:0,zIndex:1200,
+          position:"fixed",top:0,right:0,bottom:0,left:260,zIndex:1200,
           display:"flex",flexDirection:"column",
           height:"100dvh",maxHeight:"100dvh",minHeight:0,
           boxSizing:"border-box",
@@ -62,8 +62,8 @@ export default function AddExerciseModal({
           aria-labelledby="add-ex-modal-title"
           style={{
             flex:"0 1 auto",
-            width: coachDesktopNavHidden ? "min(100%, 1120px)" : "100%",
-            maxWidth: coachDesktopNavHidden ? 1120 : undefined,
+            width:"calc(100% - 40px)",
+            maxWidth:900,
             minWidth: coachDesktopNavHidden ? 0 : undefined,
             maxHeight: coachDesktopNavHidden
               ? "min(90dvh, calc(100dvh - 40px))"
