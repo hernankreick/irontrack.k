@@ -158,7 +158,7 @@ export default function AddExerciseModal({
                   className={"add-ex-card add-ex-card--"+(darkMode?"dark":"light")}
                   role="button"
                   tabIndex={0}
-                  style={{display:"flex",alignItems:"flex-start",gap:12,padding:"8px 12px",marginBottom:8,marginLeft:1,marginRight:1,border:"none",boxSizing:"border-box",outline:"none",boxShadow:sel?"inset 0 0 0 2px "+(pat.color||"#2563EB"):"none",WebkitTapHighlightColor:"transparent",borderRadius:12}}
+                  style={{display:"flex",alignItems:"center",gap:10,padding:"6px 10px",marginBottom:4,marginLeft:1,marginRight:1,border:"none",boxSizing:"border-box",outline:"none",boxShadow:sel?"inset 0 0 0 2px "+(pat.color||"#2563EB"):"none",WebkitTapHighlightColor:"transparent",borderRadius:10}}
                   onMouseDown={e=>e.preventDefault()}
                   onClick={()=>setAddExSelectedIds(function(prev){return prev.includes(ex.id)?prev.filter(function(x){return x!==ex.id;}):[...prev,ex.id];})}
                   onKeyDown={e=>{
@@ -168,14 +168,14 @@ export default function AddExerciseModal({
                     }
                   }}
                 >
-                  <div style={{width:52,height:52,borderRadius:12,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:800,color:pat.color,flexShrink:0,marginTop:2}}>{pat.icon}</div>
+                  <div style={{width:38,height:38,borderRadius:10,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:pat.color,flexShrink:0}}>{pat.icon}</div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:18,fontWeight:700,lineHeight:1.25,wordBreak:"break-word"}}>{es?ex.name:ex.nameEn}</div>
-                    <div style={{fontSize:12,fontWeight:700,color:pat.color,textTransform:"uppercase",letterSpacing:.4,marginTop:4,lineHeight:1.3}}>{es?pat.label:pat.labelEn}</div>
-                    {(formatBibMuscleDisplay(ex.muscle, lang)||ex.equip)&&<div style={{fontSize:14,color:textMuted,marginTop:2,lineHeight:1.35,wordBreak:"break-word"}}>{[formatBibMuscleDisplay(ex.muscle, lang),ex.equip].filter(Boolean).join(" · ")}</div>}
+                    <div style={{fontSize:14,fontWeight:700,lineHeight:1.2,wordBreak:"break-word"}}>{es?ex.name:ex.nameEn}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:pat.color,textTransform:"uppercase",letterSpacing:.3,lineHeight:1.2}}>{es?pat.label:pat.labelEn}</div>
+                    {(formatBibMuscleDisplay(ex.muscle, lang)||ex.equip)&&<div style={{fontSize:11,color:textMuted,lineHeight:1.2,wordBreak:"break-word"}}>{[formatBibMuscleDisplay(ex.muscle, lang),ex.equip].filter(Boolean).join(" · ")}</div>}
                   </div>
-                  <div style={{width:28,height:28,borderRadius:"50%",border:"none",boxShadow:sel?"inset 0 0 0 2px "+pat.color:"inset 0 0 0 2px "+border,background:sel?pat.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:4}}>
-                    {sel ? <Ic name="check-sm" size={16} color={pat.color}/> : null}
+                  <div style={{width:22,height:22,borderRadius:"50%",border:"none",boxShadow:sel?"inset 0 0 0 2px "+pat.color:"inset 0 0 0 2px "+border,background:sel?pat.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                    {sel ? <Ic name="check-sm" size={14} color={pat.color}/> : null}
                   </div>
                 </div>
               );
