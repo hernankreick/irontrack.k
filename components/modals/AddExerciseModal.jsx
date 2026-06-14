@@ -66,11 +66,11 @@ export default function AddExerciseModal({
           aria-labelledby="add-ex-modal-title"
           style={{
             flex:"0 1 auto",
-            width:"calc(100% - 40px)",
+            width:"calc(100% - 16px)",
             maxWidth:900,
             minWidth: coachDesktopNavHidden ? 0 : undefined,
-            height:"85vh",
-            maxHeight: "85vh",
+            height:"95vh",
+            maxHeight: "95vh",
             minHeight:0,
             display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",
             background:bgCard,
@@ -168,9 +168,9 @@ export default function AddExerciseModal({
                     }
                   }}
                 >
-                  <div style={{width:38,height:38,borderRadius:10,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:pat.color,flexShrink:0}}>{pat.icon}</div>
+                  <div style={{width:44,height:44,borderRadius:11,background:pat.color+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,fontWeight:800,color:pat.color,flexShrink:0}}>{pat.icon}</div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:14,fontWeight:700,lineHeight:1.2,wordBreak:"break-word"}}>{es?ex.name:ex.nameEn}</div>
+                    <div style={{fontSize:16,fontWeight:700,lineHeight:1.2,wordBreak:"break-word"}}>{es?ex.name:ex.nameEn}</div>
                     <div style={{fontSize:11,fontWeight:700,color:pat.color,textTransform:"uppercase",letterSpacing:.3,lineHeight:1.2}}>{es?pat.label:pat.labelEn}</div>
                     {(formatBibMuscleDisplay(ex.muscle, lang)||ex.equip)&&<div style={{fontSize:11,color:textMuted,lineHeight:1.2,wordBreak:"break-word"}}>{[formatBibMuscleDisplay(ex.muscle, lang),ex.equip].filter(Boolean).join(" · ")}</div>}
                   </div>
