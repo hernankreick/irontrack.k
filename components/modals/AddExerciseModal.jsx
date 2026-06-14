@@ -30,7 +30,6 @@ export default function AddExerciseModal({
   const [musculoOpen, setMusculoOpen] = useState(false);
 
   const MUSCULOS = ["Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda","Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"];
-  const normalizar = str => str?.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"") || "";
 
   if (!addExModal) return null;
 
@@ -153,11 +152,8 @@ export default function AddExerciseModal({
             {allEx.filter(e=>{
               const q=addExSearch.toLowerCase();
               if(addExPat&&e.pattern!==addExPat) return false;
-              if(addExMuscle && !(
-                normalizar(e.muscle||"").includes(normalizar(addExMuscle)) ||
-                normalizar(e.musculo||"").includes(normalizar(addExMuscle)) ||
-                normalizar(e.muscles||"").includes(normalizar(addExMuscle))
-              )) return false;
+              if(addExMuscle && !(formatBibMuscleDisplay(e.muscle, lang)||"").toLowerCase()
+                .includes(addExMuscle.toLowerCase())) return false;
               if(!q) return true;
               return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
             }).map(ex=>{
