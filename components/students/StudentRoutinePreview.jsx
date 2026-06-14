@@ -142,8 +142,8 @@ export default function StudentRoutinePreview({
                 )}
             </div>
             <button type="button" className="hov" onClick={onToggleMain} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:"transparent",border:"none",padding:"6px 0",cursor:"pointer",marginBottom:8}}>
-              <span style={{fontSize:12,fontWeight:800,color:"#f59e0b",letterSpacing:0.5}}>{msg("BLOQUE PRINCIPAL", "MAIN BLOCK")}</span>
-              <Ic name="chevron-right" size={16} color="#f59e0b" style={{transform:coachDiaSecsOpen.main?"rotate(90deg)":"none",transition:"transform .2s"}}/>
+              <span style={{fontSize:12,fontWeight:800,color:"#3b82f6",letterSpacing:0.5}}>{msg("BLOQUE PRINCIPAL", "MAIN BLOCK")}</span>
+              <Ic name="chevron-right" size={16} color="#3b82f6" style={{transform:coachDiaSecsOpen.main?"rotate(90deg)":"none",transition:"transform .2s"}}/>
             </button>
             {coachDiaSecsOpen.main && (
               <div>
