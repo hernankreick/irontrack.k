@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Ic } from '../Ic.jsx';
 import { PATS } from '../../lib/exerciseStaticData.js';
-import { bibMuscleFilterHaystack, formatBibMuscleDisplay } from '../../lib/appHelpers.js';
+import { bibMuscleFilterHaystack, formatBibMuscleDisplay, BIB_MUSCLE_OPTIONS, parseBibMuscleJson } from '../../lib/appHelpers.js';
 
 export default function AddExerciseModal({
   addExModal,
@@ -28,10 +28,12 @@ export default function AddExerciseModal({
   onConfirm,
 }) {
   const [musculoOpen, setMusculoOpen] = useState(false);
-
-  const MUSCULOS = ["Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda","Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"];
-
   if (!addExModal) return null;
+
+  const MUSCULO_OPTIONS = BIB_MUSCLE_OPTIONS.map(o => ({ key: o.k, label: msg(o.selEs, o.selEn) }));
+  const selectedMuscleKey = addExMuscle
+    ? (BIB_MUSCLE_OPTIONS.find(o => msg(o.selEs, o.selEn) === addExMuscle) || {}).k || null
+    : null;
 
   return (
     <>
@@ -117,13 +119,13 @@ export default function AddExerciseModal({
                 </div>
                 {musculoOpen&&(
                   <div style={{position:"absolute",top:"110%",left:0,right:0,background:"#111827",border:"1px solid #1e1e2e",borderRadius:8,zIndex:9999,maxHeight:200,overflowY:"auto"}}>
-                    {[null,...MUSCULOS].map(m=>(
+                    {[null,...MUSCULO_OPTIONS].map(opt=>(
                       <div
-                        key={m||"__all"}
-                        onClick={()=>{setAddExMuscle(m);setMusculoOpen(false);}}
-                        style={{padding:"10px 12px",cursor:"pointer",color:"#E5E7EB",fontSize:14,background:addExMuscle===m?"#1e3a5f":"transparent"}}
+                        key={opt?opt.key:"__all"}
+                        onClick={()=>{setAddExMuscle(opt?opt.label:null);setMusculoOpen(false);}}
+                        style={{padding:"10px 12px",cursor:"pointer",color:"#E5E7EB",fontSize:14,background:addExMuscle===(opt?opt.label:null)?"#1e3a5f":"transparent"}}
                       >
-                        {m||msg("Todos los músculos","All muscles")}
+                        {opt?opt.label:msg("Todos los músculos","All muscles")}
                       </div>
                     ))}
                   </div>
@@ -152,8 +154,13 @@ export default function AddExerciseModal({
             {allEx.filter(e=>{
               const q=addExSearch.toLowerCase();
               if(addExPat&&e.pattern!==addExPat) return false;
-              if(addExMuscle && !(formatBibMuscleDisplay(e.muscle, lang)||"").toLowerCase()
-                .includes(addExMuscle.toLowerCase())) return false;
+              if(addExMuscle){
+                const arr=parseBibMuscleJson(e.muscle);
+                const match=arr
+                  ?(selectedMuscleKey?arr.includes(selectedMuscleKey):false)
+                  :String(e.muscle||"").toLowerCase().includes(addExMuscle.toLowerCase());
+                if(!match) return false;
+              }
               if(!q) return true;
               return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
             }).map(ex=>{
