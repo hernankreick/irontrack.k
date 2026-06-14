@@ -104,17 +104,20 @@ export default function AddExerciseModal({
             </div>
             <div style={{marginBottom:16}}>
               <label style={{fontSize:11,fontWeight:700,color:"#6B7280",letterSpacing:".5px",textTransform:"uppercase",display:"block",marginBottom:6}}>MÚSCULO</label>
-              <select
-                value={addExMuscle||""}
-                onChange={e=>setAddExMuscle(e.target.value||null)}
-                style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #1e1e2e",background:"#111827",color:"#E5E7EB",fontSize:14,fontFamily:"DM Sans, sans-serif"}}
-              >
-                <option value="">{msg("Todos los músculos","All muscles")}</option>
-                {["Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda",
-                  "Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"].map(m=>(
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
+              <div style={{overflow:"hidden"}}>
+                <select
+                  size={1}
+                  value={addExMuscle||""}
+                  onChange={e=>setAddExMuscle(e.target.value||null)}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #1e1e2e",background:"#111827",color:"#E5E7EB",fontSize:14,fontFamily:"DM Sans, sans-serif"}}
+                >
+                  <option value="">{msg("Todos los músculos","All muscles")}</option>
+                  {["Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda",
+                    "Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"].map(m=>(
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
           <div
@@ -150,7 +153,7 @@ export default function AddExerciseModal({
                   className={"add-ex-card add-ex-card--"+(darkMode?"dark":"light")}
                   role="button"
                   tabIndex={0}
-                  style={{display:"flex",alignItems:"flex-start",gap:12,padding:"14px 14px",marginBottom:8,marginLeft:1,marginRight:1,border:"none",boxSizing:"border-box",outline:"none",boxShadow:sel?"inset 0 0 0 2px "+(pat.color||"#2563EB"):"none",WebkitTapHighlightColor:"transparent",borderRadius:12}}
+                  style={{display:"flex",alignItems:"flex-start",gap:12,padding:"8px 12px",marginBottom:8,marginLeft:1,marginRight:1,border:"none",boxSizing:"border-box",outline:"none",boxShadow:sel?"inset 0 0 0 2px "+(pat.color||"#2563EB"):"none",WebkitTapHighlightColor:"transparent",borderRadius:12}}
                   onMouseDown={e=>e.preventDefault()}
                   onClick={()=>setAddExSelectedIds(function(prev){return prev.includes(ex.id)?prev.filter(function(x){return x!==ex.id;}):[...prev,ex.id];})}
                   onKeyDown={e=>{
