@@ -77,7 +77,7 @@ export default function AddExerciseModal({
             borderRadius: coachDesktopNavHidden ? 16 : "16px 16px 0 0",
             flexShrink: coachDesktopNavHidden ? 0 : undefined,
           }}
-          onClick={e=>e.stopPropagation()}
+          onClick={e=>{e.stopPropagation();setMusculoOpen(false);}}
         >
           <div style={{flex:"none",padding: coachDesktopNavHidden ? "12px 24px 0 24px" : "12px 16px 0 16px",background:bgCard}}>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}>
@@ -104,7 +104,7 @@ export default function AddExerciseModal({
               <label style={{fontSize:10,fontWeight:700,color:"#6B7280",letterSpacing:".5px",textTransform:"uppercase",display:"block",marginBottom:4}}>MÚSCULO</label>
               <div style={{position:"relative"}}>
                 <div
-                  onClick={()=>setMusculoOpen(o=>!o)}
+                  onClick={e=>{e.stopPropagation();setMusculoOpen(o=>!o);}}
                   style={{width:"100%",padding:"7px 12px",borderRadius:8,border:"1px solid #1e1e2e",background:"#111827",color:"#E5E7EB",fontSize:13,fontFamily:"DM Sans, sans-serif",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",boxSizing:"border-box"}}
                 >
                   <span>{addExMuscle||msg("Todos los músculos","All muscles")}</span>
@@ -115,7 +115,7 @@ export default function AddExerciseModal({
                     {[null,...MUSCULO_OPTIONS].map(opt=>(
                       <div
                         key={opt?opt.key:"__all"}
-                        onClick={()=>{setAddExMuscle(opt?opt.label:null);setMusculoOpen(false);}}
+                        onClick={e=>{e.stopPropagation();setAddExMuscle(opt?opt.label:null);setMusculoOpen(false);}}
                         style={{padding:"10px 12px",cursor:"pointer",color:"#E5E7EB",fontSize:14,background:addExMuscle===(opt?opt.label:null)?"#1e3a5f":"transparent"}}
                       >
                         {opt?opt.label:msg("Todos los músculos","All muscles")}
