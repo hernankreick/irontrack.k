@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Ic } from '../Ic.jsx';
 import { PATS } from '../../lib/exerciseStaticData.js';
-import { bibMuscleFilterHaystack, formatBibMuscleDisplay, BIB_MUSCLE_OPTIONS, parseBibMuscleJson } from '../../lib/appHelpers.js';
+import { bibMuscleFilterHaystack, BIB_MUSCLE_OPTIONS } from '../../lib/appHelpers.js';
 
 export default function AddExerciseModal({
   addExModal,
@@ -31,9 +31,7 @@ export default function AddExerciseModal({
   if (!addExModal) return null;
 
   const MUSCULO_OPTIONS = BIB_MUSCLE_OPTIONS.map(o => ({ key: o.k, label: msg(o.selEs, o.selEn) }));
-  const selectedMuscleKey = addExMuscle
-    ? (BIB_MUSCLE_OPTIONS.find(o => msg(o.selEs, o.selEn) === addExMuscle) || {}).k || null
-    : null;
+  const normalizar = str => (str||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 
   return (
     <>
@@ -152,16 +150,9 @@ export default function AddExerciseModal({
           }}
           >
             {allEx.filter(e=>{
-              if(allEx.indexOf(e)<3) console.log('Selected key:',selectedMuscleKey,'| Exercise muscle field:',e.muscle,'| Parsed:',parseBibMuscleJson(e.muscle));
               const q=addExSearch.toLowerCase();
               if(addExPat&&e.pattern!==addExPat) return false;
-              if(addExMuscle){
-                const arr=parseBibMuscleJson(e.muscle);
-                const match=arr
-                  ?(selectedMuscleKey?arr.includes(selectedMuscleKey):false)
-                  :String(e.muscle||"").toLowerCase().includes(addExMuscle.toLowerCase());
-                if(!match) return false;
-              }
+              if(addExMuscle && !normalizar(e.muscle).includes(normalizar(addExMuscle))) return false;
               if(!q) return true;
               return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
             }).map(ex=>{
