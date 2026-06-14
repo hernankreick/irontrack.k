@@ -28,6 +28,10 @@ export default function AddExerciseModal({
   onConfirm,
 }) {
   const [musculoOpen, setMusculoOpen] = useState(false);
+
+  const MUSCULOS = ["Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda","Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"];
+  const normalizar = str => str?.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"") || "";
+
   if (!addExModal) return null;
 
   return (
@@ -114,7 +118,7 @@ export default function AddExerciseModal({
                 </div>
                 {musculoOpen&&(
                   <div style={{position:"absolute",top:"110%",left:0,right:0,background:"#111827",border:"1px solid #1e1e2e",borderRadius:8,zIndex:9999,maxHeight:200,overflowY:"auto"}}>
-                    {[null,"Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda","Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"].map(m=>(
+                    {[null,...MUSCULOS].map(m=>(
                       <div
                         key={m||"__all"}
                         onClick={()=>{setAddExMuscle(m);setMusculoOpen(false);}}
@@ -146,13 +150,13 @@ export default function AddExerciseModal({
             touchAction:"pan-y",
           }}
           >
-            {console.log('Músculos únicos:', [...new Set(allEx.map(e => e.muscle))])}
             {allEx.filter(e=>{
               const q=addExSearch.toLowerCase();
               if(addExPat&&e.pattern!==addExPat) return false;
               if(addExMuscle && !(
-                (e.muscle||"").toLowerCase().includes(addExMuscle.toLowerCase()) ||
-                (e.musculos||"").toLowerCase().includes(addExMuscle.toLowerCase())
+                normalizar(e.muscle||"").includes(normalizar(addExMuscle)) ||
+                normalizar(e.musculo||"").includes(normalizar(addExMuscle)) ||
+                normalizar(e.muscles||"").includes(normalizar(addExMuscle))
               )) return false;
               if(!q) return true;
               return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
