@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Ic } from '../Ic.jsx';
 import { PATS } from '../../lib/exerciseStaticData.js';
 import { bibMuscleFilterHaystack, formatBibMuscleDisplay } from '../../lib/appHelpers.js';
@@ -27,6 +27,7 @@ export default function AddExerciseModal({
   onClose,
   onConfirm,
 }) {
+  const [musculoOpen, setMusculoOpen] = useState(false);
   if (!addExModal) return null;
 
   return (
@@ -104,19 +105,27 @@ export default function AddExerciseModal({
             </div>
             <div style={{marginBottom:16}}>
               <label style={{fontSize:11,fontWeight:700,color:"#6B7280",letterSpacing:".5px",textTransform:"uppercase",display:"block",marginBottom:6}}>MÚSCULO</label>
-              <div style={{overflow:"hidden"}}>
-                <select
-                  size={1}
-                  value={addExMuscle||""}
-                  onChange={e=>setAddExMuscle(e.target.value||null)}
-                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #1e1e2e",background:"#111827",color:"#E5E7EB",fontSize:14,fontFamily:"DM Sans, sans-serif"}}
+              <div style={{position:"relative"}}>
+                <div
+                  onClick={()=>setMusculoOpen(o=>!o)}
+                  style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #1e1e2e",background:"#111827",color:"#E5E7EB",fontSize:14,fontFamily:"DM Sans, sans-serif",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",boxSizing:"border-box"}}
                 >
-                  <option value="">{msg("Todos los músculos","All muscles")}</option>
-                  {["Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda",
-                    "Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"].map(m=>(
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+                  <span>{addExMuscle||msg("Todos los músculos","All muscles")}</span>
+                  <span style={{fontSize:10}}>▼</span>
+                </div>
+                {musculoOpen&&(
+                  <div style={{position:"absolute",top:"110%",left:0,right:0,background:"#111827",border:"1px solid #1e1e2e",borderRadius:8,zIndex:9999,maxHeight:200,overflowY:"auto"}}>
+                    {[null,"Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda","Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"].map(m=>(
+                      <div
+                        key={m||"__all"}
+                        onClick={()=>{setAddExMuscle(m);setMusculoOpen(false);}}
+                        style={{padding:"10px 12px",cursor:"pointer",color:"#E5E7EB",fontSize:14,background:addExMuscle===m?"#1e3a5f":"transparent"}}
+                      >
+                        {m||msg("Todos los músculos","All muscles")}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
