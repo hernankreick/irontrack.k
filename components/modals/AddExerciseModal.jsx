@@ -152,6 +152,7 @@ export default function AddExerciseModal({
           }}
           >
             {allEx.filter(e=>{
+              if(allEx.indexOf(e)<3) console.log('Selected key:',selectedMuscleKey,'| Exercise muscle field:',e.muscle,'| Parsed:',parseBibMuscleJson(e.muscle));
               const q=addExSearch.toLowerCase();
               if(addExPat&&e.pattern!==addExPat) return false;
               if(addExMuscle){
