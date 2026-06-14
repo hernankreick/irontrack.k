@@ -66,9 +66,7 @@ export default function AddExerciseModal({
             width:"calc(100% - 40px)",
             maxWidth:900,
             minWidth: coachDesktopNavHidden ? 0 : undefined,
-            maxHeight: coachDesktopNavHidden
-              ? "min(90dvh, calc(100dvh - 40px))"
-              : "80dvh",
+            maxHeight: "85vh",
             minHeight:0,
             display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",
             background:bgCard,
