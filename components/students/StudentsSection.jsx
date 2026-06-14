@@ -165,9 +165,9 @@ export default function StudentsSection(props) {
                       const errEm = !/^[^@]+@[^@]+\.[^@]+$/.test(newAlumnoData.email);
                       if(errNom||errEm){setNewAlumnoErrors({nombre:errNom,email:errEm});return;}
                       setLoadingSB(true);
-                      const res = await sb.createAlumno({nombre:newAlumnoData.nombre.trim(),email:newAlumnoData.email.trim(),password:newAlumnoData.pass.trim()||"irontrack2024",entrenador_id:ENTRENADOR_ID});
-                      if(res&&res[0]){setAlumnos(prev=>cleanActiveCoachAlumnos([...prev,res[0]],ENTRENADOR_ID));toast2(msg("Alumno creado ✓", "Athlete created ✓"));setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}
-                      else{toast2("Error al crear alumno");}
+                      const {data:createdRows,error:createErr} = await sb.createAlumno({nombre:newAlumnoData.nombre.trim(),email:newAlumnoData.email.trim(),password:newAlumnoData.pass.trim()||"irontrack2024",entrenador_id:ENTRENADOR_ID});
+                      if(createdRows&&createdRows[0]){setAlumnos(prev=>cleanActiveCoachAlumnos([...prev,createdRows[0]],ENTRENADOR_ID));toast2(msg("Alumno creado ✓", "Athlete created ✓"));setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}
+                      else{const errMsg=createErr?.message||createErr?.details||"";toast2("Error al crear alumno"+(errMsg?" — "+errMsg:""));}
                       setLoadingSB(false);
                     }}>GUARDAR</button>
                   </div>

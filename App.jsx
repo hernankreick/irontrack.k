@@ -272,7 +272,11 @@ const sbFetch = async (path, method="GET", body=null) => {
 
 const sb = {
   getAlumnos: (entId) => sbFetch("alumnos?entrenador_id=eq."+entId+"&select=*"),
-  createAlumno: (data) => sbFetch("alumnos", "POST", data),
+  createAlumno: async (alumnoData) => {
+    const { data, error } = await supabase.from("alumnos").insert([alumnoData]).select();
+    if (error) console.error("[createAlumno]", error);
+    return { data: data || [], error };
+  },
   getRutinas: async (alumnoId) => {
     const { data, error } = await supabase.from("rutinas").select("*").eq("alumno_id", alumnoId);
     if (error) { console.error("[rutinas SELECT ERROR]", error); return null; }
