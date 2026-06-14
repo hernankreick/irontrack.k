@@ -31,7 +31,7 @@ export default function AddExerciseModal({
   if (!addExModal) return null;
 
   const MUSCULO_OPTIONS = BIB_MUSCLE_OPTIONS.map(o => ({ key: o.k, label: msg(o.selEs, o.selEn) }));
-  const normalizar = str => (str||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  const normalizar = str => String(str||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 
   return (
     <>
