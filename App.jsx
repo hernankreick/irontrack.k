@@ -469,7 +469,7 @@ const sb = {
 },
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
-  getVideoOverrides: () => sbFetch("video_overrides?select=ejercicio_id,youtube_url"), // TODO: filtrar por entrenador_id cuando esté disponible
+  getVideoOverrides: (entId) => sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(entId||"entrenador_principal")+"&select=ejercicio_id,youtube_url"),
   getCustomEx: async (entId) => {
     const { data, error } = await supabase
       .from("ejercicios_custom")
@@ -484,6 +484,7 @@ const sb = {
     return row;
   },
   deleteCustomEx: async (id, entId) => {
+    if (!entId) { console.error('deleteCustomEx called without entId — aborting'); return; }
     var q = supabase.from("ejercicios_custom").delete().eq("id", id);
     if (entId) q = q.eq("entrenador_id", String(entId));
     const { error } = await q;
@@ -491,6 +492,7 @@ const sb = {
     return true;
   },
   updateCustomEx: async (id, data, entId) => {
+    if (!entId) { console.error('updateCustomEx called without entId — aborting'); return; }
     var q = supabase.from("ejercicios_custom").update(data).eq("id", id);
     if (entId) q = q.eq("entrenador_id", String(entId));
     const { data: rows, error } = await q.select();

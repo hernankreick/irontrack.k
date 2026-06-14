@@ -862,7 +862,7 @@ export function RoutineCard({
                   );
                   setHasUnsaved(true);
                   if (r.saved && sb) {
-                    console.log('Saving reorder to Supabase:', savedDays);
+
                     try {
                       await sb.updateRutina(r.id, {
                         nombre: r.name,
@@ -886,7 +886,7 @@ export function RoutineCard({
                   );
                   setHasUnsaved(true);
                   if (r.saved && sb) {
-                    console.log('Saving reorder to Supabase:', savedDays);
+
                     try {
                       await sb.updateRutina(r.id, {
                         nombre: r.name,
