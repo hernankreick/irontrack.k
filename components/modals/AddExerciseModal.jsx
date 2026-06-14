@@ -146,7 +146,7 @@ export default function AddExerciseModal({
             touchAction:"pan-y",
           }}
           >
-            {console.log('Primer ejercicio:', allEx[0])}
+            {console.log('Músculos únicos:', [...new Set(allEx.map(e => e.muscle))])}
             {allEx.filter(e=>{
               const q=addExSearch.toLowerCase();
               if(addExPat&&e.pattern!==addExPat) return false;
