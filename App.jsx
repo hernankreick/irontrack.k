@@ -469,7 +469,7 @@ const sb = {
 },
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
-  getVideoOverrides: () => sbFetch("video_overrides?select=ejercicio_id,youtube_url"), // TODO: filtrar por entrenador_id cuando esté disponible
+  getVideoOverrides: (entId) => sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(entId||"entrenador_principal")+"&select=ejercicio_id,youtube_url"),
   getCustomEx: async (entId) => {
     const { data, error } = await supabase
       .from("ejercicios_custom")
