@@ -132,10 +132,10 @@ export default function AddExerciseModal({
             className={coachDesktopNavHidden ? "add-ex-list-scroll--desktop" : undefined}
             style={{
             flex:1,
-            minHeight:300,
-            maxHeight:"45vh",
+            minHeight:0,
+            maxHeight:"calc(90vh - 280px)",
             minWidth:0,
-            overflowY:"auto",
+            overflowY:"scroll",
             overflowX:"hidden",
             WebkitOverflowScrolling:"touch",
             overscrollBehavior:"contain",
@@ -149,8 +149,10 @@ export default function AddExerciseModal({
             {allEx.filter(e=>{
               const q=addExSearch.toLowerCase();
               if(addExPat&&e.pattern!==addExPat) return false;
-              if(addExMuscle && !(formatBibMuscleDisplay(e.muscle, lang)||"").toLowerCase()
-                .includes(addExMuscle.toLowerCase())) return false;
+              if(addExMuscle && !(
+                (e.muscle||"").toLowerCase().includes(addExMuscle.toLowerCase()) ||
+                (e.musculos||"").toLowerCase().includes(addExMuscle.toLowerCase())
+              )) return false;
               if(!q) return true;
               return (e.name||"").toLowerCase().includes(q)||(e.nameEn||"").toLowerCase().includes(q)||bibMuscleFilterHaystack(e.muscle).includes(q);
             }).map(ex=>{
