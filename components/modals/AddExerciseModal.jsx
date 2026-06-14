@@ -89,83 +89,32 @@ export default function AddExerciseModal({
               <button type="button" className="hov" style={{...btn(),padding:"6px",flexShrink:0}} onClick={onClose} aria-label={msg("Cerrar", "Close")}><Ic name="x" size={20}/></button>
             </div>
             <input style={{...inp,marginBottom:12,width:"100%",boxSizing:"border-box"}} placeholder={msg("Buscar...", "Search...")} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:700,color:textMuted,letterSpacing:"0.06em",marginBottom:10,textTransform:"uppercase"}}>
-                {msg("Patrones", "Patterns")}
-              </div>
-              <div style={{position:"relative",overflow:"hidden"}}>
-                <div
-                  className="add-ex-hscroll"
-                  style={{
-                    display:"flex",
-                    flexDirection:"row",
-                    flexWrap:"nowrap",
-                    alignItems:"center",
-                    gap:9,
-                    overflowX:"auto",
-                    overflowY:"hidden",
-                    WebkitOverflowScrolling:"touch",
-                    marginLeft:-6,
-                    marginRight:-6,
-                    paddingLeft:6,
-                    paddingRight:6,
-                    paddingBottom:2,
-                    minHeight:46,
-                  }}
-                >
-                  {Object.entries(PATS).map(([k,p])=>(
-                    <button key={k} type="button" className="hov" style={{flex:"0 0 auto",background:addExPat===k?"#2563EB":"transparent",color:addExPat===k?"#ffffff":"#94a3b8",border:addExPat===k?"1px solid #2563EB":"1px solid #334155",boxShadow:"none",borderRadius:10,padding:"10px 16px",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:".5px"}} onClick={()=>setAddExPat(addExPat===k?null:k)}>
-                      {es?p.label:p.labelEn}
-                    </button>
-                  ))}
-                </div>
-                <div aria-hidden style={{position:"absolute",right:0,top:0,bottom:0,width:32,pointerEvents:"none",zIndex:2,background:"linear-gradient(to left, "+bgCard+" 0%, "+bgCard+"cc 35%, transparent 100%)"}} />
-              </div>
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:11,fontWeight:700,color:"#6B7280",letterSpacing:".5px",textTransform:"uppercase",display:"block",marginBottom:6}}>PATRÓN</label>
+              <select
+                value={addExPat||""}
+                onChange={e=>setAddExPat(e.target.value||null)}
+                style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #1e1e2e",background:"#111827",color:"#E5E7EB",fontSize:14,fontFamily:"DM Sans, sans-serif"}}
+              >
+                <option value="">{msg("Todos los patrones","All patterns")}</option>
+                {Object.entries(PATS).map(([k,p])=>(
+                  <option key={k} value={k}>{es?p.label:p.labelEn}</option>
+                ))}
+              </select>
             </div>
-            <div style={{marginBottom:14}}>
-              <div style={{fontSize:11,fontWeight:600,color:"#64748b",letterSpacing:"0.06em",marginBottom:8,textTransform:"uppercase",opacity:0.92}}>
-                {msg("Músculos", "Muscles")}
-              </div>
-              <div style={{position:"relative",overflow:"hidden"}}>
-                <div
-                  className="add-ex-hscroll"
-                  style={{
-                    display:"flex",
-                    flexDirection:"row",
-                    flexWrap:"nowrap",
-                    alignItems:"center",
-                    gap:9,
-                    overflowX:"auto",
-                    overflowY:"hidden",
-                    WebkitOverflowScrolling:"touch",
-                    marginLeft:-6,
-                    marginRight:-6,
-                    paddingLeft:6,
-                    paddingRight:6,
-                    paddingBottom:2,
-                    minHeight:40,
-                  }}
-                >
-                  {["Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda",
-                    "Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"]
-                    .map(m=>(
-                      <button key={m} type="button" className="hov" style={{
-                        flex:"0 0 auto",
-                        background: addExMuscle===m ? "#2563EB" : "transparent",
-                        color: addExMuscle===m ? "#ffffff" : "#94a3b8",
-                        border: addExMuscle===m ? "1px solid #2563EB" : "1px solid #334155",
-                        boxShadow: "none",
-                        borderRadius:8, padding:"8px 12px", fontSize:12, fontWeight:700,
-                        cursor:"pointer", whiteSpace:"nowrap",
-                        textTransform:"uppercase", letterSpacing:".5px"
-                      }} onClick={()=>setAddExMuscle(addExMuscle===m?null:m)}>
-                        {m}
-                      </button>
-                    ))
-                  }
-                </div>
-                <div aria-hidden style={{position:"absolute",right:0,top:0,bottom:0,width:28,pointerEvents:"none",zIndex:2,background:"linear-gradient(to left, "+bgCard+" 0%, "+bgCard+"cc 40%, transparent 100%)"}} />
-              </div>
+            <div style={{marginBottom:16}}>
+              <label style={{fontSize:11,fontWeight:700,color:"#6B7280",letterSpacing:".5px",textTransform:"uppercase",display:"block",marginBottom:6}}>MÚSCULO</label>
+              <select
+                value={addExMuscle||""}
+                onChange={e=>setAddExMuscle(e.target.value||null)}
+                style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #1e1e2e",background:"#111827",color:"#E5E7EB",fontSize:14,fontFamily:"DM Sans, sans-serif"}}
+              >
+                <option value="">{msg("Todos los músculos","All muscles")}</option>
+                {["Cuádriceps","Glúteo","Isquiotibial","Pectoral","Espalda",
+                  "Hombro","Core","Aductor","Abductor","Bíceps","Tríceps"].map(m=>(
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div
