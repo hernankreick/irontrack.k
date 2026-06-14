@@ -66,7 +66,8 @@ export default function AddExerciseModal({
             width:"calc(100% - 40px)",
             maxWidth:900,
             minWidth: coachDesktopNavHidden ? 0 : undefined,
-            maxHeight: "85vh",
+            maxHeight: "90vh",
+            height: "90vh",
             minHeight:0,
             display:"flex",flexDirection:"column",overflow:"hidden",boxSizing:"border-box",
             background:bgCard,
@@ -131,7 +132,8 @@ export default function AddExerciseModal({
             className={coachDesktopNavHidden ? "add-ex-list-scroll--desktop" : undefined}
             style={{
             flex:1,
-            minHeight:0,
+            minHeight:300,
+            maxHeight:"45vh",
             minWidth:0,
             overflowY:"auto",
             overflowX:"hidden",
