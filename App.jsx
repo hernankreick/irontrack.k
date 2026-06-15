@@ -3424,7 +3424,12 @@ function GymApp() {
         <CoachSectionRenderer {...buildCoachSectionRendererProps()} />
         {tab==="plan"&&esAlumno&&(
           <div className="mx-auto w-full max-w-[32rem] pt-4">
-            {esAlumno&&routines.length>0&&(()=>{
+            {esAlumno&&cargandoAlumno&&(
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"60vh"}}>
+                <div style={{width:32,height:32,border:"3px solid #1e1e2e",borderTop:"3px solid #2563EB",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+              </div>
+            )}
+            {esAlumno&&!cargandoAlumno&&routines.length>0&&(()=>{
               const r0 = routines[0];
               const hoy = new Date().toLocaleDateString("es-AR");
               const totalDays = r0?.days?.length||0;
@@ -3612,15 +3617,10 @@ function GymApp() {
               );
             })()}
 
-            {esAlumno&&cargandoAlumno&&(
-              <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0A0F1A"}}>
-                <div style={{width:32,height:32,border:"3px solid #1e1e2e",borderTop:"3px solid #2563EB",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
-              </div>
-            )}
             {esAlumno&&!cargandoAlumno&&routines.length===0&&(
               <StudentNoRoutinesEmptyState msg={msg} textMuted={textMuted} />
             )}
-            {esAlumno&&routines.length>0&&routines.map(r=>{
+            {esAlumno&&!cargandoAlumno&&routines.length>0&&routines.map(r=>{
               const hoyStr = new Date().toLocaleDateString("es-AR");
               const currentWeekForRoutine = String(r.id) === String(routines[0]?.id) ? studentCurrentWeek : currentWeek;
               const completedDaysForRoutine = String(r.id) === String(routines[0]?.id)
