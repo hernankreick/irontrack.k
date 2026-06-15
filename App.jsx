@@ -1152,6 +1152,7 @@ function GymApp() {
     var sess = null;
     try { sess = JSON.parse(localStorage.getItem("it_session") || "null"); } catch (e) { sess = null; }
     setSessionData(sess);
+    if (sess?.role === "alumno") setCargandoAlumno(true);
     try { setLoginScreen(!localStorage.getItem("it_session")); } catch (e) { setLoginScreen(true); }
     try { setRoutines(JSON.parse(localStorage.getItem("it_rt") || "[]")); } catch (e) { setRoutines([]); }
     try { setProgress(JSON.parse(localStorage.getItem("it_pg") || "{}")); } catch (e) { setProgress({}); }
@@ -1571,6 +1572,7 @@ function GymApp() {
   // Refrescar rutinas del alumno desde Supabase siempre al cargar
   useEffect(() => {
     if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
+      setCargandoAlumno(true);
       (async () => {
         try {
           const rutsRaw = await sb.getRutinas(sessionData.alumnoId);
