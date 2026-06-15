@@ -822,6 +822,7 @@ function GymApp() {
     setSettingsOpen,
   } = useAppShellUIState();
 
+  const [cargandoAlumno, setCargandoAlumno] = useState(function () { try { return !localStorage.getItem("it_session") ? false : JSON.parse(localStorage.getItem("it_session")||"null")?.role === "alumno"; } catch(e) { return false; } });
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
   const [progress, setProgress] = useState(() => { try{return JSON.parse(localStorage.getItem("it_pg")||"{}")}catch(e){return {}} });
   const [user, setUser] = useState(() => { try{return JSON.parse(localStorage.getItem("it_u")||"null")}catch(e){return null} });
@@ -1602,7 +1603,10 @@ function GymApp() {
             if(res && res[0]) setNotaDia(res[0].contenido||res[0].texto||"");
           }).catch(function(){});
         } catch(e) { console.error('[cargarRutinaAlumno]', e); }
+        finally { setCargandoAlumno(false); }
       })();
+    } else if (sessionData?.role !== "alumno") {
+      setCargandoAlumno(false);
     }
   }, [sessionData?.alumnoId]);
   useEffect(() => { localStorage.setItem("it_cd",JSON.stringify(completedDays)); },[completedDays]);
@@ -3606,7 +3610,12 @@ function GymApp() {
               );
             })()}
 
-            {esAlumno&&routines.length===0&&(
+            {esAlumno&&cargandoAlumno&&(
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0A0F1A"}}>
+                <div style={{width:32,height:32,border:"3px solid #1e1e2e",borderTop:"3px solid #2563EB",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+              </div>
+            )}
+            {esAlumno&&!cargandoAlumno&&routines.length===0&&(
               <StudentNoRoutinesEmptyState msg={msg} textMuted={textMuted} />
             )}
             {esAlumno&&routines.length>0&&routines.map(r=>{
