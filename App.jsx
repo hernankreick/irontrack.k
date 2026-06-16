@@ -1582,6 +1582,10 @@ function GymApp() {
     console.log('useEffect fired, alumnoId:', sessionData?.alumnoId);
     if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
       setCargandoAlumno(true);
+      const safetyTimeout = setTimeout(() => {
+        console.warn('Safety timeout: forcing cargandoAlumno to false');
+        setCargandoAlumno(false);
+      }, 8000);
       (async () => {
         try {
           const rutsRaw = await sb.getRutinas(sessionData.alumnoId);
@@ -1614,7 +1618,10 @@ function GymApp() {
             if(res && res[0]) setNotaDia(res[0].contenido||res[0].texto||"");
           }).catch(function(){});
         } catch(e) { console.error('[cargarRutinaAlumno]', e); }
-        finally { setCargandoAlumno(false); }
+        finally {
+          clearTimeout(safetyTimeout);
+          setCargandoAlumno(false);
+        }
       })();
     } else if (sessionData?.role !== "alumno") {
       setCargandoAlumno(false);
