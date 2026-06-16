@@ -1583,6 +1583,7 @@ function GymApp() {
     if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
       setCargandoAlumno(true);
       const safetyTimeout = setTimeout(() => {
+        console.log('TIMEOUT fired at 1586');
         console.warn('Safety timeout: forcing cargandoAlumno to false');
         setCargandoAlumno(false);
       }, 8000);
@@ -1619,6 +1620,7 @@ function GymApp() {
           }).catch(function(){});
         } catch(e) { console.error('[cargarRutinaAlumno]', e); }
         finally {
+          console.log('FINALLY fired at 1623, fetch completed normally');
           clearTimeout(safetyTimeout);
           setCargandoAlumno(false);
         }
