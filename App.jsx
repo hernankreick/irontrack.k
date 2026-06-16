@@ -822,7 +822,14 @@ function GymApp() {
     setSettingsOpen,
   } = useAppShellUIState();
 
-  const [cargandoAlumno, setCargandoAlumno] = useState(function () { try { return !localStorage.getItem("it_session") ? false : JSON.parse(localStorage.getItem("it_session")||"null")?.role === "alumno"; } catch(e) { return false; } });
+  const [cargandoAlumno, setCargandoAlumno] = useState(() => {
+    try {
+      const item = localStorage.getItem('it_session');
+      if (!item) return false;
+      const sess = JSON.parse(item);
+      return sess?.role === 'alumno';
+    } catch(e) { return false; }
+  });
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
   const [progress, setProgress] = useState(() => { try{return JSON.parse(localStorage.getItem("it_pg")||"{}")}catch(e){return {}} });
   const [user, setUser] = useState(() => { try{return JSON.parse(localStorage.getItem("it_u")||"null")}catch(e){return null} });
