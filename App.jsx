@@ -1624,6 +1624,7 @@ function GymApp() {
         }
       })();
     } else if (sessionData?.role !== "alumno") {
+      console.log('Line 1627 fired — sessionData.role was:', sessionData?.role);
       setCargandoAlumno(false);
     }
   }, [sessionData?.alumnoId]);
