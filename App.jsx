@@ -830,6 +830,7 @@ function GymApp() {
       return sess?.role === 'alumno';
     } catch(e) { return false; }
   });
+  console.log('Initial cargandoAlumno:', cargandoAlumno);
   const [routines, setRoutines] = useState(() => { try{return JSON.parse(localStorage.getItem("it_rt")||"[]")}catch(e){return []} });
   const [progress, setProgress] = useState(() => { try{return JSON.parse(localStorage.getItem("it_pg")||"{}")}catch(e){return {}} });
   const [user, setUser] = useState(() => { try{return JSON.parse(localStorage.getItem("it_u")||"null")}catch(e){return null} });
@@ -1578,6 +1579,7 @@ function GymApp() {
 
   // Refrescar rutinas del alumno desde Supabase siempre al cargar
   useEffect(() => {
+    console.log('useEffect fired, alumnoId:', sessionData?.alumnoId);
     if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
       setCargandoAlumno(true);
       (async () => {
@@ -2768,6 +2770,7 @@ function GymApp() {
     </>
   );
 
+  console.log('Render check — esAlumno:', esAlumno, 'cargandoAlumno:', cargandoAlumno);
   if (esAlumno && cargandoAlumno) return (
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100dvh",background:bg}}>
       <div style={{width:36,height:36,border:"3px solid #1e1e2e",borderTop:"3px solid #2563EB",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
