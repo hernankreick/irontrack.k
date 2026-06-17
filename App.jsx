@@ -3473,6 +3473,13 @@ function GymApp() {
               const nextDayIdx = daysCompletedThisWeek < totalDays ? daysCompletedThisWeek : null;
               const weeklyPct = totalDays > 0 ? Math.min(100, Math.round((daysCompletedThisWeek / totalDays) * 100)) : 0;
               const todayDay = nextDayIdx !== null ? r0?.days?.[nextDayIdx] : null;
+              console.log('DEBUG hoy/iniciar:', {
+                completedDaysInWeek: activeStudentRoutinePosition.completedDaysInWeek,
+                totalDays,
+                nextDayIdx,
+                todayDay: todayDay?.dia || todayDay,
+                esAlumno
+              });
               const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeekForStudent)));
               const todayDayPresentation = buildStudentDayPresentation({
                 day: todayDay,
