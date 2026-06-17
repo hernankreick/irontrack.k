@@ -1979,6 +1979,13 @@ function GymApp() {
       currentWeek: currentWeek,
     });
   }, [esAlumno, routines, sessionData?.alumnoId, sesiones, completedDays, currentWeek]);
+  console.log('DEBUG completedDays/sesiones snapshot:', {
+    completedDaysInWeek: activeStudentRoutinePosition.completedDaysInWeek,
+    sesionesLength: sesiones?.length,
+    sesionesAlumnoIds: [...new Set((sesiones||[]).map(s => s.alumno_id))],
+    completedDaysArray: completedDays,
+    currentAlumnoId: sessionData?.alumnoId
+  });
   const studentCurrentWeek = esAlumno ? activeStudentRoutinePosition.currentWeek : currentWeek;
   const alumnoPlanHeaderDayNum = useMemo(
     function () {
@@ -3701,6 +3708,13 @@ function GymApp() {
                     const dayKey=r.id+"-"+di+"-w"+currentWeekForRoutine;
                     const isDayDone=completedDays.includes(dayKey);
                     const daysCompletedR=completedDaysForRoutine;
+                    console.log('DEBUG completedDays/sesiones snapshot:', {
+                      completedDaysInWeek: activeStudentRoutinePosition.completedDaysInWeek,
+                      sesionesLength: sesiones?.length,
+                      sesionesAlumnoIds: [...new Set((sesiones||[]).map(s => s.alumno_id))],
+                      completedDaysArray: completedDays,
+                      currentAlumnoId: sessionData?.alumnoId
+                    });
                     const localNextDayIdx=daysCompletedR < r.days.length ? daysCompletedR : null;
                     const isNextDay=di===localNextDayIdx;
                     const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
