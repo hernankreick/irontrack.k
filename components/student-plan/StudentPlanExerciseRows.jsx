@@ -1,5 +1,6 @@
 import React from "react";
 import { resolveExerciseTitle } from "../../lib/exerciseResolve.js";
+import { Ic } from "../Ic.jsx";
 
 function cleanKey(value) {
   return String(value || "")
@@ -54,9 +55,7 @@ function ExThumb({ src, name }) {
       {src ? (
         <img src={src} alt={name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
       ) : (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6.5 6.5h11M6.5 17.5h11M4 12h16M9 4.5V6.5M15 4.5V6.5M9 17.5V19.5M15 17.5V19.5" />
-        </svg>
+        <Ic name="dumbbell" size={22} color="#2563EB" strokeWidth={1.9} />
       )}
     </div>
   );
