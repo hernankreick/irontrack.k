@@ -139,26 +139,6 @@ export function WelcomeModal({
                   ctaLabel={startLabel}
                   onStart={handleStart}
                 />
-                <section style={{ marginTop: 18, paddingBottom: 8 }}>
-                  <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.1, color: textMain, textTransform: "uppercase", marginBottom: 10 }}>
-                    {msg ? msg("TU ENTRENAMIENTO DE HOY", "TODAY'S WORKOUT", "SEU TREINO DE HOJE") : "TU ENTRENAMIENTO DE HOY"}
-                  </div>
-                  <div style={{ background: "rgba(13,20,36,0.84)", border: "1px solid " + border, borderRadius: 14, overflow: "hidden", padding: "0 12px" }}>
-                    <StudentPlanExerciseRows
-                      day={todayDay}
-                      routineId={routineId || "welcome"}
-                      dayIndex={dayIndex}
-                      allEx={allEx || []}
-                      currentWeekForRoutine={currentWeek}
-                      border={border}
-                      textMain={textMain}
-                      msg={msg}
-                      es={es}
-                      fmtP={fmtP}
-                      renderExerciseVideoButton={renderExerciseVideoButton}
-                    />
-                  </div>
-                </section>
               </>
             ) : (
               <CurrentWorkoutHero
