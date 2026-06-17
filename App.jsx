@@ -1969,6 +1969,7 @@ function GymApp() {
         currentDayIndex: null,
         completedDaysInWeek: 0,
         totalDaysInWeek: 0,
+        completedDayIndexes: [],
       };
     }
     return getActiveStudentRoutinePosition({
@@ -3706,7 +3707,8 @@ function GymApp() {
                   </div>
                   {r.days.map((d,di)=>{
                     const dayKey=r.id+"-"+di+"-w"+currentWeekForRoutine;
-                    const isDayDone=completedDays.includes(dayKey);
+                    const isDayDone=completedDays.includes(dayKey)
+                      ||(esAlumno&&String(r.id)===String(routines[0]?.id)&&(activeStudentRoutinePosition.completedDayIndexes||[]).includes(di));
                     const daysCompletedR=completedDaysForRoutine;
                     console.log('DEBUG completedDays/sesiones snapshot:', {
                       completedDaysInWeek: activeStudentRoutinePosition.completedDaysInWeek,
