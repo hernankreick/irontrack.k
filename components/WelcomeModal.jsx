@@ -1,6 +1,9 @@
 import React from "react";
+import { resolveVideoUrl } from "../lib/exerciseResolve.js";
+import { fmtP } from "../lib/timeFormat.js";
+import { ExerciseVideoPlayButton } from "./ExerciseVideoPlayButton.jsx";
 import { CurrentWorkoutHero } from "./student-plan/CurrentWorkoutHero.jsx";
-import { TodayWorkoutList } from "./student-plan/TodayWorkoutList.jsx";
+import StudentPlanExerciseRows from "./student-plan/StudentPlanExerciseRows.jsx";
 
 /**
  * Drawer de bienvenida del modo alumno.
@@ -9,6 +12,7 @@ import { TodayWorkoutList } from "./student-plan/TodayWorkoutList.jsx";
 export function WelcomeModal({
   open,
   onOpenChange,
+  routineId,
   es,
   bgCard,
   border,
@@ -38,6 +42,18 @@ export function WelcomeModal({
     if (onStartWorkout) onStartWorkout();
     else onOpenChange?.(false);
   };
+
+  function renderExerciseVideoButton(inf, ex, nombre) {
+    var vUrl = resolveVideoUrl(inf || null, ex, videoOverrides || {});
+    return (
+      <ExerciseVideoPlayButton
+        hasVideo={!!vUrl}
+        onClick={function () { if (vUrl && onExerciseVideo) onExerciseVideo(nombre, vUrl); }}
+        ariaLabel={msg ? msg("Ver video del ejercicio", "View exercise video") : "Ver video"}
+        ariaLabelDisabled={msg ? msg("Video no disponible", "No video available") : "Sin video"}
+      />
+    );
+  }
 
   return (
     <>
@@ -123,19 +139,27 @@ export function WelcomeModal({
                   ctaLabel={startLabel}
                   onStart={handleStart}
                 />
-                <TodayWorkoutList
-                  msg={msg}
-                  day={todayDay}
-                  allEx={allEx}
-                  images={images}
-                  currentWeek={currentWeek}
-                  es={es}
-                  videoOverrides={videoOverrides}
-                  textMain={textMain}
-                  textMuted={textMuted}
-                  border={border}
-                  onExerciseVideo={onExerciseVideo}
-                />
+                <section style={{ marginTop: 18, paddingBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1.1, color: textMain, textTransform: "uppercase", marginBottom: 10 }}>
+                    {msg ? msg("TU ENTRENAMIENTO DE HOY", "TODAY'S WORKOUT", "SEU TREINO DE HOJE") : "TU ENTRENAMIENTO DE HOY"}
+                  </div>
+                  <div style={{ background: "rgba(13,20,36,0.84)", border: "1px solid " + border, borderRadius: 14, overflow: "hidden", padding: "0 12px" }}>
+                    <StudentPlanExerciseRows
+                      day={todayDay}
+                      routineId={routineId || "welcome"}
+                      dayIndex={dayIndex}
+                      allEx={allEx || []}
+                      currentWeekForRoutine={currentWeek}
+                      border={border}
+                      textMain={textMain}
+                      msg={msg}
+                      es={es}
+                      fmtP={fmtP}
+                      images={images}
+                      renderExerciseVideoButton={renderExerciseVideoButton}
+                    />
+                  </div>
+                </section>
               </>
             ) : (
               <CurrentWorkoutHero
