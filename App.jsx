@@ -1582,6 +1582,7 @@ function GymApp() {
     console.log('useEffect fired, alumnoId:', sessionData?.alumnoId);
     if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
       setCargandoAlumno(true);
+      setSesiones([]); // FIX B: flush stale sesiones from a previous student before fetching
       const safetyTimeout = setTimeout(() => {
         console.log('TIMEOUT fired at 1586');
         console.warn('Safety timeout: forcing cargandoAlumno to false');
@@ -1589,7 +1590,11 @@ function GymApp() {
       }, 8000);
       (async () => {
         try {
-          const rutsRaw = await sb.getRutinas(sessionData.alumnoId);
+          // FIX A: fetch rutinas and sesiones in parallel
+          const [rutsRaw, ses] = await Promise.all([
+            sb.getRutinas(sessionData.alumnoId),
+            sb.getSesiones(sessionData.alumnoId),
+          ]);
           const ruts = (rutsRaw || []).slice().sort(function (a, b) {
             return new Date(b.created_at || 0) - new Date(a.created_at || 0);
           }).slice(0, 1);
@@ -1612,8 +1617,6 @@ function GymApp() {
               return [rutLocal];
             });
           }
-          // Cargar nota del día
-          const ses = await sb.getSesiones(sessionData.alumnoId);
           setSesiones(ses || []);
           sb.getNota(sessionData.alumnoId).then(function(res) {
             if(res && res[0]) setNotaDia(res[0].contenido||res[0].texto||"");
