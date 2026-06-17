@@ -155,7 +155,6 @@ export function WelcomeModal({
                       msg={msg}
                       es={es}
                       fmtP={fmtP}
-                      images={images}
                       renderExerciseVideoButton={renderExerciseVideoButton}
                     />
                   </div>
