@@ -57,42 +57,6 @@ export function WelcomeModal({
 
   return (
     <>
-      <style>{`
-        .it-welcome-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,.93);
-          z-index: 300;
-          display: flex;
-          justify-content: center;
-          align-items: flex-start;
-          padding: calc(4rem + env(safe-area-inset-top, 0px)) 16px env(safe-area-inset-bottom, 0px);
-          box-sizing: border-box;
-        }
-        @media (min-width: 1024px) {
-          .it-welcome-overlay {
-            align-items: center;
-            padding: 2rem 24px;
-          }
-        }
-        .it-welcome-panel {
-          width: 100%;
-          max-width: 480px;
-          max-height: min(78vh, 720px);
-          display: flex;
-          flex-direction: column;
-          border-radius: 20px;
-          overflow: hidden;
-          animation: slideUpFade 0.35s ease;
-          box-sizing: border-box;
-        }
-        .it-welcome-body {
-          flex: 1;
-          min-height: 0;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-      `}</style>
       <div
         className="it-welcome-overlay"
         onClick={() => onOpenChange?.(false)}
