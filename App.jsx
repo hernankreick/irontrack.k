@@ -3598,6 +3598,7 @@ function GymApp() {
                   />
 
                   {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
+                  {console.log('[HERO-DIAG] showWelcome:', showWelcome, '| hoyCard:', planScrollDiag.hoyCard, '| todayDay:', !!todayDay, '| yaEntrenoHoy:', yaEntrenoHoy, '| session:', !!session)}
                   {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&!showWelcome&&(
                     <>
                     <CurrentWorkoutHero
