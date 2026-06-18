@@ -3598,7 +3598,7 @@ function GymApp() {
                   />
 
                   {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
-                  {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&(
+                  {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&!showWelcome&&(
                     <>
                     <CurrentWorkoutHero
                       msg={msg}
