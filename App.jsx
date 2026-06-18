@@ -1172,6 +1172,7 @@ function GymApp() {
         welcome = true;
       }
     } catch (e) {}
+    console.log('[SYNC-DIAG] setShowWelcome called with:', welcome);
     setShowWelcome(welcome);
     try { setCurrentWeek(parseInt(localStorage.getItem("it_week") || "0", 10) || 0); } catch (e) { setCurrentWeek(0); }
     try { setCompletedDays(JSON.parse(localStorage.getItem("it_cd") || "[]")); } catch (e) { setCompletedDays([]); }
@@ -1625,6 +1626,7 @@ function GymApp() {
         finally {
           console.log('FINALLY fired at 1623, fetch completed normally');
           clearTimeout(safetyTimeout);
+          console.log('[LOADING-DIAG] setCargandoAlumno(false) — moment showWelcome would be evaluated');
           setCargandoAlumno(false);
         }
       })();
