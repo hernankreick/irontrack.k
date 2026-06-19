@@ -1,18 +1,15 @@
 import React, { useRef } from "react";
-import { resolveVideoUrl } from "../lib/exerciseResolve.js";
-import { fmtP } from "../lib/timeFormat.js";
-import { ExerciseVideoPlayButton } from "./ExerciseVideoPlayButton.jsx";
+import { createPortal } from "react-dom";
 import { CurrentWorkoutHero } from "./student-plan/CurrentWorkoutHero.jsx";
-import StudentPlanExerciseRows from "./student-plan/StudentPlanExerciseRows.jsx";
 
 /**
  * Drawer de bienvenida del modo alumno.
- * Muestra el entrenamiento actual sin repetir la bienvenida generica anterior.
+ * Usa createPortal para montarse directamente en document.body y evitar
+ * problemas de stacking context con AppMainScroll (z-index: 0, overflow-y: auto).
  */
 export function WelcomeModal({
   open,
   onOpenChange,
-  routineId,
   es,
   bgCard,
   border,
@@ -26,19 +23,15 @@ export function WelcomeModal({
   typeBadgeText,
   exerciseCount,
   durationMinutes,
-  allEx,
-  images,
-  videoOverrides,
-  onExerciseVideo,
   onStartWorkout,
 }) {
   // Must be before the early return to comply with Rules of Hooks.
-  // Stores the timestamp of when the modal last opened so the overlay
-  // click-to-dismiss is ignored for the first 350ms (prevents click-through
-  // from the login button firing on the newly-mounted overlay).
+  // Grace period: ignore overlay clicks for 350ms after mount to prevent
+  // the login button's mouseup from immediately closing the modal.
   const mountedAt = useRef(0);
   if (open && mountedAt.current === 0) mountedAt.current = Date.now();
   if (!open) { mountedAt.current = 0; return null; }
+  if (typeof document === "undefined") return null;
 
   const startLabel = msg ? msg("EMPEZAR", "START", "COMEÇAR") : es ? "EMPEZAR" : "START";
   const weekDayLine = msg
@@ -49,19 +42,7 @@ export function WelcomeModal({
     else onOpenChange?.(false);
   };
 
-  function renderExerciseVideoButton(inf, ex, nombre) {
-    var vUrl = resolveVideoUrl(inf || null, ex, videoOverrides || {});
-    return (
-      <ExerciseVideoPlayButton
-        hasVideo={!!vUrl}
-        onClick={function () { if (vUrl && onExerciseVideo) onExerciseVideo(nombre, vUrl); }}
-        ariaLabel={msg ? msg("Ver video del ejercicio", "View exercise video") : "Ver video"}
-        ariaLabelDisabled={msg ? msg("Video no disponible", "No video available") : "Sin video"}
-      />
-    );
-  }
-
-  return (
+  return createPortal(
     <>
       <div
         className="it-welcome-overlay"
@@ -95,21 +76,19 @@ export function WelcomeModal({
               {msg ? msg("Entrenamiento de hoy", "Today's workout", "Treino de hoje") : "Entrenamiento de hoy"}
             </div>
             {todayDay ? (
-              <>
-                <CurrentWorkoutHero
-                  msg={msg}
-                  textMain={textMain}
-                  textMuted={textMuted}
-                  hoyBadgeText={msg("HOY TOCA", "TODAY", "HOJE")}
-                  semDiaLine={weekDayLine}
-                  dayTitle={dayTitle}
-                  typeBadgeText={typeBadgeText}
-                  exerciseCount={exerciseCount}
-                  durationMinutes={durationMinutes}
-                  ctaLabel={startLabel}
-                  onStart={handleStart}
-                />
-              </>
+              <CurrentWorkoutHero
+                msg={msg}
+                textMain={textMain}
+                textMuted={textMuted}
+                hoyBadgeText={msg("HOY TOCA", "TODAY", "HOJE")}
+                semDiaLine={weekDayLine}
+                dayTitle={dayTitle}
+                typeBadgeText={typeBadgeText}
+                exerciseCount={exerciseCount}
+                durationMinutes={durationMinutes}
+                ctaLabel={startLabel}
+                onStart={handleStart}
+              />
             ) : (
               <CurrentWorkoutHero
                 msg={msg}
@@ -128,6 +107,7 @@ export function WelcomeModal({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
