@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { resolveVideoUrl } from "../lib/exerciseResolve.js";
 import { fmtP } from "../lib/timeFormat.js";
 import { ExerciseVideoPlayButton } from "./ExerciseVideoPlayButton.jsx";
@@ -32,7 +32,13 @@ export function WelcomeModal({
   onExerciseVideo,
   onStartWorkout,
 }) {
-  if (!open) return null;
+  // Must be before the early return to comply with Rules of Hooks.
+  // Stores the timestamp of when the modal last opened so the overlay
+  // click-to-dismiss is ignored for the first 350ms (prevents click-through
+  // from the login button firing on the newly-mounted overlay).
+  const mountedAt = useRef(0);
+  if (open && mountedAt.current === 0) mountedAt.current = Date.now();
+  if (!open) { mountedAt.current = 0; return null; }
 
   const startLabel = msg ? msg("EMPEZAR", "START", "COMEÇAR") : es ? "EMPEZAR" : "START";
   const weekDayLine = msg
@@ -59,7 +65,7 @@ export function WelcomeModal({
     <>
       <div
         className="it-welcome-overlay"
-        onClick={() => onOpenChange?.(false)}
+        onClick={() => { if (Date.now() - mountedAt.current > 350) onOpenChange?.(false); }}
         role="presentation"
       >
         <div
