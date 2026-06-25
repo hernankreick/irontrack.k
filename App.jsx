@@ -643,7 +643,7 @@ function GymApp() {
     editAlumnoPass, setEditAlumnoPass,
     cargarAlumnos,
     notifyAlumno,
-  } = useAlumnos({ sb });
+  } = useAlumnos({ sb, entrenadorId: supabaseSessionUserId || sessionData?.entrenadorId || null });
   const {
     registrosSubTab, setRegistrosSubTab,
     sugsOpen, setSugsOpen,

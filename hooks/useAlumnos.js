@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 const ONESIGNAL_APP_ID = '8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7';
 const ONESIGNAL_KEY = 'os_v2_app_rrpcxujkzbexve7l7ud6lttu24fxxofjnc3eke5wljs2bkhvuto27d46nxt5r7pvgtnpsrxphnbgr35vfdsiesntivkncl75aq4gyuy';
 
-export function useAlumnos({ sb }) {
+export function useAlumnos({ sb, entrenadorId }) {
 
   // ── Estados ──────────────────────────────────────────────────────────
   const [alumnos,         setAlumnos]         = useState([]);
@@ -23,17 +23,10 @@ export function useAlumnos({ sb }) {
   // ── Funciones ─────────────────────────────────────────────────────────
 
   const cargarAlumnos = useCallback(async () => {
-    const rawSession = localStorage.getItem('it_session');
-    let entrenadorId = null;
-    try {
-      entrenadorId = JSON.parse(rawSession || 'null')?.entrenadorId || null;
-    } catch (e) {}
-    console.log('[cargarAlumnos] it_session raw:', rawSession);
-    console.log('[cargarAlumnos] entrenadorId parsed:', entrenadorId);
     if (!entrenadorId) return;
     const sbAlumnos = await sb.getAlumnos(entrenadorId) || [];
     setAlumnos(sbAlumnos);
-  }, [sb]);
+  }, [sb, entrenadorId]);
 
   const notifyAlumno = useCallback(async (alumnoId, mensaje) => {
     try {
