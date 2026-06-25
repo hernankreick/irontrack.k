@@ -23,6 +23,7 @@ export function useAlumnos({ sb, entrenadorId }) {
   // ── Funciones ─────────────────────────────────────────────────────────
 
   const cargarAlumnos = useCallback(async () => {
+    console.log('[cargarAlumnos] entrenadorId prop:', entrenadorId);
     if (!entrenadorId) return;
     const sbAlumnos = await sb.getAlumnos(entrenadorId) || [];
     setAlumnos(sbAlumnos);

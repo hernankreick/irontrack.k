@@ -643,6 +643,7 @@ function GymApp() {
     editAlumnoPass, setEditAlumnoPass,
     cargarAlumnos,
     notifyAlumno,
+  console.log('[useAlumnos init] supabaseSessionUserId:', supabaseSessionUserId, '| sessionData?.entrenadorId:', sessionData?.entrenadorId);
   } = useAlumnos({ sb, entrenadorId: supabaseSessionUserId || sessionData?.entrenadorId || null });
   const {
     registrosSubTab, setRegistrosSubTab,
