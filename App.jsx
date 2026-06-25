@@ -643,7 +643,6 @@ function GymApp() {
     editAlumnoPass, setEditAlumnoPass,
     cargarAlumnos,
     notifyAlumno,
-  console.log('[useAlumnos init] supabaseSessionUserId:', supabaseSessionUserId, '| sessionData?.entrenadorId:', sessionData?.entrenadorId);
   } = useAlumnos({ sb, entrenadorId: supabaseSessionUserId || sessionData?.entrenadorId || null });
   const {
     registrosSubTab, setRegistrosSubTab,
@@ -2792,7 +2791,6 @@ function GymApp() {
     </>
   );
 
-  console.log('Render check — esAlumno:', esAlumno, 'cargandoAlumno:', cargandoAlumno);
   if (esAlumno && cargandoAlumno) return (
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100dvh",background:bg}}>
       <div style={{width:36,height:36,border:"3px solid #1e1e2e",borderTop:"3px solid #2563EB",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
@@ -3458,6 +3456,11 @@ function GymApp() {
             routineDaysCount={routineDaysCount}
             onRegistrarPrimerEntrenamiento={()=>setTab("plan")}
           />
+        )}
+        {sessionData?.role === 'entrenador' && (
+          <div style={{position:'fixed',top:0,left:0,right:0,zIndex:99999,background:'#1e1b4b',color:'#a5b4fc',fontSize:11,padding:'6px 10px',fontFamily:'monospace',lineHeight:1.5}}>
+            <b>DEBUG</b> | supabaseSessionUserId: <b>{String(supabaseSessionUserId ?? 'null')}</b> | sessionData.entrenadorId: <b>{String(sessionData?.entrenadorId ?? 'null')}</b> | alumnos.length: <b>{alumnos.length}</b>
+          </div>
         )}
         <CoachSectionRenderer {...buildCoachSectionRendererProps()} />
         {tab==="plan"&&esAlumno&&(
