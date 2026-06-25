@@ -760,7 +760,7 @@ function GymApp() {
     var lista = alumnosActuales || alumnosActivosLimpios;
     if(!lista || lista.length === 0) {
       try {
-        var sbAlumnos = await sb.getAlumnos('entrenador_principal');
+        var sbAlumnos = await sb.getAlumnos(supabaseSessionUserId || sessionData?.entrenadorId);
         var clean = cleanActiveCoachAlumnos(sbAlumnos || [], ENTRENADOR_ID);
         if(clean && clean.length > 0) { setAlumnos(clean); lista = clean; }
         else return;
@@ -793,7 +793,7 @@ function GymApp() {
     if(sessionData && sessionData.role==='entrenador') {
       var init = async function() {
         var rutinasPromise = cargarRutinasEntrenador();
-        var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos('entrenador_principal') || [], ENTRENADOR_ID);
+        var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos(supabaseSessionUserId || sessionData?.entrenadorId) || [], ENTRENADOR_ID);
         setAlumnos(sbAlumnos);
         if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
         await rutinasPromise;
