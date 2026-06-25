@@ -23,10 +23,13 @@ export function useAlumnos({ sb }) {
   // ── Funciones ─────────────────────────────────────────────────────────
 
   const cargarAlumnos = useCallback(async () => {
+    const rawSession = localStorage.getItem('it_session');
     let entrenadorId = null;
     try {
-      entrenadorId = JSON.parse(localStorage.getItem('it_session') || 'null')?.entrenadorId || null;
+      entrenadorId = JSON.parse(rawSession || 'null')?.entrenadorId || null;
     } catch (e) {}
+    console.log('[cargarAlumnos] it_session raw:', rawSession);
+    console.log('[cargarAlumnos] entrenadorId parsed:', entrenadorId);
     if (!entrenadorId) return;
     const sbAlumnos = await sb.getAlumnos(entrenadorId) || [];
     setAlumnos(sbAlumnos);
