@@ -1,7 +1,6 @@
 // ── hooks/useAlumnos.js ──────────────────────────────────────────────────
 import { useState, useCallback } from 'react';
 
-const ENTRENADOR_ID = 'entrenador_principal';
 const ONESIGNAL_APP_ID = '8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7';
 const ONESIGNAL_KEY = 'os_v2_app_rrpcxujkzbexve7l7ud6lttu24fxxofjnc3eke5wljs2bkhvuto27d46nxt5r7pvgtnpsrxphnbgr35vfdsiesntivkncl75aq4gyuy';
 
@@ -24,7 +23,12 @@ export function useAlumnos({ sb }) {
   // ── Funciones ─────────────────────────────────────────────────────────
 
   const cargarAlumnos = useCallback(async () => {
-    const sbAlumnos = await sb.getAlumnos(ENTRENADOR_ID) || [];
+    let entrenadorId = null;
+    try {
+      entrenadorId = JSON.parse(localStorage.getItem('it_session') || 'null')?.entrenadorId || null;
+    } catch (e) {}
+    if (!entrenadorId) return;
+    const sbAlumnos = await sb.getAlumnos(entrenadorId) || [];
     setAlumnos(sbAlumnos);
   }, [sb]);
 
