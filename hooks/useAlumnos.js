@@ -23,10 +23,11 @@ export function useAlumnos({ sb }) {
   // ── Funciones ─────────────────────────────────────────────────────────
 
   const cargarAlumnos = useCallback(async () => {
-    let entrenadorId = 'entrenador_principal';
+    let entrenadorId = null;
     try {
-      entrenadorId = JSON.parse(localStorage.getItem('it_session') || 'null')?.entrenadorId || 'entrenador_principal';
+      entrenadorId = JSON.parse(localStorage.getItem('it_session') || 'null')?.entrenadorId || null;
     } catch (e) {}
+    if (!entrenadorId) return;
     const sbAlumnos = await sb.getAlumnos(entrenadorId) || [];
     setAlumnos(sbAlumnos);
   }, [sb]);
