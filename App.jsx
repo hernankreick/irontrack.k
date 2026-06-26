@@ -156,9 +156,9 @@ const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 function getStoredEntrenadorId() {
   try {
-    return JSON.parse(localStorage.getItem("it_session") || "null")?.entrenadorId || null;
+    return JSON.parse(localStorage.getItem("it_session") || "null")?.entrenadorId || "entrenador_principal";
   } catch (e) {
-    return null;
+    return "entrenador_principal";
   }
 }
 
