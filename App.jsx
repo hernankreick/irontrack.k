@@ -674,8 +674,8 @@ function GymApp() {
   
 
   const alumnosActivosLimpios = useMemo(function () {
-    return cleanActiveCoachAlumnos(alumnos, ENTRENADOR_ID);
-  }, [alumnos, ENTRENADOR_ID]);
+    return cleanActiveCoachAlumnos(alumnos, supabaseSessionUserId || sessionData?.entrenadorId);
+  }, [alumnos, supabaseSessionUserId, sessionData?.entrenadorId]);
 
   const alumnosActivosIds = useMemo(function () {
     var ids = {};
