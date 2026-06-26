@@ -104,6 +104,27 @@ export function WelcomeModal({
                 onStart={handleStart}
               />
             )}
+            <button
+              type="button"
+              onClick={() => onOpenChange?.(false)}
+              style={{
+                display: "block",
+                width: "100%",
+                marginTop: 8,
+                padding: "10px 16px",
+                background: "transparent",
+                border: "none",
+                color: textMuted,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textAlign: "center",
+                letterSpacing: 0.2,
+              }}
+            >
+              {msg ? msg("Ver rutina completa", "View full routine", "Ver rotina completa") : es ? "Ver rutina completa" : "View full routine"}
+            </button>
           </div>
         </div>
       </div>
