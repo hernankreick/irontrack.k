@@ -8,7 +8,10 @@ const GlobalBottomNav = React.forwardRef(function GlobalBottomNav({ darkMode, es
       backdropFilter: "blur(12px)",
       borderTop:"1px solid "+(darkMode?"#1E2D40":"#E2E8F0"),
       display:"flex",zIndex:40,
-      paddingBottom:"env(safe-area-inset-bottom,0px)"
+      paddingBottom:"env(safe-area-inset-bottom,0px)",
+      overflowX:"auto",
+      WebkitOverflowScrolling:"touch",
+      whiteSpace:"nowrap",
     }}>
       {tabs2.map(tb=>{
         const isActive = tab===tb.k;
