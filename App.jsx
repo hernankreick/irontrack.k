@@ -580,7 +580,6 @@ function GymApp() {
   const [tabMain, setTabMain] = useState("entrenador"); // entrenador | alumno
       const [onboardStep, setOnboardStep] = useState(0);
   const [onboardDone, setOnboardDone] = useState(()=>{ try{return !!localStorage.getItem('it_onboard_done');}catch(e){return false;} });
-                          const ENTRENADOR_ID = "entrenador_principal";
   // Modo alumno: detectar ?r= en la URL
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const sharedParam = urlParams ? urlParams.get("r") : null;
@@ -590,6 +589,7 @@ function GymApp() {
   const [sessionData, setSessionData] = useState(()=>{ try{return JSON.parse(localStorage.getItem("it_session")||"null")}catch(e){return null} });
   const esAlumno = readOnly || sessionData?.role==="alumno";
   const [supabaseSessionUserId, setSupabaseSessionUserId] = useState(null);
+  const ENTRENADOR_ID = supabaseSessionUserId || sessionData?.entrenadorId || "entrenador_principal";
   const [loginScreen, setLoginScreen] = useState(()=>{ try{return !localStorage.getItem("it_session")}catch(e){return true} });
   const [loginRole, setLoginRole] = useState("entrenador");
   const [loginEmail, setLoginEmail] = useState("");
