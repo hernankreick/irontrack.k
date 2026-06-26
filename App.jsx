@@ -1623,7 +1623,6 @@ function GymApp() {
           }).catch(function(){});
         } catch(e) { console.error('[cargarRutinaAlumno]', e); }
         finally {
-          console.log('FINALLY fired at 1623, fetch completed normally');
           clearTimeout(safetyTimeout);
           setCargandoAlumno(false);
         }
