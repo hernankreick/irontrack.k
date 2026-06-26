@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useRef } from "react";
+import { createPortal } from "react-dom";
 import { CurrentWorkoutHero } from "./student-plan/CurrentWorkoutHero.jsx";
-import { TodayWorkoutList } from "./student-plan/TodayWorkoutList.jsx";
 
 /**
  * Drawer de bienvenida del modo alumno.
- * Muestra el entrenamiento actual sin repetir la bienvenida generica anterior.
+ * Usa createPortal para montarse directamente en document.body y evitar
+ * problemas de stacking context con AppMainScroll (z-index: 0, overflow-y: auto).
  */
 export function WelcomeModal({
   open,
@@ -22,13 +23,15 @@ export function WelcomeModal({
   typeBadgeText,
   exerciseCount,
   durationMinutes,
-  allEx,
-  images,
-  videoOverrides,
-  onExerciseVideo,
   onStartWorkout,
 }) {
-  if (!open) return null;
+  // Must be before the early return to comply with Rules of Hooks.
+  // Grace period: ignore overlay clicks for 350ms after mount to prevent
+  // the login button's mouseup from immediately closing the modal.
+  const mountedAt = useRef(0);
+  if (open && mountedAt.current === 0) mountedAt.current = Date.now();
+  if (!open) { mountedAt.current = 0; return null; }
+  if (typeof document === "undefined") return null;
 
   const startLabel = msg ? msg("EMPEZAR", "START", "COMEÇAR") : es ? "EMPEZAR" : "START";
   const weekDayLine = msg
@@ -39,47 +42,11 @@ export function WelcomeModal({
     else onOpenChange?.(false);
   };
 
-  return (
+  return createPortal(
     <>
-      <style>{`
-        .it-welcome-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,.93);
-          z-index: 300;
-          display: flex;
-          justify-content: center;
-          align-items: flex-start;
-          padding: calc(4rem + env(safe-area-inset-top, 0px)) 16px env(safe-area-inset-bottom, 0px);
-          box-sizing: border-box;
-        }
-        @media (min-width: 1024px) {
-          .it-welcome-overlay {
-            align-items: center;
-            padding: 2rem 24px;
-          }
-        }
-        .it-welcome-panel {
-          width: 100%;
-          max-width: 480px;
-          max-height: min(78vh, 720px);
-          display: flex;
-          flex-direction: column;
-          border-radius: 20px;
-          overflow: hidden;
-          animation: slideUpFade 0.35s ease;
-          box-sizing: border-box;
-        }
-        .it-welcome-body {
-          flex: 1;
-          min-height: 0;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-      `}</style>
       <div
         className="it-welcome-overlay"
-        onClick={() => onOpenChange?.(false)}
+        onClick={() => { if (Date.now() - mountedAt.current > 350) onOpenChange?.(false); }}
         role="presentation"
       >
         <div
@@ -109,34 +76,19 @@ export function WelcomeModal({
               {msg ? msg("Entrenamiento de hoy", "Today's workout", "Treino de hoje") : "Entrenamiento de hoy"}
             </div>
             {todayDay ? (
-              <>
-                <CurrentWorkoutHero
-                  msg={msg}
-                  textMain={textMain}
-                  textMuted={textMuted}
-                  hoyBadgeText={msg("HOY TOCA", "TODAY", "HOJE")}
-                  semDiaLine={weekDayLine}
-                  dayTitle={dayTitle}
-                  typeBadgeText={typeBadgeText}
-                  exerciseCount={exerciseCount}
-                  durationMinutes={durationMinutes}
-                  ctaLabel={startLabel}
-                  onStart={handleStart}
-                />
-                <TodayWorkoutList
-                  msg={msg}
-                  day={todayDay}
-                  allEx={allEx}
-                  images={images}
-                  currentWeek={currentWeek}
-                  es={es}
-                  videoOverrides={videoOverrides}
-                  textMain={textMain}
-                  textMuted={textMuted}
-                  border={border}
-                  onExerciseVideo={onExerciseVideo}
-                />
-              </>
+              <CurrentWorkoutHero
+                msg={msg}
+                textMain={textMain}
+                textMuted={textMuted}
+                hoyBadgeText={msg("HOY TOCA", "TODAY", "HOJE")}
+                semDiaLine={weekDayLine}
+                dayTitle={dayTitle}
+                typeBadgeText={typeBadgeText}
+                exerciseCount={exerciseCount}
+                durationMinutes={durationMinutes}
+                ctaLabel={startLabel}
+                onStart={handleStart}
+              />
             ) : (
               <CurrentWorkoutHero
                 msg={msg}
@@ -152,9 +104,32 @@ export function WelcomeModal({
                 onStart={handleStart}
               />
             )}
+            <button
+              type="button"
+              onClick={() => onOpenChange?.(false)}
+              style={{
+                display: "block",
+                width: "100%",
+                marginTop: 8,
+                padding: "10px 16px",
+                background: "transparent",
+                border: "1px solid #1E293B",
+                borderRadius: 12,
+                color: textMuted,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textAlign: "center",
+                letterSpacing: 0.2,
+              }}
+            >
+              {msg ? msg("Ver rutina completa", "View full routine", "Ver rotina completa") : es ? "Ver rutina completa" : "View full routine"}
+            </button>
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

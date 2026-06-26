@@ -1623,7 +1623,6 @@ function GymApp() {
           }).catch(function(){});
         } catch(e) { console.error('[cargarRutinaAlumno]', e); }
         finally {
-          console.log('FINALLY fired at 1623, fetch completed normally');
           clearTimeout(safetyTimeout);
           setCargandoAlumno(false);
         }
@@ -2939,7 +2938,7 @@ function GymApp() {
                 const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id,entrenadorId:alumno.entrenador_id};
                 localStorage.setItem("it_session",JSON.stringify(s));
                 localStorage.setItem("it_show_welcome","1");
-                if(ruts&&ruts[0]) localStorage.setItem("it_rt",JSON.stringify([{...ruts[0].datos,alumnoId:alumno.id}]));
+                if(ruts&&ruts[0]){const rutLocal={id:ruts[0].id,name:ruts[0].nombre||"Rutina",days:ruts[0].datos?.days||[],datos:ruts[0].datos||{},alumno:ruts[0].datos?.alumno||alumno.nombre||"",note:ruts[0].datos?.note||"",alumno_id:alumno.id,saved:true};localStorage.setItem("it_rt",JSON.stringify([rutLocal]));}
                 // Registrar OneSignal
                 try {
                   window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -3598,7 +3597,7 @@ function GymApp() {
                   />
 
                   {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
-                  {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&(
+                  {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&!showWelcome&&(
                     <>
                     <CurrentWorkoutHero
                       msg={msg}
