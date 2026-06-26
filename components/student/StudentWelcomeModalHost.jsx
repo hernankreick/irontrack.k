@@ -44,6 +44,7 @@ export default function StudentWelcomeModalHost({
     <WelcomeModal
       open={true}
       onOpenChange={onOpenChange}
+      routineId={welcomeRoutine?.id}
       userName={sessionData?.name}
       es={es}
       bgCard={bgCard}
