@@ -793,7 +793,7 @@ function GymApp() {
     if(sessionData && sessionData.role==='entrenador') {
       var init = async function() {
         var rutinasPromise = cargarRutinasEntrenador();
-        var entId = supabaseSessionUserId || sessionData?.entrenadorId; var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos(entId) || [], entId);
+        var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos('entrenador_principal') || [], ENTRENADOR_ID);
         setAlumnos(sbAlumnos);
         if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
         await rutinasPromise;
