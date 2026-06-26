@@ -473,7 +473,7 @@ const sb = {
 },
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
-  getVideoOverrides: (entId) => sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(entId||"")+"&select=ejercicio_id,youtube_url"),
+  getVideoOverrides: (entId) => sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(entId||"entrenador_principal")+"&select=ejercicio_id,youtube_url"),
   getCustomEx: async (entId) => {
     const { data, error } = await supabase
       .from("ejercicios_custom")
@@ -505,15 +505,15 @@ const sb = {
   },
   setVideoOverride: async (ejercicioId, url) => {
     try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
-    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:supabaseSessionUserId || sessionData?.entrenadorId}); } catch(e){ return null; }
+    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
   },
-  getEntrenador: (id) => sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"")+"&select=*"),
+  getEntrenador: (id) => sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal")+"&select=*"),
   updateEntrenador: (id, data) => {
     var clean = {};
     if (data && typeof data === "object") {
       Object.keys(data).forEach(function(k){ if(data[k] !== undefined) clean[k] = data[k]; });
     }
-    return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||""), "PATCH", clean);
+    return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
   },
 };
 
@@ -643,7 +643,7 @@ function GymApp() {
     editAlumnoPass, setEditAlumnoPass,
     cargarAlumnos,
     notifyAlumno,
-  } = useAlumnos({ sb, entrenadorId: supabaseSessionUserId || sessionData?.entrenadorId || null });
+  } = useAlumnos({ sb });
   const {
     registrosSubTab, setRegistrosSubTab,
     sugsOpen, setSugsOpen,
@@ -674,8 +674,8 @@ function GymApp() {
   
 
   const alumnosActivosLimpios = useMemo(function () {
-    return cleanActiveCoachAlumnos(alumnos, supabaseSessionUserId || sessionData?.entrenadorId);
-  }, [alumnos, supabaseSessionUserId, sessionData?.entrenadorId]);
+    return cleanActiveCoachAlumnos(alumnos, ENTRENADOR_ID);
+  }, [alumnos, ENTRENADOR_ID]);
 
   const alumnosActivosIds = useMemo(function () {
     var ids = {};
@@ -760,7 +760,7 @@ function GymApp() {
     var lista = alumnosActuales || alumnosActivosLimpios;
     if(!lista || lista.length === 0) {
       try {
-        var sbAlumnos = await sb.getAlumnos(supabaseSessionUserId || sessionData?.entrenadorId);
+        var sbAlumnos = await sb.getAlumnos('entrenador_principal');
         var clean = cleanActiveCoachAlumnos(sbAlumnos || [], ENTRENADOR_ID);
         if(clean && clean.length > 0) { setAlumnos(clean); lista = clean; }
         else return;
@@ -793,7 +793,7 @@ function GymApp() {
     if(sessionData && sessionData.role==='entrenador') {
       var init = async function() {
         var rutinasPromise = cargarRutinasEntrenador();
-        var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos(supabaseSessionUserId || sessionData?.entrenadorId) || [], ENTRENADOR_ID);
+        var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos('entrenador_principal') || [], ENTRENADOR_ID);
         setAlumnos(sbAlumnos);
         if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
         await rutinasPromise;
@@ -2791,6 +2791,7 @@ function GymApp() {
     </>
   );
 
+  console.log('Render check — esAlumno:', esAlumno, 'cargandoAlumno:', cargandoAlumno);
   if (esAlumno && cargandoAlumno) return (
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100dvh",background:bg}}>
       <div style={{width:36,height:36,border:"3px solid #1e1e2e",borderTop:"3px solid #2563EB",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
@@ -3456,11 +3457,6 @@ function GymApp() {
             routineDaysCount={routineDaysCount}
             onRegistrarPrimerEntrenamiento={()=>setTab("plan")}
           />
-        )}
-        {sessionData?.role === 'entrenador' && (
-          <div style={{position:'fixed',top:0,left:0,right:0,zIndex:99999,background:'#1e1b4b',color:'#a5b4fc',fontSize:11,padding:'6px 10px',fontFamily:'monospace',lineHeight:1.5}}>
-            <b>DEBUG</b> | supabaseSessionUserId: <b>{String(supabaseSessionUserId ?? 'null')}</b> | sessionData.entrenadorId: <b>{String(sessionData?.entrenadorId ?? 'null')}</b> | alumnos.length: <b>{alumnos.length}</b>
-          </div>
         )}
         <CoachSectionRenderer {...buildCoachSectionRendererProps()} />
         {tab==="plan"&&esAlumno&&(
