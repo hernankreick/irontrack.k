@@ -156,9 +156,9 @@ const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 function getStoredEntrenadorId() {
   try {
-    return JSON.parse(localStorage.getItem("it_session") || "null")?.entrenadorId || "entrenador_principal";
+    return JSON.parse(localStorage.getItem("it_session") || "null")?.entrenadorId || null;
   } catch (e) {
-    return "entrenador_principal";
+    return null;
   }
 }
 
@@ -473,7 +473,7 @@ const sb = {
 },
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
-  getVideoOverrides: (entId) => sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(entId||"entrenador_principal")+"&select=ejercicio_id,youtube_url"),
+  getVideoOverrides: (entId) => sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(entId||"")+"&select=ejercicio_id,youtube_url"),
   getCustomEx: async (entId) => {
     const { data, error } = await supabase
       .from("ejercicios_custom")
@@ -505,15 +505,15 @@ const sb = {
   },
   setVideoOverride: async (ejercicioId, url) => {
     try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
-    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
+    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:supabaseSessionUserId || sessionData?.entrenadorId}); } catch(e){ return null; }
   },
-  getEntrenador: (id) => sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal")+"&select=*"),
+  getEntrenador: (id) => sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"")+"&select=*"),
   updateEntrenador: (id, data) => {
     var clean = {};
     if (data && typeof data === "object") {
       Object.keys(data).forEach(function(k){ if(data[k] !== undefined) clean[k] = data[k]; });
     }
-    return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
+    return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||""), "PATCH", clean);
   },
 };
 
