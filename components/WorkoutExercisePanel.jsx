@@ -324,7 +324,6 @@ export function WorkoutExercisePanel(props) {
             </div>
 
             {/* PESO - input editable + botón [+] */}
-            {hasSuggestedLoad&&(
             <div style={{marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                 <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>PESO</span>
@@ -365,7 +364,6 @@ export function WorkoutExercisePanel(props) {
               </div>
               <div style={{fontSize:9,color:"#374151",marginTop:3}}>{es?"Tocá ±1 kg · mantené ±5 kg":"Tap ±1 kg · hold ±5 kg"}</div>
             </div>
-            )}
 
             {/* REPS - pills dinámicas extendidas */}
             <div style={{marginBottom:12}}>
