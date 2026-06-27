@@ -1,15 +1,4 @@
 import React from 'react';
-
-function useIsUnder768() {
-  const [v, setV] = React.useState(typeof window !== 'undefined' && window.innerWidth < 768);
-  React.useEffect(function() {
-    var mq = window.matchMedia('(max-width: 767px)');
-    function onChange() { setV(mq.matches); }
-    mq.addEventListener('change', onChange);
-    return function() { mq.removeEventListener('change', onChange); };
-  }, []);
-  return v;
-}
 import { ScanLine, Plus, Search, ChevronDown } from 'lucide-react';
 import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
 import { RoutineFilters } from './RoutineFilters.jsx';
@@ -34,7 +23,6 @@ export function RoutinesTopSection({
   onScan,
   onNewRoutine,
 }) {
-  const isUnder768 = useIsUnder768();
   return (
     <div className="it-routines-top-wrap">
       <header
@@ -85,10 +73,9 @@ export function RoutinesTopSection({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: isUnder768 ? 8 : 10,
-            flexShrink: isUnder768 ? undefined : 0,
-            flexWrap: isUnder768 ? undefined : 'wrap',
-            width: isUnder768 ? '100%' : undefined,
+            gap: 10,
+            flexShrink: 0,
+            flexWrap: 'wrap',
           }}
         >
           <button
@@ -107,10 +94,8 @@ export function RoutinesTopSection({
               fontFamily: 'inherit',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
               gap: 8,
               whiteSpace: 'nowrap',
-              ...(isUnder768 ? { flex: 1, minWidth: 0 } : {}),
             }}
           >
             <ScanLine size={17} strokeWidth={2} />
@@ -132,11 +117,9 @@ export function RoutinesTopSection({
               fontFamily: 'inherit',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
               gap: 8,
               boxShadow: '0 4px 20px rgba(37,99,235,0.35)',
               whiteSpace: 'nowrap',
-              ...(isUnder768 ? { flex: 1, minWidth: 0 } : {}),
             }}
           >
             <Plus size={18} strokeWidth={2.5} />

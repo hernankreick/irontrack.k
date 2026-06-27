@@ -41,7 +41,7 @@ export default function RoutineCardTitleMeta({
         />
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ ...T.numberStat, color: textMain, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ ...T.numberStat, color: textMain, lineHeight: 1.1, wordBreak: 'break-word' }}>
             {nombreLocal}
           </div>
           <button
