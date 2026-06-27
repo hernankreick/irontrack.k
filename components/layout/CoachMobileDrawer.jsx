@@ -121,6 +121,7 @@ export default function CoachMobileDrawer({
             { k: "alumnos", icon: "users", label: msg("Alumnos", "Athletes"), sub: msg("Gestionar equipo", "Manage team") },
             { k: "routines", icon: "file-text", label: msg("Rutinas", "Routines"), sub: null },
             { k: "biblioteca", icon: "activity", label: msg("Ejercicios", "Exercises"), sub: null },
+            { k: "progress", icon: "trending-up", label: msg("Progreso", "Progress"), sub: msg("Estadísticas generales", "General stats") },
           ].map((item) => (
             <div
               key={item.k}

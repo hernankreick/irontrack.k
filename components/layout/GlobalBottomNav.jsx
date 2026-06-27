@@ -1,13 +1,23 @@
 import React from 'react';
 
 const GlobalBottomNav = React.forwardRef(function GlobalBottomNav({ darkMode, esAlumno, tabs2, tab, setTab }, ref) {
+  const [isUnder768, setIsUnder768] = React.useState(
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
+  React.useEffect(function () {
+    var mq = window.matchMedia('(max-width: 767px)');
+    function onChange() { setIsUnder768(mq.matches); }
+    mq.addEventListener('change', onChange);
+    return function () { mq.removeEventListener('change', onChange); };
+  }, []);
+
   return (
     <nav ref={ref} style={{
       position:"fixed",bottom:0,left:0,right:0,
       background: darkMode ? "rgba(15,25,35,0.96)" : "rgba(255,255,255,0.96)",
       backdropFilter: "blur(12px)",
       borderTop:"1px solid "+(darkMode?"#1E2D40":"#E2E8F0"),
-      display:"flex",zIndex:40,
+      display: isUnder768 ? "none" : "flex", zIndex:40,
       paddingBottom:"env(safe-area-inset-bottom,0px)",
       overflowX:"auto",
       WebkitOverflowScrolling:"touch",
