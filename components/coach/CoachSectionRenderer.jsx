@@ -1,5 +1,16 @@
 import React from 'react';
 import CoachDashboardMain from './CoachDashboardMain.jsx';
+
+function useIsUnder768() {
+  const [v, setV] = React.useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  React.useEffect(function() {
+    var mq = window.matchMedia('(max-width: 767px)');
+    function onChange() { setV(mq.matches); }
+    mq.addEventListener('change', onChange);
+    return function() { mq.removeEventListener('change', onChange); };
+  }, []);
+  return v;
+}
 import CoachExercisesMain from './CoachExercisesMain.jsx';
 import CoachRoutinesMain from './CoachRoutinesMain.jsx';
 import CoachStudentsMain from './CoachStudentsMain.jsx';
@@ -26,15 +37,19 @@ export default function CoachSectionRenderer({
   scannerProps,
 }) {
   const isCoach = sessionData?.role === "entrenador" && !esAlumno;
+  const isUnder768 = useIsUnder768();
+  const mobilePad = isUnder768 ? { paddingTop: 20, paddingLeft: 16, paddingRight: 16 } : {};
 
   return (
     <>
       {/* Main coach sections */}
       {(tab === "plan" || tab === "progress") && isCoach && (
-        <CoachDashboardMain
-          activeNav={tab === "progress" ? "progreso" : "dashboard"}
-          {...dashboardProps}
-        />
+        <div style={mobilePad}>
+          <CoachDashboardMain
+            activeNav={tab === "progress" ? "progreso" : "dashboard"}
+            {...dashboardProps}
+          />
+        </div>
       )}
 
       {tab === "calendar" && isCoach && (
@@ -44,11 +59,15 @@ export default function CoachSectionRenderer({
       )}
 
       {tab === "routines" && !esAlumno && (
-        <CoachRoutinesMain {...routinesProps} />
+        <div style={mobilePad}>
+          <CoachRoutinesMain {...routinesProps} />
+        </div>
       )}
 
       {tab === "alumnos" && sessionData?.role === "entrenador" && (
-        <CoachStudentsMain {...studentsProps} />
+        <div style={mobilePad}>
+          <CoachStudentsMain {...studentsProps} />
+        </div>
       )}
 
       {tab === "mensajes" && isCoach && (
@@ -57,11 +76,15 @@ export default function CoachSectionRenderer({
 
       {/* Exercise library aliases */}
       {tab === "library" && !esAlumno && (
-        <CoachExercisesMain {...exercisesProps} />
+        <div style={mobilePad}>
+          <CoachExercisesMain {...exercisesProps} />
+        </div>
       )}
 
       {tab === "biblioteca" && !esAlumno && (
-        <CoachExercisesMain {...exercisesProps} />
+        <div style={mobilePad}>
+          <CoachExercisesMain {...exercisesProps} />
+        </div>
       )}
 
       {/* Coach shell/support views */}

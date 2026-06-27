@@ -3,6 +3,17 @@ import AppHeaderBrand from './AppHeaderBrand.jsx';
 import AppHeaderActions from './AppHeaderActions.jsx';
 import AlumnoPlanHeaderDayLabel from '../student/AlumnoPlanHeaderDayLabel.jsx';
 
+function useIsUnder768() {
+  const [v, setV] = React.useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  React.useEffect(function() {
+    var mq = window.matchMedia('(max-width: 767px)');
+    function onChange() { setV(mq.matches); }
+    mq.addEventListener('change', onChange);
+    return function() { mq.removeEventListener('change', onChange); };
+  }, []);
+  return v;
+}
+
 const AppTopBar = forwardRef(function AppTopBar({
   alumnoTopBarFixed,
   alumnoTopBarHeight,
@@ -33,6 +44,7 @@ const AppTopBar = forwardRef(function AppTopBar({
   loginButtonStyle,
   onLogin,
 }, ref) {
+  const isUnder768 = useIsUnder768();
   return (
     <div
       ref={ref}
@@ -47,6 +59,7 @@ const AppTopBar = forwardRef(function AppTopBar({
               : "border-b border-[#2D4057] bg-[#F0F4F8]")
       }
       style={{
+        display: showCoachDesktopShell && !esAlumno && isUnder768 ? "none" : undefined,
         position: alumnoTopBarFixed ? "fixed" : "relative",
         top: alumnoTopBarFixed ? 0 : undefined,
         left: alumnoTopBarFixed ? 0 : undefined,
