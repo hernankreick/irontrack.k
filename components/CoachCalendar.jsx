@@ -344,18 +344,18 @@ export default function CoachCalendar({
   }
 
   return (
-    <div style={{ width: "100%", maxWidth: 1120, margin: "0 auto", color: P.text }}>
+    <div style={{ width: "100%", maxWidth: 1120, margin: "0 auto", color: P.text, paddingTop: 20, paddingLeft: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, color: P.primary, fontSize: 13, fontWeight: 900, letterSpacing: 1, textTransform: "uppercase" }}>
             <CalendarDays size={18} strokeWidth={2.2} />
             {M(lang, "Calendario", "Calendar", "Calendario")}
           </div>
-          <h1 style={{ margin: "6px 0 0", fontSize: 28, lineHeight: 1.05, letterSpacing: 0, color: P.text }}>
+          <h1 style={{ margin: "6px 0 16px", fontSize: 28, lineHeight: 1.05, letterSpacing: 0, color: P.text }}>
             {M(lang, "Asignaciones por fecha", "Assignments by date", "Atribuicoes por data")}
           </h1>
         </div>
-        <div style={{ background: P.card, border: "1px solid " + P.border, borderRadius: 18, padding: "10px 14px", color: P.muted, fontSize: 13, fontWeight: 700 }}>
+        <div style={{ background: P.card, border: "1px solid " + P.border, borderRadius: 18, padding: "10px 14px", color: P.muted, fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
           {Object.values(assignments).reduce(function (acc, list) { return acc + (Array.isArray(list) ? list.length : 0); }, 0)} {M(lang, "asignaciones", "assignments", "atribuicoes")}
         </div>
       </div>
