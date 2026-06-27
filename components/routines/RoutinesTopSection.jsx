@@ -70,13 +70,7 @@ export function RoutinesTopSection({
           </p>
         </div>
         <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexShrink: 0,
-            flexWrap: 'wrap',
-          }}
+          style={{ display: 'flex', flexDirection: window.innerWidth < 768 ? 'column' : 'row', gap: '8px', width: '100%' }}
         >
           <button
             type="button"
@@ -96,6 +90,7 @@ export function RoutinesTopSection({
               alignItems: 'center',
               gap: 8,
               whiteSpace: 'nowrap',
+              width: '100%',
             }}
           >
             <ScanLine size={17} strokeWidth={2} />
@@ -120,6 +115,7 @@ export function RoutinesTopSection({
               gap: 8,
               boxShadow: '0 4px 20px rgba(37,99,235,0.35)',
               whiteSpace: 'nowrap',
+              width: '100%',
             }}
           >
             <Plus size={18} strokeWidth={2.5} />
