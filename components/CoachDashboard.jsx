@@ -1302,6 +1302,7 @@ export default function CoachDashboard({
             dashBorder={dashBorder}
             dashCardSoft={dashCardSoft}
             blockGap={S.blockGap}
+            isMobile={isMobile}
           />
 
           <CoachActiveStudentsCard

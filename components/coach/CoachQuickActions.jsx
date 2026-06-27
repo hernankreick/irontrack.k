@@ -13,6 +13,7 @@ export default function CoachQuickActions({
   dashBorder,
   dashCardSoft,
   blockGap,
+  isMobile,
 }) {
   var C = colors;
   var T = type;
@@ -28,7 +29,13 @@ export default function CoachQuickActions({
         {title}
       </div>
       <div
-        style={{
+        style={isMobile ? {
+          display: "flex",
+          gap: 12,
+          overflowX: "auto",
+          paddingBottom: 8,
+          WebkitOverflowScrolling: "touch",
+        } : {
           display: "grid",
           gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
           gap: 14,
@@ -58,6 +65,7 @@ export default function CoachQuickActions({
                 background: dashCard,
                 border: "1px solid " + dashBorder,
                 boxShadow: "none",
+                ...(isMobile ? { flexShrink: 0, minWidth: 140 } : {}),
               }}
               onClick={function () {
                 if (typeof onRunQuick === "function") onRunQuick(item.action);
