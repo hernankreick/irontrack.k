@@ -654,7 +654,7 @@ export function RoutineCard({
         <div style={{ display: 'flex', gap: S.gridTight, marginTop: S.blockGap, alignItems: 'stretch' }}>
           <div
             ref={assignTriggerRef}
-            style={{ flex: '0 1 auto', minWidth: 0, maxWidth: 'calc(100% - 118px)' }}
+            style={{ flex: 1, minWidth: 0 }}
           >
             <button
               type="button"
@@ -680,7 +680,7 @@ export function RoutineCard({
                 cursor: 'pointer',
               }}
             >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                 {assigneeButtonLabel()}
               </span>
               <ChevronDown
