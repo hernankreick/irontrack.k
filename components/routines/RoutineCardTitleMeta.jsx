@@ -53,7 +53,7 @@ export default function RoutineCardTitleMeta({
         />
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ ...T.numberStat, fontSize: 16, color: textMain, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ ...T.numberStat, fontSize: 16, color: textMain, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
             {nombreLocal}
           </div>
           <button
@@ -83,9 +83,8 @@ export default function RoutineCardTitleMeta({
           display: 'flex',
           gap: isUnder768 ? 4 : 6,
           marginTop: 6,
-          flexWrap: isUnder768 ? 'nowrap' : 'wrap',
+          flexWrap: 'wrap',
           alignItems: 'center',
-          overflow: isUnder768 ? 'hidden' : undefined,
         }}
       >
         {selectedAlumnoIds.length > 0 ? (
@@ -131,7 +130,7 @@ export default function RoutineCardTitleMeta({
             {isUnder768 && ' ·'}
           </span>
         )}
-        <span style={{ ...T.meta, color: '#64748b', fontWeight: 600, fontSize: isUnder768 ? 11 : undefined, whiteSpace: isUnder768 ? 'nowrap' : undefined }}>
+        <span style={{ ...T.meta, color: '#64748b', fontWeight: 600, fontSize: isUnder768 ? 11 : undefined, whiteSpace: 'normal' }}>
           {r.days.length} {M(lang, 'días', 'days', 'dias')} · {totalEx}{' '}
           {M(lang, 'ejercicios', 'exercises', 'exercícios')}
         </span>
