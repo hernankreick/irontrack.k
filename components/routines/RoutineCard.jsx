@@ -573,7 +573,7 @@ export function RoutineCard({
       }}
     >
       <div style={{ background: bgHeader, padding: isUnder768 ? '14px' : `${S.gridGapTight}px ${S.cardPadding}px ${S.blockGap}px` }}>
-        <div style={{ display: 'flex', flexDirection: isUnder768 ? 'column' : 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <RoutineCardTitleMeta
             r={r}
             nombreLocal={nombreLocal}
