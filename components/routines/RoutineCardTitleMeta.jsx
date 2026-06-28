@@ -1,5 +1,16 @@
 import React from 'react';
 
+function useIsUnder768() {
+  const [v, setV] = React.useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  React.useEffect(function () {
+    var mq = window.matchMedia('(max-width: 767px)');
+    function onChange() { setV(mq.matches); }
+    mq.addEventListener('change', onChange);
+    return function () { mq.removeEventListener('change', onChange); };
+  }, []);
+  return v;
+}
+
 export default function RoutineCardTitleMeta({
   r,
   nombreLocal,
@@ -18,8 +29,9 @@ export default function RoutineCardTitleMeta({
   Ic,
   Pencil,
 }) {
+  const isUnder768 = useIsUnder768();
   return (
-    <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ flex: 1, minWidth: 0, ...(isUnder768 ? { borderLeft: '3px solid #2563EB', paddingLeft: 10 } : {}) }}>
       {editandoNombre ? (
         <input
           autoFocus
@@ -69,10 +81,11 @@ export default function RoutineCardTitleMeta({
       <div
         style={{
           display: 'flex',
-          gap: 6,
+          gap: isUnder768 ? 4 : 6,
           marginTop: 6,
-          flexWrap: 'wrap',
+          flexWrap: isUnder768 ? 'nowrap' : 'wrap',
           alignItems: 'center',
+          overflow: isUnder768 ? 'hidden' : undefined,
         }}
       >
         {selectedAlumnoIds.length > 0 ? (
@@ -80,41 +93,45 @@ export default function RoutineCardTitleMeta({
             className="it-routine-badge--assigned"
             style={{
               background: '#22C55E18',
-              color: '#4ade80',
-              border: '1px solid rgba(74, 222, 128, 0.35)',
+              color: isUnder768 ? '#64748b' : '#4ade80',
+              border: isUnder768 ? 'none' : '1px solid rgba(74, 222, 128, 0.35)',
               borderRadius: 6,
-              padding: '3px 8px',
+              padding: isUnder768 ? '0' : '3px 8px',
               ...T.tableHeader,
-              fontSize: 10,
-              fontWeight: 800,
+              fontSize: isUnder768 ? 11 : 10,
+              fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
+              flexShrink: 0,
             }}
           >
             {M(lang, 'Asignada', 'Assigned', 'Atribuída')}
+            {isUnder768 && ' ·'}
           </span>
         ) : (
           <span
             className="it-routine-badge--unassigned"
             style={{
-              background: 'rgba(15, 23, 42, 0.65)',
-              color: '#94a3b8',
-              border: `1px solid ${border}`,
+              background: isUnder768 ? 'transparent' : 'rgba(15, 23, 42, 0.65)',
+              color: '#64748b',
+              border: isUnder768 ? 'none' : `1px solid ${border}`,
               borderRadius: 6,
-              padding: '3px 8px',
+              padding: isUnder768 ? '0' : '3px 8px',
               ...T.tableHeader,
-              fontSize: 10,
-              fontWeight: 800,
+              fontSize: isUnder768 ? 11 : 10,
+              fontWeight: 600,
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
+              flexShrink: 0,
             }}
           >
             {M(lang, 'Sin asignar', 'Unassigned', 'Não atribuída')}
+            {isUnder768 && ' ·'}
           </span>
         )}
-        <span style={{ ...T.meta, color: textMuted, fontWeight: 600 }}>
+        <span style={{ ...T.meta, color: '#64748b', fontWeight: 600, fontSize: isUnder768 ? 11 : undefined, whiteSpace: isUnder768 ? 'nowrap' : undefined }}>
           {r.days.length} {M(lang, 'días', 'days', 'dias')} · {totalEx}{' '}
           {M(lang, 'ejercicios', 'exercises', 'exercícios')}
         </span>
@@ -131,6 +148,7 @@ export default function RoutineCardTitleMeta({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 4,
+              flexShrink: 0,
             }}
           >
             <Ic name="image" size={11} color="#2563EB" />
