@@ -52,8 +52,8 @@ export default function RoutineCardTitleMeta({
           }}
         />
       ) : (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
-          <div style={{ ...T.numberStat, fontSize: isUnder768 ? 15 : 16, fontWeight: 700, color: textMain, lineHeight: 1.2, whiteSpace: isUnder768 ? 'normal' : 'nowrap', ...(!isUnder768 ? { overflow: 'hidden', textOverflow: 'ellipsis' } : {}), flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, ...(isUnder768 ? { justifyContent: 'space-between', width: '100%' } : {}) }}>
+          <div style={{ ...T.numberStat, fontSize: isUnder768 ? 15 : 16, fontWeight: 700, color: textMain, lineHeight: 1.2, whiteSpace: isUnder768 ? 'normal' : 'nowrap', ...(!isUnder768 ? { overflow: 'hidden', textOverflow: 'ellipsis' } : {}), flex: 1, minWidth: 0, ...(isUnder768 ? { marginRight: '8px' } : {}) }}>
             {nombreLocal}
           </div>
           <button

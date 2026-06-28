@@ -664,10 +664,10 @@ export function RoutineCard({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: S.gridTight, ...(isUnder768 ? { borderTop: '1px solid #1e293b', paddingTop: 10, marginTop: 8 } : { marginTop: S.blockGap }), alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', gap: S.gridTight, ...(isUnder768 ? { borderTop: '1px solid #1e293b', paddingTop: 10, marginTop: 8, alignItems: 'center', width: '100%' } : { marginTop: S.blockGap, alignItems: 'stretch' }) }}>
           <div
             ref={assignTriggerRef}
-            style={{ flex: 1, minWidth: 0 }}
+            style={{ flex: 1, minWidth: 0, ...(isUnder768 ? { overflow: 'visible' } : {}) }}
           >
             <button
               type="button"
@@ -676,8 +676,7 @@ export function RoutineCard({
               aria-expanded={assignOpen}
               aria-haspopup="listbox"
               style={{
-                width: 'max-content',
-                maxWidth: '100%',
+                ...(isUnder768 ? { width: '100%' } : { width: 'max-content', maxWidth: '100%' }),
                 textAlign: 'left',
                 background: darkMode ? '#0B1220' : '#fff',
                 color: textMain,
@@ -693,7 +692,7 @@ export function RoutineCard({
                 cursor: 'pointer',
               }}
             >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+              <span style={isUnder768 ? { whiteSpace: 'normal', overflow: 'visible', textOverflow: 'unset' } : { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                 {assigneeButtonLabel()}
               </span>
               <ChevronDown
@@ -726,6 +725,7 @@ export function RoutineCard({
               letterSpacing: '.5px',
               minWidth: 110,
               justifyContent: 'center',
+              ...(isUnder768 ? { flexShrink: 0, whiteSpace: 'nowrap' } : {}),
             }}
           >
             {saving ? (
