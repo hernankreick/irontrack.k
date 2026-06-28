@@ -11,6 +11,17 @@ import RoutineDeleteConfirmModals from './RoutineDeleteConfirmModals.jsx';
 import RoutineCardTitleMeta from './RoutineCardTitleMeta.jsx';
 import './routines-ui.css';
 
+function useIsUnder768() {
+  const [v, setV] = React.useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  React.useEffect(function () {
+    var mq = window.matchMedia('(max-width: 767px)');
+    function onChange() { setV(mq.matches); }
+    mq.addEventListener('change', onChange);
+    return function () { mq.removeEventListener('change', onChange); };
+  }, []);
+  return v;
+}
+
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 const dayUid = () => {
@@ -56,6 +67,7 @@ export function RoutineCard({
   setRutinasSBEntrenador,
   rutinasSBEntrenador = [],
 }) {
+  const isUnder768 = useIsUnder768();
   const [collapsed, setCollapsed] = useState(!!r.collapsed);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
@@ -557,10 +569,11 @@ export function RoutineCard({
         overflow: 'hidden',
         marginBottom: S.blockGap,
         ['--stagger-delay']: staggerMs + 'ms',
+        ...(isUnder768 ? { borderLeft: '3px solid #2563EB', borderRadius: 14 } : {}),
       }}
     >
-      <div style={{ background: bgHeader, padding: `${S.gridGapTight}px ${S.cardPadding}px ${S.blockGap}px` }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+      <div style={{ background: bgHeader, padding: isUnder768 ? '14px' : `${S.gridGapTight}px ${S.cardPadding}px ${S.blockGap}px` }}>
+        <div style={{ display: 'flex', flexDirection: isUnder768 ? 'column' : 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <RoutineCardTitleMeta
             r={r}
             nombreLocal={nombreLocal}
@@ -651,7 +664,7 @@ export function RoutineCard({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: S.gridTight, marginTop: S.blockGap, alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', gap: S.gridTight, ...(isUnder768 ? { borderTop: '1px solid #1e293b', paddingTop: 10, marginTop: 8 } : { marginTop: S.blockGap }), alignItems: 'stretch' }}>
           <div
             ref={assignTriggerRef}
             style={{ flex: 1, minWidth: 0 }}
