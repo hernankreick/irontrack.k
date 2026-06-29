@@ -31,7 +31,7 @@ export default function RoutineCardTitleMeta({
 }) {
   const isUnder768 = useIsUnder768();
   return (
-    <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ flex: 1, minWidth: 0, ...(isUnder768 ? { width: '100%' } : {}) }}>
       {editandoNombre ? (
         <input
           autoFocus
@@ -63,7 +63,7 @@ export default function RoutineCardTitleMeta({
           alignItems: 'flex-start',
           gap: 6,
         }}>
-          <div style={{ ...T.numberStat, fontSize: isUnder768 ? 15 : 16, fontWeight: 700, color: textMain, lineHeight: 1.2, whiteSpace: isUnder768 ? 'normal' : 'nowrap', ...(!isUnder768 ? { overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 } : {}), minWidth: 0 }}>
+          <div style={{ ...T.numberStat, fontSize: isUnder768 ? 15 : 16, fontWeight: 700, color: textMain, lineHeight: 1.2, whiteSpace: isUnder768 ? 'normal' : 'nowrap', ...(isUnder768 ? { flex: 1 } : { overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }), minWidth: 0 }}>
             {nombreLocal}
           </div>
           <button
