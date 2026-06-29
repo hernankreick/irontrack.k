@@ -53,10 +53,10 @@ export default function RoutineCardTitleMeta({
         />
       ) : (
         <div style={isUnder768 ? {
-          display: 'grid',
-          gridTemplateColumns: '1fr auto',
-          alignItems: 'start',
-          gap: '4px',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
           width: '100%',
         } : {
           display: 'flex',
