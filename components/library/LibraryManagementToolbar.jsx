@@ -30,6 +30,36 @@ export default function LibraryManagementToolbar({
 }) {
   return (
     <>
+      {libNarrow && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <div style={{ flex: 1 }}>
+            <input
+              type="search"
+              style={{...inpS, marginBottom: 0}}
+              placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")}
+              value={busq}
+              onChange={e=>setBusq(e.target.value)}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={function () { setSortModo(function (m) { return (m + 1) % 3; }); }}
+            title={sortModo === 0 ? (msg("Sin orden definido — clic para A-Z", "Default order — click for A-Z")) : sortModo === 1 ? (msg("Orden: A-Z — clic para Z-A", "Order: A-Z — click for Z-A")) : (msg("Orden: Z-A — clic para quitar orden", "Order: Z-A — click to clear sort"))}
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "8px 14px", borderRadius: 10,
+              border: "1px solid " + (sortModo === 0 ? border : "#2563EB"),
+              background: sortModo === 0 ? bgSub : "#2563EB22",
+              color: sortModo === 0 ? textMuted : "#2563EB",
+              fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer",
+              flexShrink: 0, whiteSpace: 'nowrap',
+            }}
+          >
+            <Ic name="arrow-up-down" size={18} color={sortModo === 0 ? "#8B9AB2" : "#2563EB"} />
+            {msg("Ordenar", "Sort")}
+          </button>
+        </div>
+      )}
       <div
         className="min-w-0"
         style={{
@@ -45,13 +75,15 @@ export default function LibraryManagementToolbar({
           display: "flex", flexDirection: "column", gap: libNarrow ? 16 : 18, minWidth: 0,
         }}
       >
-        <input
-          type="search"
-          style={{...inpS, marginBottom:0}}
-          placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")}
-          value={busq}
-          onChange={e=>setBusq(e.target.value)}
-        />
+        {!libNarrow && (
+          <input
+            type="search"
+            style={{...inpS, marginBottom:0}}
+            placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")}
+            value={busq}
+            onChange={e=>setBusq(e.target.value)}
+          />
+        )}
         <div
           className="min-w-0"
           style={{ display:"flex", background:bgSub, border:"1px solid "+border, borderRadius: 12, padding: 4, gap: 4 }}
@@ -125,32 +157,32 @@ export default function LibraryManagementToolbar({
         <div style={{fontSize: 14, color: textMuted, fontWeight: 600, minWidth: 0, lineHeight: 1.4, flex: libNarrow ? "none" : 1, overflowWrap: "anywhere" }}>
           {msg("Mostrando", "Showing")} {exFiltrados.length} {msg("ejercicios de", "exercises of")} {allEx.length}
         </div>
-        <button
-          type="button"
-          onClick={function () { setSortModo(function (m) { return (m + 1) % 3; }); }}
-          title={sortModo === 0 ? (msg("Sin orden definido — clic para A-Z", "Default order — click for A-Z")) : sortModo === 1 ? (msg("Orden: A-Z — clic para Z-A", "Order: A-Z — click for Z-A")) : (msg("Orden: Z-A — clic para quitar orden", "Order: Z-A — click to clear sort"))}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            padding: "8px 14px",
-            borderRadius: 10,
-            border: "1px solid " + (sortModo === 0 ? border : "#2563EB"),
-            background: sortModo === 0 ? bgSub : "#2563EB22",
-            color: sortModo === 0 ? textMuted : "#2563EB",
-            fontFamily: "inherit",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: "pointer",
-            flexShrink: 0,
-            alignSelf: libNarrow ? "stretch" : "auto",
-            width: libNarrow ? "100%" : "auto",
-          }}
-        >
-          <Ic name="arrow-up-down" size={18} color={sortModo === 0 ? "#8B9AB2" : "#2563EB"} />
-          {msg("Ordenar", "Sort")}
-        </button>
+        {!libNarrow && (
+          <button
+            type="button"
+            onClick={function () { setSortModo(function (m) { return (m + 1) % 3; }); }}
+            title={sortModo === 0 ? (msg("Sin orden definido — clic para A-Z", "Default order — click for A-Z")) : sortModo === 1 ? (msg("Orden: A-Z — clic para Z-A", "Order: A-Z — click for Z-A")) : (msg("Orden: Z-A — clic para quitar orden", "Order: Z-A — click to clear sort"))}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 10,
+              border: "1px solid " + (sortModo === 0 ? border : "#2563EB"),
+              background: sortModo === 0 ? bgSub : "#2563EB22",
+              color: sortModo === 0 ? textMuted : "#2563EB",
+              fontFamily: "inherit",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <Ic name="arrow-up-down" size={18} color={sortModo === 0 ? "#8B9AB2" : "#2563EB"} />
+            {msg("Ordenar", "Sort")}
+          </button>
+        )}
       </div>
     </>
   );
