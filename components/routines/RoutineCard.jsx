@@ -357,31 +357,35 @@ export function RoutineCard({
       }
 
       var newCards = [];
-      for (var i = 1; i < ids.length; i++) {
-        var aid = ids[i];
-        var nm = alumnoNombreById(aid);
-        var res2 = await sb.createRutina({
-          nombre: rActual.name,
-          alumno_id: aid,
-          datos: {
-            days: daysCopy,
-            alumno: nm,
-            note: rActual.note || '',
-          },
-          entrenador_id: 'entrenador_principal',
-          fecha_inicio: fechaInicio,
-        });
-        if (res2 && res2[0]) {
-          newCards.push({
-            id: res2[0].id,
-            name: rActual.name,
-            days: rActual.days,
-            alumno_id: aid,
-            alumno: nm,
-            note: rActual.note || '',
-            saved: true,
-            collapsed: true,
-          });
+      if (ids.length > 1) {
+        var extraResults = await Promise.all(
+          ids.slice(1).map(function (xid) {
+            var xnm = alumnoNombreById(xid);
+            return sb.createRutina({
+              nombre: rActual.name,
+              alumno_id: xid,
+              datos: { days: daysCopy, alumno: xnm, note: rActual.note || '' },
+              entrenador_id: 'entrenador_principal',
+              fecha_inicio: fechaInicio,
+            }).then(function (res2) {
+              return { res2: res2, aid: xid, nm: xnm };
+            });
+          })
+        );
+        for (var xi = 0; xi < extraResults.length; xi++) {
+          var xr = extraResults[xi];
+          if (xr.res2 && xr.res2[0]) {
+            newCards.push({
+              id: xr.res2[0].id,
+              name: rActual.name,
+              days: rActual.days,
+              alumno_id: xr.aid,
+              alumno: xr.nm,
+              note: rActual.note || '',
+              saved: true,
+              collapsed: true,
+            });
+          }
         }
       }
       if (newCards.length) {
@@ -573,7 +577,7 @@ export function RoutineCard({
       }}
     >
       <div style={{ background: bgHeader, padding: isUnder768 ? '14px' : `${S.gridGapTight}px ${S.cardPadding}px ${S.blockGap}px` }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: isUnder768 ? 'column' : 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <RoutineCardTitleMeta
             r={r}
             nombreLocal={nombreLocal}
