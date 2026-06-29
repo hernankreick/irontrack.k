@@ -71,8 +71,9 @@ export default function RoutineCardTitleMeta({
             onClick={() => setEditandoNombre(true)}
             className="it-routine-btn"
             style={{
-              width: 44,
-              height: 44,
+              ...(isUnder768
+                ? { padding: '2px 4px' }
+                : { width: 44, height: 44 }),
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
