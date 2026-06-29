@@ -31,7 +31,7 @@ export default function RoutineCardTitleMeta({
 }) {
   const isUnder768 = useIsUnder768();
   return (
-    <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ flex: 1, minWidth: 0, ...(isUnder768 ? { position: 'relative' } : {}) }}>
       {editandoNombre ? (
         <input
           autoFocus
@@ -53,7 +53,7 @@ export default function RoutineCardTitleMeta({
         />
       ) : (
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, ...(isUnder768 ? { flexDirection: 'row', justifyContent: 'space-between', width: '100%' } : {}) }}>
-          <div style={{ ...T.numberStat, fontSize: isUnder768 ? 15 : 16, fontWeight: 700, color: textMain, lineHeight: 1.2, whiteSpace: isUnder768 ? 'normal' : 'nowrap', ...(!isUnder768 ? { overflow: 'hidden', textOverflow: 'ellipsis' } : {}), flex: 1, minWidth: 0, ...(isUnder768 ? { marginRight: '8px' } : {}) }}>
+          <div style={{ ...T.numberStat, fontSize: isUnder768 ? 15 : 16, fontWeight: 700, color: textMain, lineHeight: 1.2, whiteSpace: isUnder768 ? 'normal' : 'nowrap', ...(!isUnder768 ? { overflow: 'hidden', textOverflow: 'ellipsis' } : {}), flex: 1, minWidth: 0, ...(isUnder768 ? { paddingRight: '32px' } : {}) }}>
             {nombreLocal}
           </div>
           <button
@@ -72,6 +72,7 @@ export default function RoutineCardTitleMeta({
               justifyContent: 'center',
               borderRadius: 8,
               flexShrink: 0,
+              ...(isUnder768 ? { position: 'absolute', top: '0', right: '0' } : {}),
             }}
           >
             <Pencil size={15} />
