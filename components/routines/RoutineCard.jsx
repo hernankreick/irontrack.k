@@ -275,7 +275,7 @@ export function RoutineCard({
       return M(lang, 'Elegir alumnos…', 'Choose athletes…', 'Escolher alunos…');
     }
     if (selectedAlumnoIds.length === 1) {
-      return alumnoNombreById(selectedAlumnoIds[0]) || selectedAlumnoIds[0];
+      return alumnoNombreById(selectedAlumnoIds[0]) || r.alumno || selectedAlumnoIds[0];
     }
     return (
       String(selectedAlumnoIds.length) +
