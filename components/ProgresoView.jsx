@@ -4,6 +4,7 @@ import {
   Star,
   BarChart2,
   Users,
+  CheckCircle,
 } from "lucide-react";
 import { buildCoachProgresoModel, getRoutineForAlumno } from "./coachProgresoMetrics.js";
 import { coachType as T, coachSpace as S } from "./coachUiScale.js";
@@ -467,89 +468,207 @@ export default function ProgresoView({
           gap: S.pageGap,
         }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: S.chipGridGap }}>
-          {model.summaryChips.map(function (c) {
-            return (
-              <div
-                key={c.label}
-                style={{
-                  background: C.cardDark,
-                  border: "1px solid " + C.brd,
-                  borderRadius: 8,
-                  padding: "12px 14px",
-                  flex: 1,
-                  minWidth: 0,
-                }}
-              >
-                <div style={{ ...T.numberStat, color: c.color }}>{c.val}</div>
-                <div style={{ ...T.meta, color: C.t2, marginTop: 4 }}>{c.label}</div>
-                <div style={{ ...T.meta, color: c.deltaColor, marginTop: 4 }}>{c.delta}</div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: isUnder768 ? "1fr" : "1fr 1fr", gap: S.gridGap }}>
+        {isUnder768 ? (
           <div
             style={{
-              background: C.card,
-              border: "1px solid " + C.brd,
-              borderRadius: 12,
-              padding: S.cardPadding,
-              minWidth: 0,
+              display: "flex",
+              gap: 10,
+              overflowX: "auto",
+              padding: "0 4px 8px",
+              scrollSnapType: "x mandatory",
+              WebkitOverflowScrolling: "touch",
+              msOverflowStyle: "none",
+              scrollbarWidth: "none",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGapLoose }}>
-              <TrendingUp size={16} color={C.blue} strokeWidth={2} />
-              <span style={{ ...T.cardTitle, color: C.t }}>
-                {M(lang, "Evolución de carga", "Load progression")}
-              </span>
+            {model.summaryChips.map(function (c) {
+              return (
+                <div
+                  key={c.label}
+                  style={{
+                    flex: "0 0 44%",
+                    scrollSnapAlign: "start",
+                    background: C.cardDark,
+                    border: "1px solid " + C.brd,
+                    borderRadius: 8,
+                    padding: "12px 14px",
+                    minWidth: 0,
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <div style={{ ...T.numberStat, color: c.color }}>{c.val}</div>
+                  <div style={{ ...T.meta, color: C.t2, marginTop: 4 }}>{c.label}</div>
+                  <div style={{ ...T.meta, color: c.deltaColor, marginTop: 4 }}>{c.delta}</div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: S.chipGridGap }}>
+            {model.summaryChips.map(function (c) {
+              return (
+                <div
+                  key={c.label}
+                  style={{
+                    background: C.cardDark,
+                    border: "1px solid " + C.brd,
+                    borderRadius: 8,
+                    padding: "12px 14px",
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <div style={{ ...T.numberStat, color: c.color }}>{c.val}</div>
+                  <div style={{ ...T.meta, color: C.t2, marginTop: 4 }}>{c.label}</div>
+                  <div style={{ ...T.meta, color: c.deltaColor, marginTop: 4 }}>{c.delta}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {isUnder768 ? (
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              overflowX: "auto",
+              padding: "0 4px 8px",
+              scrollSnapType: "x mandatory",
+              WebkitOverflowScrolling: "touch",
+              msOverflowStyle: "none",
+              scrollbarWidth: "none",
+            }}
+          >
+            <div
+              onClick={function () { setActiveSheet("carga"); }}
+              style={{
+                flex: "0 0 88%",
+                scrollSnapAlign: "start",
+                background: C.card,
+                border: "1px solid " + C.brd,
+                borderRadius: 14,
+                padding: 16,
+                cursor: "pointer",
+                boxSizing: "border-box",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <TrendingUp size={15} color={C.blue} strokeWidth={2} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
+                  {M(lang, "Evolución de carga", "Load progression")}
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: C.t2, marginTop: 4 }}>
+                {(function () {
+                  var a = alumnosSorted.find(function (x) { return String(x.id) === String(alumnoSel); });
+                  return a ? (a.nombre || a.email || "—") : "—";
+                })()}
+              </div>
+              <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
+                {M(lang, "Ver detalle →", "See detail →")}
+              </div>
             </div>
-            <ProgressLoadControls
-              alumnosSorted={alumnosSorted}
-              alumnoSel={alumnoSel}
-              setAlumnoSel={setAlumnoSel}
-              diasRutina={diasRutina}
-              diaIdx={diaIdx}
-              setDiaIdx={setDiaIdx}
-              ejercicioSelId={ejercicioSelId}
-              setEjercicioSelId={setEjercicioSelId}
-              exerciseOptions={model.exerciseOptions}
-              alumnoColor={alumnoColor}
-              rutinaActiva={rutinaActiva}
-              selectBaseStyle={selectBaseStyle}
+
+            <div
+              onClick={function () { setActiveSheet("adherencia"); }}
+              style={{
+                flex: "0 0 88%",
+                scrollSnapAlign: "start",
+                background: C.card,
+                border: "1px solid " + C.brd,
+                borderRadius: 14,
+                padding: 16,
+                cursor: "pointer",
+                boxSizing: "border-box",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <CheckCircle size={15} color={C.green} strokeWidth={2} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
+                  {M(lang, "Adherencia al plan", "Plan adherence")}
+                </span>
+              </div>
+              {model.adherenciaRows.length > 0 ? (
+                <>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: model.adherenciaRows[0].color, lineHeight: 1.1 }}>
+                    {model.adherenciaRows[0].p}%
+                  </div>
+                  <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>
+                    {"🏆 " + model.adherenciaRows[0].n}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 22, fontWeight: 900, color: C.t2, lineHeight: 1.1 }}>—</div>
+              )}
+              <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
+                {M(lang, "Ver detalle →", "See detail →")}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: S.gridGap }}>
+            <div
+              style={{
+                background: C.card,
+                border: "1px solid " + C.brd,
+                borderRadius: 12,
+                padding: S.cardPadding,
+                minWidth: 0,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGapLoose }}>
+                <TrendingUp size={16} color={C.blue} strokeWidth={2} />
+                <span style={{ ...T.cardTitle, color: C.t }}>
+                  {M(lang, "Evolución de carga", "Load progression")}
+                </span>
+              </div>
+              <ProgressLoadControls
+                alumnosSorted={alumnosSorted}
+                alumnoSel={alumnoSel}
+                setAlumnoSel={setAlumnoSel}
+                diasRutina={diasRutina}
+                diaIdx={diaIdx}
+                setDiaIdx={setDiaIdx}
+                ejercicioSelId={ejercicioSelId}
+                setEjercicioSelId={setEjercicioSelId}
+                exerciseOptions={model.exerciseOptions}
+                alumnoColor={alumnoColor}
+                rutinaActiva={rutinaActiva}
+                selectBaseStyle={selectBaseStyle}
+                C={C}
+                T={T}
+                S={S}
+                lang={lang}
+                M={M}
+                emptyBox={emptyBox}
+              />
+
+              {rutinaActiva && diasRutina.length > 0 && (model.exerciseOptions || []).length > 0 ? (
+                !model.hasChartData || chartComputed.empty ? (
+                  emptyBox(lang, M(lang, "No hay registros de carga para este ejercicio", "No load records for this exercise", "Sem registros de carga para este exercício"), C)
+                ) : (
+                  <ProgressLoadChart
+                    chartComputed={chartComputed}
+                    weekLabels={model.chartWeekLabels}
+                    alumnoColor={alumnoColor}
+                    C={C}
+                    T={T}
+                    lang={lang}
+                    M={M}
+                  />
+                )
+              ) : null}
+            </div>
+
+            <ProgressAdherenceCard
+              rows={model.adherenciaRows}
               C={C}
-              T={T}
-              S={S}
               lang={lang}
-              M={M}
               emptyBox={emptyBox}
             />
-
-            {rutinaActiva && diasRutina.length > 0 && (model.exerciseOptions || []).length > 0 ? (
-              !model.hasChartData || chartComputed.empty ? (
-                emptyBox(lang, M(lang, "No hay registros de carga para este ejercicio", "No load records for this exercise", "Sem registros de carga para este exercício"), C)
-              ) : (
-                <ProgressLoadChart
-                  chartComputed={chartComputed}
-                  weekLabels={model.chartWeekLabels}
-                  alumnoColor={alumnoColor}
-                  C={C}
-                  T={T}
-                  lang={lang}
-                  M={M}
-                />
-              )
-            ) : null}
           </div>
-
-          <ProgressAdherenceCard
-            rows={model.adherenciaRows}
-            C={C}
-            lang={lang}
-            emptyBox={emptyBox}
-          />
-        </div>
+        )}
 
         {isUnder768 ? (
           <>
@@ -563,12 +682,13 @@ export default function ProgresoView({
                 WebkitOverflowScrolling: "touch",
                 msOverflowStyle: "none",
                 scrollbarWidth: "none",
+                paddingRight: "4px",
               }}
             >
               <div
                 onClick={function () { setActiveSheet("prs"); }}
                 style={{
-                  flex: "0 0 78%",
+                  flex: "0 0 82%",
                   scrollSnapAlign: "start",
                   background: C.card,
                   border: "1px solid " + C.brd,
@@ -598,7 +718,7 @@ export default function ProgresoView({
               <div
                 onClick={function () { setActiveSheet("vol"); }}
                 style={{
-                  flex: "0 0 78%",
+                  flex: "0 0 82%",
                   scrollSnapAlign: "start",
                   background: C.card,
                   border: "1px solid " + C.brd,
@@ -628,7 +748,7 @@ export default function ProgresoView({
               <div
                 onClick={function () { setActiveSheet("ranking"); }}
                 style={{
-                  flex: "0 0 78%",
+                  flex: "0 0 82%",
                   scrollSnapAlign: "start",
                   background: C.card,
                   border: "1px solid " + C.brd,
@@ -748,6 +868,59 @@ export default function ProgresoView({
                       lang={lang}
                       emptyBox={emptyBox}
                       isUnder768={true}
+                    />
+                  )}
+                  {activeSheet === "carga" && (
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGapLoose }}>
+                        <TrendingUp size={16} color={C.blue} strokeWidth={2} />
+                        <span style={{ ...T.cardTitle, color: C.t }}>
+                          {M(lang, "Evolución de carga", "Load progression")}
+                        </span>
+                      </div>
+                      <ProgressLoadControls
+                        alumnosSorted={alumnosSorted}
+                        alumnoSel={alumnoSel}
+                        setAlumnoSel={setAlumnoSel}
+                        diasRutina={diasRutina}
+                        diaIdx={diaIdx}
+                        setDiaIdx={setDiaIdx}
+                        ejercicioSelId={ejercicioSelId}
+                        setEjercicioSelId={setEjercicioSelId}
+                        exerciseOptions={model.exerciseOptions}
+                        alumnoColor={alumnoColor}
+                        rutinaActiva={rutinaActiva}
+                        selectBaseStyle={selectBaseStyle}
+                        C={C}
+                        T={T}
+                        S={S}
+                        lang={lang}
+                        M={M}
+                        emptyBox={emptyBox}
+                      />
+                      {rutinaActiva && diasRutina.length > 0 && (model.exerciseOptions || []).length > 0 ? (
+                        !model.hasChartData || chartComputed.empty ? (
+                          emptyBox(lang, M(lang, "No hay registros de carga para este ejercicio", "No load records for this exercise", "Sem registros de carga para este exercício"), C)
+                        ) : (
+                          <ProgressLoadChart
+                            chartComputed={chartComputed}
+                            weekLabels={model.chartWeekLabels}
+                            alumnoColor={alumnoColor}
+                            C={C}
+                            T={T}
+                            lang={lang}
+                            M={M}
+                          />
+                        )
+                      ) : null}
+                    </>
+                  )}
+                  {activeSheet === "adherencia" && (
+                    <ProgressAdherenceCard
+                      rows={model.adherenciaRows}
+                      C={C}
+                      lang={lang}
+                      emptyBox={emptyBox}
                     />
                   )}
                 </div>
