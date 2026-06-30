@@ -53,7 +53,7 @@ export default function LibraryExerciseCard({
         minWidth: 0,
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 0 }}>
         {/* Thumbnail */}
         {videoId ? (
           <img
