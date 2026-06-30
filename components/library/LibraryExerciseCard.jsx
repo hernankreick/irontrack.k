@@ -75,6 +75,11 @@ export default function LibraryExerciseCard({
               {nombre}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={onEdit}
+                style={{ ...btnStyle, fontSize: 18 }}
+              >⋮</button>
               {ytUrl && (
                 videoId ? (
                   <button
@@ -93,11 +98,6 @@ export default function LibraryExerciseCard({
                   >▶</a>
                 )
               )}
-              <button
-                type="button"
-                onClick={onEdit}
-                style={{ ...btnStyle, fontSize: 18 }}
-              >⋮</button>
               {isCustom && (
                 <button
                   type="button"
