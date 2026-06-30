@@ -40,11 +40,7 @@ export default function LibraryExerciseCard({
   const [showVideo, setShowVideo] = useState(false);
   const videoId = extractYouTubeId(ytUrl);
 
-  const btnSize = libNarrow ? 30 : 42;
-  const btnRadius = libNarrow ? 7 : 12;
-  const btnBg = libNarrow ? '#111827' : (_dm ? "rgba(22, 34, 52, 0.6)" : bgSub);
-  const btnBorder = libNarrow ? '1px solid #1E293B' : "1px solid " + cardBorder;
-  const icSize = libNarrow ? 13 : 15;
+  const btnStyle = { width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: '#111827', border: '1px solid #1E293B', borderRadius: 7, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", padding: 0, color: textMuted };
 
   return (
     <div
@@ -78,14 +74,14 @@ export default function LibraryExerciseCard({
             <div style={{ flex: 1, fontSize: 17, fontWeight: 800, color: textMain, lineHeight: 1.3, wordBreak: "break-word", overflowWrap: "anywhere" }}>
               {nombre}
             </div>
-            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
               {ytUrl && (
                 videoId ? (
                   <button
                     type="button"
                     onClick={() => setShowVideo(v => !v)}
                     aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
-                    style={{ width: btnSize, height: btnSize, display: "flex", alignItems: "center", justifyContent: "center", background: btnBg, border: btnBorder, borderRadius: btnRadius, cursor: "pointer", fontSize: libNarrow ? 14 : 16, flexShrink: 0, color: textMuted, fontFamily: "inherit", padding: 0 }}
+                    style={{ ...btnStyle, fontSize: 14 }}
                   >▶</button>
                 ) : (
                   <a
@@ -93,24 +89,22 @@ export default function LibraryExerciseCard({
                     target="_blank"
                     rel="noreferrer"
                     aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
-                    style={{ width: btnSize, height: btnSize, display: "flex", alignItems: "center", justifyContent: "center", background: btnBg, border: btnBorder, borderRadius: btnRadius, textDecoration: "none", fontSize: libNarrow ? 14 : 16, flexShrink: 0, color: textMuted }}
+                    style={{ ...btnStyle, textDecoration: "none", fontSize: 14 }}
                   >▶</a>
                 )
               )}
               <button
                 type="button"
                 onClick={onEdit}
-                style={{ width: btnSize, height: btnSize, display: "flex", alignItems: "center", justifyContent: "center", background: btnBg, border: btnBorder, borderRadius: btnRadius, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", padding: 0, color: textMuted }}
-              >
-                <Ic name="link" size={icSize}/>
-              </button>
+                style={{ ...btnStyle, fontSize: 18 }}
+              >⋮</button>
               {isCustom && (
                 <button
                   type="button"
                   onClick={onDelete}
-                  style={{ width: btnSize, height: btnSize, display: "flex", alignItems: "center", justifyContent: "center", background: btnBg, border: btnBorder, borderRadius: btnRadius, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", padding: 0, color: textMuted }}
+                  style={btnStyle}
                 >
-                  <Ic name="trash-2" size={icSize}/>
+                  <Ic name="trash-2" size={13}/>
                 </button>
               )}
             </div>
