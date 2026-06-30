@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   TrendingUp,
+  Star,
+  BarChart2,
+  Users,
 } from "lucide-react";
 import { buildCoachProgresoModel, getRoutineForAlumno } from "./coachProgresoMetrics.js";
 import { coachType as T, coachSpace as S } from "./coachUiScale.js";
@@ -193,6 +196,7 @@ export default function ProgresoView({
   const [ejercicioSelId, setEjercicioSelId] = useState(null);
   const [volBarHoverIdx, setVolBarHoverIdx] = useState(null);
   const [patronExpanded, setPatronExpanded] = useState({});
+  const [activeSheet, setActiveSheet] = useState(null);
 
   function togglePatronRow(key) {
     setPatronExpanded(function (prev) {
@@ -547,40 +551,245 @@ export default function ProgresoView({
           />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: isUnder768 ? "1fr" : "1fr 1fr 1fr", gap: S.gridGapTight }}>
-          <ProgressRecentPrsCard
-            prs={model.prsRecientes}
-            C={C}
-            lang={lang}
-            emptyBox={emptyBox}
-            isUnder768={isUnder768}
-          />
+        {isUnder768 ? (
+          <>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                overflowX: "auto",
+                padding: "0 4px 8px",
+                scrollSnapType: "x mandatory",
+                WebkitOverflowScrolling: "touch",
+                msOverflowStyle: "none",
+                scrollbarWidth: "none",
+              }}
+            >
+              <div
+                onClick={function () { setActiveSheet("prs"); }}
+                style={{
+                  flex: "0 0 78%",
+                  scrollSnapAlign: "start",
+                  background: C.card,
+                  border: "1px solid " + C.brd,
+                  borderRadius: 14,
+                  padding: 16,
+                  cursor: "pointer",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <Star size={15} color={C.yel} strokeWidth={2} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
+                    {M(lang, "PRs recientes", "Recent PRs")}
+                  </span>
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: C.green, lineHeight: 1.1 }}>
+                  {(model.prsRecientes || []).length}
+                </div>
+                <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>
+                  {M(lang, "PRs registrados", "PRs logged")}
+                </div>
+                <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
+                  {M(lang, "Ver detalle →", "See detail →")}
+                </div>
+              </div>
 
-          <ProgressWeeklyVolumeCard
-            volBars={model.volBars}
-            currentRoutineWeekIndex={model.currentRoutineWeekIndex != null ? model.currentRoutineWeekIndex : 0}
-            maxV={maxV}
-            volBarHoverIdx={volBarHoverIdx}
-            setVolBarHoverIdx={setVolBarHoverIdx}
-            C={C}
-            lang={lang}
-            formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
-            formatWeeklyVolKgFull={formatWeeklyVolKgFull}
-            isUnder768={isUnder768}
-          />
+              <div
+                onClick={function () { setActiveSheet("vol"); }}
+                style={{
+                  flex: "0 0 78%",
+                  scrollSnapAlign: "start",
+                  background: C.card,
+                  border: "1px solid " + C.brd,
+                  borderRadius: 14,
+                  padding: 16,
+                  cursor: "pointer",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <BarChart2 size={15} color={C.blue} strokeWidth={2} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
+                    {M(lang, "Volumen semanal", "Weekly volume")}
+                  </span>
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: C.blue, lineHeight: 1.1 }}>
+                  {maxV > 0 ? formatWeeklyVolKgAbbrev(maxV) : "—"}
+                </div>
+                <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>
+                  {M(lang, "Pico del bloque", "Block peak")}
+                </div>
+                <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
+                  {M(lang, "Ver detalle →", "See detail →")}
+                </div>
+              </div>
 
-          <ProgressRankingCard
-            ranking={model.ranking}
-            rankingTop3={rankingTop3}
-            rankingRest={rankingRest}
-            rankingCardUi={rankingCardUi}
-            rankingSessionsLine={rankingSessionsLine}
-            C={C}
-            lang={lang}
-            emptyBox={emptyBox}
-            isUnder768={isUnder768}
-          />
-        </div>
+              <div
+                onClick={function () { setActiveSheet("ranking"); }}
+                style={{
+                  flex: "0 0 78%",
+                  scrollSnapAlign: "start",
+                  background: C.card,
+                  border: "1px solid " + C.brd,
+                  borderRadius: 14,
+                  padding: 16,
+                  cursor: "pointer",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <Users size={15} color={C.blue} strokeWidth={2} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
+                    {M(lang, "Ranking", "Leaderboard")}
+                  </span>
+                </div>
+                {rankingTop3.length > 0 ? (
+                  <>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: C.t, lineHeight: 1.1 }}>
+                      {rankingTop3[0].initials}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>
+                      {"🥇 " + rankingTop3[0].n + " · " + rankingTop3[0].p + "%"}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 24, fontWeight: 900, color: C.t2, lineHeight: 1.1 }}>—</div>
+                )}
+                <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
+                  {M(lang, "Ver detalle →", "See detail →")}
+                </div>
+              </div>
+            </div>
+
+            {activeSheet !== null && (
+              <div
+                onClick={function () { setActiveSheet(null); }}
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "rgba(0,0,0,0.6)",
+                  zIndex: 1000,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <div
+                  onClick={function (e) { e.stopPropagation(); }}
+                  style={{
+                    background: darkMode !== false ? "#0D1424" : C.card,
+                    borderRadius: "18px 18px 0 0",
+                    maxHeight: "80vh",
+                    overflowY: "auto",
+                    padding: "16px 16px 36px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 40,
+                      height: 4,
+                      background: C.brd,
+                      borderRadius: 99,
+                      margin: "0 auto 16px",
+                    }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                    <button
+                      type="button"
+                      onClick={function () { setActiveSheet(null); }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: C.t2,
+                        fontSize: 22,
+                        cursor: "pointer",
+                        lineHeight: 1,
+                        padding: "4px 8px",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {activeSheet === "prs" && (
+                    <ProgressRecentPrsCard
+                      prs={model.prsRecientes}
+                      C={C}
+                      lang={lang}
+                      emptyBox={emptyBox}
+                      isUnder768={true}
+                    />
+                  )}
+                  {activeSheet === "vol" && (
+                    <ProgressWeeklyVolumeCard
+                      volBars={model.volBars}
+                      currentRoutineWeekIndex={model.currentRoutineWeekIndex != null ? model.currentRoutineWeekIndex : 0}
+                      maxV={maxV}
+                      volBarHoverIdx={volBarHoverIdx}
+                      setVolBarHoverIdx={setVolBarHoverIdx}
+                      C={C}
+                      lang={lang}
+                      formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
+                      formatWeeklyVolKgFull={formatWeeklyVolKgFull}
+                      isUnder768={true}
+                    />
+                  )}
+                  {activeSheet === "ranking" && (
+                    <ProgressRankingCard
+                      ranking={model.ranking}
+                      rankingTop3={rankingTop3}
+                      rankingRest={rankingRest}
+                      rankingCardUi={rankingCardUi}
+                      rankingSessionsLine={rankingSessionsLine}
+                      C={C}
+                      lang={lang}
+                      emptyBox={emptyBox}
+                      isUnder768={true}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: S.gridGapTight }}>
+            <ProgressRecentPrsCard
+              prs={model.prsRecientes}
+              C={C}
+              lang={lang}
+              emptyBox={emptyBox}
+              isUnder768={false}
+            />
+
+            <ProgressWeeklyVolumeCard
+              volBars={model.volBars}
+              currentRoutineWeekIndex={model.currentRoutineWeekIndex != null ? model.currentRoutineWeekIndex : 0}
+              maxV={maxV}
+              volBarHoverIdx={volBarHoverIdx}
+              setVolBarHoverIdx={setVolBarHoverIdx}
+              C={C}
+              lang={lang}
+              formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
+              formatWeeklyVolKgFull={formatWeeklyVolKgFull}
+              isUnder768={false}
+            />
+
+            <ProgressRankingCard
+              ranking={model.ranking}
+              rankingTop3={rankingTop3}
+              rankingRest={rankingRest}
+              rankingCardUi={rankingCardUi}
+              rankingSessionsLine={rankingSessionsLine}
+              C={C}
+              lang={lang}
+              emptyBox={emptyBox}
+              isUnder768={false}
+            />
+          </div>
+        )}
 
         <ProgressMovementPatternVolumeCard
           patterns={model.patronPatterns}
