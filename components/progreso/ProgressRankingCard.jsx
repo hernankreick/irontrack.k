@@ -1,6 +1,6 @@
 import React from "react";
 import { Users } from "lucide-react";
-import { coachType as T, coachSpace as S } from "../coachUiScale.js";
+import { coachType as _T, coachSpace as _S, coachTypeMobile, coachSpaceMobile } from "../coachUiScale.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
 
 export default function ProgressRankingCard({
@@ -12,7 +12,10 @@ export default function ProgressRankingCard({
   C,
   lang,
   emptyBox,
+  isUnder768,
 }) {
+  const T = isUnder768 ? coachTypeMobile : _T;
+  const S = isUnder768 ? coachSpaceMobile : _S;
   return (
     <div
       style={{
@@ -61,7 +64,7 @@ export default function ProgressRankingCard({
         </div>
         <span
           style={{
-            fontSize: 10,
+            fontSize: isUnder768 ? 9 : 10,
             fontWeight: 700,
             letterSpacing: 0.06,
             textTransform: "uppercase",
@@ -110,7 +113,7 @@ export default function ProgressRankingCard({
                 >
                   <div
                     style={{
-                      width: 36,
+                      width: isUnder768 ? 28 : 36,
                       textAlign: "center",
                       fontSize: 22,
                       lineHeight: 1,
@@ -122,8 +125,8 @@ export default function ProgressRankingCard({
                   </div>
                   <div
                     style={{
-                      width: 44,
-                      height: 44,
+                      width: isUnder768 ? 36 : 44,
+                      height: isUnder768 ? 36 : 44,
                       borderRadius: "50%",
                       background: row.color + "28",
                       color: row.color,
@@ -160,7 +163,7 @@ export default function ProgressRankingCard({
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div
                       style={{
-                        fontSize: 22,
+                        fontSize: isUnder768 ? 17 : 22,
                         fontWeight: 900,
                         color: row.color,
                         lineHeight: 1.1,
@@ -233,8 +236,8 @@ export default function ProgressRankingCard({
                       </div>
                       <div
                         style={{
-                          width: 28,
-                          height: 28,
+                          width: isUnder768 ? 24 : 28,
+                          height: isUnder768 ? 24 : 28,
                           borderRadius: "50%",
                           background: row.color + "20",
                           color: row.color,
@@ -264,7 +267,7 @@ export default function ProgressRankingCard({
                       </div>
                       <div
                         style={{
-                          width: 56,
+                          width: isUnder768 ? 44 : 56,
                           height: 5,
                           background: rankingCardUi.miniBarTrack,
                           borderRadius: 3,
@@ -284,9 +287,9 @@ export default function ProgressRankingCard({
                       </div>
                       <div
                         style={{
-                          fontSize: 12,
+                          fontSize: isUnder768 ? 11 : 12,
                           fontWeight: 800,
-                          width: 34,
+                          width: isUnder768 ? 28 : 34,
                           textAlign: "right",
                           fontFamily: "ui-monospace, monospace",
                           color: row.color,

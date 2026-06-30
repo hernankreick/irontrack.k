@@ -1,9 +1,11 @@
 import React from "react";
 import { Star } from "lucide-react";
-import { coachType as T, coachSpace as S } from "../coachUiScale.js";
+import { coachType as _T, coachSpace as _S, coachTypeMobile, coachSpaceMobile } from "../coachUiScale.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
 
-export default function ProgressRecentPrsCard({ prs, C, lang, emptyBox }) {
+export default function ProgressRecentPrsCard({ prs, C, lang, emptyBox, isUnder768 }) {
+  const T = isUnder768 ? coachTypeMobile : _T;
+  const S = isUnder768 ? coachSpaceMobile : _S;
   var visiblePrs = prs.slice(0, 4);
 
   return (

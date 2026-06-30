@@ -78,6 +78,22 @@ export const coachSpace = {
   chipGridGap: 10,
 };
 
+export const coachTypeMobile = {
+  ...coachType,
+  cardTitle:    { fontSize: 15, fontWeight: 700, lineHeight: 1.25, letterSpacing: -0.02 },
+  numberStat:   { fontSize: 18, fontWeight: 800, lineHeight: 1.1 },
+  numberStatSm: { fontSize: 13, fontWeight: 700, lineHeight: 1.15 },
+  bodySemibold: { fontSize: 12, fontWeight: 600, lineHeight: 1.4 },
+  subtitle:     { fontSize: 11, fontWeight: 500, lineHeight: 1.45 },
+};
+
+export const coachSpaceMobile = {
+  ...coachSpace,
+  cardPadding:      14,
+  cardPaddingTight: 12,
+  gridGapTight:     10,
+};
+
 /** Primer nombre (primer token) para saludo, ej. "Hernán Kreick" → "Hernán". */
 export function coachFirstNameFromFullName(fullName) {
   var parts = String(fullName || "")

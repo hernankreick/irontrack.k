@@ -57,6 +57,22 @@ function rankingSessionsLine(completed, planned, lang) {
   );
 }
 
+function useIsUnder768() {
+  const [v, setV] = useState(
+    typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia("(max-width: 767px)").matches
+      : false
+  );
+  useEffect(function () {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    var mq = window.matchMedia("(max-width: 767px)");
+    var fn = function () { setV(mq.matches); };
+    mq.addEventListener("change", fn);
+    return function () { mq.removeEventListener("change", fn); };
+  }, []);
+  return v;
+}
+
 function emptyBox(lang, title, palette) {
   var P = palette || coachThemePalette(true);
   return (
@@ -97,6 +113,7 @@ export default function ProgresoView({
   darkMode = true,
 }) {
   const { lang } = useIronTrackI18n();
+  const isUnder768 = useIsUnder768();
   const [periodo, setPeriodo] = useState("semanas4");
 
   var C = useMemo(
@@ -468,7 +485,7 @@ export default function ProgresoView({
           })}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: S.gridGap }}>
+        <div style={{ display: "grid", gridTemplateColumns: isUnder768 ? "1fr" : "1fr 1fr", gap: S.gridGap }}>
           <div
             style={{
               background: C.card,
@@ -530,12 +547,13 @@ export default function ProgresoView({
           />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: S.gridGapTight }}>
+        <div style={{ display: "grid", gridTemplateColumns: isUnder768 ? "1fr" : "1fr 1fr 1fr", gap: S.gridGapTight }}>
           <ProgressRecentPrsCard
             prs={model.prsRecientes}
             C={C}
             lang={lang}
             emptyBox={emptyBox}
+            isUnder768={isUnder768}
           />
 
           <ProgressWeeklyVolumeCard
@@ -548,6 +566,7 @@ export default function ProgresoView({
             lang={lang}
             formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
             formatWeeklyVolKgFull={formatWeeklyVolKgFull}
+            isUnder768={isUnder768}
           />
 
           <ProgressRankingCard
@@ -559,6 +578,7 @@ export default function ProgresoView({
             C={C}
             lang={lang}
             emptyBox={emptyBox}
+            isUnder768={isUnder768}
           />
         </div>
 

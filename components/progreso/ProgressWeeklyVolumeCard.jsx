@@ -1,6 +1,6 @@
 import React from "react";
 import { BarChart2 } from "lucide-react";
-import { coachType as T, coachSpace as S } from "../coachUiScale.js";
+import { coachType as _T, coachSpace as _S, coachTypeMobile, coachSpaceMobile } from "../coachUiScale.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
 import ProgressWeeklyVolumeBar from "./ProgressWeeklyVolumeBar.jsx";
 
@@ -14,7 +14,10 @@ export default function ProgressWeeklyVolumeCard({
   lang,
   formatWeeklyVolKgAbbrev,
   formatWeeklyVolKgFull,
+  isUnder768,
 }) {
+  const T = isUnder768 ? coachTypeMobile : _T;
+  const S = isUnder768 ? coachSpaceMobile : _S;
   return (
     <div
       style={{
@@ -47,7 +50,7 @@ export default function ProgressWeeklyVolumeCard({
           display: "flex",
           justifyContent: "center",
           width: "100%",
-          minHeight: 188,
+          minHeight: isUnder768 ? 130 : 188,
           boxSizing: "border-box",
           padding: "4px 10px 0",
         }}
@@ -59,8 +62,8 @@ export default function ProgressWeeklyVolumeCard({
             justifyContent: "center",
             gap: 10,
             width: "100%",
-            maxWidth: 420,
-            minHeight: 168,
+            maxWidth: isUnder768 ? 280 : 420,
+            minHeight: isUnder768 ? 110 : 168,
           }}
         >
           {(volBars || []).map(function (bar, vidx) {
@@ -83,6 +86,7 @@ export default function ProgressWeeklyVolumeCard({
                 lang={lang}
                 formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
                 formatWeeklyVolKgFull={formatWeeklyVolKgFull}
+                isUnder768={isUnder768}
               />
             );
           })}

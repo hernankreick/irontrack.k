@@ -1,5 +1,5 @@
 import React from "react";
-import { coachType as T } from "../coachUiScale.js";
+import { coachType as _T, coachTypeMobile } from "../coachUiScale.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
 
 export default function ProgressWeeklyVolumeBar({
@@ -15,8 +15,10 @@ export default function ProgressWeeklyVolumeBar({
   lang,
   formatWeeklyVolKgAbbrev,
   formatWeeklyVolKgFull,
+  isUnder768,
 }) {
-  var chartBarMaxPx = 132;
+  const T = isUnder768 ? coachTypeMobile : _T;
+  var chartBarMaxPx = isUnder768 ? 90 : 132;
   var h = maxV > 0 ? (bar.v / maxV) * chartBarMaxPx : 0;
   if (maxV > 0 && bar.v <= 0) {
     h = Math.max(h, 4);
@@ -48,7 +50,7 @@ export default function ProgressWeeklyVolumeBar({
       style={{
         flex: "1 1 0",
         minWidth: 0,
-        maxWidth: 96,
+        maxWidth: isUnder768 ? 64 : 96,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -115,7 +117,7 @@ export default function ProgressWeeklyVolumeBar({
         <div
           style={{
             width: isCurrentWeek ? "78%" : "68%",
-            maxWidth: 56,
+            maxWidth: isUnder768 ? 38 : 56,
             height: Math.max(0, h) + "px",
             minHeight: maxV <= 0 ? 4 : 0,
             borderRadius: 8,
