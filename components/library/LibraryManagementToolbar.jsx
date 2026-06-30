@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Ic } from '../Ic.jsx';
 
 export default function LibraryManagementToolbar({
@@ -28,6 +28,12 @@ export default function LibraryManagementToolbar({
   msg,
   textMuted,
 }) {
+  const [filterExpanded, setFilterExpanded] = useState(false);
+  const isFilterActive = modoFiltro === "patron" ? filtPat !== "todos" : filtMus !== "todos";
+  const activeFilterLabel = isFilterActive
+    ? (modoFiltro === "patron" ? patLabel(filtPat) : musLabel(filtMus))
+    : msg("Todos los ejercicios", "All exercises", "Todos os exercícios");
+
   return (
     <>
       {libNarrow && (
@@ -60,88 +66,99 @@ export default function LibraryManagementToolbar({
           </button>
         </div>
       )}
-      <div
-        className="min-w-0"
+      {/* Filter toggle button (collapsed view) */}
+      <button
+        type="button"
+        onClick={() => setFilterExpanded(v => !v)}
         style={{
-          borderRadius: 20,
-          padding: libNarrow ? 16 : 22,
-          border: "1px solid " + (_dm ? "rgba(45, 64, 87, 0.65)" : "rgba(226, 232, 240, 0.9)"),
-          background: _dm
-            ? "linear-gradient(165deg, rgba(32, 48, 64, 0.42) 0%, rgba(12, 22, 35, 0.58) 100%)"
-            : "linear-gradient(165deg, rgba(255, 255, 255, 0.96) 0%, rgba(241, 245, 249, 0.9) 100%)",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
-          boxShadow: _dm ? "0 4px 24px rgba(0,0,0,0.12)" : "0 2px 12px rgba(15, 23, 42, 0.06)",
-          display: "flex", flexDirection: "column", gap: libNarrow ? 16 : 18, minWidth: 0,
+          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          background: '#111827', border: '1px solid #1E293B', borderRadius: '8px',
+          padding: '12px 14px', cursor: 'pointer', fontFamily: 'inherit',
         }}
       >
-        {!libNarrow && (
-          <input
-            type="search"
-            style={{...inpS, marginBottom:0}}
-            placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")}
-            value={busq}
-            onChange={e=>setBusq(e.target.value)}
-          />
-        )}
-        <div
-          className="min-w-0"
-          style={{ display:"flex", background:bgSub, border:"1px solid "+border, borderRadius: 12, padding: 4, gap: 4 }}
-        >
-          {[msg("Por patrón", "By pattern", "Por padrão"), msg("Por músculo", "By muscle", "Por músculo")].map((t,i)=>(
-            <button
-              type="button"
-              key={i===0?"bib-filt-patron":"bib-filt-muscle"}
-              onClick={()=>{setModoFiltro(i===0?"patron":"musculo");setFiltPat("todos");setFiltMus("todos");}}
-              style={{
-                flex:1, padding:"9px 8px", border:"none", borderRadius:8, fontFamily:"inherit", fontSize:14, fontWeight:700, cursor:"pointer",
-                background:modoFiltro===(i===0?"patron":"musculo")?"#2563EB":"transparent",
-                color:modoFiltro===(i===0?"patron":"musculo")?"#fff":"#8B9AB2",
-                minWidth:0,
-              }}
-            >
-              {t}
-            </button>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#E2E8F0' }}>{activeFilterLabel}</span>
+          {isFilterActive && (
+            <span style={{ background: '#2563EB', color: '#fff', borderRadius: 12, padding: '1px 7px', fontSize: 12, fontWeight: 700 }}>1</span>
+          )}
         </div>
+        <span style={{ color: '#6B7280', fontSize: 16, transform: filterExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
+      </button>
 
-        {modoFiltro==="patron" && (
-          <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
-            {patrones.map(p=>(
+      {/* Filter expanded panel */}
+      {filterExpanded && (
+        <div style={{ background: '#111827', border: '1px solid #1E293B', borderRadius: '8px', padding: '14px', marginTop: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#9CA3AF', letterSpacing: '.5px', textTransform: 'uppercase' }}>{msg("Filtrar ejercicios", "Filter exercises", "Filtrar exercícios")}</span>
+            <button type="button" onClick={() => setFilterExpanded(false)} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: '16px', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>✕</button>
+          </div>
+          {!libNarrow && (
+            <input
+              type="search"
+              style={{...inpS, marginBottom: 12}}
+              placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")}
+              value={busq}
+              onChange={e=>setBusq(e.target.value)}
+            />
+          )}
+          <div
+            className="min-w-0"
+            style={{ display:"flex", background:bgSub, border:"1px solid "+border, borderRadius: 12, padding: 4, gap: 4, marginBottom: 12 }}
+          >
+            {[msg("Por patrón", "By pattern", "Por padrão"), msg("Por músculo", "By muscle", "Por músculo")].map((t,i)=>(
               <button
                 type="button"
-                key={p}
-                onClick={()=>setFiltPat(p)}
-                style={{...chipBtnPad,
-                  border: filtPat===p ? "1px solid "+patColors[p] : filtPat==="todos"&&p==="todos" ? "1px solid #243040" : "1px solid "+border,
-                  background: filtPat===p ? patColors[p]+"22" : filtPat==="todos"&&p==="todos" ? "#2563EB22" : _dm ? "#1E2D40" : bgSub,
-                  color: filtPat===p ? patColors[p] : filtPat==="todos"&&p==="todos" ? "#2563EB" : "#8B9AB2",
+                key={i===0?"bib-filt-patron":"bib-filt-muscle"}
+                onClick={()=>{setModoFiltro(i===0?"patron":"musculo");setFiltPat("todos");setFiltMus("todos");}}
+                style={{
+                  flex:1, padding:"9px 8px", border:"none", borderRadius:8, fontFamily:"inherit", fontSize:14, fontWeight:700, cursor:"pointer",
+                  background:modoFiltro===(i===0?"patron":"musculo")?"#2563EB":"transparent",
+                  color:modoFiltro===(i===0?"patron":"musculo")?"#fff":"#8B9AB2",
+                  minWidth:0,
                 }}
               >
-                {patLabel(p)}
+                {t}
               </button>
             ))}
           </div>
-        )}
-        {modoFiltro==="musculo" && (
-          <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
-            {musculos.map(m=>(
-              <button
-                type="button"
-                key={m}
-                onClick={()=>setFiltMus(m==="todos"?"todos":m)}
-                style={{...chipBtnPad,
-                  border: filtMus===m ? "1px solid #60a5fa" : "1px solid "+border,
-                  background: filtMus===m ? "#2563EB22" : _dm ? "#1E2D40" : bgSub,
-                  color: filtMus===m ? "#2563EB" : "#8B9AB2",
-                }}
-              >
-                {musLabel(m)}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+          {modoFiltro==="patron" && (
+            <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
+              {patrones.map(p=>(
+                <button
+                  type="button"
+                  key={p}
+                  onClick={()=>setFiltPat(p)}
+                  style={{...chipBtnPad,
+                    border: filtPat===p ? "1px solid "+patColors[p] : filtPat==="todos"&&p==="todos" ? "1px solid #243040" : "1px solid "+border,
+                    background: filtPat===p ? patColors[p]+"22" : filtPat==="todos"&&p==="todos" ? "#2563EB22" : _dm ? "#1E2D40" : bgSub,
+                    color: filtPat===p ? patColors[p] : filtPat==="todos"&&p==="todos" ? "#2563EB" : "#8B9AB2",
+                  }}
+                >
+                  {patLabel(p)}
+                </button>
+              ))}
+            </div>
+          )}
+          {modoFiltro==="musculo" && (
+            <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
+              {musculos.map(m=>(
+                <button
+                  type="button"
+                  key={m}
+                  onClick={()=>setFiltMus(m==="todos"?"todos":m)}
+                  style={{...chipBtnPad,
+                    border: filtMus===m ? "1px solid #60a5fa" : "1px solid "+border,
+                    background: filtMus===m ? "#2563EB22" : _dm ? "#1E2D40" : bgSub,
+                    color: filtMus===m ? "#2563EB" : "#8B9AB2",
+                  }}
+                >
+                  {musLabel(m)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div
         className="min-w-0"
