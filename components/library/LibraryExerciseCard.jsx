@@ -1,4 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+function extractYouTubeId(url) {
+  if (!url) return null;
+  const patterns = [
+    /youtube\.com\/watch\?v=([^&]+)/,
+    /youtu\.be\/([^?]+)/,
+    /youtube\.com\/shorts\/([^?]+)/,
+    /youtube\.com\/embed\/([^?]+)/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
 
 export default function LibraryExerciseCard({
   e,
@@ -22,6 +37,8 @@ export default function LibraryExerciseCard({
   onDelete,
 }) {
   void lang;
+  const [showVideo, setShowVideo] = useState(false);
+  const videoId = extractYouTubeId(ytUrl);
 
   return (
     <div
@@ -42,13 +59,22 @@ export default function LibraryExerciseCard({
             </div>
             <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
               {ytUrl && (
-                <a
-                  href={ytUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
-                  style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: '#111827', border: '1px solid #1E293B', borderRadius: 7, textDecoration: "none", fontSize: 14, flexShrink: 0, color: textMuted }}
-                >▶</a>
+                videoId ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowVideo(v => !v)}
+                    aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
+                    style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: '#111827', border: '1px solid #1E293B', borderRadius: 7, cursor: "pointer", fontSize: 14, flexShrink: 0, color: textMuted, fontFamily: "inherit", padding: 0 }}
+                  >▶</button>
+                ) : (
+                  <a
+                    href={ytUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
+                    style={{ width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: '#111827', border: '1px solid #1E293B', borderRadius: 7, textDecoration: "none", fontSize: 14, flexShrink: 0, color: textMuted }}
+                  >▶</a>
+                )
               )}
               <button
                 type="button"
@@ -116,8 +142,17 @@ export default function LibraryExerciseCard({
             style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", marginLeft: "auto", width: "auto", justifyContent: "flex-end" }}
           >
             {ytUrl && (
-              <a href={ytUrl} target="_blank" rel="noreferrer" aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
-                style={{ width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center", background: _dm ? "rgba(22, 34, 52, 0.6)" : bgSub, color: textMuted, border: "1px solid " + cardBorder, borderRadius: 12, textDecoration: "none", fontSize: 16, flexShrink: 0 }}>▶</a>
+              videoId ? (
+                <button
+                  type="button"
+                  onClick={() => setShowVideo(v => !v)}
+                  aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
+                  style={{ width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center", background: _dm ? "rgba(22, 34, 52, 0.6)" : bgSub, color: textMuted, border: "1px solid " + cardBorder, borderRadius: 12, cursor: "pointer", fontSize: 16, flexShrink: 0, fontFamily: "inherit", padding: 0 }}
+                >▶</button>
+              ) : (
+                <a href={ytUrl} target="_blank" rel="noreferrer" aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
+                  style={{ width: 42, height: 42, display: "flex", alignItems: "center", justifyContent: "center", background: _dm ? "rgba(22, 34, 52, 0.6)" : bgSub, color: textMuted, border: "1px solid " + cardBorder, borderRadius: 12, textDecoration: "none", fontSize: 16, flexShrink: 0 }}>▶</a>
+              )
             )}
             <button
               type="button"
@@ -136,6 +171,20 @@ export default function LibraryExerciseCard({
               </button>
             )}
           </div>
+        </div>
+      )}
+      {showVideo && videoId && (
+        <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', marginTop: '10px' }}>
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none', borderRadius: '8px' }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+          <button
+            onClick={() => setShowVideo(false)}
+            style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', color: '#fff', fontSize: '14px', cursor: 'pointer', zIndex: 1 }}
+          >✕</button>
         </div>
       )}
     </div>
