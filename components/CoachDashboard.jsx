@@ -435,9 +435,9 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
       var completedDaysFromSessions = weekly.completedDaysFromSessions || 0;
       var hasRealRoutineSessions = (weekly.realSessionsCount || 0) > 0;
       var rutinaId = String(rutina.id || weekly.rutinaId || "");
-      if (rutinaId && totalDays > 0 && hasRealRoutineSessions && completedDaysFromSessions >= totalDays) {
+      if (rutinaId && totalDays > 0 && hasRealRoutineSessions && completedDaysFromSessions >= totalDays && weekly.weekIndex === 3) {
         out.push({
-          key: "rutina-terminada-" + a.id + "-" + rutinaId,
+          key: "rutina-terminada-" + a.id + "-" + rutinaId + "-w" + weekly.weekIndex,
           alumnoId: a.id,
           rutinaId: rutinaId,
           initials: initials,
@@ -457,7 +457,7 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
       }
       if (rutinaId && totalDays > 1 && hasRealRoutineSessions && completedDaysFromSessions > 0 && completedDaysFromSessions === totalDays - 1) {
         out.push({
-          key: "rutina-falta-1-" + a.id + "-" + rutinaId,
+          key: "rutina-falta-1-" + a.id + "-" + rutinaId + "-w" + weekly.weekIndex,
           alumnoId: a.id,
           rutinaId: rutinaId,
           initials: initials,

@@ -2415,7 +2415,7 @@ function GymApp() {
     if (rut && rid && typeof sb.updateRutina === "function") {
       var resetAllDatos = Object.assign({}, rut.datos || {}, {
         days: (rut.datos && rut.datos.days) || rut.days || [],
-        semana_activa: 1,
+        semana_activa: 4,
       });
       delete resetAllDatos.semana_reiniciada;
       delete resetAllDatos.semana_reiniciada_at;
@@ -2441,7 +2441,7 @@ function GymApp() {
         });
       });
     }
-    setCurrentWeek(0);
+    setCurrentWeek(3);
     setCoachRoutineDiaIdx(0);
     setRegistrosSubTab(0);
     clearRoutineLocalKeysForAlumno(aid, rid);
