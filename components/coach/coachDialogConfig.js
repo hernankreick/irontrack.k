@@ -72,14 +72,20 @@ export function getCoachDialogModalConfig(coachDialog, msg, es) {
       tone: 'caution',
       title: msg('Reiniciar rutina', 'Reset routine', 'Redefinir rotina'),
       message: msg(
-        '¿Reiniciar la rutina completa? Volverá a Semana 1, Día 1 y se limpiarán sus sesiones/días completados de esta rutina.',
-        'Reset the entire routine? It will go back to Week 1, Day 1 and clear completed sessions/days for this routine.',
-        'Redefinir a rotina completa? Volta à Semana 1, Dia 1 e limpa sessões/dias concluídos desta rotina.'
+        '¿Reiniciar la rutina completa? Se borrarán todas las sesiones y el progreso registrado de esta rutina, y el alumno quedará en Semana 4 para continuar entrenando.',
+        'Reset the entire routine? All sessions and recorded progress for this routine will be deleted, and the athlete will be left at Week 4 to keep training.',
+        'Redefinir a rotina completa? Todas as sessões e o progresso registrado desta rotina serão apagados, e o aluno ficará na Semana 4 para continuar treinando.'
       ),
       subjectName: c.a && (c.a.nombre || c.a.email),
       confirmLabel: msg('Reiniciar', 'Reset', 'Redefinir'),
       useLogoutIcon: false,
       loadingLabel: msg('Aplicando…', 'Applying…', 'Aplicando…'),
+      requireAcknowledge: true,
+      acknowledgeLabel: msg(
+        'Entiendo que esta acción no se puede deshacer',
+        'I understand this action cannot be undone',
+        'Entendo que esta ação não pode ser desfeita'
+      ),
     };
   }
   if (c.t === 'editAlum') {
