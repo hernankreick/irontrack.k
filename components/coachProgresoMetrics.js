@@ -145,17 +145,13 @@ function routineExerciseIdSet(rut) {
   return ids;
 }
 
-function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackStartMs, fallbackEndMs, maxSemana) {
+function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackStartMs, fallbackEndMs) {
   if (!row) return false;
   if (routineId && row.rutina_id != null && row.rutina_id !== "") {
     return String(row.rutina_id) === String(routineId);
   }
   if (row.ejercicio_id == null) return false;
   if (!routineExerciseIds[String(row.ejercicio_id)]) return false;
-  var semana = Number(row.semana);
-  if (Number.isFinite(semana) && semana > 0) {
-    return semana <= maxSemana;
-  }
   var d = parseProgresoDate(row.fecha);
   var t = d ? d.getTime() : 0;
   return t >= fallbackStartMs && t < fallbackEndMs;
@@ -280,15 +276,12 @@ export function buildCoachProgresoModel(params) {
   var now = new Date();
   var fallbackWeekStartMs = weekKeyMon(now);
   var fallbackWeekEndMs = fallbackWeekStartMs + 7 * DAY_MS;
-  // Semana máxima "vigente" segun el período que el coach eligió en el selector de la UI
-  // (semanas4/semanas8/meses3), usada para validar row.semana cuando está presente.
-  var maxSemanaPeriodo = Math.max(1, Math.ceil(bounds.durDays / 7));
   var routineForSelected = getRoutineForAlumno(rutinasSBEntrenador, alumnoSel);
   var routineForSelectedId = routineForSelected && routineForSelected.id != null ? String(routineForSelected.id) : null;
   var routineExerciseIds = routineExerciseIdSet(routineForSelected);
   var selectedProgressRows = alumnoSel
     ? (progresoGlobal[alumnoSel] || []).filter(function (row) {
-        return progressRowMatchesRoutine(row, routineForSelectedId, routineExerciseIds, fallbackWeekStartMs, fallbackWeekEndMs, maxSemanaPeriodo);
+        return progressRowMatchesRoutine(row, routineForSelectedId, routineExerciseIds, fallbackWeekStartMs, fallbackWeekEndMs);
       })
     : [];
   var selectedSessions = (sesionesGlobales || []).filter(function (ses) {
