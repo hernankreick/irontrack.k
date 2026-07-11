@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { Ic } from '../Ic.jsx';
 import { getYTVideoId } from '../../lib/getYTVideoId.js';
 import { resolveVideoUrl } from '../../lib/exerciseResolve.js';
@@ -55,7 +55,7 @@ function SessionSummaryStatsPanel({
   msg,
   allEx,
   videoOverrides,
-}) {
+}, ref) {
   var prList = mergeSessionPRs(sessionPRList, resumenSesion && resumenSesion.prs);
   var prCount = resumenSesion.prsNuevos || prList.length || 0;
   var featuredPr = prList[0] || null;
@@ -69,7 +69,7 @@ function SessionSummaryStatsPanel({
   ];
 
   return (
-    <div style={{color:"#F8FAFC"}}>
+    <div ref={ref} style={{color:"#F8FAFC"}}>
       <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:18,marginBottom:44}}>
         <div style={{
           width:34,
@@ -121,8 +121,6 @@ function SessionSummaryStatsPanel({
                 padding:"12px 9px 11px",
                 background:"rgba(13,20,36,0.72)",
                 border:"1px solid rgba(255,255,255,0.05)",
-                backdropFilter:"blur(16px)",
-                WebkitBackdropFilter:"blur(16px)",
               }}
             >
               <MetricIcon name={metric.icon} color={metric.accent}/>
@@ -142,8 +140,6 @@ function SessionSummaryStatsPanel({
         padding:18,
         background:"rgba(13,20,36,0.72)",
         border:"1px solid rgba(255,255,255,0.05)",
-        backdropFilter:"blur(18px)",
-        WebkitBackdropFilter:"blur(18px)",
         marginBottom:12,
         position:"relative",
         overflow:"hidden",
@@ -335,4 +331,4 @@ function SessionSummaryStatsPanel({
   );
 }
 
-export default SessionSummaryStatsPanel;
+export default forwardRef(SessionSummaryStatsPanel);
