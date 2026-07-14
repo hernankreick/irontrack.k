@@ -4024,8 +4024,8 @@ function GymApp() {
                   await sb.updateRutina(rSB.id, payloadSB);
                 }
               }
-            } catch(e){ console.error("Auto-save error:",e); }
-            setEditEx(null);toast2("Guardado âœ“");
+              setEditEx(null);toast2("Guardado âœ“");
+            } catch(e){ console.error("Auto-save error:",e); toast2(msg("Error al guardar", "Could not save")); }
           },
           onClose: ()=>setEditEx(null),
         }}
