@@ -73,7 +73,7 @@ export function filterRoutinesByChip(routines, filtro) {
   if (f === 'sin_asignar') return list.filter((r) => !r.alumno_id);
   if (f === 'plantillas') {
     return list.filter(
-      (r) => (r.templateId && r.templateId !== 'blank') || !!r.scanned
+      (r) => !!r.es_plantilla || (r.templateId && r.templateId !== 'blank') || !!r.scanned
     );
   }
   return [...list];
