@@ -893,17 +893,12 @@ function GymApp() {
       rutina: rutina,
     });
 
-    var insertResult = await supabase
-      .from("rutinas")
-      .insert([body])
-      .select()
-      .single();
-    if (insertResult.error || !insertResult.data) {
-      console.error("[assignRut INSERT ERROR]", insertResult.error || new Error("No se pudo crear la rutina asignada"));
-      throw insertResult.error || new Error("No se pudo crear la rutina asignada");
+    var createdRutinas = await sb.createRutina(body);
+    if (!createdRutinas || !createdRutinas[0]) {
+      throw new Error("No se pudo crear la rutina asignada");
     }
 
-    var res = insertResult.data;
+    var res = createdRutinas[0];
     var oldRutina = previousRoutine || getRutinaAsignadaAlumno(alumnoIdAssign);
     var oldRutinas = [];
     var seenOldRutinas = {};
