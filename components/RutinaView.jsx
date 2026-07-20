@@ -180,6 +180,7 @@ export function RutinaView(props) {
           alumno_id: r.alumno_id || null,
           datos: { days, alumno: r.alumno || '', note: r.note || '' },
           entrenador_id: 'entrenador_principal',
+          es_plantilla: !!r.es_plantilla,
         };
         if (r.saved) {
           await sb.updateRutina(r.id, payload);

@@ -4011,7 +4011,7 @@ function GymApp() {
               if(rActual) {
                 const updatedDays = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rActual.days));
                 updateRutinaRowsLocal(rActual.id, updatedDays);
-                const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:rActual.entrenador_id};
+                const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:rActual.entrenador_id,es_plantilla:!!rActual.es_plantilla};
                 if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
                 else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
               } else {
@@ -4019,7 +4019,7 @@ function GymApp() {
                 const rSB = (rutinasSBEntrenador||[]).find(x=>String(x.id)===String(editEx.rId)) || (rutinasSB||[]).find(x=>String(x.id)===String(editEx.rId));
                 if(rSB) {
                   const diasActualizados = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rSB.datos?.days||[]));
-                  const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:rSB.entrenador_id};
+                  const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:rSB.entrenador_id,es_plantilla:!!rSB.es_plantilla};
                   updateRutinaRowsLocal(rSB.id, diasActualizados);
                   await sb.updateRutina(rSB.id, payloadSB);
                 }

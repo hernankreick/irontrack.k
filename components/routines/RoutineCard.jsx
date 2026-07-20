@@ -321,6 +321,7 @@ export function RoutineCard({
           note: rActual.note || '',
         },
         entrenador_id: 'entrenador_principal',
+        es_plantilla: !!rActual.es_plantilla,
       };
 
       if (isSaved) {

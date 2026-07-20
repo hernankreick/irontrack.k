@@ -79,6 +79,10 @@ export default function NewRoutineModal({newR, setNewR, es, msg, lbl, inp, btn, 
                   <span style={lbl}>{msg("ALUMNO (opcional)", "CLIENT (optional)")}</span>
                   <input style={inp} value={newR.alumno||""} onChange={e=>setNewR(p=>({...p,alumno:e.target.value}))} placeholder={msg("Asigná también desde la tarjeta del alumno", "Or assign from client card")}/>
                 </div>
+                <label style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,cursor:"pointer",fontSize:13,color:textMuted,fontWeight:700}}>
+                  <input type="checkbox" checked={!!newR.es_plantilla} onChange={e=>setNewR(p=>({...p,es_plantilla:e.target.checked}))}/>
+                  {msg("Guardar como plantilla (sin asignar a un alumno)", "Save as template (no client assigned)")}
+                </label>
                 <span style={lbl}>{msg("NOMBRE DE CADA DÍA", "NAME EACH DAY")}</span>
                 <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:6}}>
                   {(newR.days||[]).map(function(d,di){return(
@@ -97,10 +101,10 @@ export default function NewRoutineModal({newR, setNewR, es, msg, lbl, inp, btn, 
               <button type="button" className="hov" style={{...btn(),flex:1,padding:"10px"}} onClick={()=>setNewR(null)}>{msg("CANCELAR", "CANCEL")}</button>
               <button type="button" className="hov" style={{...btn("#2563EB"),flex:2,padding:"10px",fontSize:17,fontWeight:800}} onClick={()=>{
                 if(!newR.name.trim()){toast2(msg("Pon un nombre", "Add a name"));return;}
-                var payload={name:newR.name,numDays:newR.numDays,days:newR.days,note:newR.note||"",alumno:newR.alumno||"",collapsed:false};
+                var payload={name:newR.name,numDays:newR.numDays,days:newR.days,note:newR.note||"",alumno:newR.alumno||"",es_plantilla:!!newR.es_plantilla,collapsed:false};
                 var newId=uid();
                 setRoutines(p=>[...p,{...payload,id:newId,created:new Date().toLocaleDateString("es-AR")}]);
-                setAssignRoutineId(newId);
+                if(!newR.es_plantilla) setAssignRoutineId(newId);
                 setNewR(null);
                 toast2(msg("Rutina creada ✓", "Routine created ✓"));
               }}>{msg("CREAR", "CREATE")}</button>
