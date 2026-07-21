@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Pencil, MoreVertical, ChevronDown, ClipboardList } from 'lucide-react';
 import { Ic } from '../Ic.jsx';
 import { DaySection } from '../DaySection.jsx';
-import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
+import { resolveExerciseTitle, resolveVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
 import { coachType as T, coachSpace as S } from '../coachUiScale.js';
 import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
 import RoutineCardActionMenu from './RoutineCardActionMenu.jsx';
@@ -66,6 +66,7 @@ export function RoutineCard({
   cardIndex = 0,
   setRutinasSBEntrenador,
   rutinasSBEntrenador = [],
+  videoOverrides,
 }) {
   const isUnder768 = useIsUnder768();
   const [collapsed, setCollapsed] = useState(!!r.collapsed);
@@ -776,7 +777,7 @@ export function RoutineCard({
             const enrichList = (list) =>
               (list || []).map((ex) => {
                 const lib = allEx.find((e) => e.id === ex.id);
-                const vu = pickVideoUrl(lib) || pickVideoUrl(ex);
+                const vu = resolveVideoUrl(lib, ex, videoOverrides);
                 const nm = resolveExerciseTitle(lib || null, ex, es);
                 const nameEnFallback = lib?.nameEn || ex.nameEn || lib?.name || ex.name || nm;
                 const { youtube: _y, videoUrl: _vv, youtube_url: _yu, ...exRest } = ex;

@@ -35,6 +35,7 @@ export function RutinaView(props) {
     routinesLoading = false,
     rutinasSBEntrenador = [],
     setRutinasSBEntrenador,
+    videoOverrides,
   } = props;
 
   const lang = langProp || (es ? 'es' : 'en');
@@ -431,6 +432,7 @@ export function RutinaView(props) {
               cardIndex={idx}
               setRutinasSBEntrenador={setRutinasSBEntrenador}
               rutinasSBEntrenador={rutinasSBEntrenador}
+              videoOverrides={videoOverrides}
             />
           ))
         )}

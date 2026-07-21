@@ -3158,6 +3158,7 @@ function GymApp() {
         desktopCoachStableLayout: coachDesktopNavHidden,
         rutinasSBEntrenador: rutinasSBEntrenador,
         setRutinasSBEntrenador: setRutinasSBEntrenador,
+        videoOverrides: videoOverrides,
       },
       studentsProps: {
         allEx: allEx,
