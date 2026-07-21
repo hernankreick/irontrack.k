@@ -974,6 +974,8 @@ function GymApp() {
   const [patternOverrides, setPatternOverrides] = useState({});
   const [videoModal, setVideoModal] = useState(null); // {url, nombre}
   const [editEx, setEditEx] = useState(null);
+  /** IDs de rutina para las que ya se mostró el hint "asigná un alumno o marcá como plantilla" (Flujo A). */
+  const assignHintShownRef = useRef({});
   const [loginModal, setLoginModal] = useState(false);
   const [session, setSession] = useState(null);
   const [preSessionPRs, setPreSessionPRs] = useState({});
@@ -4000,9 +4002,17 @@ function GymApp() {
             };
             // Actualizar routines locales
             setRoutines(p=>(p||[]).map(r=>r.id===editEx.rId?{...r,days:replaceExerciseInDays(r.days)}:r));
+            const rActual = routines.find(x=>x.id===editEx.rId);
+            if(rActual && !rActual.alumno_id && !rActual.es_plantilla){
+              setEditEx(null);
+              if(!assignHintShownRef.current[rActual.id]){
+                assignHintShownRef.current[rActual.id]=true;
+                toast2(msg("Asigná un alumno o marcá como plantilla para guardar", "Assign a client or mark as template to save"));
+              }
+              return;
+            }
             // Auto-guardar en Supabase inmediatamente
             try {
-              const rActual = routines.find(x=>x.id===editEx.rId);
               if(rActual) {
                 const updatedDays = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rActual.days));
                 updateRutinaRowsLocal(rActual.id, updatedDays);
