@@ -172,8 +172,9 @@ export function RutinaView(props) {
       return;
     }
     const fechaInicio = new Date().toLocaleDateString('es-AR');
-    try {
-      for (const r of routines) {
+    const results = [];
+    for (const r of routines) {
+      try {
         const days = sanitizeRoutineDaysForWrite(r.days);
         const payload = {
           nombre: r.name,
@@ -196,13 +197,40 @@ export function RutinaView(props) {
             throw new Error('createRutina failed');
           }
         }
+        results.push({ id: r.id, name: r.name, ok: true });
+      } catch (e) {
+        console.error('[RutinaView] handleSaveAll', r.id, r.name, e);
+        results.push({ id: r.id, name: r.name, ok: false, reason: (e && e.message) || String(e) });
       }
+    }
+
+    const failed = results.filter((x) => !x.ok);
+    if (failed.length === 0) {
       setHasUnsaved(false);
       toast2(M(lang, 'Cambios guardados ✓', 'Changes saved ✓', 'Alterações salvas ✓'));
-    } catch (e) {
-      console.error('[RutinaView] handleSaveAll', e);
-      toast2(M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar'));
+      return;
     }
+    if (failed.length === results.length) {
+      toast2(
+        M(
+          lang,
+          'No se pudo guardar ningún cambio',
+          'Could not save any changes',
+          'Não foi possível salvar nenhuma alteração'
+        )
+      );
+      return;
+    }
+    const okCount = results.length - failed.length;
+    const failedDetail = failed.map((f) => `"${f.name}": ${f.reason}`).join(' · ');
+    toast2(
+      M(
+        lang,
+        `${okCount} de ${results.length} guardadas — ${failedDetail}`,
+        `${okCount} of ${results.length} saved — ${failedDetail}`,
+        `${okCount} de ${results.length} salvas — ${failedDetail}`
+      )
+    );
   };
 
   const requestDiscardUnsaved = useCallback(
