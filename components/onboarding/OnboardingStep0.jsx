@@ -9,12 +9,12 @@ import {
 import {
   ChartSVG,
   ClipboardSVG,
-  LandingStepDots4,
+  OnboardingProgress,
   UserGroupSVG,
 } from './OnboardingPrimitives.jsx';
 import IronTrackAppIcon from '../IronTrackAppIcon.jsx';
 
-const Step0 = ({es, onNext, onYaTengoCuenta}) => {
+const Step0 = ({es, onNext, onYaTengoCuenta, total, current}) => {
   const [vis,setVis] = React.useState(false);
   React.useEffect(() => {
     const t = setTimeout(() => setVis(true), 100);
@@ -328,19 +328,15 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
               <span style={{ fontSize: 20, lineHeight: 1 }}>→</span>
               {es ? "EMPEZAR GRATIS" : "GET STARTED FREE"}
             </button>
-            <div
-              style={{
-                fontSize: 14,
-                color: "rgba(255,255,255,0.55)",
-                textAlign: "center",
-                marginTop: 18,
-                marginBottom: 10,
-                fontWeight: 600,
-              }}
-            >
-              {es ? "Paso 1 de 4" : "Step 1 of 4"}
+            <div style={{ marginTop: 18 }}>
+              <OnboardingProgress
+                total={total}
+                current={current}
+                label={es ? `Paso ${current} de ${total}` : `Step ${current} of ${total}`}
+                progressFontSize={14}
+                barMaxWidth="100%"
+              />
             </div>
-            <LandingStepDots4 />
             <button
               type="button"
               onClick={onYaTengoCuenta}

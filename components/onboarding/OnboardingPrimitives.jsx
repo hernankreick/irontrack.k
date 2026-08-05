@@ -178,8 +178,12 @@ export const BtnBack = ({onClick}) => (
   </button>
 );
 
-/** “Paso X de 3” + barra de 3 segmentos (onboarding perfiles). */
-export const OnboardingProgress3 = ({ text, filled, barMaxWidth, progressFontSize = 12 }) => (
+/**
+ * Indicador de progreso único del onboarding: "Paso {current} de {total}" + barra
+ * segmentada. Reemplaza a OnboardingProgress3 / Dots / LandingStepDots4 dentro del
+ * flujo de onboarding — total/current llegan siempre por props desde OnboardingScreen.
+ */
+export const OnboardingProgress = ({ total, current, label, barMaxWidth, progressFontSize = 13 }) => (
   <div>
     <div
       style={{
@@ -192,7 +196,7 @@ export const OnboardingProgress3 = ({ text, filled, barMaxWidth, progressFontSiz
         fontFamily: "system-ui,sans-serif",
       }}
     >
-      {text}
+      {label != null ? label : `Paso ${current} de ${total}`}
     </div>
     <div
       style={{
@@ -204,14 +208,14 @@ export const OnboardingProgress3 = ({ text, filled, barMaxWidth, progressFontSiz
         ...(barMaxWidth === "100%" ? { width: "100%" } : { maxWidth: barMaxWidth != null ? barMaxWidth : 260 }),
       }}
     >
-      {[0, 1, 2].map((i) => (
+      {Array.from({ length: total }).map((_, i) => (
         <div
           key={i}
           style={{
             flex: 1,
             height: 3,
             borderRadius: 2,
-            background: i < filled ? "#2563EB" : "rgba(255,255,255,0.14)",
+            background: i < current ? "#2563EB" : "rgba(255,255,255,0.14)",
             transition: "background 0.25s ease",
           }}
         />
@@ -220,21 +224,21 @@ export const OnboardingProgress3 = ({ text, filled, barMaxWidth, progressFontSiz
   </div>
 );
 
-/* Contenedor de botones — siempre perfecto (opcional: texto de progreso en lugar de dots) */
-export const BtnRow = ({ total, current, children, progressLabel, footerBg, progressBarFilled, contentWrap, progressBarWidth }) => (
+/**
+ * “Paso X de 3” + barra de 3 segmentos (onboarding perfiles).
+ * @deprecated Mantenido solo porque App.jsx importa este nombre de forma estática
+ * (import ESM no puede resolver un named export inexistente aunque no se use en JSX).
+ * El flujo de onboarding ya no lo usa — usar OnboardingProgress en su lugar.
+ */
+export const OnboardingProgress3 = ({ text, filled, barMaxWidth, progressFontSize = 12 }) => (
+  <OnboardingProgress total={3} current={filled} label={text} barMaxWidth={barMaxWidth} progressFontSize={progressFontSize} />
+);
+
+/* Contenedor de botones — siempre perfecto */
+export const BtnRow = ({ total, current, children, footerBg, contentWrap, progressBarWidth }) => (
   <div style={{padding:"8px 0 18px",flexShrink:0,background:footerBg!=null?footerBg:C.bg}}>
     <div style={{...(contentWrap || ONBOARD_CONTENT_WRAP),padding: "0 " + ONBOARD_PROFILE_H_PAD + "px" }}>
-      {progressLabel != null && progressLabel !== "" ? (
-        typeof progressBarFilled === "number" ? (
-          <OnboardingProgress3 text={progressLabel} filled={progressBarFilled} barMaxWidth={progressBarWidth != null ? progressBarWidth : 260} progressFontSize={13} />
-        ) : (
-          <div style={{textAlign:"center",fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.5)",marginBottom:12,letterSpacing:"0.2px",fontFamily:"system-ui,sans-serif"}}>
-            {progressLabel}
-          </div>
-        )
-      ) : (
-        <Dots total={total} current={current}/>
-      )}
+      <OnboardingProgress total={total} current={current} barMaxWidth={progressBarWidth != null ? progressBarWidth : 260} progressFontSize={13} />
       <div style={{
         display:"flex",flexDirection:"row",
         gap:10,
@@ -246,6 +250,10 @@ export const BtnRow = ({ total, current, children, progressLabel, footerBg, prog
   </div>
 );
 
+/**
+ * @deprecated Mantenido solo por el import estático de App.jsx (ver nota en
+ * OnboardingProgress3). El flujo de onboarding ya no lo usa.
+ */
 export const LandingStepDots4 = () => (
   <div
     style={{

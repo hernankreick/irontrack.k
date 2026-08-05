@@ -13,22 +13,20 @@ import {
   ChartSVG,
   CheckSVG,
   CoachSVG,
-  Dots,
   InfoSVG,
+  OnboardingProgress,
   TrendSVG,
 } from './OnboardingPrimitives.jsx';
 
 /* ═══════════════════════════════════════════
    PASO FINAL — Dashboard preview
 ═══════════════════════════════════════════ */
-const StepFinal = ({onDone,onBack,role,name,alumnosRange}) => {
+const StepFinal = ({onDone,onBack,role,name,alumnosRange,total,current}) => {
   const isCoach = role==="entrenador";
   const [done,setDone] = React.useState(false);
   const finish = ()=>{ setDone(true); setTimeout(onDone,950); };
 
   const rangeLabel = alumnosRange==="1-5"?"1 a 5":alumnosRange==="5-10"?"5 a 10":"más de 10";
-  const totalDots  = isCoach ? 5 : 4;
-  const currentDot = isCoach ? 4 : 3;
 
   const steps = isCoach
     ? [
@@ -100,7 +98,7 @@ const StepFinal = ({onDone,onBack,role,name,alumnosRange}) => {
 
       <div style={{position:"relative",zIndex:5,flexShrink:0,padding:"0 0 18px",background:C.bg}}>
         <div style={{...ONBOARD_CONTENT_WRAP,padding:"0 24px"}}>
-        <Dots total={totalDots} current={currentDot}/>
+        <OnboardingProgress total={total} current={current}/>
         <BtnPrimary onClick={finish} done={done}>
           {done?"Redirigiendo...":"Ir a mi panel"}
         </BtnPrimary>

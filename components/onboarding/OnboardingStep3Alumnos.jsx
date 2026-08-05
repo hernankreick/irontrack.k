@@ -18,7 +18,7 @@ import {
 /* ═══════════════════════════════════════════
    PASO 3 — ALUMNOS (solo entrenadores)
 ═══════════════════════════════════════════ */
-const Step3Alumnos = ({onNext,onBack,alumnosRange,setAlumnosRange}) => {
+const Step3Alumnos = ({onNext,onBack,alumnosRange,setAlumnosRange,total,current}) => {
   const [vis,setVis] = React.useState(false);
   React.useEffect(()=>{const t=setTimeout(()=>setVis(true),60);return()=>clearTimeout(t);},[]);
 
@@ -102,7 +102,7 @@ const Step3Alumnos = ({onNext,onBack,alumnosRange,setAlumnosRange}) => {
       </div>
       </div>
 
-      <BtnRow total={5} current={3}>
+      <BtnRow total={total} current={current}>
         <BtnBack onClick={onBack}/>
         <BtnPrimary onClick={onNext} disabled={!alumnosRange}>
           {alumnosRange?"Continuar":"Seleccioná una opción"}
