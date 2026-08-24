@@ -1408,7 +1408,7 @@ function GymApp() {
 
   // ── Detectar online/offline y sincronizar cola ─────────────────────────
   useEffect(()=>{
-    const goOnline = async () => {
+    const flushPendingSync = async () => {
       setIsOnline(true);
       // Sincronizar sets pendientes
       let pending = [];
@@ -1443,9 +1443,16 @@ function GymApp() {
       const syncedCount = pending.length - failed.length;
       if(syncedCount > 0) toast2(syncedCount+' set'+(syncedCount>1?'s':'')+' sincronizados ✓');
     };
+    const goOnline = () => { flushPendingSync(); };
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online',  goOnline);
     window.addEventListener('offline', goOffline);
+    // Si la app se abre/recupera sesión ya con conexión (ej. se cerró offline
+    // y se reabrió con internet), el evento 'online' no vuelve a disparar
+    // porque no hay transición offline→online. Chequear y flushear acá.
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      flushPendingSync();
+    }
     return () => {
       window.removeEventListener('online',  goOnline);
       window.removeEventListener('offline', goOffline);
