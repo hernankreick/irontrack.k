@@ -1845,8 +1845,8 @@ function GymApp() {
     coachAluDropdown, coachAluDropdownShadow, coachAluGhostBtn, card, inp, lbl, btn, tag,
   } = getAppThemeTokens(darkMode);
 
-  const shareSessionSummaryImage = async () => {
-    return shareSessionSummaryImageUi({ resumenSesion: resumenSesion, msg: msg, toast2: toast2 });
+  const shareSessionSummaryImage = async ({ node, resumenSesion: resumenSesionParam }) => {
+    return shareSessionSummaryImageUi({ node: node, resumenSesion: resumenSesionParam || resumenSesion, msg: msg, toast2: toast2 });
   };
 
   const allEx = React.useMemo(function () {

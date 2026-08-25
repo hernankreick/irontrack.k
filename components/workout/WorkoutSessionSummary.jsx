@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import BaseModal from '../modals/BaseModal.jsx';
 import { Ic } from '../Ic.jsx';
 import SessionSummaryStatsPanel from '../student-plan/SessionSummaryStatsPanel.jsx';
@@ -17,6 +17,8 @@ export default function WorkoutSessionSummary({
   onClose,
   onShareImage,
 }) {
+  const cardRef = useRef(null);
+
   if (!resumenSesion) return null;
 
   return (
@@ -30,6 +32,7 @@ export default function WorkoutSessionSummary({
       contentStyle={{background:"transparent",borderRadius:0,padding:"18px 0 0",paddingBottom:"calc(20px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:440,maxHeight:"none",overflowY:"visible",WebkitOverflowScrolling:"touch",border:"none",textAlign:"left",animation:"fadeIn 0.25s ease",boxShadow:"none"}}
     >
       <SessionSummaryStatsPanel
+        ref={cardRef}
         resumenSesion={resumenSesion}
         sessionPRList={sessionPRList}
         msg={msg}
@@ -48,7 +51,7 @@ export default function WorkoutSessionSummary({
           background:"#2563EB",color:"#fff",
           boxShadow:"0 16px 34px rgba(37,99,235,0.24)",
           display:"flex",alignItems:"center",justifyContent:"center",gap:8
-        }} onClick={onShareImage}>
+        }} onClick={() => onShareImage({ node: cardRef.current, resumenSesion })}>
           <Ic name="upload" size={16}/> {msg("COMPARTIR / GUARDAR IMAGEN", "SHARE / SAVE IMAGE")}
         </button>
         <button className="hov" style={{width:"100%",minHeight:44,padding:"11px 16px",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:16,color:"#94A3B8",fontSize:14,fontWeight:750,cursor:"pointer",fontFamily:"inherit"}}

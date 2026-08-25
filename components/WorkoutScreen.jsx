@@ -132,6 +132,7 @@ export function WorkoutScreen(props) {
       preSessionPRs: preSessionPRs,
       date: hoyFin,
       now: Date.now(),
+      semana: semanaParaGuardar,
     }));
     setSession(null);
     if (readOnly && sharedParam) {
