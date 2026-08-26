@@ -2,6 +2,7 @@ import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { getYTVideoId } from '../../lib/getYTVideoId.js';
 import { resolveVideoUrl } from '../../lib/exerciseResolve.js';
+import { formatKg } from '../../lib/formatKg.js';
 
 function MetricIcon({ name, color }) {
   return (
@@ -25,11 +26,6 @@ function resolvePrThumbnail(pr, allEx, videoOverrides) {
   var videoUrl = resolveVideoUrl(info || null, { id: pr && pr.exId }, videoOverrides || {});
   var videoId = getYTVideoId(videoUrl || "");
   return videoId ? "https://img.youtube.com/vi/" + videoId + "/hqdefault.jpg" : "";
-}
-
-function formatKg(value) {
-  var n = Number(value);
-  return Number.isFinite(n) ? n.toLocaleString("es-AR") + " kg" : String(value || "-");
 }
 
 function mergeSessionPRs(primary, fallback) {
