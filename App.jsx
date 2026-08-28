@@ -2848,6 +2848,12 @@ function GymApp() {
         {loginError&&<div style={{color:"#2563EB",fontSize:13,marginBottom:12,textAlign:"center"}}>{loginError}</div>}
         <button style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:"pointer",letterSpacing:1}} onClick={async ()=>{
           setLoginLoading(true); setLoginError("");
+          // Si Supabase no responde (red bloqueada/caída), no dejar el botón "INGRESANDO..." colgado para siempre.
+          const loginSafetyTimeout = setTimeout(() => {
+            console.warn('[AUTH] Safety timeout: el login no respondió a tiempo');
+            setLoginLoading(false);
+            setLoginError(msg("La conexión está tardando demasiado. Revisá tu internet e intentá de nuevo.", "The connection is taking too long. Check your internet and try again."));
+          }, 15000);
           try {
             const sp = typeof window!=="undefined"?(localStorage.getItem("it_tpass")||"irontrack2024"):"irontrack2024";
             const loginEmailNorm = loginEmail.trim().toLowerCase();
@@ -2959,6 +2965,7 @@ function GymApp() {
               } else setLoginError("Email o contraseña incorrectos");
             }
           } finally {
+            clearTimeout(loginSafetyTimeout);
             setLoginLoading(false);
           }
         }}>
