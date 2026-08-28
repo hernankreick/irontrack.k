@@ -2903,18 +2903,34 @@ function GymApp() {
                 clearIronTrackStorageForNewLogin();
                 var demoName = "Entrenador";
                 var hasCoachRowName = false;
-                try {
-                  var coachRow = await supabase
-                    .from('entrenadores')
-                    .select('nombre')
-                    .eq('id', String(authLogin.data.user.id))
-                    .maybeSingle();
-                  if (!coachRow.error && coachRow.data && typeof coachRow.data.nombre === "string" && coachRow.data.nombre.trim()) {
-                    demoName = coachRow.data.nombre.trim();
-                    hasCoachRowName = true;
+                // Disparar el select y el upsert en paralelo (son independientes) en vez de en serie,
+                // para no sumar dos round-trips seguidos al login.
+                var coachRowPromise = (async function () {
+                  try {
+                    return await supabase
+                      .from('entrenadores')
+                      .select('nombre')
+                      .eq('id', String(authLogin.data.user.id))
+                      .maybeSingle();
+                  } catch (eCoachName) {
+                    console.error("[AUTH] entrenadores nombre select exception", eCoachName);
+                    return null;
                   }
-                } catch (eCoachName) {
-                  console.error("[AUTH] entrenadores nombre select exception", eCoachName);
+                })();
+                var upCoachPromise = (async function () {
+                  try {
+                    return await supabase
+                      .from('entrenadores')
+                      .upsert({ id: String(authLogin.data.user.id), email: authLogin.data.user.email || loginEmailNorm }, { onConflict: 'id' });
+                  } catch (eUpCoach) {
+                    console.error("[AUTH] entrenadores upsert migracion exception", eUpCoach);
+                    return null;
+                  }
+                })();
+                var coachRow = await coachRowPromise;
+                if (coachRow && !coachRow.error && coachRow.data && typeof coachRow.data.nombre === "string" && coachRow.data.nombre.trim()) {
+                  demoName = coachRow.data.nombre.trim();
+                  hasCoachRowName = true;
                 }
                 try {
                   var cpl = localStorage.getItem("it_coach_profile_local");
@@ -2923,14 +2939,8 @@ function GymApp() {
                     if (!hasCoachRowName && cpj && typeof cpj.name === "string" && cpj.name.trim()) demoName = cpj.name.trim();
                   }
                 } catch (e) {}
-                try {
-                  var upCoach = await supabase
-                    .from('entrenadores')
-                    .upsert({ id: String(authLogin.data.user.id), email: authLogin.data.user.email || loginEmailNorm }, { onConflict: 'id' });
-                  if (upCoach.error) console.error("[AUTH] entrenadores upsert migracion fallo", upCoach.error);
-                } catch (eUpCoach) {
-                  console.error("[AUTH] entrenadores upsert migracion exception", eUpCoach);
-                }
+                var upCoach = await upCoachPromise;
+                if (upCoach && upCoach.error) console.error("[AUTH] entrenadores upsert migracion fallo", upCoach.error);
                 const s={role:"entrenador",name: demoName,email:authLogin.data.user.email||loginEmailNorm,entrenadorId:String(authLogin.data.user.id)};
                 localStorage.setItem("it_session",JSON.stringify(s));
                 syncStateWithLocalStorage();
