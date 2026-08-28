@@ -116,12 +116,23 @@ export function WorkoutScreen(props) {
   // ── Finalizar (sin cambios de lógica) ─────────────────────────────
   const finalizarSesion = async () => {
     const r = activeR;
-    const dayKey = buildCompletedDayKey(session, currentWeek);
+    // La semana local (currentWeek) puede quedar desincronizada de la semana real de la
+    // rutina (r.datos.semana_activa, la que persiste en el server) — por ejemplo si el
+    // alumno vuelve a loguearse y se resetea el estado local. Si hay un valor persistido
+    // válido, es la fuente de verdad: se usa para guardar la sesión y se re-sincroniza el
+    // estado local, para no marcar el día completado bajo la semana equivocada.
+    const persistedWeekNum = Number(r && r.datos && r.datos.semana_activa);
+    const hasPersistedWeek = Number.isFinite(persistedWeekNum) && persistedWeekNum >= 1 && persistedWeekNum <= 4;
+    const effectiveWeek = hasPersistedWeek ? (persistedWeekNum - 1) : currentWeek;
+    if (hasPersistedWeek && effectiveWeek !== currentWeek) {
+      setCurrentWeek(effectiveWeek);
+    }
+    const dayKey = buildCompletedDayKey(session, effectiveWeek);
     const newCompleted = mergeCompletedDay(completedDays, dayKey);
     const totalDays = r ? r.days.length : 1;
-    const daysThisWeek = countCompletedDaysForWeek(newCompleted, session.rId, currentWeek);
+    const daysThisWeek = countCompletedDaysForWeek(newCompleted, session.rId, effectiveWeek);
     setCompletedDays(newCompleted);
-    const semanaParaGuardar = currentWeek + 1;
+    const semanaParaGuardar = effectiveWeek + 1;
     const hoyFin = new Date().toLocaleDateString("es-AR");
     const horaFin = new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
     setResumenSesion(buildWorkoutSummary({
@@ -132,6 +143,7 @@ export function WorkoutScreen(props) {
       preSessionPRs: preSessionPRs,
       date: hoyFin,
       now: Date.now(),
+      weekToSave: semanaParaGuardar,
     }));
     setSession(null);
     if (readOnly && sharedParam) {
@@ -178,7 +190,7 @@ export function WorkoutScreen(props) {
     }
     const lastAdvance = localStorage.getItem("it_last_week_advance_date");
     const todayStr = new Date().toDateString();
-    if (daysThisWeek >= totalDays && currentWeek < 3 && lastAdvance !== todayStr) {
+    if (daysThisWeek >= totalDays && effectiveWeek < 3 && lastAdvance !== todayStr) {
       if (!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId && r?.id && typeof sb.updateRutina === "function") {
         try {
           await sb.updateRutina(r.id, {
@@ -187,15 +199,15 @@ export function WorkoutScreen(props) {
             entrenador_id: r.entrenador_id,
             datos: Object.assign({}, r.datos || {}, {
               days: r.days || (r.datos && r.datos.days) || [],
-              semana_activa: currentWeek + 2,
+              semana_activa: effectiveWeek + 2,
             }),
           });
         } catch (e) {
           console.error("[advance active week]", e);
         }
       }
-      setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+currentWeek)));
-      setCurrentWeek(currentWeek + 1);
+      setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+effectiveWeek)));
+      setCurrentWeek(effectiveWeek + 1);
       localStorage.setItem("it_last_week_advance_date", todayStr);
     }
   };

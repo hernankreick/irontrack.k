@@ -1620,6 +1620,14 @@ function GymApp() {
               if(existe) return prev.map(function(r) { return r.id === rSB.id ? rutLocal : r; });
               return [rutLocal];
             });
+            // currentWeek es estado local (localStorage) y se pierde en cada login nuevo
+            // (clearIronTrackStorageForNewLogin); re-sincronizarlo acá con la semana real
+            // persistida en la rutina evita que un día ya completado se guarde o se lea
+            // bajo el número de semana equivocado.
+            var persistedWeekNum = Number(rSB.datos && rSB.datos.semana_activa);
+            if (Number.isFinite(persistedWeekNum) && persistedWeekNum >= 1 && persistedWeekNum <= 4) {
+              setCurrentWeek(persistedWeekNum - 1);
+            }
           }
           setSesiones(ses || []);
           sb.getNota(sessionData.alumnoId).then(function(res) {
