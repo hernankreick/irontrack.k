@@ -1802,7 +1802,14 @@ function GymApp() {
 
   const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe, weekOverride) => {
     const d = new Date().toLocaleDateString("es-AR");
-    const weekForSet = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : currentWeek;
+    // Mismo criterio que al finalizar una sesión: si la rutina tiene una semana persistida
+    // en el servidor, es la fuente de verdad por sobre el currentWeek local (que puede
+    // haber quedado desincronizado), para no taggear cada serie con la semana equivocada.
+    const persistedWeekNumForSet = Number(routines[0] && routines[0].datos && routines[0].datos.semana_activa);
+    const effectiveCurrentWeek = (Number.isFinite(persistedWeekNumForSet) && persistedWeekNumForSet >= 1 && persistedWeekNumForSet <= 4)
+      ? (persistedWeekNumForSet - 1)
+      : currentWeek;
+    const weekForSet = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : effectiveCurrentWeek;
     const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe);
     setProgress(prev=>{
       const ex = updateExerciseProgressRecord(prev[exId], newSet);
