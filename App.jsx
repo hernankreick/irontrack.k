@@ -597,6 +597,8 @@ function GymApp() {
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const loginSubmitRef = React.useRef(null);
+  const handleLoginEnterKey = (e) => { if (e.key === "Enter") loginSubmitRef.current?.click(); };
   /** Evita mostrar onboarding/login hasta leer `it_session` / flags en localStorage (post-login, refresh). */
   const [authLoading, setAuthLoading] = useState(function () { return !sharedParam; });
   /** Splash de marca: una vez por pestaña (sessionStorage), no en enlaces ?r= */
@@ -2846,12 +2848,12 @@ function GymApp() {
 
         <div style={{marginBottom:12}}>
           <div style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4}}>EMAIL</div>
-          <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder="tu@email.com" type="email"/>
+          <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} onKeyDown={handleLoginEnterKey} placeholder="tu@email.com" type="email"/>
         </div>
         <div style={{marginBottom:loginError?12:20}}>
           <div style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4}}>CONTRASEÑA</div>
           <div style={{position:"relative"}}>
-            <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:8,padding:"8px 40px 8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginPass} onChange={e=>setLoginPass(e.target.value)} placeholder="••••••••" type={showPassword?"text":"password"}/>
+            <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:8,padding:"8px 40px 8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginPass} onChange={e=>setLoginPass(e.target.value)} onKeyDown={handleLoginEnterKey} placeholder="••••••••" type={showPassword?"text":"password"}/>
             <button type="button" onClick={()=>setShowPassword(v=>!v)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:"#6B7280",padding:4,display:"flex",alignItems:"center"}}>
               {showPassword
                 ? <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -2861,7 +2863,7 @@ function GymApp() {
           </div>
         </div>
         {loginError&&<div style={{color:"#2563EB",fontSize:13,marginBottom:12,textAlign:"center"}}>{loginError}</div>}
-        <button style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:"pointer",letterSpacing:1}} onClick={async ()=>{
+        <button ref={loginSubmitRef} style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:"pointer",letterSpacing:1}} onClick={async ()=>{
           setLoginLoading(true); setLoginError("");
           // Si Supabase no responde (red bloqueada/caída), no dejar el botón "INGRESANDO..." colgado para siempre.
           const loginSafetyTimeout = setTimeout(() => {
