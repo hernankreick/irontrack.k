@@ -38,7 +38,7 @@ export default function CoachSectionRenderer({
 }) {
   const isCoach = sessionData?.role === "entrenador" && !esAlumno;
   const isUnder768 = useIsUnder768();
-  const mobilePad = isUnder768 ? { paddingTop: 20, paddingLeft: 16, paddingRight: 16 } : {};
+  const mobilePad = isUnder768 ? { paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", paddingLeft: 16, paddingRight: 16 } : {};
 
   return (
     <>
