@@ -44,7 +44,11 @@ export function WorkoutScreen(props) {
   const green   = "#22C55E";
 
   const hoy       = new Date().toLocaleDateString("es-AR");
-  const exercises = activeDay?.exercises || [];
+  // Entrada en calor + bloque principal, en ese orden — igual que en el resto de las
+  // pantallas (plan semanal, resumen). Antes solo se tomaba activeDay.exercises, así que
+  // el entrenamiento activo arrancaba directo en el bloque principal y la entrada en
+  // calor quedaba imposible de marcar desde esta pantalla.
+  const exercises = [...(activeDay?.warmup || []), ...(activeDay?.exercises || [])];
   const ex        = exercises[activeExIdx];
   const info      = ex ? allEx.find(e => e.id === ex.id) : null;
   const pat       = info
