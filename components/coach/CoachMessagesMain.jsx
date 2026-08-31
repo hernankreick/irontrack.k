@@ -116,7 +116,7 @@ export default function CoachMessagesMain({
 
   return (
     <div style={{ minHeight: "100%", background: C.bg, color: C.text, overflowY: "auto" }}>
-      <div style={{ width: "100%", maxWidth: 920, margin: "0 auto", padding: "20px 16px 96px", boxSizing: "border-box" }}>
+      <div style={{ width: "100%", maxWidth: 920, margin: "0 auto", padding: "calc(20px + env(safe-area-inset-top, 0px)) 16px 96px", boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
           <div>
             <div style={{ fontSize: 26, lineHeight: 1, fontWeight: 900, letterSpacing: 0 }}>

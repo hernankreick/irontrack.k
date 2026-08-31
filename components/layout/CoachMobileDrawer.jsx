@@ -51,7 +51,7 @@ export default function CoachMobileDrawer({
         }}
       >
         {/* Header del drawer */}
-        <div style={{ padding: "20px 16px 14px", borderBottom: "1px solid #1A2535", flexShrink: 0 }}>
+        <div style={{ padding: "calc(20px + env(safe-area-inset-top, 0px)) 16px 14px", borderBottom: "1px solid #1A2535", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
             <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: "-.3px" }}>
               <span style={{ color: "#2563EB" }}>IRON</span>
