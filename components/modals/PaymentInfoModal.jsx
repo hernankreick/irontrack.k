@@ -32,7 +32,7 @@ export default function PaymentInfoModal({
           <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"8px 16px",fontSize:15,width:"100%",fontFamily:"inherit",marginBottom:16}} value={form.nota} onChange={e=>setForm(p=>({...p,nota:e.target.value}))} placeholder={msg("Ej: Transferir antes del 5 de cada mes", "E.g.: Transfer before the 5th of each month")}/>
           <div style={{display:"flex",gap:8}}>
             <button className="hov" style={{background:darkMode?"#162234":"#E2E8F0",color:textMain,border:"none",borderRadius:12,padding:"12px",flex:1,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={onClose}>{msg("Cancelar", "Cancel")}</button>
-            <button className="hov" style={{background:green,color:darkMode?"#fff":"#fff",border:"none",borderRadius:12,padding:"12px",flex:2,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={onSave}>{msg("Guardar", "Save")}</button>
+            <button className="hov" style={{background:"#2563EB",color:darkMode?"#fff":"#fff",border:"none",borderRadius:12,padding:"12px",flex:2,fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={onSave}>{msg("Guardar", "Save")}</button>
           </div>
         </div>
       </div>
