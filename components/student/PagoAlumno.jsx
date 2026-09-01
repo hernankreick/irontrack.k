@@ -2,14 +2,23 @@ import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { getTheme } from '../../lib/uiHelpers.js';
 
-function PagoAlumno({aliasData, es, toast2, darkMode, msg}) {
+function pagoConfirmadoEsteMes(ultimoPagoConfirmado) {
+  if (!ultimoPagoConfirmado) return false;
+  const d = new Date(ultimoPagoConfirmado);
+  if (isNaN(d.getTime())) return false;
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
+function PagoAlumno({aliasData, ultimoPagoConfirmado, es, toast2, darkMode, msg}) {
   const {bg, bgCard, bgSub, border, textMain, textMuted} = getTheme(darkMode);
+  const cerradoHoyKey = "it_pago_cerrado_" + new Date().toISOString().slice(0, 10);
   const [pagoVisible, setPagoVisible] = React.useState(() =>
-    localStorage.getItem("it_pago_cerrado") !== "true"
+    localStorage.getItem(cerradoHoyKey) !== "true"
   );
   const [copied, setCopied] = React.useState(false);
 
-  if (!pagoVisible) return null;
+  if (!pagoVisible || pagoConfirmadoEsteMes(ultimoPagoConfirmado)) return null;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(aliasData.alias);
@@ -47,7 +56,7 @@ function PagoAlumno({aliasData, es, toast2, darkMode, msg}) {
           </span>
         </div>
         <button
-          onClick={() => { setPagoVisible(false); localStorage.setItem("it_pago_cerrado", "true"); }}
+          onClick={() => { setPagoVisible(false); localStorage.setItem(cerradoHoyKey, "true"); }}
           style={{
             background: "transparent", border: "none", cursor: "pointer",
             color: textMuted, width: 28, height: 28, borderRadius: 6,
