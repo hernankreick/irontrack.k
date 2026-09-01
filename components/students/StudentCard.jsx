@@ -24,6 +24,7 @@ export default function StudentCard({
   onToggleMenu,
   onEdit,
   onChat,
+  onMarkPaid,
   onClearProgress,
   onDelete,
   onAsignarRutina,
@@ -99,6 +100,7 @@ export default function StudentCard({
                 coachAluDropdownShadow={coachAluDropdownShadow}
                 onEdit={onEdit}
                 onChat={onChat}
+                onMarkPaid={onMarkPaid}
                 onClearProgress={onClearProgress}
                 onDelete={onDelete}
               />

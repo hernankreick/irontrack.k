@@ -302,6 +302,18 @@ export default function StudentsSection(props) {
                   setCoachCardMenuId(null);
                   setCoachDialog({ t: 'deleteAlumno', a: a });
                 }}
+                onMarkPaid={async function () {
+                  setCoachCardMenuId(null);
+                  try {
+                    const now = new Date().toISOString();
+                    const updated = await sb.updateAlumno(a.id, { ultimo_pago_confirmado: now });
+                    if (!updated) { toast2(msg("Error al registrar el pago", "Error registering payment")); return; }
+                    setAlumnos(function (prev) { return prev.map(function (al) { return al.id === a.id ? {...al, ultimo_pago_confirmado: now} : al; }); });
+                    toast2(msg("Pago registrado ✓", "Payment registered ✓"));
+                  } catch (e) {
+                    toast2(msg("Error al registrar el pago", "Error registering payment"));
+                  }
+                }}
                 onAsignarRutina={function () {}}
               >
                 {isAlumnoActive&&(
