@@ -11,6 +11,7 @@ export default function StudentActionsMenu({
   coachAluDropdownShadow,
   onEdit,
   onChat,
+  onMarkPaid,
   onClearProgress,
   onDelete,
   disabled,
@@ -37,6 +38,15 @@ export default function StudentActionsMenu({
         onClick={onChat}
       >
         <Ic name="message-circle" size={16} color="#2563eb"/> {msg("Mensaje", "Message")}
+      </button>
+      <button
+        type="button"
+        className="hov"
+        disabled={disabled}
+        style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#22c55e",fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit"}}
+        onClick={onMarkPaid}
+      >
+        <Ic name="check-circle" size={16} color="#22c55e"/> {msg("Marcar pagado", "Mark as paid")}
       </button>
       <button
         type="button"
