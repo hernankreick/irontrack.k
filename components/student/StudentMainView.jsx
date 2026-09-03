@@ -7,6 +7,7 @@ export default function StudentMainView({
   tab,
   planScrollDiag,
   aliasData,
+  ultimoPagoConfirmado,
   es,
   darkMode,
   toast2,
@@ -28,7 +29,7 @@ export default function StudentMainView({
 }) {
   return (
     <>
-      {tab==="plan"&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} es={es} darkMode={darkMode} toast2={toast2} msg={msg}/>}
+      {tab==="plan"&&planScrollDiag.pagoAlumnoBanner&&aliasData?.alias&&<PagoAlumno aliasData={aliasData} ultimoPagoConfirmado={ultimoPagoConfirmado} es={es} darkMode={darkMode} toast2={toast2} msg={msg}/>}
       {tab==="plan"&&planView}
       {tab==="library"&&(
         <div className="mx-auto w-full max-w-[32rem] pt-4">

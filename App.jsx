@@ -1030,6 +1030,7 @@ function GymApp() {
   const [exModal, setExModal] = useState(null);
   const [aliasModal, setAliasModal] = useState(false);
   const [aliasData, setAliasData] = useState(null);
+  const [ultimoPagoConfirmado, setUltimoPagoConfirmado] = useState(null);
   const [isOnline, setIsOnline] = useState(()=>typeof navigator!=='undefined'?navigator.onLine:true);
   const [pendingSync, setPendingSync] = useState(()=>{
     try{return JSON.parse(localStorage.getItem('it_pending_sync')||'[]');}catch(e){return [];}
@@ -1589,6 +1590,7 @@ function GymApp() {
     if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
       setCargandoAlumno(true);
       setSesiones([]); // FIX B: flush stale sesiones from a previous student before fetching
+      setUltimoPagoConfirmado(null); // flush stale payment status from a previous student before fetching
       const safetyTimeout = setTimeout(() => {
         console.log('TIMEOUT fired at 1586');
         console.warn('Safety timeout: forcing cargandoAlumno to false');
@@ -1597,10 +1599,12 @@ function GymApp() {
       (async () => {
         try {
           // FIX A: fetch rutinas and sesiones in parallel
-          const [rutsRaw, ses] = await Promise.all([
+          const [rutsRaw, ses, alumnoRows] = await Promise.all([
             sb.getRutinas(sessionData.alumnoId),
             sb.getSesiones(sessionData.alumnoId),
+            sbFetch("alumnos?id=eq."+sessionData.alumnoId+"&select=ultimo_pago_confirmado"),
           ]);
+          setUltimoPagoConfirmado((alumnoRows && alumnoRows[0] && alumnoRows[0].ultimo_pago_confirmado) || null);
           const ruts = (rutsRaw || []).slice().sort(function (a, b) {
             return new Date(b.created_at || 0) - new Date(a.created_at || 0);
           }).slice(0, 1);
@@ -3475,6 +3479,7 @@ function GymApp() {
             tab={tab}
             planScrollDiag={planScrollDiag}
             aliasData={aliasData}
+            ultimoPagoConfirmado={ultimoPagoConfirmado}
             es={es}
             darkMode={darkMode}
             toast2={toast2}
