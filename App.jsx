@@ -488,20 +488,28 @@ const sb = {
     return row;
   },
   deleteCustomEx: async (id, entId) => {
-    if (!entId) { console.error('deleteCustomEx called without entId — aborting'); return; }
-    var q = supabase.from("ejercicios_custom").delete().eq("id", id);
-    if (entId) q = q.eq("entrenador_id", String(entId));
-    const { error } = await q;
+    if (!entId) throw new Error('deleteCustomEx: entId no resuelto');
+    const { data: rows, error } = await supabase
+      .from("ejercicios_custom")
+      .delete()
+      .eq("id", id)
+      .eq("entrenador_id", String(entId))
+      .select();
     if (error) throw error;
+    if (!rows || rows.length === 0) throw new Error('deleteCustomEx: 0 filas eliminadas — posible mismatch de entrenador_id');
     return true;
   },
   updateCustomEx: async (id, data, entId) => {
-    if (!entId) { console.error('updateCustomEx called without entId — aborting'); return; }
-    var q = supabase.from("ejercicios_custom").update(data).eq("id", id);
-    if (entId) q = q.eq("entrenador_id", String(entId));
-    const { data: rows, error } = await q.select();
+    if (!entId) throw new Error('updateCustomEx: entId no resuelto');
+    const { data: rows, error } = await supabase
+      .from("ejercicios_custom")
+      .update(data)
+      .eq("id", id)
+      .eq("entrenador_id", String(entId))
+      .select();
     if (error) throw error;
-    return rows || [];
+    if (!rows || rows.length === 0) throw new Error('updateCustomEx: 0 filas actualizadas — posible mismatch de entrenador_id');
+    return rows;
   },
   setVideoOverride: async (ejercicioId, url) => {
     try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
