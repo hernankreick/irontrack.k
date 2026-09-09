@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, TrendingUp, TrendingDown } from "lucide-react";
 import { parseProgresoDate } from "../coachProgresoMetrics.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
@@ -102,12 +103,15 @@ export default function EjercicioHistorialCoach({
     touchStartY.current = null;
   }
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       style={{
         position: "fixed",
-        inset: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         background: "rgba(0,0,0,0.6)",
         zIndex: 1100,
         display: "flex",
@@ -265,6 +269,7 @@ export default function EjercicioHistorialCoach({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
