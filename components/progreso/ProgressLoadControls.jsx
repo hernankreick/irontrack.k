@@ -10,7 +10,6 @@ export default function ProgressLoadControls({
   ejercicioSelId,
   setEjercicioSelId,
   exerciseOptions,
-  alumnoColor,
   rutinaActiva,
   selectBaseStyle,
   C,
@@ -21,6 +20,12 @@ export default function ProgressLoadControls({
   emptyBox,
 }) {
   var options = exerciseOptions || [];
+  var warmupOptions = options.filter(function (ex) {
+    return ex.section === "warmup";
+  });
+  var mainOptions = options.filter(function (ex) {
+    return ex.section === "main";
+  });
 
   return (
     <>
@@ -111,98 +116,76 @@ export default function ProgressLoadControls({
             </div>
           ) : (
             <>
-              {options.some(function (o) {
-                return o.section === "warmup";
-              }) ? (
+              {warmupOptions.length > 0 ? (
                 <div style={{ marginBottom: S.blockGap }}>
-                  <div
+                  <label
                     style={{
+                      display: "block",
                       ...T.labelMd,
                       color: C.t2,
-                      marginBottom: 8,
-                      letterSpacing: 0.3,
+                      marginBottom: 6,
                     }}
                   >
                     {M(lang, "Calentamiento", "Warm-up")}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {options
-                      .filter(function (ex) {
-                        return ex.section === "warmup";
+                  </label>
+                  <select
+                    value={
+                      warmupOptions.some(function (ex) {
+                        return String(ex.id) === String(ejercicioSelId);
                       })
-                      .map(function (ex) {
-                        var act = String(ejercicioSelId) === String(ex.id);
-                        return (
-                          <button
-                            key={"w-" + ex.id}
-                            type="button"
-                            onClick={function () {
-                              setEjercicioSelId(ex.id);
-                            }}
-                            style={{
-                              border: "1px solid " + (act ? C.blue : C.brd),
-                              background: act ? "#1e3a8a22" : "transparent",
-                              color: act ? alumnoColor : C.t2,
-                              ...T.bodySemibold,
-                              padding: "7px 12px",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                              fontFamily: "inherit",
-                              maxWidth: "100%",
-                            }}
-                          >
-                            {ex.name}
-                          </button>
-                        );
-                      })}
-                  </div>
+                        ? String(ejercicioSelId)
+                        : ""
+                    }
+                    onChange={function (e) {
+                      setEjercicioSelId(e.target.value || null);
+                    }}
+                    style={selectBaseStyle}
+                  >
+                    <option value="">{M(lang, "Seleccionar...", "Select...")}</option>
+                    {warmupOptions.map(function (ex) {
+                      return (
+                        <option key={"w-" + ex.id} value={String(ex.id)}>
+                          {ex.name}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               ) : null}
-              {options.some(function (o) {
-                return o.section === "main";
-              }) ? (
+              {mainOptions.length > 0 ? (
                 <div style={{ marginBottom: S.blockGapLoose }}>
-                  <div
+                  <label
                     style={{
+                      display: "block",
                       ...T.labelMd,
                       color: C.t2,
-                      marginBottom: 8,
-                      letterSpacing: 0.3,
+                      marginBottom: 6,
                     }}
                   >
                     {M(lang, "Principal", "Main")}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {options
-                      .filter(function (ex) {
-                        return ex.section === "main";
+                  </label>
+                  <select
+                    value={
+                      mainOptions.some(function (ex) {
+                        return String(ex.id) === String(ejercicioSelId);
                       })
-                      .map(function (ex) {
-                        var act = String(ejercicioSelId) === String(ex.id);
-                        return (
-                          <button
-                            key={"m-" + ex.id}
-                            type="button"
-                            onClick={function () {
-                              setEjercicioSelId(ex.id);
-                            }}
-                            style={{
-                              border: "1px solid " + (act ? C.blue : C.brd),
-                              background: act ? "#1e3a8a22" : "transparent",
-                              color: act ? alumnoColor : C.t2,
-                              ...T.bodySemibold,
-                              padding: "7px 12px",
-                              borderRadius: 8,
-                              cursor: "pointer",
-                              fontFamily: "inherit",
-                              maxWidth: "100%",
-                            }}
-                          >
-                            {ex.name}
-                          </button>
-                        );
-                      })}
-                  </div>
+                        ? String(ejercicioSelId)
+                        : ""
+                    }
+                    onChange={function (e) {
+                      setEjercicioSelId(e.target.value || null);
+                    }}
+                    style={selectBaseStyle}
+                  >
+                    <option value="">{M(lang, "Seleccionar...", "Select...")}</option>
+                    {mainOptions.map(function (ex) {
+                      return (
+                        <option key={"m-" + ex.id} value={String(ex.id)}>
+                          {ex.name}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               ) : null}
             </>
