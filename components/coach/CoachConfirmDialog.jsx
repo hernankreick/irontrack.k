@@ -27,6 +27,7 @@ export default function CoachConfirmDialog({
       useLogoutIcon={!!config.useLogoutIcon}
       requireAcknowledge={!!config.requireAcknowledge}
       acknowledgeLabel={config.acknowledgeLabel}
+      compact={!!config.compact}
     />
   );
 }
