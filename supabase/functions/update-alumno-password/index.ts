@@ -62,22 +62,32 @@ Deno.serve(async (req) => {
     }
 
     const authUser = users.find(u => (u.email ?? '').toLowerCase() === alumnoEmail.toLowerCase())
-    if (!authUser) {
-      return new Response(JSON.stringify({ error: 'user not found in auth' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
 
-    // Update password via Admin SDK
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      authUser.id,
-      { password: newPassword }
-    )
-
-    if (updateError) {
-      return new Response(JSON.stringify({ error: updateError.message }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    if (authUser) {
+      // Ya tiene cuenta en Auth: actualizar la contraseña
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+        authUser.id,
+        { password: newPassword }
+      )
+      if (updateError) {
+        return new Response(JSON.stringify({ error: updateError.message }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+    } else {
+      // El alumno se crea sin cuenta de Auth (solo nombre+email en la tabla alumnos).
+      // Editar alumno es también el punto donde se le da contraseña por primera vez.
+      const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: alumnoEmail,
+        password: newPassword,
+        email_confirm: true,
+        user_metadata: { role: 'alumno' },
       })
+      if (createError) {
+        return new Response(JSON.stringify({ error: createError.message }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
     }
 
     return new Response(JSON.stringify({ ok: true }), {
