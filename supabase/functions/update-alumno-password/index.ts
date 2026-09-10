@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
     const { data: alumnoRow, error: alumnoError } = await supabaseAdmin
       .from('alumnos')
       .select('id, entrenador_id')
-      .eq('email', alumnoEmail)
+      .ilike('email', alumnoEmail)
       .maybeSingle()
     if (alumnoError) {
       return new Response(JSON.stringify({ error: alumnoError.message }), {
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const authUser = users.find(u => u.email === alumnoEmail)
+    const authUser = users.find(u => (u.email ?? '').toLowerCase() === alumnoEmail.toLowerCase())
     if (!authUser) {
       return new Response(JSON.stringify({ error: 'user not found in auth' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
