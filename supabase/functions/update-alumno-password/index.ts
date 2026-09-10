@@ -9,6 +9,13 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
+    const callerToken = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+    if (!callerToken) {
+      return new Response(JSON.stringify({ error: 'missing authorization' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     const { alumnoEmail, newPassword } = await req.json()
     if (!alumnoEmail || !newPassword) {
       return new Response(JSON.stringify({ error: 'alumnoEmail and newPassword required' }), {
@@ -20,6 +27,31 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Identify the caller (must be a logged-in coach) from their JWT
+    const { data: { user: caller }, error: callerError } = await supabaseAdmin.auth.getUser(callerToken)
+    if (callerError || !caller) {
+      return new Response(JSON.stringify({ error: 'invalid session' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Only the alumno's own coach can reset their password
+    const { data: alumnoRow, error: alumnoError } = await supabaseAdmin
+      .from('alumnos')
+      .select('id, entrenador_id')
+      .eq('email', alumnoEmail)
+      .maybeSingle()
+    if (alumnoError) {
+      return new Response(JSON.stringify({ error: alumnoError.message }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    if (!alumnoRow || String(alumnoRow.entrenador_id) !== String(caller.id)) {
+      return new Response(JSON.stringify({ error: 'not authorized for this student' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // Find user in Auth by email
     const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers()
