@@ -47,7 +47,16 @@ Deno.serve(async (req) => {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
-    if (!alumnoRow || String(alumnoRow.entrenador_id) !== String(caller.id)) {
+    // La app todavía convive con dos esquemas de entrenador_id: el UUID real de
+    // Supabase Auth (flujos nuevos, ej. asignar rutina) y el string legacy
+    // "entrenador_principal" que sigue usando "Nuevo alumno" y por lo tanto casi
+    // todos los alumnos existentes hoy. Se acepta cualquiera de los dos para no
+    // bloquear el uso real de la app de un solo entrenador.
+    const ownsAlumno = alumnoRow && (
+      String(alumnoRow.entrenador_id) === String(caller.id) ||
+      alumnoRow.entrenador_id === 'entrenador_principal'
+    )
+    if (!ownsAlumno) {
       return new Response(JSON.stringify({ error: 'not authorized for this student' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
