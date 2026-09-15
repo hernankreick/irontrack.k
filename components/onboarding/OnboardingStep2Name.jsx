@@ -53,18 +53,15 @@ const Step2Name = ({onNext,onBack,role,name,setName}) => {
     >
       <div
         style={{
-          flex: 1,
-          minHeight: 0,
           overflowY: "auto",
           WebkitOverflowScrolling: "touch",
         }}
       >
         <div
           style={{
-            minHeight: "100%",
             display: "flex",
             flexDirection: "column",
-            justifyContent: "center",
+            justifyContent: "flex-start",
             boxSizing: "border-box",
             padding: "clamp(8px, 1.2svh, 20px) 0 12px",
           }}
