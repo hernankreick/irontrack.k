@@ -4105,19 +4105,21 @@ function GymApp() {
                 const updates={};
                 if(editAlumnoEmail&&editAlumnoEmail!==editAlumnoModal.email) updates.email=editAlumnoEmail;
                 if(!Object.keys(updates).length&&!editAlumnoPass){toast2("Sin cambios");return;}
-                if(editAlumnoPass){
-                  const{data:fnData,error:fnError}=await supabase.functions.invoke("update-alumno-password",{
-                    body:{alumnoEmail:editAlumnoModal.email,newPassword:editAlumnoPass}
-                  });
-                  if(fnError||(fnData&&fnData.error)){
-                    console.error("[update-alumno-password]",fnError||fnData.error);
-                    toast2("Error al guardar");
-                    return;
-                  }
-                }
                 if(Object.keys(updates).length){
                   const res=await sbFetch("alumnos?id=eq."+editAlumnoModal.id,"PATCH",updates);
                   if(res===null){toast2("Error al guardar");return;}
+                }
+                if(editAlumnoPass){
+                  const alumnoEmailActual=updates.email||editAlumnoModal.email;
+                  const{data:fnData,error:fnError}=await supabase.functions.invoke("update-alumno-password",{
+                    body:{alumnoEmail:alumnoEmailActual,newPassword:editAlumnoPass}
+                  });
+                  if(fnError||(fnData&&fnData.error)){
+                    console.error("[update-alumno-password]",fnError||fnData.error);
+                    setAlumnos(prev=>prev.map(a=>a.id===editAlumnoModal.id?{...a,...updates}:a));
+                    toast2(Object.keys(updates).length?"Email guardado, pero no se pudo cambiar la contraseña":"Error al guardar");
+                    return;
+                  }
                 }
                 setAlumnos(prev=>prev.map(a=>a.id===editAlumnoModal.id?{...a,...updates}:a));
                 toast2("Alumno actualizado ✓");
