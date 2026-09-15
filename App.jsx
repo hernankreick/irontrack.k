@@ -4134,9 +4134,23 @@ function GymApp() {
                     body:{alumnoEmail:alumnoEmailActual,newPassword:editAlumnoPass}
                   });
                   if(fnError||(fnData&&fnData.error)){
-                    console.error("[update-alumno-password]",fnError||fnData.error);
+                    // fnError.message del SDK es genérico ("Edge Function returned a non-2xx
+                    // status code"); el error real que devuelve la función viaja en el body
+                    // de la response (fnError.context), hay que leerlo aparte.
+                    let detail=fnData&&fnData.error;
+                    if(!detail&&fnError){
+                      try{
+                        if(fnError.context&&typeof fnError.context.json==="function"){
+                          const body=await fnError.context.json();
+                          detail=body&&body.error;
+                        }
+                      }catch(eParse){}
+                      if(!detail) detail=fnError.message;
+                    }
+                    console.error("[update-alumno-password]",detail,fnError||fnData.error);
                     setAlumnos(prev=>prev.map(a=>a.id===editAlumnoModal.id?{...a,...updates}:a));
-                    toast2(Object.keys(updates).length?"Email guardado, pero no se pudo cambiar la contraseña":"Error al guardar");
+                    const base=Object.keys(updates).length?"Email guardado, pero no se pudo cambiar la contraseña":"Error al guardar";
+                    toast2(detail?base+": "+detail:base);
                     return;
                   }
                 }
