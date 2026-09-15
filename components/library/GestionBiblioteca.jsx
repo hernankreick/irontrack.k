@@ -122,6 +122,9 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, entre
     setEditSaveLoading(true);
     try {
       const isCustom = !!(customEx || []).find(c => c.id === editModal.id);
+      var _dbg = 'isCustom: ' + isCustom
+        + ' | editModal.id: ' + editModal.id + ' (' + typeof editModal.id + ')'
+        + ' | entrenadorId: ' + entrenadorId;
       if (isCustom) {
         const updated = customEx.map(e =>
           e.id === editModal.id
@@ -130,10 +133,21 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, entre
         );
         const row = updated.find(c => c.id === editModal.id);
         if (row) {
-          await sb.updateCustomEx(editModal.id, { name: row.name, name_en: row.nameEn, video_url: row.video_url, pattern: canPat }, entrenadorId);
+          _dbg += ' | updateCustomEx llamado con id=' + editModal.id + ', entId=' + entrenadorId;
+          try {
+            const rowsResult = await sb.updateCustomEx(editModal.id, { name: row.name, name_en: row.nameEn, video_url: row.video_url, pattern: canPat }, entrenadorId);
+            _dbg += ' | rows devueltas: ' + JSON.stringify(rowsResult);
+          } catch (updateErr) {
+            _dbg += ' | updateCustomEx ERROR: ' + (updateErr && updateErr.message);
+            alert('[TEMP DEBUG] ' + _dbg);
+            throw updateErr;
+          }
+        } else {
+          _dbg += ' | row NO encontrado -> sb.updateCustomEx NUNCA se llamó';
         }
         setCustomEx(updated);
       } else if (setPatternOverrides) {
+        _dbg += ' | rama pattern-override (no es custom) -> sb.updateCustomEx NUNCA se llamó';
         const orig = EX.find(function (x) { return x.id === editModal.id; });
         const basePat = orig && BIB_PATTERN_EDIT_KEYS[orig.pattern] ? orig.pattern : "empuje";
         if (canPat === basePat) {
@@ -152,6 +166,7 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, entre
           if (setVideoOverrides) setVideoOverrides(function (prev) { return { ...prev, [editModal.id]: editYT }; });
         } catch (e) { console.error("[videoOverride]", e); }
       }
+      alert('[TEMP DEBUG] ' + _dbg);
       setEditModal(null);
       toast2(msg("Ejercicio actualizado ✓", "Exercise updated ✓"));
     } catch (e) {
