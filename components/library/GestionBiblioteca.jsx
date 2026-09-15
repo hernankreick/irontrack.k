@@ -199,6 +199,7 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, entre
   const inpS = {background:bg,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",color:textMain,fontSize:15,width:"100%",fontFamily:"inherit",outline:"none",marginBottom:8};
   const cardBorder = _dm ? "rgba(45, 64, 87, 0.9)" : border;
   const chipBtnPad = {padding:libNarrow ? "6px 11px" : "7px 13px", borderRadius:18, fontSize:13, fontWeight:800, cursor:"pointer", fontFamily:"inherit"};
+  const editIsCustom = !!(customEx || []).find(c => c.id === editModal?.id);
 
   return (
     <div className="min-w-0 max-w-full">
@@ -427,11 +428,22 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, entre
                 style={{
                   background: _dm ? "rgba(2, 6, 23, 0.5)" : bgSub,
                   border: "1px solid " + (_dm ? "rgba(148, 163, 184, 0.3)" : border), borderRadius: 10, padding: "10px 12px", color: _dm ? "#f8fafc" : textMain, fontSize: 15, width: "100%", fontFamily: "inherit", outline: "none", boxSizing: "border-box",
+                  opacity: editIsCustom ? 1 : 0.6,
+                  cursor: editIsCustom ? "text" : "not-allowed",
                 }}
                 value={editNombre}
                 onChange={e=>setEditNombre(e.target.value)}
-                disabled={editSaveLoading}
+                disabled={editSaveLoading || !editIsCustom}
+                readOnly={!editIsCustom}
               />
+              {!editIsCustom && (
+                <div style={{ marginTop: 8, fontSize: 12, color: _dm ? "#94a3b8" : textMuted, lineHeight: 1.4 }}>
+                  {msg(
+                    "Este ejercicio es del catálogo base y no se puede renombrar. Solo podés editar su patrón de series/reps.",
+                    "This exercise is part of the base catalog and can't be renamed. Only its set/rep pattern is editable."
+                  )}
+                </div>
+              )}
             </div>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 8, color: _dm ? "#94a3b8" : textMuted }} htmlFor="bib-edit-pattern">{msg("PATRÓN", "PATTERN", "PADRÃO")}</label>
