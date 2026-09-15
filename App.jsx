@@ -2978,6 +2978,21 @@ function GymApp() {
                 setShowPassword(false);
               } else setLoginError("Email o contraseña incorrectos");
             } else {
+              if (!supabase) {
+                console.error("[AUTH] Supabase client no inicializado");
+                setLoginError("No se pudo iniciar sesión con Supabase");
+                return;
+              }
+              // La contraseña del alumno vive en Supabase Auth (la asigna el coach desde
+              // "Editar alumno"). Antes esta rama solo buscaba por email y no la validaba.
+              const authLoginAlumno = await supabase.auth.signInWithPassword({
+                email: loginEmailNorm,
+                password: loginPass,
+              });
+              if (authLoginAlumno.error || !authLoginAlumno.data || !authLoginAlumno.data.session) {
+                setLoginError("Email o contraseña incorrectos");
+                return;
+              }
               const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmailNorm)+"&select=id,nombre,entrenador_id");
               if(res&&res.length>0){
                 const alumno=res[0];
@@ -3001,7 +3016,11 @@ function GymApp() {
                 setLoginEmail("");
                 setLoginPass("");
                 setShowPassword(false);
-              } else setLoginError("Email o contraseña incorrectos");
+              } else {
+                console.error("[AUTH] Login de alumno autenticado en Auth pero sin fila en alumnos", loginEmailNorm);
+                try { await supabase.auth.signOut(); } catch(e) {}
+                setLoginError("Email o contraseña incorrectos");
+              }
             }
           } finally {
             clearTimeout(loginSafetyTimeout);
