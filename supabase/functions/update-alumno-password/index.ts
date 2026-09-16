@@ -62,15 +62,31 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Find user in Auth by email
-    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers()
-    if (listError) {
+    // Find user in Auth by email. listUsers() está paginado (50 por página por
+    // default) — hay que recorrer todas las páginas o se puede no encontrar un
+    // usuario que sí existe y terminar intentando crearlo de nuevo (createUser
+    // falla entonces con un error de base, tipo "Database error creating new
+    // user", que es justo lo que devuelve un email duplicado en auth.users).
+    const findAuthUserByEmail = async (email) => {
+      const target = email.toLowerCase()
+      for (let page = 1; page <= 20; page++) {
+        const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 })
+        if (error) throw error
+        const match = (data?.users ?? []).find(u => (u.email ?? '').toLowerCase() === target)
+        if (match) return match
+        if (!data?.users || data.users.length < 200) break
+      }
+      return null
+    }
+
+    let authUser
+    try {
+      authUser = await findAuthUserByEmail(alumnoEmail)
+    } catch (listError) {
       return new Response(JSON.stringify({ error: listError.message }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
-
-    const authUser = users.find(u => (u.email ?? '').toLowerCase() === alumnoEmail.toLowerCase())
 
     if (authUser) {
       // Ya tiene cuenta en Auth: actualizar la contraseña
@@ -93,9 +109,28 @@ Deno.serve(async (req) => {
         user_metadata: { role: 'alumno' },
       })
       if (createError) {
-        return new Response(JSON.stringify({ error: createError.message }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
+        // "Database error creating new user" suele ser en realidad un email ya
+        // registrado que la primera búsqueda no encontró (paginación, timing).
+        // Reintentamos la búsqueda una vez más antes de rendirnos.
+        let retryUser
+        try {
+          retryUser = await findAuthUserByEmail(alumnoEmail)
+        } catch (e) { retryUser = null }
+        if (retryUser) {
+          const { error: retryUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
+            retryUser.id,
+            { password: newPassword }
+          )
+          if (retryUpdateError) {
+            return new Response(JSON.stringify({ error: retryUpdateError.message }), {
+              status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+        } else {
+          return new Response(JSON.stringify({ error: createError.message }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
       }
     }
 
