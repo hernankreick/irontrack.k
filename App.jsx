@@ -515,6 +515,21 @@ const sb = {
     try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
     try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
   },
+  getNameOverrides: (entId) => sbFetch("ejercicio_overrides?entrenador_id=eq."+encodeURIComponent(entId||"entrenador_principal")+"&select=ejercicio_id,name,name_en"),
+  setNameOverride: async (ejercicioId, name, nameEn, entId) => {
+    if (!entId) throw new Error('setNameOverride: entId no resuelto');
+    const nm = String(name || "").trim();
+    if (!nm) throw new Error('setNameOverride: name vacío');
+    const { data, error } = await supabase
+      .from("ejercicio_overrides")
+      .upsert(
+        { entrenador_id: String(entId), ejercicio_id: String(ejercicioId), name: nm, name_en: String(nameEn || nm).trim() },
+        { onConflict: "entrenador_id,ejercicio_id" }
+      )
+      .select();
+    if (error) throw error;
+    return data || [];
+  },
   getEntrenador: (id) => sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal")+"&select=*"),
   updateEntrenador: (id, data) => {
     var clean = {};
@@ -980,6 +995,7 @@ function GymApp() {
   const [dupDayClosing, setDupDayClosing] = useState(false);
   const [chatModal, setChatModal] = useState(null); // {alumnoId, alumnoNombre}
   const [videoOverrides, setVideoOverrides] = useState({}); // {ejercicioId: url}
+  const [nameOverrides, setNameOverrides] = useState({}); // {ejercicioId: {name, nameEn}}
   /** Claves: id de EX (catálogo); p.ej. { sq: "empuje" } — persiste en localStorage `it_pattern_ov` */
   const [patternOverrides, setPatternOverrides] = useState({});
   const [videoModal, setVideoModal] = useState(null); // {url, nombre}
@@ -1683,6 +1699,14 @@ function GymApp() {
         setVideoOverrides(map);
       }
     }).catch(function(){});
+    // Cargar name overrides
+    sb.getNameOverrides(supabaseSessionUserId || sessionData?.entrenadorId || null).then(function(res){
+      if(res && Array.isArray(res)) {
+        var map = {};
+        res.forEach(function(r){ map[r.ejercicio_id] = { name: r.name, nameEn: r.name_en || r.name }; });
+        setNameOverrides(map);
+      }
+    }).catch(function(){});
     try {
       var pRaw = localStorage.getItem("it_pattern_ov");
       if (pRaw) {
@@ -1881,10 +1905,13 @@ function GymApp() {
   const allEx = React.useMemo(function () {
     var BIB_PAT = { empuje: 1, traccion: 1, rodilla: 1, bisagra: 1, core: 1, movilidad: 1, cardio: 1, oly: 1 };
     var po = patternOverrides || {};
+    var no = nameOverrides || {};
     var catalog = EX.map(function (e) {
       var n = normalizeLibraryExercise(e, { catalog: true });
       var p = po[n.id];
-      if (p && BIB_PAT[p]) return { ...n, pattern: p };
+      if (p && BIB_PAT[p]) n = { ...n, pattern: p };
+      var ov = no[n.id];
+      if (ov && ov.name) n = { ...n, name: ov.name, nameEn: (ov.nameEn || ov.name) };
       return n;
     });
     var seenNames = {};
@@ -1902,7 +1929,7 @@ function GymApp() {
       return true;
     });
     return catalog.concat(custom);
-  }, [customEx, patternOverrides]);
+  }, [customEx, patternOverrides, nameOverrides]);
   const filteredEx = allEx.filter(function (e) {
     return exerciseMatchesLibraryFilter(e, search, filterPat, bibMuscleFilterHaystack);
   });
@@ -3306,6 +3333,7 @@ function GymApp() {
         toast2: toast2,
         videoOverrides: videoOverrides,
         setVideoOverrides: setVideoOverrides,
+        setNameOverrides: setNameOverrides,
         openNewExerciseTick: bibOpenNewExerciseTick,
       },
       settingsProps: {

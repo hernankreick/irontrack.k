@@ -12,6 +12,7 @@ export default function CoachExercisesMain({
   toast2,
   videoOverrides,
   setVideoOverrides,
+  setNameOverrides,
   openNewExerciseTick,
 }) {
   return (
@@ -27,6 +28,7 @@ export default function CoachExercisesMain({
         toast2={toast2}
         videoOverrides={videoOverrides}
         setVideoOverrides={setVideoOverrides}
+        setNameOverrides={setNameOverrides}
         openNewExerciseTick={openNewExerciseTick}
       />
     </div>
