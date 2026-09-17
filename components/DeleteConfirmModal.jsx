@@ -26,6 +26,8 @@ export function DeleteConfirmModal({
   acknowledgeLabel = 'Entiendo que esta acción no se puede deshacer',
   variant = 'default',
   zIndex = 10000,
+  /** Confirmaciones livianas (no destructivas): card chica, ícono reducido, botones en fila. */
+  compact = false,
 }) {
   const cancelRef = useRef(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -134,9 +136,9 @@ export function DeleteConfirmModal({
     };
   }
 
-  var titleFont = isWorkoutExit ? 18 : narrow ? 21 : 24;
+  var titleFont = isWorkoutExit ? 18 : compact ? 20 : narrow ? 21 : 24;
   var py = isWorkoutExit ? 18 : narrow ? 24 : 32;
-  var maxW = (isWorkoutExit || isLogout) ? 320 : 520;
+  var maxW = isWorkoutExit ? 320 : compact ? 360 : isLogout ? 320 : 520;
   var confirmDisabled = loading || (requireAcknowledge && !acknowledged);
 
   return (
@@ -161,14 +163,14 @@ export function DeleteConfirmModal({
         'aria-describedby': message ? descId : undefined,
       }}
       contentStyle={{
-          width: isLogout ? 'min(320px, calc(100vw - 48px))' : 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
-          maxWidth: isLogout ? 320 : 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
-          margin: isLogout ? '0 auto' : undefined,
+          width: (isLogout || compact) ? 'min(' + maxW + 'px, calc(100vw - 48px))' : 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
+          maxWidth: (isLogout || compact) ? maxW : 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
+          margin: (isLogout || compact) ? '0 auto' : undefined,
           background: 'rgba(15, 23, 42, 0.92)',
           border: '1px solid rgba(148, 163, 184, 0.28)',
-          borderRadius: isLogout ? 20 : isWorkoutExit ? 22 : 24,
+          borderRadius: compact ? 18 : isLogout ? 20 : isWorkoutExit ? 22 : 24,
           boxShadow: isWorkoutExit ? '0 18px 60px rgba(0,0,0,.38)' : '0 24px 80px rgba(0,0,0,.45)',
-          padding: isLogout ? '28px 24px' : py,
+          padding: compact ? '24px 20px' : isLogout ? '28px 24px' : py,
           fontFamily: 'Inter, system-ui, sans-serif',
           ...(isWorkoutExit ? { animation: 'it-workout-exit-card-in 200ms ease-out both' } : {}),
       }}
@@ -176,19 +178,19 @@ export function DeleteConfirmModal({
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isWorkoutExit ? 8 : 0 }}>
           <div
             style={{
-              width: isWorkoutExit ? 44 : 64,
-              height: isWorkoutExit ? 44 : 64,
+              width: isWorkoutExit ? 44 : compact ? 48 : 64,
+              height: isWorkoutExit ? 44 : compact ? 48 : 64,
               borderRadius: '50%',
               background: iconWrap.bg,
               border: iconWrap.border || 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: isWorkoutExit ? 0 : 20,
+              marginBottom: isWorkoutExit ? 0 : compact ? 12 : 20,
             }}
             aria-hidden
           >
-            <Icon size={iconPx} color={iconWrap.color} strokeWidth={2} />
+            <Icon size={compact ? 22 : iconPx} color={iconWrap.color} strokeWidth={2} />
           </div>
           <h2
             id={titleId}
@@ -277,10 +279,10 @@ export function DeleteConfirmModal({
         <div
           style={{
             display: 'flex',
-            flexDirection: isWorkoutExit ? 'column-reverse' : narrow ? 'column-reverse' : 'row',
+            flexDirection: isWorkoutExit ? 'column-reverse' : compact ? 'row' : narrow ? 'column-reverse' : 'row',
             flexWrap: 'wrap',
-            gap: isWorkoutExit ? 8 : 12,
-            marginTop: isWorkoutExit ? 18 : 28,
+            gap: isWorkoutExit ? 8 : compact ? 8 : 12,
+            marginTop: isWorkoutExit ? 18 : compact ? 20 : 28,
           }}
         >
           <button
@@ -290,14 +292,14 @@ export function DeleteConfirmModal({
             onClick={onCancel}
             className={isWorkoutExit ? 'it-workout-exit-cancel' : undefined}
             style={{
-              flex: isWorkoutExit ? '0 0 auto' : '1 1 160px',
+              flex: isWorkoutExit ? '0 0 auto' : compact ? '1 1 90px' : '1 1 160px',
               width: isWorkoutExit ? '100%' : undefined,
-              minHeight: isWorkoutExit ? 44 : 52,
-              borderRadius: isLogout ? 12 : isWorkoutExit ? 14 : 16,
+              minHeight: isWorkoutExit ? 44 : compact ? 48 : 52,
+              borderRadius: compact ? 12 : isLogout ? 12 : isWorkoutExit ? 14 : 16,
               border: isWorkoutExit ? '1px solid rgb(71, 85, 105)' : '1px solid rgba(148, 163, 184, 0.32)',
               background: isWorkoutExit ? 'transparent' : 'rgba(148, 163, 184, 0.08)',
               color: isWorkoutExit ? 'rgb(203, 213, 225)' : '#fff',
-              fontSize: isLogout ? 14 : 15,
+              fontSize: compact ? 14 : isLogout ? 14 : 15,
               fontWeight: isWorkoutExit ? 500 : 800,
               padding: isLogout ? '14px 0' : undefined,
               cursor: loading ? 'default' : 'pointer',
@@ -314,11 +316,11 @@ export function DeleteConfirmModal({
             onClick={onConfirm}
             className={isWorkoutExit ? 'it-workout-exit-confirm' : undefined}
             style={{
-              flex: isWorkoutExit ? '0 0 auto' : '1 1 160px',
+              flex: isWorkoutExit ? '0 0 auto' : compact ? '1 1 90px' : '1 1 160px',
               width: isWorkoutExit ? '100%' : undefined,
-              minHeight: isWorkoutExit ? 48 : 52,
-              borderRadius: isLogout ? 12 : isWorkoutExit ? 14 : 16,
-              fontSize: isLogout ? 14 : isWorkoutExit ? 18 : 15,
+              minHeight: isWorkoutExit ? 48 : compact ? 48 : 52,
+              borderRadius: compact ? 12 : isLogout ? 12 : isWorkoutExit ? 14 : 16,
+              fontSize: compact ? 14 : isLogout ? 14 : isWorkoutExit ? 18 : 15,
               fontWeight: isWorkoutExit ? 500 : 800,
               padding: isLogout ? '14px 0' : undefined,
               cursor: loading ? 'wait' : confirmDisabled ? 'not-allowed' : 'pointer',

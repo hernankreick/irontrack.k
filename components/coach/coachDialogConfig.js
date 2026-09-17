@@ -97,6 +97,7 @@ export function getCoachDialogModalConfig(coachDialog, msg, es) {
       confirmLabel: msg('Continuar', 'Continue', 'Continuar'),
       useLogoutIcon: false,
       loadingLabel: msg('…', '…', '…'),
+      compact: true,
     };
   }
   if (c.t === 'goRoutines') {

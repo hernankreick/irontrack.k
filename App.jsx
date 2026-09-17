@@ -3005,6 +3005,21 @@ function GymApp() {
                 setShowPassword(false);
               } else setLoginError("Email o contraseña incorrectos");
             } else {
+              if (!supabase) {
+                console.error("[AUTH] Supabase client no inicializado");
+                setLoginError("No se pudo iniciar sesión con Supabase");
+                return;
+              }
+              // La contraseña del alumno vive en Supabase Auth (la asigna el coach desde
+              // "Editar alumno"). Antes esta rama solo buscaba por email y no la validaba.
+              const authLoginAlumno = await supabase.auth.signInWithPassword({
+                email: loginEmailNorm,
+                password: loginPass,
+              });
+              if (authLoginAlumno.error || !authLoginAlumno.data || !authLoginAlumno.data.session) {
+                setLoginError("Email o contraseña incorrectos");
+                return;
+              }
               const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmailNorm)+"&select=id,nombre,entrenador_id");
               if(res&&res.length>0){
                 const alumno=res[0];
@@ -3028,7 +3043,11 @@ function GymApp() {
                 setLoginEmail("");
                 setLoginPass("");
                 setShowPassword(false);
-              } else setLoginError("Email o contraseña incorrectos");
+              } else {
+                console.error("[AUTH] Login de alumno autenticado en Auth pero sin fila en alumnos", loginEmailNorm);
+                try { await supabase.auth.signOut(); } catch(e) {}
+                setLoginError("Email o contraseña incorrectos");
+              }
             }
           } finally {
             clearTimeout(loginSafetyTimeout);
@@ -4132,14 +4151,40 @@ function GymApp() {
         onSave={async()=>{
                 const updates={};
                 if(editAlumnoEmail&&editAlumnoEmail!==editAlumnoModal.email) updates.email=editAlumnoEmail;
-                if(editAlumnoPass) updates.password=editAlumnoPass;
-                if(!Object.keys(updates).length){toast2("Sin cambios");return;}
-                const res=await sbFetch("alumnos?id=eq."+editAlumnoModal.id,"PATCH",updates);
-                if(res!==null){
-                  setAlumnos(prev=>prev.map(a=>a.id===editAlumnoModal.id?{...a,...updates}:a));
-                  toast2("Alumno actualizado ✓");
-                  setEditAlumnoModal(null);
-                } else {toast2("Error al guardar");}
+                if(!Object.keys(updates).length&&!editAlumnoPass){toast2("Sin cambios");return;}
+                if(Object.keys(updates).length){
+                  const res=await sbFetch("alumnos?id=eq."+editAlumnoModal.id,"PATCH",updates);
+                  if(res===null){toast2("Error al guardar");return;}
+                }
+                if(editAlumnoPass){
+                  const alumnoEmailActual=updates.email||editAlumnoModal.email;
+                  const{data:fnData,error:fnError}=await supabase.functions.invoke("update-alumno-password",{
+                    body:{alumnoEmail:alumnoEmailActual,newPassword:editAlumnoPass}
+                  });
+                  if(fnError||(fnData&&fnData.error)){
+                    // fnError.message del SDK es genérico ("Edge Function returned a non-2xx
+                    // status code"); el error real que devuelve la función viaja en el body
+                    // de la response (fnError.context), hay que leerlo aparte.
+                    let detail=fnData&&fnData.error;
+                    if(!detail&&fnError){
+                      try{
+                        if(fnError.context&&typeof fnError.context.json==="function"){
+                          const body=await fnError.context.json();
+                          detail=body&&body.error;
+                        }
+                      }catch(eParse){}
+                      if(!detail) detail=fnError.message;
+                    }
+                    console.error("[update-alumno-password]",detail,fnError||fnData.error);
+                    setAlumnos(prev=>prev.map(a=>a.id===editAlumnoModal.id?{...a,...updates}:a));
+                    const base=Object.keys(updates).length?"Email guardado, pero no se pudo cambiar la contraseña":"Error al guardar";
+                    toast2(detail?base+": "+detail:base);
+                    return;
+                  }
+                }
+                setAlumnos(prev=>prev.map(a=>a.id===editAlumnoModal.id?{...a,...updates}:a));
+                toast2("Alumno actualizado ✓");
+                setEditAlumnoModal(null);
         }}
       />
       {newR&&(
