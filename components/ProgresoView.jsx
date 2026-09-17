@@ -12,9 +12,11 @@ import ProgressAdherenceCard from "./progreso/ProgressAdherenceCard.jsx";
 import ProgressLoadChart from "./progreso/ProgressLoadChart.jsx";
 import ProgressLoadControls from "./progreso/ProgressLoadControls.jsx";
 import ProgressMovementPatternVolumeCard from "./progreso/ProgressMovementPatternVolumeCard.jsx";
+import { PatternDrilldownContext } from "./progreso/ProgressMovementPatternRow.jsx";
 import ProgressRankingCard from "./progreso/ProgressRankingCard.jsx";
 import ProgressRecentPrsCard from "./progreso/ProgressRecentPrsCard.jsx";
 import ProgressWeeklyVolumeCard from "./progreso/ProgressWeeklyVolumeCard.jsx";
+import EjercicioHistorialCoach from "./coach/EjercicioHistorialCoach.jsx";
 import { useIronTrackI18n } from "../contexts/IronTrackI18nContext.jsx";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
@@ -198,6 +200,8 @@ export default function ProgresoView({
   const [volBarHoverIdx, setVolBarHoverIdx] = useState(null);
   const [patronExpanded, setPatronExpanded] = useState({});
   const [activeSheet, setActiveSheet] = useState(null);
+  /** Drill-down de ejercicio individual abierto desde el expand de patrón muscular. */
+  const [ejercicioDrilldown, setEjercicioDrilldown] = useState(null);
 
   function togglePatronRow(key) {
     setPatronExpanded(function (prev) {
@@ -206,6 +210,18 @@ export default function ProgresoView({
       return n;
     });
   }
+
+  var patternDrilldownCtx = useMemo(
+    function () {
+      return {
+        alumnoId: alumnoSel,
+        onOpenExercise: function (payload) {
+          setEjercicioDrilldown(payload);
+        },
+      };
+    },
+    [alumnoSel]
+  );
 
   var alumnosSorted = useMemo(
     function () {
@@ -964,15 +980,30 @@ export default function ProgresoView({
           </div>
         )}
 
-        <ProgressMovementPatternVolumeCard
-          patterns={model.patronPatterns}
-          totalVol={model.patronTotalVol}
-          patronExpanded={patronExpanded}
-          togglePatronRow={togglePatronRow}
-          C={C}
-          lang={lang}
-          formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
-        />
+        <PatternDrilldownContext.Provider value={patternDrilldownCtx}>
+          <ProgressMovementPatternVolumeCard
+            patterns={model.patronPatterns}
+            totalVol={model.patronTotalVol}
+            patronExpanded={patronExpanded}
+            togglePatronRow={togglePatronRow}
+            C={C}
+            lang={lang}
+            formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
+          />
+        </PatternDrilldownContext.Provider>
+
+        {ejercicioDrilldown ? (
+          <EjercicioHistorialCoach
+            alumnoId={ejercicioDrilldown.alumnoId}
+            ejercicioId={ejercicioDrilldown.ejercicioId}
+            ejercicioNombre={ejercicioDrilldown.ejercicioNombre}
+            progresoGlobal={progresoGlobal}
+            lang={lang}
+            onClose={function () {
+              setEjercicioDrilldown(null);
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

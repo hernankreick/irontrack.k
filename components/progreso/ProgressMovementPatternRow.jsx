@@ -1,7 +1,14 @@
-import React from "react";
-import { ChevronDown } from "lucide-react";
+import React, { useContext } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { coachType as T } from "../coachUiScale.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
+
+/**
+ * Provisto por ProgresoView.jsx alrededor de ProgressMovementPatternVolumeCard para que esta
+ * fila (renderizada dos niveles más abajo) sepa qué alumno está seleccionado y cómo abrir el
+ * drill-down de un ejercicio, sin tener que agregar props intermedias en la card.
+ */
+export var PatternDrilldownContext = React.createContext(null);
 
 export default function ProgressMovementPatternRow({
   pattern,
@@ -13,6 +20,17 @@ export default function ProgressMovementPatternRow({
   formatWeeklyVolKgAbbrev,
 }) {
   var fillPct = totalVol > 0 ? Math.min(100, (100 * pattern.vol) / totalVol) : 0;
+  var drilldown = useContext(PatternDrilldownContext) || {};
+  var canDrilldown = typeof drilldown.onOpenExercise === "function";
+
+  function openExercise(ex) {
+    if (!canDrilldown) return;
+    drilldown.onOpenExercise({
+      alumnoId: drilldown.alumnoId,
+      ejercicioId: ex.ejercicio_id,
+      ejercicioNombre: ex.name,
+    });
+  }
 
   return (
     <div key={pattern.key}>
@@ -127,16 +145,27 @@ export default function ProgressMovementPatternRow({
           ) : (
             (pattern.exercises || []).map(function (ex, exi) {
               var exList = pattern.exercises || [];
+              var Wrap = canDrilldown ? "button" : "div";
               return (
-                <div
+                <Wrap
                   key={pattern.key + "-" + ex.ejercicio_id}
+                  type={canDrilldown ? "button" : undefined}
+                  onClick={canDrilldown ? function () { openExercise(ex); } : undefined}
                   style={{
                     display: "flex",
                     alignItems: "baseline",
                     justifyContent: "space-between",
                     gap: 10,
+                    width: "100%",
+                    margin: 0,
                     padding: "6px 0",
+                    border: "none",
                     borderBottom: exi < exList.length - 1 ? "1px solid #1e1e2e44" : "none",
+                    background: "transparent",
+                    fontFamily: "inherit",
+                    textAlign: "left",
+                    color: "inherit",
+                    cursor: canDrilldown ? "pointer" : "default",
                   }}
                 >
                   <span
@@ -145,9 +174,13 @@ export default function ProgressMovementPatternRow({
                       color: C.t,
                       flex: 1,
                       minWidth: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
                     }}
                   >
                     {ex.name}
+                    {canDrilldown ? <ChevronRight size={13} color={C.t2} strokeWidth={2} style={{ flexShrink: 0 }} /> : null}
                   </span>
                   <span
                     style={{
@@ -170,7 +203,7 @@ export default function ProgressMovementPatternRow({
                           ? "set"
                           : "sets"}
                   </span>
-                </div>
+                </Wrap>
               );
             })
           )}
