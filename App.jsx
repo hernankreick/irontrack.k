@@ -4355,6 +4355,7 @@ function GymApp() {
           readOnly={readOnly}
           sharedParam={sharedParam}
           sb={sb}
+          toast2={toast2}
           es={es}
           darkMode={darkMode}
           prCelebration={prCelebration}

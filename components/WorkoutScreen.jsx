@@ -18,11 +18,23 @@ import {
   sessionAlreadyExists,
 } from '../lib/workoutSession.js';
 
+function queuePendingWorkoutAction(type, payload) {
+  try {
+    var raw = localStorage.getItem("it_pending_workout_actions");
+    var list = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) list = [];
+    list.push({ type: type, payload: payload, ts: Date.now() });
+    localStorage.setItem("it_pending_workout_actions", JSON.stringify(list));
+  } catch (e) {
+    console.error("[queuePendingWorkoutAction]", e);
+  }
+}
+
 export function WorkoutScreen(props) {
   const {
     session, activeDay, activeR, allEx, progress, logSet, startTimer, timer,
     setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek,
-    preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode,
+    preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode, toast2,
     prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData,
     onSesionGuardada, sessionPRList, videoOverrides, setVideoModal,
   } = props;
@@ -117,7 +129,7 @@ export function WorkoutScreen(props) {
     });
   };
 
-  // ── Finalizar (sin cambios de lógica) ─────────────────────────────
+  // ── Finalizar ────────────────────────────────────────────────────
   const finalizarSesion = async () => {
     const r = activeR;
     // La semana local (currentWeek) puede quedar desincronizada de la semana real de la
@@ -173,46 +185,62 @@ export function WorkoutScreen(props) {
       } catch(e) {}
     }
     if (!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
+      const sesionPayload = removeUndefinedPayloadFields(buildSessionPayload({
+        alumnoId: sessionData.alumnoId,
+        session: session,
+        activeDay: activeDay,
+        activeRoutine: r,
+        exercises: exercises,
+        weekToSave: semanaParaGuardar,
+        date: hoyFin,
+        time: horaFin,
+        includeRoutineId: true,
+      }));
       try {
         const existentes = await sb.getSesiones(sessionData.alumnoId);
         const yaExiste = sessionAlreadyExists(existentes, hoyFin, session.dIdx, semanaParaGuardar);
         if (!yaExiste) {
-          await sb.addSesion(removeUndefinedPayloadFields(buildSessionPayload({
-            alumnoId: sessionData.alumnoId,
-            session: session,
-            activeDay: activeDay,
-            activeRoutine: r,
-            exercises: exercises,
-            weekToSave: semanaParaGuardar,
-            date: hoyFin,
-            time: horaFin,
-            includeRoutineId: true,
-          })));
+          await sb.addSesion(sesionPayload);
           if (typeof onSesionGuardada === "function") onSesionGuardada();
         }
-      } catch(e) { console.error("[addSesion]", e); }
+      } catch(e) {
+        console.error("[addSesion]", e);
+        queuePendingWorkoutAction("addSesion", sesionPayload);
+        if (typeof toast2 === "function") {
+          toast2(es ? "No se pudo guardar la sesión — se reintentará" : "Could not save session — will retry");
+        }
+      }
     }
     const lastAdvance = localStorage.getItem("it_last_week_advance_date");
     const todayStr = new Date().toDateString();
     if (daysThisWeek >= totalDays && effectiveWeek < 3 && lastAdvance !== todayStr) {
+      let weekAdvancePersisted = true;
       if (!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId && r?.id && typeof sb.updateRutina === "function") {
+        const weekAdvanceBody = {
+          nombre: r.name || r.nombre || "Rutina",
+          alumno_id: sessionData.alumnoId,
+          entrenador_id: r.entrenador_id,
+          datos: Object.assign({}, r.datos || {}, {
+            days: r.days || (r.datos && r.datos.days) || [],
+            semana_activa: effectiveWeek + 2,
+          }),
+        };
         try {
-          await sb.updateRutina(r.id, {
-            nombre: r.name || r.nombre || "Rutina",
-            alumno_id: sessionData.alumnoId,
-            entrenador_id: r.entrenador_id,
-            datos: Object.assign({}, r.datos || {}, {
-              days: r.days || (r.datos && r.datos.days) || [],
-              semana_activa: effectiveWeek + 2,
-            }),
-          });
+          await sb.updateRutina(r.id, weekAdvanceBody);
         } catch (e) {
           console.error("[advance active week]", e);
+          weekAdvancePersisted = false;
+          queuePendingWorkoutAction("advanceWeek", { rutinaId: r.id, body: weekAdvanceBody });
+          if (typeof toast2 === "function") {
+            toast2(es ? "No se pudo actualizar la semana — se reintentará" : "Could not update the week — will retry");
+          }
         }
       }
-      setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+effectiveWeek)));
-      setCurrentWeek(effectiveWeek + 1);
-      localStorage.setItem("it_last_week_advance_date", todayStr);
+      if (weekAdvancePersisted) {
+        setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+effectiveWeek)));
+        setCurrentWeek(effectiveWeek + 1);
+        localStorage.setItem("it_last_week_advance_date", todayStr);
+      }
     }
   };
 
