@@ -669,7 +669,7 @@ export function RoutineCard({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: S.gridTight, ...(isUnder768 ? { borderTop: '1px solid #1e293b', paddingTop: 10, marginTop: 8, alignItems: 'center', width: '100%' } : { marginTop: S.blockGap, alignItems: 'stretch' }) }}>
+        <div style={{ display: 'flex', gap: S.gridTight, ...(isUnder768 ? { borderTop: '1px solid ' + (darkMode ? '#1e293b' : border), paddingTop: 10, marginTop: 8, alignItems: 'center', width: '100%' } : { marginTop: S.blockGap, alignItems: 'stretch' }) }}>
           <div
             ref={assignTriggerRef}
             style={{ flex: 1, minWidth: 0, ...(isUnder768 ? { overflow: 'visible' } : {}) }}
@@ -925,11 +925,11 @@ export function RoutineCard({
             style={{
               width: '100%',
               marginTop: S.gridGapTight,
-              border: '1px solid rgba(255,255,255,0.06)',
+              border: '1px solid ' + (darkMode ? 'rgba(255,255,255,0.06)' : border),
               borderRadius: 18,
               padding: '16px 18px',
-              background: '#0D1424',
-              color: '#fff',
+              background: darkMode ? '#0D1424' : bgCard,
+              color: textMain,
               fontFamily: 'inherit',
               cursor: 'pointer',
               display: 'flex',

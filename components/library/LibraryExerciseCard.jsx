@@ -40,7 +40,7 @@ export default function LibraryExerciseCard({
   const [showVideo, setShowVideo] = useState(false);
   const videoId = extractYouTubeId(ytUrl);
 
-  const btnStyle = { width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: '#111827', border: '1px solid #1E293B', borderRadius: 7, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", padding: 0, color: textMuted };
+  const btnStyle = { width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: _dm ? '#111827' : bgSub, border: '1px solid ' + (_dm ? '#1E293B' : border), borderRadius: 7, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", padding: 0, color: textMuted };
 
   return (
     <div
@@ -62,8 +62,8 @@ export default function LibraryExerciseCard({
             style={{ width: 90, height: 68, flexShrink: 0, borderRadius: '8px', objectFit: 'cover' }}
           />
         ) : (
-          <div style={{ width: 90, height: 68, flexShrink: 0, borderRadius: '8px', background: '#1E293B', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ color: '#4B5563', fontSize: 20 }}>▶</span>
+          <div style={{ width: 90, height: 68, flexShrink: 0, borderRadius: '8px', background: _dm ? '#1E293B' : bgSub, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: _dm ? '#4B5563' : textMuted, fontSize: 20 }}>▶</span>
           </div>
         )}
 

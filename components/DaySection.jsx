@@ -29,6 +29,8 @@ function SortableBlock({
   blockKey,
   darkMode = true,
   addButtonClassName = '',
+  textMain,
+  textMuted,
 }) {
   var blockBg = darkMode ? '#0f172a' : '#f8fafc';
   var blockBorder = darkMode ? `1px solid ${accent}22` : `1px solid ${accent}28`;
@@ -100,6 +102,9 @@ function SortableBlock({
               exercise={ex}
               onEdit={onEditExercise}
               onDelete={onDeleteExercise}
+              darkMode={darkMode}
+              textMain={textMain}
+              textMuted={textMuted}
             />
           ))}
         </SortableContext>
@@ -110,6 +115,9 @@ function SortableBlock({
               exercise={activeExercise}
               onEdit={() => {}}
               onDelete={() => {}}
+              darkMode={darkMode}
+              textMain={textMain}
+              textMuted={textMuted}
             />
           ) : null}
         </DragOverlay>
@@ -273,6 +281,8 @@ export function DaySection({
         onDeleteExercise={onDeleteExercise}
         onReorderBlock={onReorderWarmup}
         darkMode={darkMode}
+        textMain={textMain}
+        textMuted={textMuted}
         addButtonClassName={premiumAddButtonClass}
       />
 
@@ -289,6 +299,8 @@ export function DaySection({
         onDeleteExercise={onDeleteExercise}
         onReorderBlock={onReorderExercises}
         darkMode={darkMode}
+        textMain={textMain}
+        textMuted={textMuted}
         addButtonClassName={premiumAddButtonClass}
       />
     </div>

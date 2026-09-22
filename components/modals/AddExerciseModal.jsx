@@ -30,6 +30,12 @@ export default function AddExerciseModal({
   const [musculoOpen, setMusculoOpen] = useState(false);
   if (!addExModal) return null;
 
+  const selectBg = darkMode ? '#111827' : inp.background;
+  const selectBorderColor = darkMode ? '#1e1e2e' : border;
+  const selectTextColor = darkMode ? '#E5E7EB' : '#0F1923';
+  const labelColor = darkMode ? '#6B7280' : textMuted;
+  const selectedMuscleBg = darkMode ? '#1e3a5f' : 'rgba(37,99,235,0.12)';
+
   const MUSCULO_OPTIONS = BIB_MUSCLE_OPTIONS.map(o => ({ key: o.k, label: msg(o.selEs, o.selEn) }));
   const normalizar = str => String(str||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 
@@ -88,11 +94,11 @@ export default function AddExerciseModal({
             </div>
             <input style={{...inp,marginBottom:8,width:"100%",boxSizing:"border-box"}} placeholder={msg("Buscar...", "Search...")} value={addExSearch} onChange={e=>setAddExSearch(e.target.value)}/>
             <div style={{marginBottom:8}}>
-              <label style={{fontSize:10,fontWeight:700,color:"#6B7280",letterSpacing:".5px",textTransform:"uppercase",display:"block",marginBottom:4}}>PATRÓN</label>
+              <label style={{fontSize:10,fontWeight:700,color:labelColor,letterSpacing:".5px",textTransform:"uppercase",display:"block",marginBottom:4}}>PATRÓN</label>
               <select
                 value={addExPat||""}
                 onChange={e=>setAddExPat(e.target.value||null)}
-                style={{width:"100%",padding:"7px 12px",borderRadius:8,border:"1px solid #1e1e2e",background:"#111827",color:"#E5E7EB",fontSize:13,fontFamily:"DM Sans, sans-serif"}}
+                style={{width:"100%",padding:"7px 12px",borderRadius:8,border:"1px solid "+selectBorderColor,background:selectBg,color:selectTextColor,fontSize:13,fontFamily:"DM Sans, sans-serif"}}
               >
                 <option value="">{msg("Todos los patrones","All patterns")}</option>
                 {Object.entries(PATS).map(([k,p])=>(
@@ -101,22 +107,22 @@ export default function AddExerciseModal({
               </select>
             </div>
             <div style={{marginBottom:10}}>
-              <label style={{fontSize:10,fontWeight:700,color:"#6B7280",letterSpacing:".5px",textTransform:"uppercase",display:"block",marginBottom:4}}>MÚSCULO</label>
+              <label style={{fontSize:10,fontWeight:700,color:labelColor,letterSpacing:".5px",textTransform:"uppercase",display:"block",marginBottom:4}}>MÚSCULO</label>
               <div style={{position:"relative"}}>
                 <div
                   onClick={e=>{e.stopPropagation();setMusculoOpen(o=>!o);}}
-                  style={{width:"100%",padding:"7px 12px",borderRadius:8,border:"1px solid #1e1e2e",background:"#111827",color:"#E5E7EB",fontSize:13,fontFamily:"DM Sans, sans-serif",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",boxSizing:"border-box"}}
+                  style={{width:"100%",padding:"7px 12px",borderRadius:8,border:"1px solid "+selectBorderColor,background:selectBg,color:selectTextColor,fontSize:13,fontFamily:"DM Sans, sans-serif",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",boxSizing:"border-box"}}
                 >
                   <span>{addExMuscle||msg("Todos los músculos","All muscles")}</span>
                   <span style={{fontSize:10}}>▼</span>
                 </div>
                 {musculoOpen&&(
-                  <div style={{position:"absolute",top:"110%",left:0,right:0,background:"#111827",border:"1px solid #1e1e2e",borderRadius:8,zIndex:9999,maxHeight:200,overflowY:"auto"}}>
+                  <div style={{position:"absolute",top:"110%",left:0,right:0,background:selectBg,border:"1px solid "+selectBorderColor,borderRadius:8,zIndex:9999,maxHeight:200,overflowY:"auto"}}>
                     {[null,...MUSCULO_OPTIONS].map(opt=>(
                       <div
                         key={opt?opt.key:"__all"}
                         onClick={e=>{e.stopPropagation();setAddExMuscle(opt?opt.label:null);setMusculoOpen(false);}}
-                        style={{padding:"10px 12px",cursor:"pointer",color:"#E5E7EB",fontSize:14,background:addExMuscle===(opt?opt.label:null)?"#1e3a5f":"transparent"}}
+                        style={{padding:"10px 12px",cursor:"pointer",color:selectTextColor,fontSize:14,background:addExMuscle===(opt?opt.label:null)?selectedMuscleBg:"transparent"}}
                       >
                         {opt?opt.label:msg("Todos los músculos","All muscles")}
                       </div>

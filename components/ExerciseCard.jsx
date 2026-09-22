@@ -21,7 +21,13 @@ function compactSummary(ex) {
   return parts.join(' · ');
 }
 
-export function ExerciseCard({ exercise, onEdit, onDelete }) {
+export function ExerciseCard({
+  exercise, onEdit, onDelete,
+  darkMode = true,
+  textMain,
+  textMuted,
+  bgCard,
+}) {
   const {
     attributes, listeners, setNodeRef,
     transform, transition, isDragging,
@@ -38,7 +44,7 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.4 : 1,
-        background: '#1e293b',
+        background: darkMode ? '#1e293b' : (bgCard || '#ffffff'),
         borderRadius: 10,
         borderLeft: `3px solid ${color}`,
         marginBottom: S.chipGridGap - 4,
@@ -53,7 +59,7 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
         {...attributes}
         {...listeners}
         style={{
-          color: 'rgba(148,163,184,0.4)',
+          color: darkMode ? 'rgba(148,163,184,0.4)' : 'rgba(100,116,139,0.4)',
           cursor: 'grab',
           touchAction: 'none',
           flexShrink: 0,
@@ -70,14 +76,14 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
           ...T.bodySemibold,
           fontWeight: 700,
           wordBreak: 'break-word',
-          color: '#f1f5f9',
+          color: darkMode ? '#f1f5f9' : (textMain || '#0f172a'),
           lineHeight: 1.3,
           marginBottom: summary ? 2 : 0,
         }}>
           {exercise.name}
         </div>
         {summary && (
-          <div style={{ ...T.meta, color: '#64748b' }}>
+          <div style={{ ...T.meta, color: darkMode ? '#64748b' : (textMuted || '#64748b') }}>
             {summary}
           </div>
         )}
@@ -93,7 +99,7 @@ export function ExerciseCard({ exercise, onEdit, onDelete }) {
           style={{
             width: 44, height: 44, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#94a3b8', textDecoration: 'none',
+            color: darkMode ? '#94a3b8' : (textMuted || '#64748b'), textDecoration: 'none',
             ...T.control,
             borderRadius: 8,
           }}
