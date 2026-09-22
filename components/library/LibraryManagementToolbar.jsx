@@ -72,25 +72,25 @@ export default function LibraryManagementToolbar({
         onClick={() => setFilterExpanded(v => !v)}
         style={{
           width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          background: '#111827', border: '1px solid #1E293B', borderRadius: '8px',
+          background: _dm ? '#111827' : bgSub, border: '1px solid ' + (_dm ? '#1E293B' : border), borderRadius: '8px',
           padding: '12px 14px', cursor: 'pointer', fontFamily: 'inherit',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#E2E8F0' }}>{activeFilterLabel}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: _dm ? '#E2E8F0' : '#0F1923' }}>{activeFilterLabel}</span>
           {isFilterActive && (
             <span style={{ background: '#2563EB', color: '#fff', borderRadius: 12, padding: '1px 7px', fontSize: 12, fontWeight: 700 }}>1</span>
           )}
         </div>
-        <span style={{ color: '#6B7280', fontSize: 16, transform: filterExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
+        <span style={{ color: _dm ? '#6B7280' : textMuted, fontSize: 16, transform: filterExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▾</span>
       </button>
 
       {/* Filter expanded panel */}
       {filterExpanded && (
-        <div style={{ background: '#111827', border: '1px solid #1E293B', borderRadius: '8px', padding: '14px', marginTop: '8px' }}>
+        <div style={{ background: _dm ? '#111827' : bgSub, border: '1px solid ' + (_dm ? '#1E293B' : border), borderRadius: '8px', padding: '14px', marginTop: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#9CA3AF', letterSpacing: '.5px', textTransform: 'uppercase' }}>{msg("Filtrar ejercicios", "Filter exercises", "Filtrar exercícios")}</span>
-            <button type="button" onClick={() => setFilterExpanded(false)} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: '16px', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>✕</button>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: _dm ? '#9CA3AF' : textMuted, letterSpacing: '.5px', textTransform: 'uppercase' }}>{msg("Filtrar ejercicios", "Filter exercises", "Filtrar exercícios")}</span>
+            <button type="button" onClick={() => setFilterExpanded(false)} style={{ background: 'none', border: 'none', color: _dm ? '#6B7280' : textMuted, fontSize: '16px', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>✕</button>
           </div>
           {!libNarrow && (
             <input

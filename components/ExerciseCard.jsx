@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { pickVideoUrl } from '../lib/exerciseResolve.js';
-import { coachType as T, coachSpace as S } from './coachUiScale.js';
+import { coachType, coachSpace, coachTypeMobile, coachSpaceMobile } from './coachUiScale.js';
 
 const BLOCK_COLORS = {
   warmup: '#f59e0b',
@@ -27,12 +27,15 @@ export function ExerciseCard({
   textMain,
   textMuted,
   bgCard,
+  isUnder768 = false,
 }) {
   const {
     attributes, listeners, setNodeRef,
     transform, transition, isDragging,
   } = useSortable({ id: exercise.id });
 
+  const T = isUnder768 ? coachTypeMobile : coachType;
+  const S = isUnder768 ? coachSpaceMobile : coachSpace;
   const color = BLOCK_COLORS[exercise.block] || BLOCK_COLORS.main;
   const summary = compactSummary(exercise);
   const videoHref = pickVideoUrl(exercise);
@@ -75,7 +78,7 @@ export function ExerciseCard({
         <div style={{
           ...T.bodySemibold,
           fontWeight: 700,
-          wordBreak: 'break-word',
+          overflowWrap: 'break-word',
           color: darkMode ? '#f1f5f9' : (textMain || '#0f172a'),
           lineHeight: 1.3,
           marginBottom: summary ? 2 : 0,

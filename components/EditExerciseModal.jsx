@@ -21,50 +21,52 @@ function initWeeks(exercise) {
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
-const BG       = '#0f172a';
-const BG_CARD  = '#1e293b';
-const BG_WEEK  = '#0f172a';
-const BORDER_INACTIVE = 'rgba(255,255,255,0.15)';
-const ACTIVE_COLOR    = '#22c55e';
-const TEXT_MUTED      = '#94a3b8';
-const TEXT_LABEL      = '#64748b';
-
-const baseInput = {
-  background: BG,
-  color: '#f1f5f9',
-  border: `1px solid ${BORDER_INACTIVE}`,
-  borderRadius: 10,
-  padding: '10px 8px',
-  fontSize: 14,
-  fontFamily: 'inherit',
-  outline: 'none',
-  width: '100%',
-  boxSizing: 'border-box',
-  textAlign: 'center',
-};
-
-const sectionLabel = {
-  fontSize: 11,
-  fontWeight: 700,
-  letterSpacing: '1px',
-  color: TEXT_LABEL,
-  textTransform: 'uppercase',
-  marginBottom: 10,
-};
-
-const fieldLabel = {
-  fontSize: 10,
-  fontWeight: 600,
-  letterSpacing: '.5px',
-  color: TEXT_LABEL,
-  textTransform: 'uppercase',
-  marginBottom: 6,
-  display: 'block',
-};
+const ACTIVE_COLOR = '#22c55e';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function EditExerciseModal({ exercise, onSave, onClose }) {
+export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }) {
+  const BG       = darkMode ? '#0f172a' : '#F0F4F8';
+  const BG_CARD  = darkMode ? '#1e293b' : '#FFFFFF';
+  const BG_WEEK  = darkMode ? '#0f172a' : '#EEF2F7';
+  const BORDER_INACTIVE = darkMode ? 'rgba(255,255,255,0.15)' : '#E2E8F0';
+  const TEXT_MUTED = darkMode ? '#94a3b8' : '#64748B';
+  const TEXT_LABEL = darkMode ? '#64748b' : '#64748B';
+  const TEXT_MAIN  = darkMode ? '#f1f5f9' : '#0F1923';
+
+  const baseInput = {
+    background: BG,
+    color: TEXT_MAIN,
+    border: `1px solid ${BORDER_INACTIVE}`,
+    borderRadius: 10,
+    padding: '10px 8px',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+    textAlign: 'center',
+  };
+
+  const sectionLabel = {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: '1px',
+    color: TEXT_LABEL,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  };
+
+  const fieldLabel = {
+    fontSize: 10,
+    fontWeight: 600,
+    letterSpacing: '.5px',
+    color: TEXT_LABEL,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+    display: 'block',
+  };
+
   const [sets,       setSets]       = useState('3');
   const [reps,       setReps]       = useState('8-10');
   const [kg,         setKg]         = useState('');
@@ -159,7 +161,7 @@ export function EditExerciseModal({ exercise, onSave, onClose }) {
       >
         {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <div style={{ flex: 1, fontSize: 17, fontWeight: 800, color: '#f1f5f9', wordBreak: 'break-word', lineHeight: 1.3 }}>
+          <div style={{ flex: 1, fontSize: 17, fontWeight: 800, color: TEXT_MAIN, wordBreak: 'break-word', lineHeight: 1.3 }}>
             {exercise?.name || 'Nuevo ejercicio'}
           </div>
           <button

@@ -101,7 +101,7 @@ export default function CoachCalendar({
   var tKey = todayKey();
   var months = monthNames(lang);
   var dows = dayNames(lang);
-  var P = {
+  var P = dark ? {
     bg: "#0A0F1A",
     card: "#0D1424",
     card2: "#111827",
@@ -110,6 +110,16 @@ export default function CoachCalendar({
     muted: "#64748b",
     primary: "#2563EB",
     success: "#22C55E",
+    danger: "#EF4444",
+  } : {
+    bg: "#F0F4F8",
+    card: "#FFFFFF",
+    card2: "#F1F5F9",
+    border: "#E2E8F0",
+    text: "#0F1923",
+    muted: "#64748B",
+    primary: "#2563EB",
+    success: "#16A34A",
     danger: "#EF4444",
   };
 

@@ -99,7 +99,7 @@ export default function CoachSectionRenderer({
       )}
 
       {showCoachDesktopShell && !coachDesktop1024 && (
-        <CoachMobileDrawer {...mobileDrawerProps} />
+        <CoachMobileDrawer {...mobileDrawerProps} darkMode={calendarProps?.dark} />
       )}
 
       {tab === "scanner" && !esAlumno && (

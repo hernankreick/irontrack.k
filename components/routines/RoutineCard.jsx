@@ -4,7 +4,7 @@ import { Pencil, MoreVertical, ChevronDown, ClipboardList } from 'lucide-react';
 import { Ic } from '../Ic.jsx';
 import { DaySection } from '../DaySection.jsx';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
-import { coachType as T, coachSpace as S } from '../coachUiScale.js';
+import { coachType, coachSpace, coachTypeMobile, coachSpaceMobile } from '../coachUiScale.js';
 import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
 import RoutineCardActionMenu from './RoutineCardActionMenu.jsx';
 import RoutineDeleteConfirmModals from './RoutineDeleteConfirmModals.jsx';
@@ -68,6 +68,8 @@ export function RoutineCard({
   rutinasSBEntrenador = [],
 }) {
   const isUnder768 = useIsUnder768();
+  const T = isUnder768 ? coachTypeMobile : coachType;
+  const S = isUnder768 ? coachSpaceMobile : coachSpace;
   const [collapsed, setCollapsed] = useState(!!r.collapsed);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
@@ -800,6 +802,7 @@ export function RoutineCard({
                 darkMode={darkMode}
                 textMain={textMain}
                 textMuted={textMuted}
+                isUnder768={isUnder768}
                 premiumAddButtonClass="it-routine-btn it-routine-btn--ghost"
                 day={{
                   id: di,

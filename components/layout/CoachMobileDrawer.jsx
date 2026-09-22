@@ -11,6 +11,7 @@ export default function CoachMobileDrawer({
   onNavigate,
   onLogout,
   coachInitials,
+  darkMode = true,
 }) {
   return (
     <>
@@ -40,8 +41,8 @@ export default function CoachMobileDrawer({
           bottom: 0,
           width: 260,
           zIndex: 201,
-          background: "#111827",
-          borderRight: "1px solid #1A2535",
+          background: darkMode ? "#111827" : "#FFFFFF",
+          borderRight: "1px solid " + (darkMode ? "#1A2535" : "#E2E8F0"),
           display: "flex",
           flexDirection: "column",
           transform: open ? "translateX(0)" : "translateX(-100%)",
@@ -51,11 +52,11 @@ export default function CoachMobileDrawer({
         }}
       >
         {/* Header del drawer */}
-        <div style={{ padding: "calc(20px + env(safe-area-inset-top, 0px)) 16px 14px", borderBottom: "1px solid #1A2535", flexShrink: 0 }}>
+        <div style={{ padding: "calc(20px + env(safe-area-inset-top, 0px)) 16px 14px", borderBottom: "1px solid " + (darkMode ? "#1A2535" : "#E2E8F0"), flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
             <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: "-.3px" }}>
               <span style={{ color: "#2563EB" }}>IRON</span>
-              <span style={{ color: "#fff" }}>TRACK</span>
+              <span style={{ color: darkMode ? "#fff" : "#0F1923" }}>TRACK</span>
             </span>
             <span
               style={{
@@ -92,7 +93,7 @@ export default function CoachMobileDrawer({
               {coachInitials}
             </div>
             <div>
-              <div style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{sessionData?.name || "Entrenador"}</div>
+              <div style={{ color: darkMode ? "#fff" : "#0F1923", fontSize: 13, fontWeight: 700 }}>{sessionData?.name || "Entrenador"}</div>
               <div style={{ color: "#64748b", fontSize: 10, marginTop: 2 }}>Entrenador personal</div>
             </div>
           </div>
@@ -154,13 +155,13 @@ export default function CoachMobileDrawer({
                 <Ic name={item.icon} size={14} color={activeTab === item.k ? "#3B82F6" : "#94a3b8"} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: activeTab === item.k ? "#3B82F6" : "#e2e8f0", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
+                <div style={{ color: activeTab === item.k ? "#3B82F6" : (darkMode ? "#e2e8f0" : "#0F1923"), fontSize: 12, fontWeight: 600 }}>{item.label}</div>
                 {item.sub && <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{item.sub}</div>}
               </div>
             </div>
           ))}
 
-          <div style={{ height: 1, background: "#1A2535", margin: "6px 16px" }} />
+          <div style={{ height: 1, background: darkMode ? "#1A2535" : "#E2E8F0", margin: "6px 16px" }} />
 
           {/* PERFIL */}
           <div
@@ -211,13 +212,13 @@ export default function CoachMobileDrawer({
                 <Ic name={item.icon} size={14} color="#3B82F6" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
+                <div style={{ color: darkMode ? "#e2e8f0" : "#0F1923", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
                 <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{item.sub}</div>
               </div>
             </div>
           ))}
 
-          <div style={{ height: 1, background: "#1A2535", margin: "6px 16px" }} />
+          <div style={{ height: 1, background: darkMode ? "#1A2535" : "#E2E8F0", margin: "6px 16px" }} />
 
           {/* PAGOS */}
           <div
@@ -256,12 +257,12 @@ export default function CoachMobileDrawer({
                 <Ic name={item.icon} size={14} color="#22c55e" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#e2e8f0", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
+                <div style={{ color: darkMode ? "#e2e8f0" : "#0F1923", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
                 <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{item.sub}</div>
               </div>
               <span
                 style={{
-                  background: "#1A2535",
+                  background: darkMode ? "#1A2535" : "#E2E8F0",
                   color: "#64748b",
                   fontSize: 8,
                   borderRadius: 99,
@@ -276,7 +277,7 @@ export default function CoachMobileDrawer({
         </div>
 
         {/* Footer: cerrar sesión */}
-        <div style={{ borderTop: "1px solid #1A2535", flexShrink: 0 }}>
+        <div style={{ borderTop: "1px solid " + (darkMode ? "#1A2535" : "#E2E8F0"), flexShrink: 0 }}>
           <div
             onClick={onLogout}
             style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", cursor: "pointer" }}

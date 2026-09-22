@@ -7,7 +7,7 @@ import {
 } from '@dnd-kit/sortable';
 import { Copy, Trash2, Plus, Pencil } from 'lucide-react';
 import { ExerciseCard } from './ExerciseCard.jsx';
-import { coachType as T, coachSpace as S } from './coachUiScale.js';
+import { coachType, coachSpace, coachTypeMobile, coachSpaceMobile } from './coachUiScale.js';
 import { irontrackMsg as M } from '../lib/irontrackMsg.js';
 
 const BLOCK_ACCENT = {
@@ -31,7 +31,10 @@ function SortableBlock({
   addButtonClassName = '',
   textMain,
   textMuted,
+  isUnder768 = false,
 }) {
+  const T = isUnder768 ? coachTypeMobile : coachType;
+  const S = isUnder768 ? coachSpaceMobile : coachSpace;
   var blockBg = darkMode ? '#0f172a' : '#f8fafc';
   var blockBorder = darkMode ? `1px solid ${accent}22` : `1px solid ${accent}28`;
   const [activeId, setActiveId] = useState(null);
@@ -105,6 +108,7 @@ function SortableBlock({
               darkMode={darkMode}
               textMain={textMain}
               textMuted={textMuted}
+              isUnder768={isUnder768}
             />
           ))}
         </SortableContext>
@@ -118,6 +122,7 @@ function SortableBlock({
               darkMode={darkMode}
               textMain={textMain}
               textMuted={textMuted}
+              isUnder768={isUnder768}
             />
           ) : null}
         </DragOverlay>
@@ -172,9 +177,12 @@ export function DaySection({
   darkMode = true,
   textMain = '#0f172a',
   textMuted = '#64748b',
+  isUnder768 = false,
   /** Clases CSS opcionales (p. ej. microinteracciones en vista Rutinas). */
   premiumAddButtonClass = '',
 }) {
+  const T = isUnder768 ? coachTypeMobile : coachType;
+  const S = isUnder768 ? coachSpaceMobile : coachSpace;
   var dayTitleColor = darkMode ? '#f1f5f9' : textMain;
   var dayInputColor = darkMode ? '#f1f5f9' : textMain;
   const warmup    = day.warmup    || [];
@@ -283,6 +291,7 @@ export function DaySection({
         darkMode={darkMode}
         textMain={textMain}
         textMuted={textMuted}
+        isUnder768={isUnder768}
         addButtonClassName={premiumAddButtonClass}
       />
 
@@ -301,6 +310,7 @@ export function DaySection({
         darkMode={darkMode}
         textMain={textMain}
         textMuted={textMuted}
+        isUnder768={isUnder768}
         addButtonClassName={premiumAddButtonClass}
       />
     </div>

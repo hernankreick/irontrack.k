@@ -442,6 +442,7 @@ export function RutinaView(props) {
           exercise={editingExercise.exercise}
           onClose={closeEditModal}
           onSave={handleModalSave}
+          darkMode={darkMode}
         />
       )}
 
