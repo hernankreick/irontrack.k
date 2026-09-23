@@ -205,10 +205,10 @@ export function WorkoutExercisePanel(props) {
   return (
     <>
       <div style={{marginBottom:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:10,padding:12,background:"#0D1520",borderRadius:10,border:"1px solid #1a2535"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:12,background:darkMode?"#0D1520":"#F0F4F8",borderRadius:10,border:"1px solid "+(darkMode?"#1a2535":"#E2E8F0")}}>
           <div style={{width:4,height:36,borderRadius:2,background:pat.color||"#2563EB",flexShrink:0}}/>
           <div style={{flex:1}}>
-            <div style={{fontSize:18,fontWeight:800,color:"#fff",lineHeight:1.15,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <div style={{fontSize:18,fontWeight:800,color:darkMode?"#fff":"#0F1923",lineHeight:1.15,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
               {displayName}
               {sessionPRList&&sessionPRList.some(function(p){return p.exId===ex.id})&&(
                 <span style={{background:"#fbbf2422",border:"1px solid #fbbf2444",borderRadius:6,padding:"2px 8px",fontSize:10,fontWeight:800,color:"#fbbf24",flexShrink:0}}>PR</span>
@@ -345,8 +345,8 @@ export function WorkoutExercisePanel(props) {
                   <input
                     type="number" value={kg} onChange={e=>setKg(e.target.value)}
                     placeholder="0"
-                    style={{width:"100%",height:48,background:"#111827",border:"1px solid #1E3A5F",borderRadius:10,
-                      textAlign:"center",fontSize:20,fontWeight:800,color:"#fff",padding:"0 40px 0 40px",
+                    style={{width:"100%",height:48,background:darkMode?"#111827":"#F0F4F8",border:"1px solid "+(darkMode?"#1E3A5F":"#CBD5E1"),borderRadius:10,
+                      textAlign:"center",fontSize:20,fontWeight:800,color:darkMode?"#fff":"#0F1923",padding:"0 40px 0 40px",
                       fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
                   <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:14,fontWeight:600,color:"#475569",pointerEvents:"none"}}>kg</span>
                 </div>
@@ -492,15 +492,15 @@ export function WorkoutExercisePanel(props) {
       <div style={{display:"flex",gap:8,marginBottom:10}}>
         {activeExIdx>0&&(
           <button className="hov" onClick={()=>setActiveExIdx(activeExIdx-1)}
-            style={{flex:1,padding:"10px",background:"#0D1520",border:"1px solid #1a2535",
+            style={{flex:1,padding:"10px",background:darkMode?"#0D1520":"#F0F4F8",border:"1px solid "+(darkMode?"#1a2535":"#E2E8F0"),
               borderRadius:10,color:"#64748B",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
             ← {es?"Anterior":"Prev"}
           </button>
         )}
         {activeExIdx<exercises.length-1&&(
           <button className="hov" onClick={()=>setActiveExIdx(activeExIdx+1)}
-            style={{flex:2,padding:"10px",background:"#0D1520",border:"1px solid #1a2535",
-              borderRadius:10,color:"#94A3B8",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            style={{flex:2,padding:"10px",background:darkMode?"#0D1520":"#F0F4F8",border:"1px solid "+(darkMode?"#1a2535":"#E2E8F0"),
+              borderRadius:10,color:darkMode?"#94A3B8":"#0F1923",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
             {es?"Siguiente":"Next"} →
           </button>
         )}
