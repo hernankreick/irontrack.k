@@ -6,8 +6,6 @@ import React from "react";
  */
 export function CurrentWorkoutHero({
   msg,
-  textMain,
-  textMuted,
   hoyBadgeText,
   semDiaLine,
   dayTitle,
@@ -74,7 +72,7 @@ export function CurrentWorkoutHero({
             fontSize: 44,
             fontWeight: 900,
             lineHeight: 0.95,
-            color: textMain,
+            color: "#FFFFFF",
             letterSpacing: 0,
             textTransform: "uppercase",
             fontFamily: "Barlow Condensed, DM Sans, system-ui, sans-serif",
@@ -113,7 +111,7 @@ export function CurrentWorkoutHero({
         <div
           style={{
             fontSize: 13,
-            color: textMuted,
+            color: "#8B9AB2",
             fontWeight: 700,
             lineHeight: 1.4,
             marginBottom: 8,
@@ -125,7 +123,7 @@ export function CurrentWorkoutHero({
         <div
           style={{
             fontSize: 15,
-            color: textMain,
+            color: "#FFFFFF",
             fontWeight: 700,
             lineHeight: 1.35,
             marginBottom: 18,
