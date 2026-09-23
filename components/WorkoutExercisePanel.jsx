@@ -20,7 +20,7 @@ import {
  * Píldoras de reps: 3 estados (fuera de rango / rango sugerido / seleccionada).
  * Verde solo aquí; evita .hov global (transition:all + brightness) para transiciones controladas.
  */
-function repPillButtonStyle(isSelected, inTargetRange) {
+function repPillButtonStyle(isSelected, inTargetRange, darkMode = true) {
   const base = {
     minWidth: 36,
     height: 36,
@@ -48,8 +48,8 @@ function repPillButtonStyle(isSelected, inTargetRange) {
   if (inTargetRange) {
     return {
       ...base,
-      border: "1px solid rgba(34, 197, 94, 0.22)",
-      color: "rgba(220, 252, 231, 0.95)",
+      border: darkMode ? "1px solid rgba(34, 197, 94, 0.22)" : "1px solid rgba(22, 163, 74, 0.35)",
+      color: darkMode ? "rgba(220, 252, 231, 0.95)" : "#15803D",
       background: "rgba(34, 197, 94, 0.12)",
       boxShadow: "none",
       transform: "scale(1)",
@@ -398,7 +398,7 @@ export function WorkoutExercisePanel(props) {
                         <button
                           key={pn}
                           type="button"
-                          style={repPillButtonStyle(isT, inR)}
+                          style={repPillButtonStyle(isT, inR, darkMode)}
                           onClick={function(){
                             setReps(String(pn));
                             try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}
