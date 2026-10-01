@@ -144,6 +144,8 @@ import {
   buildProgressPayload,
   calculateNewWeightPR,
   formatWorkoutSetLabel,
+  hydrateProgressFromRows,
+  mergeProgressEntries,
   updateExerciseKgInRoutines,
   updateExerciseProgressRecord,
 } from './lib/workoutSession.js';
@@ -1623,11 +1625,29 @@ function GymApp() {
       (async () => {
         try {
           // FIX A: fetch rutinas and sesiones in parallel
-          const [rutsRaw, ses, alumnoRows] = await Promise.all([
+          const [rutsRaw, ses, alumnoRows, progresoRows] = await Promise.all([
             sb.getRutinas(sessionData.alumnoId),
             sb.getSesiones(sessionData.alumnoId),
             sbFetch("alumnos?id=eq."+sessionData.alumnoId+"&select=ultimo_pago_confirmado"),
+            sb.getProgreso(sessionData.alumnoId),
           ]);
+          // Rehidratar el historial de PRs/series desde Supabase: progress
+          // (localStorage "it_pg") se borra en cada login nuevo y, sin esto,
+          // quedaba en {} hasta el primer set logueado en este dispositivo,
+          // haciendo que todo se marque como "PR nuevo" con "Anterior 0 kg".
+          const hydratedProgress = hydrateProgressFromRows(progresoRows || []);
+          setProgress(function (prev) {
+            var isLocalEmpty = !prev || Object.keys(prev).length === 0;
+            if (isLocalEmpty) return hydratedProgress;
+            // Ya hay algo cargado (ej. sesion en curso sin sincronizar todavia):
+            // no lo pisamos. Por ejercicio, combinamos ambas fuentes sin
+            // descartar sets de ninguna.
+            var merged = Object.assign({}, prev);
+            Object.keys(hydratedProgress).forEach(function (exId) {
+              merged[exId] = mergeProgressEntries(prev[exId], hydratedProgress[exId]);
+            });
+            return merged;
+          });
           setUltimoPagoConfirmado((alumnoRows && alumnoRows[0] && alumnoRows[0].ultimo_pago_confirmado) || null);
           const ruts = (rutsRaw || []).slice().sort(function (a, b) {
             return new Date(b.created_at || 0) - new Date(a.created_at || 0);
