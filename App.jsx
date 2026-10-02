@@ -103,6 +103,7 @@ import {
   countExercisesWithLogToday,
   buildStudentDayPresentation,
 } from './components/student-plan/studentPlanHelpers.js';
+import { getStudentWorkoutState, STUDENT_WORKOUT_STATE } from './components/student-plan/studentWorkoutState.js';
 import LoginModalHost from './components/LoginModalHost.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
@@ -3608,7 +3609,20 @@ function GymApp() {
                 todayDay: todayDay?.dia || todayDay,
                 esAlumno
               });
-              const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeekForStudent)));
+              // Estado del entrenamiento de hoy: COMPLETADO sale de `sesiones` (finalizado), EN CURSO de las
+              // series de hoy en los ejercicios del dia que toca. Una serie suelta NO es "completado".
+              const workoutState = getStudentWorkoutState({
+                rutina: r0,
+                day: todayDay,
+                sesiones: sesiones,
+                progress: progress,
+                hoy: hoy,
+                weekNumber: currentWeekForStudent + 1,
+                weekIndex: currentWeekForStudent,
+                alumnoId: sessionData?.alumnoId,
+              }).state;
+              const workoutCompletedToday = workoutState === STUDENT_WORKOUT_STATE.COMPLETED;
+              const workoutInProgress = workoutState === STUDENT_WORKOUT_STATE.IN_PROGRESS;
               const todayDayPresentation = buildStudentDayPresentation({
                 day: todayDay,
                 dayIndex: nextDayIdx,
@@ -3715,13 +3729,13 @@ function GymApp() {
                   />
 
                   {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
-                  {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&!showWelcome&&(
+                  {planScrollDiag.hoyCard&&todayDay&&!workoutCompletedToday&&!session&&!showWelcome&&(
                     <>
                     <CurrentWorkoutHero
                       msg={msg}
                       textMain={textMain}
                       textMuted={textMuted}
-                      hoyBadgeText={msg("HOY TOCA", "TODAY", "HOJE")}
+                      hoyBadgeText={workoutInProgress ? msg("EN CURSO", "IN PROGRESS", "EM ANDAMENTO") : msg("HOY TOCA", "TODAY", "HOJE")}
                       semDiaLine={
                         msg("Semana", "Week", "Semana") + " " + (currentWeekForStudent + 1) + " · " + msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)
                       }
@@ -3729,7 +3743,7 @@ function GymApp() {
                       typeBadgeText={todayTypeBadge}
                       exerciseCount={totalEjHero}
                       durationMinutes={estimateDayMinutes(todayDay, currentWeekForStudent)}
-                      ctaLabel={msg("EMPEZAR", "START", "COMEÇAR")}
+                      ctaLabel={workoutInProgress ? msg("CONTINUAR ENTRENAMIENTO", "CONTINUE WORKOUT", "CONTINUAR TREINO") : msg("EMPEZAR", "START", "COMEÇAR")}
                       onStart={function () {
                         const snap = {};
                         [...(todayDay.warmup || []), ...(todayDay.exercises || [])].forEach(function (ex) {
@@ -3744,7 +3758,7 @@ function GymApp() {
                   )}
 
                   {/* DÍA YA ENTRENADO */}
-                  {planScrollDiag.completedTodayBanner&&yaEntrenoHoy&&!session&&(
+                  {planScrollDiag.completedTodayBanner&&workoutCompletedToday&&!session&&(
                     <CompletedTodayBanner msg={msg} textMuted={textMuted} />
                   )}
                   </div>
@@ -3753,14 +3767,15 @@ function GymApp() {
                     textMain={textMain}
                     ALUMNO_HEADER_MINI_PX={ALUMNO_HEADER_MINI_PX}
                     firstName={sessionData?.name?.split(" ")[0]||"Atleta"}
-                    showTrainButton={todayDay&&!yaEntrenoHoy&&!session}
+                    showTrainButton={todayDay&&!workoutCompletedToday&&!session}
+                    trainLabel={workoutInProgress ? msg("Continuar", "Continue", "Continuar") : null}
                     onTrainToday={()=>{
                       const snap={};
                       [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                       setPreSessionPRs({...snap});
                       setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                     }}
-                    showCompletedToday={yaEntrenoHoy}
+                    showCompletedToday={workoutCompletedToday}
                     headerRef={function (el) {
                       studentHeaderMiniRef.current = el;
                       if (el) applyAlumnoHeaderLayerStyles(headerCollapsedRef.current);
