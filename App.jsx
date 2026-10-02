@@ -103,7 +103,7 @@ import {
   countExercisesWithLogToday,
   buildStudentDayPresentation,
 } from './components/student-plan/studentPlanHelpers.js';
-import { getStudentWorkoutState, STUDENT_WORKOUT_STATE } from './components/student-plan/studentWorkoutState.js';
+import { getStudentWorkoutState, STUDENT_WORKOUT_STATE, updateProgressEntryWithSessionContext } from './components/student-plan/studentWorkoutState.js';
 import LoginModalHost from './components/LoginModalHost.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
@@ -148,7 +148,6 @@ import {
   hydrateProgressFromRows,
   mergeProgressEntries,
   updateExerciseKgInRoutines,
-  updateExerciseProgressRecord,
 } from './lib/workoutSession.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
@@ -1871,7 +1870,10 @@ function GymApp() {
     const weekForSet = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : effectiveCurrentWeek;
     const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe);
     setProgress(prev=>{
-      const ex = updateExerciseProgressRecord(prev[exId], newSet);
+      // Igual que updateExerciseProgressRecord, marcando el set con el contexto LOCAL del entrenamiento
+      // abierto (session_rutina_id / session_dia_idx). No se envia a Supabase: el payload remoto se arma
+      // aparte con buildProgressPayload.
+      const ex = updateProgressEntryWithSessionContext(prev[exId], newSet, session);
       return {...prev,[exId]:ex};
     });
     // Guardar en Supabase — si offline, guardar en cola local

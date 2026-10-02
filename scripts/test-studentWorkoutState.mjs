@@ -13,8 +13,14 @@ import {
   findTodayFinishedSession,
   findTodayFinishedSessions,
   countUnexplainedActivity,
+  buildSessionContext,
+  updateProgressEntryWithSessionContext,
 } from "../components/student-plan/studentWorkoutState.js";
-import { hydrateProgressFromRows, buildExerciseSetRecord, updateExerciseProgressRecord } from "../lib/workoutSession.js";
+import {
+  hydrateProgressFromRows, buildExerciseSetRecord, updateExerciseProgressRecord,
+  mergeProgressEntries, buildProgressPayload, buildPendingProgressItem,
+} from "../lib/workoutSession.js";
+import { readFileSync } from "node:fs";
 import { countExercisesWithLogToday } from "../components/student-plan/studentPlanHelpers.js";
 
 let count = 0;
@@ -372,6 +378,180 @@ test("countUnexplainedActivity: sin dia -> 0; sin sesiones -> 0", () => {
 test("findTodayFinishedSessions devuelve todas las sesiones de hoy validas", () => {
   const sesiones = [sesDia1(), sesDia1({ dia_idx: 1 }), sesDia1({ fecha: AYER })];
   assert.equal(findTodayFinishedSessions({ rutina: rutinaPC, sesiones, hoy: HOY, weekNumber: WEEK_NUM, alumnoId: "a1" }).length, 2);
+});
+
+
+// ---------------------------------------------------------------------------
+// T01.1A ajuste C2: contexto local (session_rutina_id / session_dia_idx) en cada serie
+// ---------------------------------------------------------------------------
+
+const SESSION_DIA1 = { rId: "r1", dIdx: 0, exIdx: 0, startTime: 1 };   // forma real de `session`
+const SESSION_DIA2 = { rId: "r1", dIdx: 1, exIdx: 0, startTime: 2 };
+// Igual que logSet: set construido con buildExerciseSetRecord y registrado dentro de la `session` abierta.
+const logLocal = (progress, exId, session, n) => {
+  const out = Object.assign({}, progress);
+  for (let i = 0; i < (n || 1); i++) {
+    out[exId] = updateProgressEntryWithSessionContext(
+      out[exId], buildExerciseSetRecord(60, 10, HOY, WEEK_IDX, "", null), session);
+  }
+  return out;
+};
+
+test("C2 forma del set: sets locales marcados traen session_rutina_id y session_dia_idx; el resto del set no cambia", () => {
+  const entry = logLocal({}, "press", SESSION_DIA2).press;
+  const set = entry.sets[0];
+  assert.deepEqual(Object.keys(set).sort(),
+    ["created_at", "date", "kg", "note", "reps", "rpe", "session_dia_idx", "session_rutina_id", "week"].sort());
+  assert.equal(set.session_rutina_id, "r1");
+  assert.equal(set.session_dia_idx, 1);
+  assert.equal(set.created_at, undefined);
+  const plain = updateExerciseProgressRecord(undefined, buildExerciseSetRecord(60, 10, HOY, WEEK_IDX, "", null)).sets[0];
+  const { session_rutina_id, session_dia_idx, ...rest } = set;
+  assert.deepEqual(rest, plain);
+  assert.equal(entry.max, 60);
+});
+
+test("C2 el set nuevo queda al frente y los anteriores no se tocan", () => {
+  const p1 = logLocal({}, "press", SESSION_DIA1);
+  const p2 = logLocal(p1, "press", SESSION_DIA2);
+  assert.equal(p2.press.sets.length, 2);
+  assert.equal(p2.press.sets[0].session_dia_idx, 1);
+  assert.equal(p2.press.sets[1].session_dia_idx, 0);
+  assert.equal(p2.press.sets[1], p1.press.sets[0]);
+});
+
+test("C2 caso 7: set registrado sin session valida mantiene forma y resultado anteriores", () => {
+  const plain = updateExerciseProgressRecord(undefined, buildExerciseSetRecord(60, 10, HOY, WEEK_IDX, "", null));
+  [null, undefined, {}, { rId: "r1" }, { dIdx: 0 }, { rId: "", dIdx: 0 }, { rId: "r1", dIdx: -1 },
+   { rId: "r1", dIdx: 1.5 }, { rId: "r1", dIdx: "1" }, { rId: "r1", dIdx: NaN }].forEach((sess) => {
+    const entry = updateProgressEntryWithSessionContext(undefined, buildExerciseSetRecord(60, 10, HOY, WEEK_IDX, "", null), sess);
+    assert.deepEqual(entry, plain, "session=" + JSON.stringify(sess));
+    assert.ok(!("session_dia_idx" in entry.sets[0]) && !("session_rutina_id" in entry.sets[0]));
+  });
+  assert.equal(buildSessionContext(null), null);
+  assert.deepEqual(buildSessionContext(SESSION_DIA2), { session_rutina_id: "r1", session_dia_idx: 1 });
+  // sin session el estado se comporta como antes (ambiguo -> COMPLETADO)
+  const progress = { press: plain };
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress }), S.COMPLETED);
+});
+
+test("C2 caso 1: Dia 1 finalizado + set LOCAL compartido (Press) marcado Dia 2 -> EN CURSO inmediato", () => {
+  const progress = logLocal({}, "press", SESSION_DIA2);
+  assert.equal(progress.press.sets[0].created_at, undefined);   // sin hidratar
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress }), S.IN_PROGRESS);
+});
+
+test("C2 caso 2: Dia 1 finalizado + set LOCAL compartido marcado Dia 1 -> COMPLETADO", () => {
+  const progress = logLocal({}, "press", SESSION_DIA1, 3);
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress }), S.COMPLETED);
+});
+
+test("C2 mezcla: sets del Dia 1 (compartido) + un set nuevo del Dia 2 -> EN CURSO; solo los del Dia 1 -> COMPLETADO", () => {
+  const p1 = logLocal({}, "press", SESSION_DIA1, 2);
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress: p1 }), S.COMPLETED);
+  const p2 = logLocal(p1, "press", SESSION_DIA2);
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress: p2 }), S.IN_PROGRESS);
+});
+
+test("C2 caso 3: marcador de OTRA rutina no se usa para inferir actividad nueva", () => {
+  const otra = { rId: "r2", dIdx: 1, exIdx: 0, startTime: 3 };
+  const progress = logLocal({}, "press", otra);
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress }), S.COMPLETED);
+  // y sin rutina en la llamada directa tampoco hay inferencia
+  assert.equal(countUnexplainedActivity({ day: dia2, progress: logLocal({}, "press", SESSION_DIA2), hoy: HOY, weekIndex: WEEK_IDX, finishedSessions: [sesDia1()] }), 0);
+});
+
+test("C2 marcadores invalidos escritos a mano (string, negativo, decimal) no cuentan", () => {
+  const base = logLocal({}, "press", SESSION_DIA2);
+  [ "1", -1, 1.5, null, undefined ].forEach((v) => {
+    const sets = base.press.sets.map((s) => Object.assign({}, s, { session_dia_idx: v }));
+    assert.equal(stateDia2({ sesiones: [sesDia1()], progress: { press: { sets, max: 60 } } }), S.COMPLETED, String(v));
+  });
+});
+
+test("C2: si una sesion finalizada de hoy no trae dia_idx valido no se usa el marcador (queda conservador)", () => {
+  const progress = logLocal({}, "press", SESSION_DIA2);
+  assert.equal(stateDia2({ sesiones: [sesDia1({ dia_idx: null })], progress }), S.COMPLETED);
+});
+
+test("C2: con varias sesiones de hoy, el marcador de un dia ya finalizado hoy esta explicado; uno distinto no", () => {
+  const dia3 = { exercises: [{ id: "press" }, { id: "tric" }] };
+  const sesiones = [sesDia1(), sesDia1({ dia_idx: 1, ejercicios: "press,curl", created_at: "2026-10-01T15:30:00Z" })];
+  assert.equal(stateDia2({ day: dia3, sesiones, progress: logLocal({}, "press", SESSION_DIA2) }), S.COMPLETED);
+  assert.equal(stateDia2({ day: dia3, sesiones, progress: logLocal({}, "press", { rId: "r1", dIdx: 2, exIdx: 0, startTime: 3 }) }), S.IN_PROGRESS);
+});
+
+test("C2 caso 4: set local SIN marcador (legacy en it_pg) conserva el comportamiento anterior", () => {
+  const legacy = { press: { sets: [{ kg: 60, reps: 10, date: HOY, week: WEEK_IDX, note: "", rpe: null }], max: 60 } };
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress: legacy }), S.COMPLETED);
+});
+
+test("C2 caso 5/6: hidratado con created_at posterior -> EN CURSO; anterior -> no es actividad nueva", () => {
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress: hydrated([{ id: "press", at: AFTER }]) }), S.IN_PROGRESS);
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress: hydrated([{ id: "press", at: BEFORE }]) }), S.COMPLETED);
+});
+
+test("C2 caso 8: los campos sobreviven al almacenamiento local (JSON de it_pg) y siguen dando EN CURSO", () => {
+  const progress = logLocal({}, "press", SESSION_DIA2);
+  const restored = JSON.parse(JSON.stringify(progress));
+  assert.equal(restored.press.sets[0].session_rutina_id, "r1");
+  assert.equal(restored.press.sets[0].session_dia_idx, 1);
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress: restored }), S.IN_PROGRESS);
+});
+
+test("C2 caso 9: los campos NO llegan a Supabase (payload remoto y cola offline)", () => {
+  const payload = buildProgressPayload("a1", "press", 60, 10, "", HOY, WEEK_IDX);
+  assert.deepEqual(Object.keys(payload).sort(), ["alumno_id", "ejercicio_id", "fecha", "kg", "nota", "reps", "semana"]);
+  const pending = buildPendingProgressItem("press", 60, 10, "", HOY, WEEK_IDX);
+  assert.deepEqual(Object.keys(pending).sort(), ["date", "exId", "kg", "note", "reps", "semana"]);
+  assert.ok(!JSON.stringify(payload).includes("session_") && !JSON.stringify(pending).includes("session_"));
+  // el POST de logSet usa buildProgressPayload con argumentos explicitos, no el set
+  const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
+  assert.ok(app.includes("sb.addProgreso(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet))"));
+  assert.ok(!/addProgreso\([^)]*newSet/.test(app));
+  const lib = readFileSync(new URL("../lib/workoutSession.js", import.meta.url), "utf8");
+  assert.ok(!lib.includes("session_dia_idx") && !lib.includes("session_rutina_id"));
+});
+
+test("C2 caso 10: merge/dedupe no cambia la identidad logica de kg/reps/date/week/note", () => {
+  const key = (s) => JSON.stringify([s.kg, s.reps, s.date, s.week, s.note]);
+  const localCtx = logLocal({}, "press", SESSION_DIA2, 2).press;
+  const localPlain = { sets: localCtx.sets.map((s) => { const { session_dia_idx, session_rutina_id, ...r } = s; return r; }), max: localCtx.max };
+  const hyd = hydrated([{ id: "press", at: AFTER }]).press;       // 1 fila servidor con la misma clave
+  const withCtx = mergeProgressEntries(localCtx, hyd);
+  const without = mergeProgressEntries(localPlain, hyd);
+  assert.deepEqual(withCtx.sets.map(key), without.sets.map(key));
+  assert.equal(withCtx.sets.length, 2);                            // 2 locales + 1 hidratada empareja 1 -> 2
+  assert.equal(withCtx.max, without.max);
+  // la copia hidratada reemplaza a la local solapada (pierde marcador, gana created_at); la sobrante local lo conserva
+  assert.equal(withCtx.sets.filter((s) => s.created_at).length, 1);
+  assert.equal(withCtx.sets.filter((s) => s.session_dia_idx === 1).length, 1);
+  // despues de la hidratacion el caso sigue resolviendose (por created_at o por marcador)
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress: { press: withCtx } }), S.IN_PROGRESS);
+});
+
+test("C2 caso 10b: copia hidratada que reemplaza a la local pierde el marcador pero conserva created_at -> sigue EN CURSO", () => {
+  const local = logLocal({}, "press", SESSION_DIA2).press;
+  const merged = mergeProgressEntries(local, hydrated([{ id: "press", at: AFTER }]).press);
+  assert.equal(merged.sets.length, 1);
+  assert.equal(merged.sets[0].session_dia_idx, undefined);
+  assert.ok(merged.sets[0].created_at);
+  assert.equal(stateDia2({ sesiones: [sesDia1()], progress: { press: merged } }), S.IN_PROGRESS);
+});
+
+test("C2 caso 11: secuencia completa NOT_STARTED -> Dia 1 EN CURSO -> Dia 1 COMPLETADO -> Dia 2 set local compartido -> Dia 2 EN CURSO", () => {
+  let progress = {};
+  assert.equal(stateDia2({ day: dia1, sesiones: [], progress }), S.NOT_STARTED);
+  progress = logLocal(progress, "press", SESSION_DIA1);
+  assert.equal(stateDia2({ day: dia1, sesiones: [], progress }), S.IN_PROGRESS);
+  progress = logLocal(progress, "row", SESSION_DIA1);
+  assert.equal(stateDia2({ day: dia1, sesiones: [], progress }), S.IN_PROGRESS);
+  const sesiones = [sesDia1()];                                              // FINALIZAR guarda la sesion del Dia 1
+  assert.equal(stateDia2({ day: dia2, sesiones, progress }), S.COMPLETED);   // Press del Dia 1 marcado Dia 1: no es actividad nueva
+  progress = logLocal(progress, "press", SESSION_DIA2);                      // Dia 2, Press compartido, set local
+  assert.equal(stateDia2({ day: dia2, sesiones, progress }), S.IN_PROGRESS);
+  // reload (it_pg) y misma conclusion
+  assert.equal(stateDia2({ day: dia2, sesiones, progress: JSON.parse(JSON.stringify(progress)) }), S.IN_PROGRESS);
 });
 
 console.log(count + " tests OK");

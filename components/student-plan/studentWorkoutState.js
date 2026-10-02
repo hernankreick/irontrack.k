@@ -1,5 +1,6 @@
 import { normalizeFecha } from '../../lib/normalizeFecha.js';
 import { isCompletedSession, sessionMatchesRoutine } from '../../lib/studentWeeklyProgress.js';
+import { updateExerciseProgressRecord } from '../../lib/workoutSession.js';
 import { countExercisesWithLogToday } from './studentPlanHelpers.js';
 
 /**
@@ -129,6 +130,47 @@ function todaySetsOf(progress, exId, hoy, weekIndex) {
 }
 
 /**
+ * C2 - Contexto LOCAL del entrenamiento abierto, guardado en cada serie al registrarla.
+ *
+ * `progreso` no tiene rutina_id ni dia_idx, y un ejercicio puede estar en varios dias:
+ * una serie local de un ejercicio compartido no se podia asociar a un dia hasta
+ * hidratarse (created_at). logSet solo se ejecuta con un entrenamiento abierto, asi
+ * que `session.rId` / `session.dIdx` dicen EN QUE dia se registro. Se guardan en el
+ * set como `session_rutina_id` / `session_dia_idx`.
+ *
+ * Son metadata EXCLUSIVAMENTE local: viven en progress / it_pg. NO viajan a
+ * Supabase (buildProgressPayload arma el payload con argumentos explicitos y no
+ * hace spread del set) ni a it_pending_sync (buildPendingProgressItem tambien).
+ * Series hidratadas y series locales anteriores a este cambio no lo traen.
+ *
+ * Devuelve null si `session` no es un entrenamiento abierto valido.
+ */
+export function buildSessionContext(session) {
+  if (!session) return null;
+  const rutinaId = toId(session.rId);
+  const dia = session.dIdx;
+  if (!rutinaId || typeof dia !== 'number' || !Number.isInteger(dia) || dia < 0) return null;
+  return { session_rutina_id: session.rId, session_dia_idx: dia };
+}
+
+/**
+ * Igual que updateExerciseProgressRecord, pero marcando el set recien insertado con el
+ * contexto de `session`. updateExerciseProgressRecord pasa el set por
+ * normalizeWorkoutSet, que reconstruye un objeto de forma fija y descartaria campos
+ * extra; por eso el contexto se agrega SOBRE el set ya insertado (indice 0, el mas
+ * nuevo) y no se modifica normalizeWorkoutSet ni updateExerciseProgressRecord.
+ * Sin `session` valido el resultado es identico a updateExerciseProgressRecord.
+ */
+export function updateProgressEntryWithSessionContext(currentEntry, newSet, session) {
+  const entry = updateExerciseProgressRecord(currentEntry, newSet);
+  const ctx = buildSessionContext(session);
+  if (!ctx) return entry;
+  const sets = entry.sets.slice();
+  sets[0] = Object.assign({}, sets[0], ctx);
+  return Object.assign({}, entry, { sets: sets });
+}
+
+/**
  * ids de ejercicio de `sesiones.ejercicios`. buildSessionPayload lo arma como
  * exercises.map(e => e.id).join(",") con exactamente los ids que usa
  * progress[exId]; se parte por "," y se compara por igualdad exacta (nunca por
@@ -146,27 +188,36 @@ function parseSessionExerciseIds(session) {
  * finalizadas de hoy NO explican. Solo cuenta evidencia demostrable:
  *  a) ejercicio cuyo id NO esta en `ejercicios` de ninguna sesion de hoy: la serie
  *     no pudo pertenecer a esas sesiones -> actividad nueva;
- *  b) ejercicio compartido (su id SI esta en una sesion de hoy): solo cuenta si
- *     alguna serie tiene `created_at` posterior al `created_at` de la ultima sesion
- *     de hoy. `created_at` solo existe en series hidratadas desde Supabase; las
- *     series locales no lo traen y no se inventa. Una serie local de un ejercicio
- *     compartido es indistinguible: NO cuenta (queda COMPLETADO).
+ *  b) ejercicio compartido (su id SI esta en una sesion de hoy): cuenta si
+ *       - la serie trae el contexto local C2 (session_rutina_id de ESTA rutina y
+ *         session_dia_idx entero) y ese dia NO esta entre los dia_idx de las sesiones
+ *         finalizadas de hoy; o
+ *       - alguna serie tiene `created_at` posterior al `created_at` de la ultima
+ *         sesion de hoy (series hidratadas desde Supabase).
+ *     Una serie sin contexto ni created_at (p. ej. serie local anterior a C2 que ya
+ *     estaba en it_pg) es indistinguible: NO cuenta (queda COMPLETADO).
  * Si alguna sesion de hoy no trae `ejercicios` usable no se puede atribuir nada:
  * devuelve 0 (se mantiene COMPLETADO).
  */
-export function countUnexplainedActivity({ day, progress, hoy, weekIndex, finishedSessions }) {
+export function countUnexplainedActivity({ rutina, day, progress, hoy, weekIndex, finishedSessions }) {
   if (!day) return 0;
   const covered = {};
+  const finishedDays = {};
+  let finishedDaysKnown = true;
   let threshold = -Infinity;
   let thresholdKnown = true;
   for (let i = 0; i < finishedSessions.length; i++) {
     const ids = parseSessionExerciseIds(finishedSessions[i]);
     if (!ids) return 0;
     ids.forEach(function (id) { covered[id] = true; });
+    const diaIdx = finishedSessions[i].dia_idx;
+    if (diaIdx != null && Number.isInteger(Number(diaIdx))) finishedDays[Number(diaIdx)] = true;
+    else finishedDaysKnown = false;
     const t = Date.parse(finishedSessions[i].created_at);
     if (Number.isFinite(t)) threshold = Math.max(threshold, t);
     else thresholdKnown = false;
   }
+  const rutinaId = toId(rutina && rutina.id);
   const dayExercises = [].concat(day.warmup || [], day.exercises || []);
   let unexplained = 0;
   dayExercises.forEach(function (ex) {
@@ -177,6 +228,19 @@ export function countUnexplainedActivity({ day, progress, hoy, weekIndex, finish
       unexplained++;
       return;
     }
+    // Ejercicio compartido. (A) contexto local C2: la serie dice en que dia se registro; si es
+    // de esta rutina y de un dia que NO esta entre los finalizados hoy, es actividad nueva.
+    // Un marcador del mismo dia ya finalizado, de otra rutina o invalido no cuenta.
+    const byContext = rutinaId && finishedDaysKnown && sets.some(function (s) {
+      return toId(s.session_rutina_id) === rutinaId
+        && typeof s.session_dia_idx === 'number' && Number.isInteger(s.session_dia_idx) && s.session_dia_idx >= 0
+        && !finishedDays[s.session_dia_idx];
+    });
+    if (byContext) {
+      unexplained++;
+      return;
+    }
+    // (B) serie hidratada con created_at posterior a la ultima sesion de hoy.
     if (!thresholdKnown) return;
     const afterSession = sets.some(function (s) {
       const t = Date.parse(s.created_at);
@@ -203,10 +267,11 @@ export function countUnexplainedActivity({ day, progress, hoy, weekIndex, finish
  * - `progreso` no guarda rutina_id ni dia_idx: la actividad se asocia solo por id de
  *   ejercicio contra el dia que toca. Un ejercicio presente en varios dias puede
  *   dar un falso EN CURSO cuando NO hay sesion finalizada hoy.
- * - Con sesion finalizada hoy, actividad del dia siguiente solo en ejercicios
- *   compartidos con el dia ya finalizado y sin created_at (series locales, antes de
- *   recargar) NO se distingue: se mantiene COMPLETADO. Tras recargar, las series
- *   hidratadas traen created_at y si son posteriores a la sesion se detectan.
+ * - Con sesion finalizada hoy, actividad del dia siguiente en ejercicios compartidos se
+ *   distingue por el contexto local C2 (series registradas con esta version) o por
+ *   created_at (hidratadas). Series locales ANTERIORES a C2 ya guardadas en it_pg (sin
+ *   contexto ni created_at) siguen ambiguas: se mantiene COMPLETADO; no se migran ni se
+ *   les infiere contexto.
  * - Una serie de un dia ya finalizado que se sincronice offline DESPUES de la sesion
  *   tendria created_at posterior; solo afecta ejercicios compartidos.
  */
@@ -214,7 +279,7 @@ export function getStudentWorkoutState({ rutina, day, sesiones, progress, hoy, w
   const doneExercises = day ? countExercisesWithLogToday(day, progress, hoy, weekIndex) : 0;
   const finished = findTodayFinishedSessions({ rutina, sesiones, hoy, weekNumber, alumnoId });
   if (finished.length) {
-    const unexplained = countUnexplainedActivity({ day, progress, hoy, weekIndex, finishedSessions: finished });
+    const unexplained = countUnexplainedActivity({ rutina, day, progress, hoy, weekIndex, finishedSessions: finished });
     return {
       state: unexplained > 0 ? STUDENT_WORKOUT_STATE.IN_PROGRESS : STUDENT_WORKOUT_STATE.COMPLETED,
       doneExercises,
