@@ -103,7 +103,7 @@ import {
   countExercisesWithLogToday,
   buildStudentDayPresentation,
 } from './components/student-plan/studentPlanHelpers.js';
-import { getStudentWorkoutState, STUDENT_WORKOUT_STATE, updateProgressEntryWithSessionContext } from './components/student-plan/studentWorkoutState.js';
+import { getStudentWorkoutState, getWorkoutHeroLabels, STUDENT_WORKOUT_STATE, updateProgressEntryWithSessionContext } from './components/student-plan/studentWorkoutState.js';
 import LoginModalHost from './components/LoginModalHost.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
@@ -3625,6 +3625,7 @@ function GymApp() {
               }).state;
               const workoutCompletedToday = workoutState === STUDENT_WORKOUT_STATE.COMPLETED;
               const workoutInProgress = workoutState === STUDENT_WORKOUT_STATE.IN_PROGRESS;
+              const workoutHeroLabels = getWorkoutHeroLabels(workoutState, msg);
               const todayDayPresentation = buildStudentDayPresentation({
                 day: todayDay,
                 dayIndex: nextDayIdx,
@@ -3737,7 +3738,7 @@ function GymApp() {
                       msg={msg}
                       textMain={textMain}
                       textMuted={textMuted}
-                      hoyBadgeText={workoutInProgress ? msg("EN CURSO", "IN PROGRESS", "EM ANDAMENTO") : msg("HOY TOCA", "TODAY", "HOJE")}
+                      hoyBadgeText={workoutHeroLabels.badge}
                       semDiaLine={
                         msg("Semana", "Week", "Semana") + " " + (currentWeekForStudent + 1) + " · " + msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)
                       }
@@ -3745,7 +3746,7 @@ function GymApp() {
                       typeBadgeText={todayTypeBadge}
                       exerciseCount={totalEjHero}
                       durationMinutes={estimateDayMinutes(todayDay, currentWeekForStudent)}
-                      ctaLabel={workoutInProgress ? msg("CONTINUAR ENTRENAMIENTO", "CONTINUE WORKOUT", "CONTINUAR TREINO") : msg("EMPEZAR", "START", "COMEÇAR")}
+                      ctaLabel={workoutHeroLabels.cta}
                       onStart={function () {
                         const snap = {};
                         [...(todayDay.warmup || []), ...(todayDay.exercises || [])].forEach(function (ex) {
@@ -4021,6 +4022,7 @@ function GymApp() {
         welcomeProps={{
           open: showWelcome, sessionData, routines, alumnos, onboardStep,
           studentCurrentWeek, activeStudentRoutinePosition, allEx, es,
+          progress, sesiones,
           bgCard, border, textMain, textMuted, msg,
           images: IMGS,
           videoOverrides,

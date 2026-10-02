@@ -15,6 +15,8 @@ import {
   countUnexplainedActivity,
   buildSessionContext,
   updateProgressEntryWithSessionContext,
+  getWorkoutHeroLabels,
+  getStudentWelcomeWorkoutState,
 } from "../components/student-plan/studentWorkoutState.js";
 import {
   hydrateProgressFromRows, buildExerciseSetRecord, updateExerciseProgressRecord,
@@ -552,6 +554,119 @@ test("C2 caso 11: secuencia completa NOT_STARTED -> Dia 1 EN CURSO -> Dia 1 COMP
   assert.equal(stateDia2({ day: dia2, sesiones, progress }), S.IN_PROGRESS);
   // reload (it_pg) y misma conclusion
   assert.equal(stateDia2({ day: dia2, sesiones, progress: JSON.parse(JSON.stringify(progress)) }), S.IN_PROGRESS);
+});
+
+
+// ---------------------------------------------------------------------------
+// T01.1A-bis: el drawer de bienvenida usa la misma fuente de verdad que el hero del plan
+// ---------------------------------------------------------------------------
+
+const msgEs = (es) => es;
+const msgEn = (es, en) => en;
+const msgPt = (es, en, pt) => pt;
+
+test("T01.1A-bis 1: SIN INICIAR -> HOY TOCA / EMPEZAR", () => {
+  assert.deepEqual(getWorkoutHeroLabels(S.NOT_STARTED, msgEs), { badge: "HOY TOCA", cta: "EMPEZAR" });
+  assert.deepEqual(getWorkoutHeroLabels(S.NOT_STARTED, msgEn), { badge: "TODAY", cta: "START" });
+  assert.deepEqual(getWorkoutHeroLabels(S.NOT_STARTED, msgPt), { badge: "HOJE", cta: "COMEÇAR" });
+});
+
+test("T01.1A-bis 2: EN CURSO -> EN CURSO / CONTINUAR ENTRENAMIENTO (es/en/pt)", () => {
+  assert.deepEqual(getWorkoutHeroLabels(S.IN_PROGRESS, msgEs), { badge: "EN CURSO", cta: "CONTINUAR ENTRENAMIENTO" });
+  assert.deepEqual(getWorkoutHeroLabels(S.IN_PROGRESS, msgEn), { badge: "IN PROGRESS", cta: "CONTINUE WORKOUT" });
+  assert.deepEqual(getWorkoutHeroLabels(S.IN_PROGRESS, msgPt), { badge: "EM ANDAMENTO", cta: "CONTINUAR TREINO" });
+});
+
+test("T01.1A-bis: COMPLETADO / estado desconocido conservan las etiquetas por defecto (comportamiento anterior del drawer)", () => {
+  const def = getWorkoutHeroLabels(S.NOT_STARTED, msgEs);
+  assert.deepEqual(getWorkoutHeroLabels(S.COMPLETED, msgEs), def);
+  assert.deepEqual(getWorkoutHeroLabels(undefined, msgEs), def);
+});
+
+// Escenario del E2E: rutina "full body" de 4 dias que COMPARTEN los 9 ejercicios, Dia 4 pendiente
+const FB_IDS = ["e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9"];
+const fbDay = () => ({ exercises: FB_IDS.map((id) => ({ id })) });
+const fbRutina = { id: "r1", name: "Cata full body", days: [fbDay(), fbDay(), fbDay(), fbDay()] };
+const fbSes = (i, fecha, at) => ({ alumno_id: "a1", rutina_id: "r1", rutina_nombre: "Cata full body", dia_idx: i,
+  semana: 1, fecha: fecha, ejercicios: FB_IDS.join(","), created_at: at });
+const fbHydrated = (n) => hydrateProgressFromRows(FB_IDS.slice(0, n).map((id, i) => ({
+  ejercicio_id: id, kg: 20, reps: 10, fecha: HOY, semana: 0, nota: "", created_at: "2026-10-02T17:0" + i + ":00Z" })));
+const fbPrev = [fbSes(0, "27/9/2026", "2026-09-27T15:00:00Z"), fbSes(1, "28/9/2026", "2026-09-28T15:00:00Z"), fbSes(2, AYER, "2026-09-30T15:00:00Z")];
+const welcomeState = (over) => getStudentWelcomeWorkoutState(Object.assign({
+  rutina: fbRutina, completedDaysInWeek: 3, weekIndex: 0, sesiones: fbPrev, progress: {}, hoy: HOY, alumnoId: "a1",
+}, over || {}));
+// lo que calcula el hero del plan (App.jsx): dia que toca = days[completedDaysInWeek]
+const heroState = (over) => {
+  const o = Object.assign({ rutina: fbRutina, completedDaysInWeek: 3, weekIndex: 0, sesiones: fbPrev, progress: {}, hoy: HOY, alumnoId: "a1" }, over || {});
+  const day = o.completedDaysInWeek < o.rutina.days.length ? o.rutina.days[o.completedDaysInWeek] : null;
+  return getStudentWorkoutState({ rutina: o.rutina, day, sesiones: o.sesiones, progress: o.progress, hoy: o.hoy,
+    weekNumber: o.weekIndex + 1, weekIndex: o.weekIndex, alumnoId: o.alumnoId });
+};
+
+test("T01.1A-bis E2E relogin: Dia 4 con 5/9 series hidratadas y sin sesion -> el drawer muestra EN CURSO / CONTINUAR ENTRENAMIENTO", () => {
+  const st = welcomeState({ progress: fbHydrated(5) });
+  assert.equal(st.state, S.IN_PROGRESS);
+  assert.equal(st.doneExercises, 5);
+  assert.deepEqual(getWorkoutHeroLabels(st.state, msgEs), { badge: "EN CURSO", cta: "CONTINUAR ENTRENAMIENTO" });
+});
+
+test("T01.1A-bis E2E relogin: sin series de hoy -> el drawer mantiene HOY TOCA / EMPEZAR", () => {
+  const st = welcomeState({ progress: {} });
+  assert.equal(st.state, S.NOT_STARTED);
+  assert.deepEqual(getWorkoutHeroLabels(st.state, msgEs), { badge: "HOY TOCA", cta: "EMPEZAR" });
+});
+
+test("T01.1A-bis: Dia 3 finalizado HOY (rutina totalmente compartida) + series hidratadas del Dia 4 posteriores -> EN CURSO", () => {
+  const sesiones = [fbPrev[0], fbPrev[1], fbSes(2, HOY, "2026-10-02T15:20:00Z")];
+  assert.equal(welcomeState({ sesiones, progress: fbHydrated(5) }).state, S.IN_PROGRESS);
+});
+
+test("T01.1A-bis: drawer y hero obtienen el MISMO estado y las MISMAS etiquetas en todos los escenarios", () => {
+  const scenarios = [
+    {},                                                                  // sin series
+    { progress: fbHydrated(1) }, { progress: fbHydrated(5) }, { progress: fbHydrated(9) },
+    { sesiones: [fbPrev[0], fbPrev[1], fbSes(2, HOY, "2026-10-02T15:20:00Z")] },
+    { sesiones: [fbPrev[0], fbPrev[1], fbSes(2, HOY, "2026-10-02T15:20:00Z")], progress: fbHydrated(5) },
+    { completedDaysInWeek: 4, sesiones: [fbPrev[0], fbPrev[1], fbPrev[2], fbSes(3, HOY, "2026-10-02T15:30:00Z")] },  // semana completa, ultimo dia hoy
+    { completedDaysInWeek: 4, sesiones: [fbPrev[0], fbPrev[1], fbPrev[2], fbSes(3, AYER, "2026-09-30T16:30:00Z")], progress: fbHydrated(5) },
+    { completedDaysInWeek: 0, sesiones: [], progress: fbHydrated(3) },
+    { completedDaysInWeek: 1, sesiones: [fbPrev[0]], progress: fbHydrated(2), alumnoId: "a2" },
+  ];
+  scenarios.forEach((sc, i) => {
+    const w = welcomeState(sc), h = heroState(sc);
+    assert.equal(w.state, h.state, "escenario " + i + " estado");
+    assert.equal(w.doneExercises, h.doneExercises, "escenario " + i + " doneExercises");
+    assert.deepEqual(getWorkoutHeroLabels(w.state, msgEs), getWorkoutHeroLabels(h.state, msgEs), "escenario " + i + " etiquetas");
+  });
+});
+
+test("T01.1A-bis: semana completa sin sesion de hoy -> el drawer no toma actividad del Dia 1 como EN CURSO (dia = ninguno, igual que el hero)", () => {
+  const sc = { completedDaysInWeek: 4, sesiones: [fbPrev[0], fbPrev[1], fbPrev[2], fbSes(3, AYER, "2026-09-30T16:30:00Z")], progress: fbHydrated(5) };
+  assert.equal(welcomeState(sc).state, S.NOT_STARTED);
+});
+
+test("T01.1A-bis: COMPLETADO hoy -> el drawer sigue con las etiquetas por defecto (sin comportamiento nuevo)", () => {
+  const sesiones = [fbPrev[0], fbPrev[1], fbPrev[2], fbSes(2, HOY, "2026-10-02T15:20:00Z")];
+  const st = welcomeState({ completedDaysInWeek: 3, sesiones });
+  assert.equal(st.state, S.COMPLETED);
+  assert.deepEqual(getWorkoutHeroLabels(st.state, msgEs), { badge: "HOY TOCA", cta: "EMPEZAR" });
+});
+
+test("T01.1A-bis cableado: hero y drawer usan getWorkoutHeroLabels/getStudentWorkoutState; ya no hay etiquetas literales duplicadas", () => {
+  const read = (rel) => readFileSync(new URL(rel, import.meta.url), "utf8");
+  const app = read("../App.jsx");
+  const modal = read("../components/WelcomeModal.jsx");
+  const host = read("../components/student/StudentWelcomeModalHost.jsx");
+  const coachHost = read("../components/CoachWelcomeModalHost.jsx");
+  assert.ok(app.includes("getWorkoutHeroLabels(workoutState, msg)"));
+  assert.ok(app.includes("hoyBadgeText={workoutHeroLabels.badge}") && app.includes("ctaLabel={workoutHeroLabels.cta}"));
+  assert.ok(app.includes("progress, sesiones,"));                       // welcomeProps
+  assert.ok(host.includes("getStudentWelcomeWorkoutState(") && host.includes("workoutState={welcomeWorkoutState}"));
+  assert.ok(coachHost.includes("progress={progress}") && coachHost.includes("sesiones={sesiones}"));
+  assert.ok(modal.includes("getWorkoutHeroLabels(workoutState || STUDENT_WORKOUT_STATE.NOT_STARTED, msg)"));
+  [app, modal, host].forEach((src) => {
+    assert.ok(!src.includes('msg("HOY TOCA"') && !src.includes('msg("EMPEZAR"') && !src.includes('msg("EN CURSO"') && !src.includes('msg("CONTINUAR ENTRENAMIENTO"'));
+  });
 });
 
 console.log(count + " tests OK");

@@ -23,6 +23,8 @@ export default function CoachWelcomeModalHost({
   onStudentOpenChange,
   onStudentExerciseVideo,
   onStudentStartWorkout,
+  progress,
+  sesiones,
   onCoachStart,
   onCoachRoutine,
   onCoachSkipRoutine,
@@ -52,6 +54,8 @@ export default function CoachWelcomeModalHost({
         onOpenChange={onStudentOpenChange}
         onExerciseVideo={onStudentExerciseVideo}
         onStartWorkout={onStudentStartWorkout}
+        progress={progress}
+        sesiones={sesiones}
       />
     );
   }

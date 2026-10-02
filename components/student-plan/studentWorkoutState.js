@@ -290,3 +290,45 @@ export function getStudentWorkoutState({ rutina, day, sesiones, progress, hoy, w
     doneExercises,
   };
 }
+
+/**
+ * Etiquetas del CTA principal segun el estado. UNA sola fuente para el hero del plan y el
+ * drawer de bienvenida (WelcomeModal), para que no puedan divergir.
+ *   EN CURSO  -> "EN CURSO" / "CONTINUAR ENTRENAMIENTO"
+ *   resto     -> "HOY TOCA" / "EMPEZAR"
+ * COMPLETADO usa las etiquetas por defecto: el hero del plan no se muestra en ese estado y el
+ * drawer conserva su comportamiento anterior (decision funcional pendiente, ver informe).
+ */
+export function getWorkoutHeroLabels(state, msg) {
+  if (state === STUDENT_WORKOUT_STATE.IN_PROGRESS) {
+    return {
+      badge: msg("EN CURSO", "IN PROGRESS", "EM ANDAMENTO"),
+      cta: msg("CONTINUAR ENTRENAMIENTO", "CONTINUE WORKOUT", "CONTINUAR TREINO"),
+    };
+  }
+  return {
+    badge: msg("HOY TOCA", "TODAY", "HOJE"),
+    cta: msg("EMPEZAR", "START", "COMEÇAR"),
+  };
+}
+
+/**
+ * Estado del dia que se ofrece en el drawer de bienvenida. Mismo criterio que el hero del plan:
+ * el dia que toca es days[completedDaysInWeek] (o ninguno si la semana esta completa) y el
+ * estado sale de getStudentWorkoutState con la misma semana (weekIndex), sesiones y progress.
+ */
+export function getStudentWelcomeWorkoutState({ rutina, completedDaysInWeek, weekIndex, sesiones, progress, hoy, alumnoId }) {
+  const days = rutina && Array.isArray(rutina.days) ? rutina.days : [];
+  const completed = Number(completedDaysInWeek) || 0;
+  const day = completed < days.length ? days[completed] : null;
+  return getStudentWorkoutState({
+    rutina: rutina,
+    day: day,
+    sesiones: sesiones,
+    progress: progress,
+    hoy: hoy,
+    weekNumber: (Number(weekIndex) || 0) + 1,
+    weekIndex: Number(weekIndex) || 0,
+    alumnoId: alumnoId,
+  });
+}
