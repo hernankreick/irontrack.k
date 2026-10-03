@@ -25,7 +25,7 @@ export function WorkoutScreen(props) {
     setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek,
     preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode,
     prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData,
-    onSesionGuardada, sessionPRList, videoOverrides, setVideoModal, toast2,
+    onSesionGuardada, sessionPRList, videoOverrides, setVideoModal, toast2, onWeekAdvanced,
   } = props;
 
   const [exitWorkoutOpen, setExitWorkoutOpen] = useState(false);
@@ -187,17 +187,10 @@ export function WorkoutScreen(props) {
           todayStr: todayStr,
           rutinaId: r && r.id,
           rutinaNombre: r && r.name,
+          // Solo datos.semana_activa (lectura fresca de `datos` + PATCH acotado); NO reescribe entrenador_id ni otras columnas.
           updateRutinaWeek: function () {
-            if (!r || !r.id || typeof sb.updateRutina !== "function") return null;
-            return sb.updateRutina(r.id, {
-              nombre: r.name || r.nombre || "Rutina",
-              alumno_id: sessionData.alumnoId,
-              entrenador_id: r.entrenador_id,
-              datos: Object.assign({}, r.datos || {}, {
-                days: r.days || (r.datos && r.datos.days) || [],
-                semana_activa: effectiveWeek + 2,
-              }),
-            });
+            if (!r || !r.id || typeof sb.updateRutinaSemanaActiva !== "function") return null;
+            return sb.updateRutinaSemanaActiva(r.id, effectiveWeek + 2);
           },
         });
 
@@ -215,8 +208,10 @@ export function WorkoutScreen(props) {
         if (hasPersistedWeek && effectiveWeek !== currentWeek) {
           setCurrentWeek(effectiveWeek);
         }
+        const weekAdvanceFailed = outcome.week.advance === "failed" || outcome.week.advance === "unverified";
         setCompletedDays(newCompleted);
-        setResumenSesion(buildSummary());
+        // Si el avance de semana fallo, el resumen lo indica de forma persistente (el toast quedaba tapado por el resumen).
+        setResumenSesion(weekAdvanceFailed ? Object.assign({}, buildSummary(), { weekAdvanceFailed: true }) : buildSummary());
         setSession(null);
         if (typeof onSesionGuardada === "function") {
           Promise.resolve().then(function () { return onSesionGuardada(); }).catch(function (e) {
@@ -226,11 +221,11 @@ export function WorkoutScreen(props) {
         if (outcome.week.advance === "ok") {
           setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+effectiveWeek)));
           setCurrentWeek(effectiveWeek + 1);
+          if (r && r.id && typeof onWeekAdvanced === "function") onWeekAdvanced(r.id, effectiveWeek + 2);
           try { localStorage.setItem("it_last_week_advance_date", todayStr); } catch (e) {}
-        } else if (outcome.week.advance === "failed" || outcome.week.advance === "unverified") {
+        } else if (weekAdvanceFailed) {
           // La sesion YA esta guardada y sigue COMPLETADA; solo falto el avance de semana.
           console.error("[advance active week] no confirmado:", outcome.week.advance);
-          if (typeof toast2 === "function") toast2(es ? "Sesión guardada ✓ · Error al avanzar de semana" : "Workout saved ✓ · Error advancing week");
         }
       } catch (e) {
         console.error("[finalizarSesion]", e);

@@ -135,6 +135,7 @@ import {
   resolveEntrenadorId,
 } from './lib/routineStore.js';
 import { getActiveStudentRoutinePosition } from './lib/studentWeeklyProgress.js';
+import { updateRutinaSemanaActiva as updateRutinaSemanaActivaLib } from './lib/updateRutinaSemanaActiva.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import {
   prepareExerciseHistoryModalData,
@@ -308,6 +309,7 @@ const sb = {
     if (error) { console.error("[rutinas UPDATE ERROR]", error); return null; }
     return updated || [];
   },
+  updateRutinaSemanaActiva: (rutinaId, nextWeek) => updateRutinaSemanaActivaLib(supabase, rutinaId, nextWeek),
   deleteRutina: async function (id) {
     const { error } = await supabase.from("rutinas").delete().eq("id", id);
     if (error) throw error;
@@ -4405,6 +4407,15 @@ function GymApp() {
           videoOverrides={videoOverrides}
           setVideoModal={setVideoModal}
           toast2={toast2}
+          onWeekAdvanced={function (rutinaId, nextWeek) {
+            setRoutines(function (prev) {
+              return (prev || []).map(function (r0) {
+                return String(r0 && r0.id) === String(rutinaId)
+                  ? Object.assign({}, r0, { datos: Object.assign({}, r0.datos || {}, { semana_activa: nextWeek }) })
+                  : r0;
+              });
+            });
+          }}
           onSesionGuardada={async function () {
             if (sessionData?.alumnoId) {
               var fresh = await sb.getSesiones(sessionData.alumnoId);
