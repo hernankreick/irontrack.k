@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function AlumnoPlanHeaderDayLabel({ alumnoPlanHeaderDayNum, textMuted, msg }) {
+export default function AlumnoPlanHeaderDayLabel({ alumnoPlanHeaderDayNum, textMuted, msg, isNextWorkout }) {
   return (
     <p
       style={{
@@ -17,7 +17,7 @@ export default function AlumnoPlanHeaderDayLabel({ alumnoPlanHeaderDayNum, textM
         letterSpacing: 0.8,
         textTransform: "uppercase",
       }}>
-        {msg("Hoy toca", "Today", "Hoje")}
+        {isNextWorkout ? msg("Próximo", "Next", "Próximo") : msg("Hoy toca", "Today", "Hoje")}
       </span>
       <span style={{
         display: "block",

@@ -3495,6 +3495,7 @@ function GymApp() {
         onOpenMobileDrawer={() => setMobileDrawerOpen(true)}
         showPlanHeaderLabel={esAlumno && tab === "plan" && alumnoPlanHeaderDayNum != null}
         alumnoPlanHeaderDayNum={alumnoPlanHeaderDayNum}
+        alumnoPlanHeaderIsNext={weekGate.active}
         textMuted={textMuted}
         session={session}
         sessionActiveStyle={{...tag("#22C55E"),fontSize:13}}
@@ -3750,6 +3751,7 @@ function GymApp() {
                     totalDays={totalDays}
                     weeklyPct={weeklyPct}
                     nextDayIdx={nextDayIdx}
+                    isNextWorkout={weekGate.active}
                   />
 
                   {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
