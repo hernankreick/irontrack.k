@@ -23,6 +23,7 @@ export default function StudentWelcomeModalHost({
   onStartWorkout,
   progress,
   sesiones,
+  weekGate,
 }) {
   const welcomeRoutine = routines[0];
   const welcomeTotalDays = welcomeRoutine?.days?.length || 0;
@@ -77,6 +78,7 @@ export default function StudentWelcomeModalHost({
       videoOverrides={videoOverrides}
       onExerciseVideo={onExerciseVideo}
       workoutState={welcomeWorkoutState}
+      weekGate={weekGate}
       onStartWorkout={function () {
         onStartWorkout({
           routine: welcomeRoutine,

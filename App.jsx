@@ -86,6 +86,8 @@ import GraficoProgreso from './components/student-progress/GraficoProgreso.jsx';
 import { CurrentWorkoutHero } from './components/student-plan/CurrentWorkoutHero.jsx';
 import { WeeklyPlanDayCard } from './components/student-plan/WeeklyPlanDayCard.jsx';
 import CompletedTodayBanner from './components/student-plan/CompletedTodayBanner.jsx';
+import WeekCompletedBanner from './components/student-plan/WeekCompletedBanner.jsx';
+import { getWeekGateTexts } from './components/student-plan/weekGateTexts.js';
 import StudentNoRoutinesEmptyState from './components/student-plan/StudentNoRoutinesEmptyState.jsx';
 import RoutinePdfDownloadButton from './components/student-plan/RoutinePdfDownloadButton.jsx';
 import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyProgressCard.jsx';
@@ -103,7 +105,7 @@ import {
   countExercisesWithLogToday,
   buildStudentDayPresentation,
 } from './components/student-plan/studentPlanHelpers.js';
-import { getStudentWorkoutState, getWorkoutHeroLabels, STUDENT_WORKOUT_STATE, updateProgressEntryWithSessionContext } from './components/student-plan/studentWorkoutState.js';
+import { getStudentWorkoutState, getWeekCompletionGate, getWorkoutHeroLabels, STUDENT_WORKOUT_STATE, updateProgressEntryWithSessionContext } from './components/student-plan/studentWorkoutState.js';
 import LoginModalHost from './components/LoginModalHost.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
@@ -2072,6 +2074,23 @@ function GymApp() {
     currentAlumnoId: sessionData?.alumnoId
   });
   const studentCurrentWeek = esAlumno ? activeStudentRoutinePosition.currentWeek : currentWeek;
+  // Gate "SEMANA COMPLETADA": semana del programa completa y la siguiente aun no disponible (misma semana calendario).
+  // Derivado de `sesiones` + fecha actual en CADA render (el lunes pasa solo a inactivo); no usa it_cd ni escribe en la DB.
+  const weekGate = esAlumno && routines[0]
+    ? getWeekCompletionGate({
+        rutina: routines[0],
+        sesiones: sesiones,
+        alumnoId: sessionData?.alumnoId,
+        weekNumber: activeStudentRoutinePosition.weekNumber,
+        now: Date.now(),
+      })
+    : getWeekCompletionGate({});
+  // Defensa central: TODO inicio de entrenamiento del alumno pasa por aqui; con el gate activo no se ejecuta setSession.
+  const startStudentWorkout = function (nextSession) {
+    if (weekGate.active) return false;
+    setSession(nextSession);
+    return true;
+  };
   const alumnoPlanHeaderDayNum = useMemo(
     function () {
       if (!esAlumno || tab !== "plan" || !routines[0]) return null;
@@ -3734,7 +3753,7 @@ function GymApp() {
                   />
 
                   {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
-                  {planScrollDiag.hoyCard&&todayDay&&!workoutCompletedToday&&!session&&!showWelcome&&(
+                  {planScrollDiag.hoyCard&&todayDay&&!workoutCompletedToday&&!weekGate.active&&!session&&!showWelcome&&(
                     <>
                     <CurrentWorkoutHero
                       msg={msg}
@@ -3756,14 +3775,17 @@ function GymApp() {
                         });
                         setPreSessionPRs({ ...snap });
                         setSessionPRList([]);
-                        setSession({ rId: r0.id, dIdx: nextDayIdx, exIdx: 0, startTime: Date.now() });
+                        startStudentWorkout({ rId: r0.id, dIdx: nextDayIdx, exIdx: 0, startTime: Date.now() });
                       }}
                     />
                     </>
                   )}
 
                   {/* DÍA YA ENTRENADO */}
-                  {planScrollDiag.completedTodayBanner&&workoutCompletedToday&&!session&&(
+                  {planScrollDiag.completedTodayBanner&&weekGate.active&&!session&&(
+                    <WeekCompletedBanner msg={msg} textMuted={textMuted} gate={weekGate} />
+                  )}
+                  {planScrollDiag.completedTodayBanner&&workoutCompletedToday&&!weekGate.active&&!session&&(
                     <CompletedTodayBanner msg={msg} textMuted={textMuted} />
                   )}
                   </div>
@@ -3772,15 +3794,15 @@ function GymApp() {
                     textMain={textMain}
                     ALUMNO_HEADER_MINI_PX={ALUMNO_HEADER_MINI_PX}
                     firstName={sessionData?.name?.split(" ")[0]||"Atleta"}
-                    showTrainButton={todayDay&&!workoutCompletedToday&&!session}
+                    showTrainButton={todayDay&&!workoutCompletedToday&&!weekGate.active&&!session}
                     trainLabel={workoutInProgress ? msg("Continuar", "Continue", "Continuar") : null}
                     onTrainToday={()=>{
                       const snap={};
                       [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                       setPreSessionPRs({...snap});
-                      setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
+                      setSessionPRList([]);startStudentWorkout({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                     }}
-                    showCompletedToday={workoutCompletedToday}
+                    showCompletedToday={workoutCompletedToday||weekGate.active}
                     headerRef={function (el) {
                       studentHeaderMiniRef.current = el;
                       if (el) applyAlumnoHeaderLayerStyles(headerCollapsedRef.current);
@@ -3856,6 +3878,7 @@ function GymApp() {
                     });
                     const localNextDayIdx=daysCompletedR < r.days.length ? daysCompletedR : null;
                     const isNextDay=di===localNextDayIdx;
+                    const weekGateBlocksDay=weekGate.active&&String(r.id)===String(routines[0]?.id)&&isNextDay;
                     const isFuture=localNextDayIdx!==null&&di>localNextDayIdx;
                     const totalEj=((d.warmup||[]).length+(d.exercises||[]).length);
                     const isOpen=expandedPlanDay===r.id+"-"+di;
@@ -3881,7 +3904,7 @@ function GymApp() {
                         titleNode={msg("Día", "Day", "Dia") + " " + (di + 1)}
                         metaLine={metaLine}
                         rightProgress={rightProgress}
-                        hoyBadgeText={isNextDay&&!isDayDone?msg("HOY", "TODAY", "HOJE"):null}
+                        hoyBadgeText={isNextDay&&!isDayDone&&!weekGateBlocksDay?msg("HOY", "TODAY", "HOJE"):null}
                         doneLabel={null}
                         nextLabel={null}
                         textMain={textMain}
@@ -3922,12 +3945,17 @@ function GymApp() {
                                 ✅ {msg("Día completado esta semana", "Day completed this week")}
                               </div>
                             )}
-                            {isNextDay&&!isDayDone&&(
+                            {weekGateBlocksDay&&!isDayDone&&(
+                              <div style={{textAlign:"center",padding:"8px",color:textMuted,fontSize:12,fontWeight:700,background:bgSub,borderRadius:8,marginTop:4}}>
+                                <Ic name="lock" size={13}/> {getWeekGateTexts(weekGate,msg).available}
+                              </div>
+                            )}
+                            {isNextDay&&!isDayDone&&!weekGateBlocksDay&&(
                               <button className="hov" style={{width:"100%",marginTop:4,padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:10,fontSize:15,fontWeight:900,letterSpacing:1,cursor:"pointer",fontFamily:"inherit"}} onClick={function(){
                                 var snap={};
                                 [].concat(d.warmup||[],d.exercises||[]).forEach(function(ex){snap[ex.id]=progress[ex.id]?.max||0});
                                 setPreSessionPRs(snap);
-                                setSessionPRList([]);setSession({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
+                                setSessionPRList([]);startStudentWorkout({rId:r.id,dIdx:di,exIdx:0,startTime:Date.now()});
                               }}>{msg("INICIAR ENTRENAMIENTO", "START WORKOUT")}</button>
                             )}
                             {isFuture&&(
@@ -4024,7 +4052,7 @@ function GymApp() {
         welcomeProps={{
           open: showWelcome, sessionData, routines, alumnos, onboardStep,
           studentCurrentWeek, activeStudentRoutinePosition, allEx, es,
-          progress, sesiones,
+          progress, sesiones, weekGate,
           bgCard, border, textMain, textMuted, msg,
           images: IMGS,
           videoOverrides,
@@ -4035,7 +4063,7 @@ function GymApp() {
             else window.open(vUrl, "_blank");
           },
           onStudentStartWorkout: function ({ routine, day, dayIndex }) {
-            if (!routine || !day) {
+            if (!routine || !day || weekGate.active) {
               setShowWelcome(false);
               return;
             }
@@ -4046,7 +4074,7 @@ function GymApp() {
             setPreSessionPRs({ ...snap });
             setSessionPRList([]);
             setShowWelcome(false);
-            setSession({ rId: routine.id, dIdx: dayIndex, exIdx: 0, startTime: Date.now() });
+            startStudentWorkout({ rId: routine.id, dIdx: dayIndex, exIdx: 0, startTime: Date.now() });
           },
           onCoachStart: function () { setOnboardStep(1); },
           onCoachRoutine: function (routinesReady) { if (!routinesReady) { setShowWelcome(false); setOnboardStep(1); setTab("routines"); } else setOnboardStep(2); },
