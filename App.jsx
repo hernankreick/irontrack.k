@@ -103,6 +103,7 @@ import {
   countExercisesWithLogToday,
   buildStudentDayPresentation,
 } from './components/student-plan/studentPlanHelpers.js';
+import { getStudentWorkoutState, getWorkoutHeroLabels, STUDENT_WORKOUT_STATE, updateProgressEntryWithSessionContext } from './components/student-plan/studentWorkoutState.js';
 import LoginModalHost from './components/LoginModalHost.jsx';
 import VideoModal from './components/ui/VideoModal.jsx';
 import PRCelebrationOverlay from './components/ui/PRCelebrationOverlay.jsx';
@@ -147,7 +148,6 @@ import {
   hydrateProgressFromRows,
   mergeProgressEntries,
   updateExerciseKgInRoutines,
-  updateExerciseProgressRecord,
 } from './lib/workoutSession.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
@@ -1870,7 +1870,10 @@ function GymApp() {
     const weekForSet = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : effectiveCurrentWeek;
     const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe);
     setProgress(prev=>{
-      const ex = updateExerciseProgressRecord(prev[exId], newSet);
+      // Igual que updateExerciseProgressRecord, marcando el set con el contexto LOCAL del entrenamiento
+      // abierto (session_rutina_id / session_dia_idx). No se envia a Supabase: el payload remoto se arma
+      // aparte con buildProgressPayload.
+      const ex = updateProgressEntryWithSessionContext(prev[exId], newSet, session);
       return {...prev,[exId]:ex};
     });
     // Guardar en Supabase — si offline, guardar en cola local
@@ -3608,7 +3611,21 @@ function GymApp() {
                 todayDay: todayDay?.dia || todayDay,
                 esAlumno
               });
-              const yaEntrenoHoy = Object.values(progress||{}).some(pg=>(pg.sets||[]).some(s=>s.date===hoy&&(s.week===undefined||s.week===currentWeekForStudent)));
+              // Estado del entrenamiento de hoy: COMPLETADO sale de `sesiones` (finalizado), EN CURSO de las
+              // series de hoy en los ejercicios del dia que toca. Una serie suelta NO es "completado".
+              const workoutState = getStudentWorkoutState({
+                rutina: r0,
+                day: todayDay,
+                sesiones: sesiones,
+                progress: progress,
+                hoy: hoy,
+                weekNumber: currentWeekForStudent + 1,
+                weekIndex: currentWeekForStudent,
+                alumnoId: sessionData?.alumnoId,
+              }).state;
+              const workoutCompletedToday = workoutState === STUDENT_WORKOUT_STATE.COMPLETED;
+              const workoutInProgress = workoutState === STUDENT_WORKOUT_STATE.IN_PROGRESS;
+              const workoutHeroLabels = getWorkoutHeroLabels(workoutState, msg);
               const todayDayPresentation = buildStudentDayPresentation({
                 day: todayDay,
                 dayIndex: nextDayIdx,
@@ -3715,13 +3732,13 @@ function GymApp() {
                   />
 
                   {/* Entrenamiento de hoy — hero (layout premium; mismos handlers que antes) */}
-                  {planScrollDiag.hoyCard&&todayDay&&!yaEntrenoHoy&&!session&&!showWelcome&&(
+                  {planScrollDiag.hoyCard&&todayDay&&!workoutCompletedToday&&!session&&!showWelcome&&(
                     <>
                     <CurrentWorkoutHero
                       msg={msg}
                       textMain={textMain}
                       textMuted={textMuted}
-                      hoyBadgeText={msg("HOY TOCA", "TODAY", "HOJE")}
+                      hoyBadgeText={workoutHeroLabels.badge}
                       semDiaLine={
                         msg("Semana", "Week", "Semana") + " " + (currentWeekForStudent + 1) + " · " + msg("Día", "Day", "Dia") + " " + (nextDayIdx + 1)
                       }
@@ -3729,7 +3746,7 @@ function GymApp() {
                       typeBadgeText={todayTypeBadge}
                       exerciseCount={totalEjHero}
                       durationMinutes={estimateDayMinutes(todayDay, currentWeekForStudent)}
-                      ctaLabel={msg("EMPEZAR", "START", "COMEÇAR")}
+                      ctaLabel={workoutHeroLabels.cta}
                       onStart={function () {
                         const snap = {};
                         [...(todayDay.warmup || []), ...(todayDay.exercises || [])].forEach(function (ex) {
@@ -3744,7 +3761,7 @@ function GymApp() {
                   )}
 
                   {/* DÍA YA ENTRENADO */}
-                  {planScrollDiag.completedTodayBanner&&yaEntrenoHoy&&!session&&(
+                  {planScrollDiag.completedTodayBanner&&workoutCompletedToday&&!session&&(
                     <CompletedTodayBanner msg={msg} textMuted={textMuted} />
                   )}
                   </div>
@@ -3753,14 +3770,15 @@ function GymApp() {
                     textMain={textMain}
                     ALUMNO_HEADER_MINI_PX={ALUMNO_HEADER_MINI_PX}
                     firstName={sessionData?.name?.split(" ")[0]||"Atleta"}
-                    showTrainButton={todayDay&&!yaEntrenoHoy&&!session}
+                    showTrainButton={todayDay&&!workoutCompletedToday&&!session}
+                    trainLabel={workoutInProgress ? msg("Continuar", "Continue", "Continuar") : null}
                     onTrainToday={()=>{
                       const snap={};
                       [...(todayDay.warmup||[]),...(todayDay.exercises||[])].forEach(ex=>{snap[ex.id]=progress[ex.id]?.max||0;});
                       setPreSessionPRs({...snap});
                       setSessionPRList([]);setSession({rId:r0.id,dIdx:nextDayIdx,exIdx:0,startTime:Date.now()});
                     }}
-                    showCompletedToday={yaEntrenoHoy}
+                    showCompletedToday={workoutCompletedToday}
                     headerRef={function (el) {
                       studentHeaderMiniRef.current = el;
                       if (el) applyAlumnoHeaderLayerStyles(headerCollapsedRef.current);
@@ -4004,6 +4022,7 @@ function GymApp() {
         welcomeProps={{
           open: showWelcome, sessionData, routines, alumnos, onboardStep,
           studentCurrentWeek, activeStudentRoutinePosition, allEx, es,
+          progress, sesiones,
           bgCard, border, textMain, textMuted, msg,
           images: IMGS,
           videoOverrides,

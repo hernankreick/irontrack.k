@@ -6,6 +6,7 @@ export default function StudentPlanMiniHeader({
   ALUMNO_HEADER_MINI_PX,
   firstName,
   showTrainButton,
+  trainLabel,
   onTrainToday,
   showCompletedToday,
   headerRef,
@@ -44,7 +45,7 @@ export default function StudentPlanMiniHeader({
               borderRadius:8,padding:"8px 14px",fontSize:13,
               fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
             onClick={onTrainToday}>
-            ⚡ {msg("Entrenar", "Train")}
+            ⚡ {trainLabel || msg("Entrenar", "Train")}
           </button>
         )}
         {showCompletedToday&&<span style={{fontSize:13,color:"#22C55E",fontWeight:600}}>✅ {msg("Listo hoy", "Done today")}</span>}

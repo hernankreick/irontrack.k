@@ -1,6 +1,7 @@
 import React from 'react';
 import { WelcomeModal } from '../WelcomeModal.jsx';
 import { estimateDayMinutes } from '../student-plan/studentPlanHelpers.js';
+import { getStudentWelcomeWorkoutState } from '../student-plan/studentWorkoutState.js';
 import { buildStudentWorkoutLabelTexts, inferStudentWorkoutLabels } from '../student-plan/studentWorkoutLabels.js';
 
 export default function StudentWelcomeModalHost({
@@ -20,6 +21,8 @@ export default function StudentWelcomeModalHost({
   onOpenChange,
   onExerciseVideo,
   onStartWorkout,
+  progress,
+  sesiones,
 }) {
   const welcomeRoutine = routines[0];
   const welcomeTotalDays = welcomeRoutine?.days?.length || 0;
@@ -33,6 +36,16 @@ export default function StudentWelcomeModalHost({
         return allEx.find(function (info) { return info.id === ex.id; }) || ex;
       }).filter(Boolean)
     : [];
+  // Estado del dia que se ofrece (misma fuente de verdad que el hero del plan).
+  const welcomeWorkoutState = getStudentWelcomeWorkoutState({
+    rutina: welcomeRoutine,
+    completedDaysInWeek: welcomeCompletedDays,
+    weekIndex: welcomeCurrentWeek,
+    sesiones: sesiones,
+    progress: progress,
+    hoy: new Date().toLocaleDateString('es-AR'),
+    alumnoId: sessionData?.alumnoId,
+  }).state;
   const welcomeWorkoutLabels = inferStudentWorkoutLabels({
     day: welcomeDay,
     exerciseInfos: welcomeExerciseInfos,
@@ -63,6 +76,7 @@ export default function StudentWelcomeModalHost({
       images={images}
       videoOverrides={videoOverrides}
       onExerciseVideo={onExerciseVideo}
+      workoutState={welcomeWorkoutState}
       onStartWorkout={function () {
         onStartWorkout({
           routine: welcomeRoutine,

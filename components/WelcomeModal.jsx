@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { createPortal } from "react-dom";
 import { CurrentWorkoutHero } from "./student-plan/CurrentWorkoutHero.jsx";
+import { getWorkoutHeroLabels, STUDENT_WORKOUT_STATE } from "./student-plan/studentWorkoutState.js";
 
 /**
  * Drawer de bienvenida del modo alumno.
@@ -24,6 +25,7 @@ export function WelcomeModal({
   exerciseCount,
   durationMinutes,
   onStartWorkout,
+  workoutState,
 }) {
   // Must be before the early return to comply with Rules of Hooks.
   // Grace period: ignore overlay clicks for 350ms after mount to prevent
@@ -33,7 +35,9 @@ export function WelcomeModal({
   if (!open) { mountedAt.current = 0; return null; }
   if (typeof document === "undefined") return null;
 
-  const startLabel = msg ? msg("EMPEZAR", "START", "COMEÇAR") : es ? "EMPEZAR" : "START";
+  // Etiquetas segun el estado del dia (misma fuente que el hero del plan). Sin estado -> SIN INICIAR.
+  const heroLabels = msg ? getWorkoutHeroLabels(workoutState || STUDENT_WORKOUT_STATE.NOT_STARTED, msg) : null;
+  const startLabel = heroLabels ? heroLabels.cta : es ? "EMPEZAR" : "START";
   const weekDayLine = msg
     ? msg("Semana", "Week", "Semana") + " " + (currentWeek + 1) + " · " + msg("Día", "Day", "Dia") + " " + (dayIndex + 1)
     : "Semana " + (currentWeek + 1) + " · Día " + (dayIndex + 1);
@@ -80,7 +84,7 @@ export function WelcomeModal({
                 msg={msg}
                 textMain={textMain}
                 textMuted={textMuted}
-                hoyBadgeText={msg("HOY TOCA", "TODAY", "HOJE")}
+                hoyBadgeText={heroLabels ? heroLabels.badge : "HOY TOCA"}
                 semDiaLine={weekDayLine}
                 dayTitle={dayTitle}
                 typeBadgeText={typeBadgeText}
@@ -94,7 +98,7 @@ export function WelcomeModal({
                 msg={msg}
                 textMain={textMain}
                 textMuted={textMuted}
-                hoyBadgeText={msg("HOY TOCA", "TODAY", "HOJE")}
+                hoyBadgeText={heroLabels ? heroLabels.badge : "HOY TOCA"}
                 semDiaLine={weekDayLine}
                 dayTitle={msg("Día", "Day", "Dia") + " " + (dayIndex + 1)}
                 typeBadgeText={msg("Entrenamiento", "Workout", "Treino")}
