@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { WorkoutExercisePanel } from './WorkoutExercisePanel.jsx';
 import { resolveExerciseTitle } from '../lib/exerciseResolve.js';
 import WorkoutExitConfirmModal from './workout/WorkoutExitConfirmModal.jsx';
@@ -17,6 +17,7 @@ import {
   removeUndefinedPayloadFields,
   sessionAlreadyExists,
 } from '../lib/workoutSession.js';
+import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
 
 export function WorkoutScreen(props) {
   const {
@@ -24,10 +25,15 @@ export function WorkoutScreen(props) {
     setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek,
     preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode,
     prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData,
-    onSesionGuardada, sessionPRList, videoOverrides, setVideoModal,
+    onSesionGuardada, sessionPRList, videoOverrides, setVideoModal, toast2,
   } = props;
 
   const [exitWorkoutOpen, setExitWorkoutOpen] = useState(false);
+  // T01.2: guard de finalizacion en curso (ref = bloqueo inmediato; state = UI).
+  const finalizeGuardRef = useRef(null);
+  if (!finalizeGuardRef.current) finalizeGuardRef.current = createFinalizeGuard();
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizeError, setFinalizeError] = useState("");
   const [lastScrollY, setLastScrollY] = useState(0);
   const [showHeader, setShowHeader] = useState(true);
   const [isCompact, setIsCompact] = useState(false);
@@ -117,8 +123,12 @@ export function WorkoutScreen(props) {
     });
   };
 
-  // ── Finalizar (sin cambios de lógica) ─────────────────────────────
+  // ── Finalizar ─────────────────────────────────────────────────────
+  // Alumno logueado (T01.2): se persiste y CONFIRMA la sesion en `sesiones` ANTES de completar,
+  // mostrar el resumen, cerrar o avanzar de semana. Si no se confirma, el entrenamiento sigue abierto.
+  // Otros flujos (readOnly/compartido y entrenador): comportamiento previo.
   const finalizarSesion = async () => {
+    if (finalizeGuardRef.current.isBusy()) return;
     const r = activeR;
     // La semana local (currentWeek) puede quedar desincronizada de la semana real de la
     // rutina (r.datos.semana_activa, la que persiste en el server) — por ejemplo si el
@@ -128,18 +138,13 @@ export function WorkoutScreen(props) {
     const persistedWeekNum = Number(r && r.datos && r.datos.semana_activa);
     const hasPersistedWeek = Number.isFinite(persistedWeekNum) && persistedWeekNum >= 1 && persistedWeekNum <= 4;
     const effectiveWeek = hasPersistedWeek ? (persistedWeekNum - 1) : currentWeek;
-    if (hasPersistedWeek && effectiveWeek !== currentWeek) {
-      setCurrentWeek(effectiveWeek);
-    }
     const dayKey = buildCompletedDayKey(session, effectiveWeek);
     const newCompleted = mergeCompletedDay(completedDays, dayKey);
     const totalDays = r ? r.days.length : 1;
-    const daysThisWeek = countCompletedDaysForWeek(newCompleted, session.rId, effectiveWeek);
-    setCompletedDays(newCompleted);
     const semanaParaGuardar = effectiveWeek + 1;
     const hoyFin = new Date().toLocaleDateString("es-AR");
     const horaFin = new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
-    setResumenSesion(buildWorkoutSummary({
+    const buildSummary = () => buildWorkoutSummary({
       session: session,
       activeDay: activeDay,
       activeRoutine: r,
@@ -148,36 +153,20 @@ export function WorkoutScreen(props) {
       date: hoyFin,
       now: Date.now(),
       weekToSave: semanaParaGuardar,
-    }));
-    setSession(null);
-    if (readOnly && sharedParam) {
-      try {
-        const rutData = JSON.parse(atob(sharedParam));
-        if (rutData.alumnoId) {
-          const existentes = await sb.getSesiones(rutData.alumnoId);
-          const yaExiste = sessionAlreadyExists(existentes, hoyFin, session.dIdx, semanaParaGuardar);
-          if (!yaExiste) {
-            sb.addSesion(removeUndefinedPayloadFields(buildSessionPayload({
-              alumnoId: rutData.alumnoId,
-              session: session,
-              activeDay: activeDay,
-              activeRoutine: r,
-              exercises: exercises,
-              weekToSave: semanaParaGuardar,
-              date: hoyFin,
-              time: horaFin,
-              includeRoutineId: false,
-            })));
-          }
-        }
-      } catch(e) {}
-    }
+    });
+
     if (!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
+      if (!finalizeGuardRef.current.acquire()) return;
+      setFinalizing(true);
+      setFinalizeError("");
       try {
-        const existentes = await sb.getSesiones(sessionData.alumnoId);
-        const yaExiste = sessionAlreadyExists(existentes, hoyFin, session.dIdx, semanaParaGuardar);
-        if (!yaExiste) {
-          await sb.addSesion(removeUndefinedPayloadFields(buildSessionPayload({
+        const todayStr = new Date().toDateString();
+        let lastAdvanceDate = null;
+        try { lastAdvanceDate = localStorage.getItem("it_last_week_advance_date"); } catch (e) {}
+        const outcome = await finalizeStudentSession({
+          sb: sb,
+          alumnoId: sessionData.alumnoId,
+          payload: removeUndefinedPayloadFields(buildSessionPayload({
             alumnoId: sessionData.alumnoId,
             session: session,
             activeDay: activeDay,
@@ -187,29 +176,106 @@ export function WorkoutScreen(props) {
             date: hoyFin,
             time: horaFin,
             includeRoutineId: true,
-          })));
-          if (typeof onSesionGuardada === "function") onSesionGuardada();
+          })),
+          date: hoyFin,
+          dayIndex: session.dIdx,
+          weekToSave: semanaParaGuardar,
+          isOnline: typeof navigator === "undefined" ? true : navigator.onLine !== false,
+          effectiveWeek: effectiveWeek,
+          totalDays: totalDays,
+          lastAdvanceDate: lastAdvanceDate,
+          todayStr: todayStr,
+          rutinaId: r && r.id,
+          rutinaNombre: r && r.name,
+          updateRutinaWeek: function () {
+            if (!r || !r.id || typeof sb.updateRutina !== "function") return null;
+            return sb.updateRutina(r.id, {
+              nombre: r.name || r.nombre || "Rutina",
+              alumno_id: sessionData.alumnoId,
+              entrenador_id: r.entrenador_id,
+              datos: Object.assign({}, r.datos || {}, {
+                days: r.days || (r.datos && r.datos.days) || [],
+                semana_activa: effectiveWeek + 2,
+              }),
+            });
+          },
+        });
+
+        if (outcome.status !== "saved") {
+          const offline = outcome.reason === FINALIZE_FAILURE.OFFLINE;
+          const text = offline
+            ? (es ? "Necesitás conexión para finalizar. Tu entrenamiento sigue abierto. Intentá nuevamente cuando vuelva la conexión." : "You need a connection to finish. Your workout is still open. Try again when you are back online.")
+            : (es ? "No pudimos guardar la finalización. Tu entrenamiento sigue abierto. Intentá nuevamente." : "We could not save your workout. It is still open. Please try again.");
+          setFinalizeError(text);
+          if (typeof toast2 === "function") toast2(es ? "Error al guardar la sesión" : "Error saving workout");
+          return;
         }
-      } catch(e) { console.error("[addSesion]", e); }
+
+        // Persistencia confirmada: recién ahora se aplican los efectos de "terminado".
+        if (hasPersistedWeek && effectiveWeek !== currentWeek) {
+          setCurrentWeek(effectiveWeek);
+        }
+        setCompletedDays(newCompleted);
+        setResumenSesion(buildSummary());
+        setSession(null);
+        if (typeof onSesionGuardada === "function") {
+          Promise.resolve().then(function () { return onSesionGuardada(); }).catch(function (e) {
+            console.error("[onSesionGuardada]", e);
+          });
+        }
+        if (outcome.week.advance === "ok") {
+          setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+effectiveWeek)));
+          setCurrentWeek(effectiveWeek + 1);
+          try { localStorage.setItem("it_last_week_advance_date", todayStr); } catch (e) {}
+        } else if (outcome.week.advance === "failed" || outcome.week.advance === "unverified") {
+          // La sesion YA esta guardada y sigue COMPLETADA; solo falto el avance de semana.
+          console.error("[advance active week] no confirmado:", outcome.week.advance);
+          if (typeof toast2 === "function") toast2(es ? "Sesión guardada ✓ · Error al avanzar de semana" : "Workout saved ✓ · Error advancing week");
+        }
+      } catch (e) {
+        console.error("[finalizarSesion]", e);
+        setFinalizeError(es ? "No pudimos guardar la finalización. Tu entrenamiento sigue abierto. Intentá nuevamente." : "We could not save your workout. It is still open. Please try again.");
+      } finally {
+        finalizeGuardRef.current.release();
+        setFinalizing(false);
+      }
+      return;
+    }
+
+    // ── Flujo previo (readOnly/compartido y entrenador) ──
+    if (hasPersistedWeek && effectiveWeek !== currentWeek) {
+      setCurrentWeek(effectiveWeek);
+    }
+    const daysThisWeek = countCompletedDaysForWeek(newCompleted, session.rId, effectiveWeek);
+    setCompletedDays(newCompleted);
+    setResumenSesion(buildSummary());
+    setSession(null);
+    if (readOnly && sharedParam) {
+      try {
+        const rutData = JSON.parse(atob(sharedParam));
+        if (rutData.alumnoId) {
+          const existentes = await sb.getSesiones(rutData.alumnoId);
+          const yaExiste = sessionAlreadyExists(existentes, hoyFin, session.dIdx, semanaParaGuardar);
+          if (!yaExiste) {
+            // .catch: evita un rechazo no manejado (sigue siendo fire-and-forget, sin cambios de flujo).
+            Promise.resolve(sb.addSesion(removeUndefinedPayloadFields(buildSessionPayload({
+              alumnoId: rutData.alumnoId,
+              session: session,
+              activeDay: activeDay,
+              activeRoutine: r,
+              exercises: exercises,
+              weekToSave: semanaParaGuardar,
+              date: hoyFin,
+              time: horaFin,
+              includeRoutineId: false,
+            })))).catch(function (e) { console.error("[addSesion shared]", e); });
+          }
+        }
+      } catch(e) {}
     }
     const lastAdvance = localStorage.getItem("it_last_week_advance_date");
     const todayStr = new Date().toDateString();
     if (daysThisWeek >= totalDays && effectiveWeek < 3 && lastAdvance !== todayStr) {
-      if (!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId && r?.id && typeof sb.updateRutina === "function") {
-        try {
-          await sb.updateRutina(r.id, {
-            nombre: r.name || r.nombre || "Rutina",
-            alumno_id: sessionData.alumnoId,
-            entrenador_id: r.entrenador_id,
-            datos: Object.assign({}, r.datos || {}, {
-              days: r.days || (r.datos && r.datos.days) || [],
-              semana_activa: effectiveWeek + 2,
-            }),
-          });
-        } catch (e) {
-          console.error("[advance active week]", e);
-        }
-      }
       setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+effectiveWeek)));
       setCurrentWeek(effectiveWeek + 1);
       localStorage.setItem("it_last_week_advance_date", todayStr);
@@ -327,6 +393,8 @@ export function WorkoutScreen(props) {
             es={es}
             blue={blue}
             onFinish={finalizarSesion}
+            saving={finalizing}
+            errorMessage={finalizeError}
           />
         )}
       </div>

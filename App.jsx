@@ -4404,6 +4404,7 @@ function GymApp() {
           sessionPRList={sessionPRList}
           videoOverrides={videoOverrides}
           setVideoModal={setVideoModal}
+          toast2={toast2}
           onSesionGuardada={async function () {
             if (sessionData?.alumnoId) {
               var fresh = await sb.getSesiones(sessionData.alumnoId);
