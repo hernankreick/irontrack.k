@@ -41,6 +41,12 @@ export default function WorkoutSessionSummary({
         videoOverrides={videoOverrides}
       />
 
+      {resumenSesion.weekAdvanceFailed ? (
+        <div role="status" style={{marginTop:14,padding:"10px 12px",borderRadius:12,border:"1px solid rgba(245,158,11,0.35)",background:"rgba(245,158,11,0.10)",color:"#F59E0B",fontSize:13,fontWeight:650,lineHeight:1.4}}>
+          {msg("Sesión guardada. No se pudo avanzar de semana.", "Workout saved. Could not advance to the next week.")}
+        </div>
+      ) : null}
+
       <div style={{display:"flex",flexDirection:"column",gap:10,marginTop:18}}>
         <button className="hov" style={{
           width:"100%",minHeight:50,padding:"13px 16px",borderRadius:16,border:"1px solid rgba(37,99,235,0.35)",cursor:"pointer",

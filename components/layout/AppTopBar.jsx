@@ -27,6 +27,7 @@ const AppTopBar = forwardRef(function AppTopBar({
   onOpenMobileDrawer,
   showPlanHeaderLabel,
   alumnoPlanHeaderDayNum,
+  alumnoPlanHeaderIsNext,
   textMuted,
   session,
   sessionActiveStyle,
@@ -102,6 +103,7 @@ const AppTopBar = forwardRef(function AppTopBar({
         {showPlanHeaderLabel && (
           <AlumnoPlanHeaderDayLabel
             alumnoPlanHeaderDayNum={alumnoPlanHeaderDayNum}
+            isNextWorkout={alumnoPlanHeaderIsNext}
             textMuted={textMuted}
             msg={msg}
           />

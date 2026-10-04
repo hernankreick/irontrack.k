@@ -25,6 +25,7 @@ export default function CoachWelcomeModalHost({
   onStudentStartWorkout,
   progress,
   sesiones,
+  weekGate,
   onCoachStart,
   onCoachRoutine,
   onCoachSkipRoutine,
@@ -56,6 +57,7 @@ export default function CoachWelcomeModalHost({
         onStartWorkout={onStudentStartWorkout}
         progress={progress}
         sesiones={sesiones}
+        weekGate={weekGate}
       />
     );
   }

@@ -11,6 +11,7 @@ function StudentWeeklyProgressCard({
   totalDays,
   weeklyPct,
   nextDayIdx,
+  isNextWorkout,
 }) {
   return (
     <div style={{background:bgCard,borderRadius:14,padding:"12px 16px 13px",marginBottom:10,border:"1px solid "+border}}>
@@ -31,7 +32,7 @@ function StudentWeeklyProgressCard({
       </div>
       {nextDayIdx !== null && (
         <div style={{fontSize:12,color:textMuted,fontWeight:600,marginTop:8,lineHeight:1.25}}>
-          {"\u2022"} {msg("Hoy:", "Today:")}{" "}
+          {"\u2022"} {isNextWorkout ? msg("Próximo:", "Next:", "Próximo:") : msg("Hoy:", "Today:")}{" "}
           <span style={{color:"#2563EB",fontWeight:800}}>{msg("Día", "Day")} {nextDayIdx+1}</span>
         </div>
       )}

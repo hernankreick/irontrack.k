@@ -1,5 +1,5 @@
 import { normalizeFecha } from '../../lib/normalizeFecha.js';
-import { isCompletedSession, sessionMatchesRoutine } from '../../lib/studentWeeklyProgress.js';
+import { isCompletedSession, sessionMatchesRoutine, mondayStartMs, parseLocalDateMs } from '../../lib/studentWeeklyProgress.js';
 import { updateExerciseProgressRecord } from '../../lib/workoutSession.js';
 import { countExercisesWithLogToday } from './studentPlanHelpers.js';
 
@@ -331,4 +331,83 @@ export function getStudentWelcomeWorkoutState({ rutina, completedDaysInWeek, wee
     weekIndex: Number(weekIndex) || 0,
     alumnoId: alumnoId,
   });
+}
+
+const MAX_PROGRAM_WEEK = 4;
+
+const INACTIVE_WEEK_GATE = Object.freeze({
+  active: false,
+  completedWeekNumber: null,
+  nextWeekNumber: null,
+  totalDays: 0,
+  completedDateMs: null,
+  availableFromMs: null,
+});
+
+/**
+ * Gate "SEMANA COMPLETADA": el alumno completo TODOS los dias de la semana de programa N y la siguiente
+ * semana del programa (W = N + 1, ya activa en semana_activa) todavia no esta disponible porque seguimos en la
+ * MISMA semana calendario (lunes a domingo, hora local) en la que se completo N.
+ *
+ * Estado DERIVADO de `sesiones` + fecha actual (nada se escribe en la DB; el lunes pasa solo a inactivo). No usa it_cd.
+ *
+ * Activo cuando:
+ *   A. W = `weekNumber` (semana activa del programa, base 1), 2..4.  (No existe espera hacia una "semana 5".)
+ *   B. N = W - 1.
+ *   C. la semana N tiene todos los dia_idx validos y DISTINTOS de la rutina (duplicados no inflan).
+ *   D. no hay ninguna sesion finalizada de la semana W (ni posterior): una semana ya comenzada no se bloquea.
+ *   E. la fecha de la ULTIMA sesion valida de N (campo `fecha`, "d/m/aaaa" local) esta en la misma semana calendario que `now`.
+ *   F. el entrenador no reinicio la semana W despues de completar N (datos.semana_reiniciada == W y semana_reiniciada_at
+ *      posterior a la ultima sesion de N): una accion explicita del entrenador habilita la semana.
+ * Cualquier dato faltante o invalido deja el gate INACTIVO (falla hacia "abierto", nunca bloquea por error).
+ *
+ * @param {object} p
+ * @param {object} p.rutina   rutina activa (id, name, days / datos.days, datos)
+ * @param {Array}  p.sesiones filas de `sesiones`
+ * @param {string} [p.alumnoId]
+ * @param {number} p.weekNumber semana activa del programa, base 1
+ * @param {number|Date} [p.now] ahora (ms o Date); por defecto Date.now()
+ */
+export function getWeekCompletionGate({ rutina, sesiones, alumnoId, weekNumber, now }) {
+  const wk = parseWeek(weekNumber);
+  if (wk == null || wk < 2 || wk > MAX_PROGRAM_WEEK) return INACTIVE_WEEK_GATE;
+  const totalDays = getRutinaDayCount(rutina);
+  if (!(totalDays > 0)) return INACTIVE_WEEK_GATE;
+  const nowMs = now instanceof Date ? now.getTime() : (now == null ? Date.now() : Number(now));
+  if (!Number.isFinite(nowMs)) return INACTIVE_WEEK_GATE;
+
+  const relevant = relevantSessions(rutina, sesiones, alumnoId);
+  const prev = wk - 1;
+  const doneDays = {};
+  let lastMs = null;
+  for (let i = 0; i < relevant.length; i++) {
+    const r = relevant[i];
+    if (r.sem >= wk) return INACTIVE_WEEK_GATE;
+    if (r.sem !== prev) continue;
+    const idx = Number(r.raw.dia_idx);
+    if (r.raw.dia_idx == null || r.raw.dia_idx === '' || !Number.isInteger(idx) || idx < 0 || idx >= totalDays) continue;
+    const ms = parseLocalDateMs(r.raw.fecha);
+    if (ms == null) continue;
+    doneDays[idx] = true;
+    if (lastMs == null || ms > lastMs) lastMs = ms;
+  }
+  if (Object.keys(doneDays).length < totalDays || lastMs == null) return INACTIVE_WEEK_GATE;
+  if (mondayStartMs(lastMs) !== mondayStartMs(nowMs)) return INACTIVE_WEEK_GATE;
+
+  const datos = rutina && rutina.datos;
+  if (datos && Number(datos.semana_reiniciada) === wk) {
+    const resetMs = new Date(datos.semana_reiniciada_at).getTime();
+    if (Number.isFinite(resetMs) && resetMs >= lastMs) return INACTIVE_WEEK_GATE;
+  }
+
+  const monday = new Date(mondayStartMs(lastMs));
+  monday.setDate(monday.getDate() + 7);
+  return {
+    active: true,
+    completedWeekNumber: prev,
+    nextWeekNumber: wk,
+    totalDays: totalDays,
+    completedDateMs: lastMs,
+    availableFromMs: monday.getTime(),
+  };
 }
