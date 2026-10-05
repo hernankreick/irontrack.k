@@ -135,6 +135,7 @@ import {
   normalizeRutinaLocalForAssignment,
   resolveAlumnoId,
   resolveEntrenadorId,
+  selectCurrentRoutine,
 } from './lib/routineStore.js';
 import { getActiveStudentRoutinePosition } from './lib/studentWeeklyProgress.js';
 import { updateRutinaSemanaActiva as updateRutinaSemanaActivaLib } from './lib/updateRutinaSemanaActiva.js';
@@ -1531,9 +1532,7 @@ function GymApp() {
           // Siempre intentar cargar desde Supabase primero (rutina más actualizada)
           if(decoded?.alumnoId) {
             const rutsRaw = await sb.getRutinas(decoded.alumnoId);
-            const ruts = (rutsRaw || []).slice().sort(function (a, b) {
-              return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-            }).slice(0, 1);
+            const ruts = [selectCurrentRoutine(rutsRaw, decoded.alumnoId)].filter(Boolean);
             if(ruts && ruts[0] && ruts[0].datos) {
               setRoutines([{...ruts[0].datos, datos: ruts[0].datos || {}, alumnoId: decoded.alumnoId, alumno_id: decoded.alumnoId, id: ruts[0].id}]);
               const ses = await sb.getSesiones(decoded.alumnoId);
@@ -1653,9 +1652,7 @@ function GymApp() {
             return merged;
           });
           setUltimoPagoConfirmado((alumnoRows && alumnoRows[0] && alumnoRows[0].ultimo_pago_confirmado) || null);
-          const ruts = (rutsRaw || []).slice().sort(function (a, b) {
-            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-          }).slice(0, 1);
+          const ruts = [selectCurrentRoutine(rutsRaw, sessionData.alumnoId)].filter(Boolean);
           if(ruts && ruts[0] && ruts[0].datos) {
             const rSB = ruts[0];
             const rutLocal = {
@@ -3068,7 +3065,7 @@ function GymApp() {
               if(res&&res.length>0){
                 const alumno=res[0];
                 const rutsRaw=await sb.getRutinas(alumno.id);
-                const ruts=(rutsRaw || []).slice().sort(function(a,b){return new Date(b.created_at||0)-new Date(a.created_at||0);}).slice(0,1);
+                const ruts=[selectCurrentRoutine(rutsRaw, alumno.id)].filter(Boolean);
                 clearIronTrackStorageForNewLogin();
                 const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id,entrenadorId:alumno.entrenador_id};
                 localStorage.setItem("it_session",JSON.stringify(s));

@@ -4,6 +4,7 @@
  */
 
 import { FALLBACK_EXERCISE_NAME } from "../lib/exerciseResolve.js";
+import { selectCurrentRoutine } from "../lib/routineStore.js";
 import { irontrackMsg as M, pickExerciseName } from "../lib/irontrackMsg.js";
 
 const DAY_MS = 86400000;
@@ -118,16 +119,7 @@ export function patternToMovementKey(pat) {
 }
 
 export function getRoutineForAlumno(rutinasSBEntrenador, alumnoId) {
-  var list = (rutinasSBEntrenador || [])
-    .filter(function (rut) {
-      return String(rut.alumno_id) === String(alumnoId);
-    })
-    .sort(function (a, b) {
-      var ta = new Date(a.created_at || a.updated_at || 0).getTime() || 0;
-      var tb = new Date(b.created_at || b.updated_at || 0).getTime() || 0;
-      return tb - ta;
-    });
-  return list[0] || null;
+  return selectCurrentRoutine(rutinasSBEntrenador, alumnoId);
 }
 
 function routineExerciseIdSet(rut) {
