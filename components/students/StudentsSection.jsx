@@ -188,7 +188,6 @@ export default function StudentsSection(props) {
                 rutina: rutinaAsignada,
                 sesiones: sesionesForAlumno(a),
                 progreso: progresoGlobal,
-                completedDays: completedDays,
                 currentWeek: currentWeek,
               }).weeklyProgress;
               const isAlumnoActive = alumnoActivo?.id===a.id;
@@ -200,7 +199,6 @@ export default function StudentsSection(props) {
                 rutina: rutinaActiva,
                 sesiones: sesionesForAlumno(a),
                 progreso: progresoGlobal,
-                completedDays: completedDays,
                 currentWeek: currentWeek,
               }) : null;
               const weeklyProgress = weeklyPosition ? weeklyPosition.weeklyProgress : null;

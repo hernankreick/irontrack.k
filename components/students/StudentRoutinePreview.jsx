@@ -88,7 +88,8 @@ export default function StudentRoutinePreview({
         {dias.length > 0 && (
           <div style={{display:"flex",gap:8,overflowX:"auto",marginBottom:14,paddingBottom:4,WebkitOverflowScrolling:"touch"}}>
             {dias.map(function(d, di){
-              var dayDone = progresoSemanal.completedDayIndexes.indexOf(di) !== -1 || (!progresoSemanal.sesiones.length && completedDays.includes(rId+"-"+di+"-w"+semanaIdx));
+              // Check de dia completado = sesion finalizada persistida (la posicion ya sale de `sesiones`); it_cd/progreso no cuentan.
+              var dayDone = progresoSemanal.completedDayIndexes.indexOf(di) !== -1;
               var active = di === diSel;
               return (
                 <button
