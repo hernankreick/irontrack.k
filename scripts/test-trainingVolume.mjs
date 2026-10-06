@@ -1,0 +1,572 @@
+// Card "Volumen de entrenamiento" (lib/trainingVolume.js + components/student-plan/StudentTrainingVolumeCard.jsx).
+//
+//   node scripts/test-trainingVolume.mjs
+//
+// Igual que los otros scripts/test-*.mjs: sin dependencias nuevas, node:assert, sale con codigo != 0 en el primer fallo.
+// Corre con zona horaria de EEUU (con DST) para probar que today/off dependen del calendario y no de milisegundos.
+
+process.env.TZ = "America/New_York";
+
+import assert from "node:assert/strict";
+import { mkdirSync } from "node:fs";
+import path from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
+
+const V = await import("../lib/trainingVolume.js");
+const {
+  dayNum, todayDayNum, parseFechaDMY, formatVolume, formatPct, formatDayShort, classifyExercise,
+  computeTrainingVolume, mergeRemoteAndLocalRows, fetchTrainingVolumeRows, getCreatedAtCutoffISO,
+  buildProgressPagePath, collectRoutineExerciseDefs, PAGE_SIZE, DEFAULT_MAX_PAGES, PCT_HIDDEN_REASONS, EXCLUSION_REASONS,
+} = V;
+
+let count = 0;
+async function test(name, fn) {
+  await fn();
+  count++;
+  console.log("ok -", name);
+}
+
+const T = dayNum(2026, 10, 5); // today de referencia
+const fechaOff = (off) => { const d = new Date((T - off) * 86400000); return d.getUTCDate() + "/" + (d.getUTCMonth() + 1) + "/" + d.getUTCFullYear(); };
+const row = (id, kg, reps, fecha) => ({ ejercicio_id: id, kg, reps, fecha });
+const rowOff = (id, kg, reps, off) => row(id, kg, reps, fechaOff(off));
+const compute = (rows, extra) => computeTrainingVolume(rows, Object.assign({ today: T }, extra || {}));
+
+// ------------------------------------------------------------------ 1. parser
+await test("parser: d/m/yyyy validos (trim, ceros a la izquierda, bisiesto)", () => {
+  assert.equal(parseFechaDMY("29/9/2026"), dayNum(2026, 9, 29));
+  assert.equal(parseFechaDMY("9/9/2026"), dayNum(2026, 9, 9));
+  assert.equal(parseFechaDMY("05/10/2026"), dayNum(2026, 10, 5));
+  assert.equal(parseFechaDMY(" 5/10/2026 "), dayNum(2026, 10, 5));
+  assert.equal(parseFechaDMY("29/2/2028"), dayNum(2028, 2, 29));
+  assert.equal(parseFechaDMY("29/2/2024"), dayNum(2024, 2, 29));
+  assert.equal(parseFechaDMY("1/1/2000"), dayNum(2000, 1, 1));
+  assert.equal(parseFechaDMY("31/12/2100"), dayNum(2100, 12, 31));
+});
+await test("parser: invalidas => null (nunca 'ahora')", () => {
+  ["31/2/2026", "32/1/2026", "0/1/2026", "1/0/2026", "1/13/2026", "29/2/2026", "29/2/2100", "5/10/26", "5/10/1999", "5/10/2101",
+    "2026-10-05", "5-10-2026", "5/10/2026 10:00", "", "   ", "hoy", "a/b/cccc", null, undefined, 20261005, {}, []].forEach((v) => {
+    assert.equal(parseFechaDMY(v), null, JSON.stringify(v));
+  });
+});
+await test("parser: no usa Date.parse ni new Date(string) (5/10/2026 es 5 de octubre, no 10 de mayo)", () => {
+  assert.equal(parseFechaDMY("5/10/2026") - parseFechaDMY("4/10/2026"), 1);
+  assert.notEqual(parseFechaDMY("5/10/2026"), dayNum(2026, 5, 10));
+  assert.equal(parseFechaDMY("13/9/2026"), dayNum(2026, 9, 13));
+});
+
+// ------------------------------------------------------------------ 2. ventanas
+await test("boundaries: off -1,0,27,28,55,56", () => {
+  const m = compute([
+    rowOff("sq", 10, 1, -1), rowOff("sq", 10, 1, 0), rowOff("sq", 10, 1, 27),
+    rowOff("sq", 10, 1, 28), rowOff("sq", 10, 1, 55), rowOff("sq", 10, 1, 56),
+  ]);
+  assert.equal(m.currentTotal, 20, "CURRENT = off 0 y 27");
+  assert.equal(m.previousTotal, 20, "PREVIOUS = off 28 y 55");
+  assert.equal(m.diagnostics.byReason.fuera_de_ventana.sets, 2, "off -1 y 56 fuera");
+});
+await test("calendario/DST: today por fecha local, estable en cambios de hora (America/New_York)", () => {
+  // Cambio de hora de EEUU: 2026-03-08 (spring forward) y 2026-11-01 (fall back).
+  const seq = (y, m, d0, n) => Array.from({ length: n }, (_, i) => todayDayNum(new Date(y, m - 1, d0 + i, 12)));
+  [seq(2026, 3, 6, 5), seq(2026, 10, 30, 5)].forEach((days) => days.forEach((d, i) => { if (i) assert.equal(d - days[i - 1], 1); }));
+  assert.equal(todayDayNum(new Date(2026, 9, 5, 0, 0, 1)), T);
+  assert.equal(todayDayNum(new Date(2026, 9, 5, 23, 59, 59)), T);
+  // una ventana que cruza el DST sigue contando dias calendario (no ms/86400000)
+  const t2 = dayNum(2026, 11, 20);
+  const m = computeTrainingVolume([row("sq", 10, 1, "20/11/2026"), row("sq", 10, 1, "24/10/2026"), row("sq", 10, 1, "23/10/2026")], { today: t2 });
+  assert.equal(m.currentTotal, 20, "20/11 (off 0) y 24/10 (off 27) -> CURRENT");
+  assert.equal(m.previousTotal, 10, "23/10 (off 28) -> PREVIOUS");
+});
+await test("cutoff created_at = medianoche local de today-55 menos 3 dias (ISO UTC), solo prefiltro", () => {
+  const iso = getCreatedAtCutoffISO(new Date(2026, 9, 5, 15, 30));
+  const back = new Date(iso);
+  assert.equal(back.getTime(), new Date(2026, 9, 5 - 55 - 3).getTime());
+  assert.equal(back.getHours(), 0);
+  assert.equal(iso.slice(-1), "Z");
+});
+
+// ------------------------------------------------------------------ 3. volumen
+await test("volumen: 3 filas 60x8 = 1440 (sin deduplicar)", () => {
+  const m = compute([rowOff("sq", 60, 8, 0), rowOff("sq", 60, 8, 0), rowOff("sq", 60, 8, 0)]);
+  assert.equal(m.currentTotal, 1440);
+  assert.equal(m.currentByExercise.sq, 1440);
+});
+await test("volumen: legext 3 x (50x15) = 2250 (no 750)", () => {
+  const m = compute([rowOff("legext", 50, 15, 3), rowOff("legext", 50, 15, 3), rowOff("legext", 50, 15, 3)]);
+  assert.equal(m.currentTotal, 2250);
+});
+await test("volumen: kg/reps como texto (parseFloat/parseInt)", () => {
+  assert.equal(compute([rowOff("sq", "62.5", "8", 1)]).currentTotal, 500);
+});
+await test("created_at nunca decide la ventana: solo cuenta fecha/off", () => {
+  const a = Object.assign(rowOff("sq", 10, 10, 1), { created_at: "2020-01-01T00:00:00Z" });
+  const b = Object.assign(rowOff("sq", 10, 10, 40), { created_at: "2026-10-05T00:00:00Z" });
+  const m = compute([a, b]);
+  assert.equal(m.currentTotal, 100);
+  assert.equal(m.previousTotal, 100);
+});
+
+// ------------------------------------------------------------------ 4. exclusiones
+await test("exclusion: fecha_invalida (nunca se convierte en 'hoy')", () => {
+  const m = compute([row("sq", 50, 5, "31/2/2026"), row("sq", 50, 5, ""), row("sq", 50, 5, null), row("sq", 50, 5, "2026-10-05")]);
+  assert.equal(m.currentTotal, 0);
+  assert.equal(m.diagnostics.byReason.fecha_invalida.sets, 4);
+});
+await test("exclusion: fuera_de_ventana", () => {
+  const m = compute([rowOff("sq", 50, 5, 56), rowOff("sq", 50, 5, -1), row("sq", 50, 5, "17/7/2026")]);
+  assert.equal(m.diagnostics.byReason.fuera_de_ventana.sets, 3);
+  assert.equal(m.currentTotal + m.previousTotal, 0);
+});
+await test("exclusion: kg<=0 y reps<=0 (incluye NaN/vacio)", () => {
+  const m = compute([rowOff("sq", 0, 8, 1), rowOff("sq", -5, 8, 1), rowOff("sq", "", 8, 1), rowOff("sq", 60, 0, 1), rowOff("sq", 60, -2, 1), rowOff("sq", 60, "x", 1)]);
+  assert.equal(m.diagnostics.byReason["kg<=0"].sets, 3);
+  assert.equal(m.diagnostics.byReason["reps<=0"].sets, 3);
+  assert.equal(m.currentTotal, 0);
+});
+await test("orden de exclusion: fecha > ventana > kg > reps > resolucion", () => {
+  const m = compute([
+    row("custom_1", 0, 0, "31/2/2026"),   // fecha_invalida gana a todo
+    rowOff("custom_1", 0, 0, 99),          // fuera_de_ventana gana a kg
+    rowOff("custom_1", 0, 5, 1),           // kg<=0 gana a reps y a resolucion
+    rowOff("custom_1", 5, 0, 1),           // reps<=0 gana a resolucion
+    rowOff("custom_1", 5, 5, 1),           // recien aqui: no_resoluble
+  ]);
+  const by = m.diagnostics.byReason;
+  assert.deepEqual(EXCLUSION_REASONS, ["fecha_invalida", "fuera_de_ventana", "kg<=0", "reps<=0", "no_resoluble", "patron_no_fuerza", "equipo_sin_carga_externa", "peso_corporal_o_asistido", "objetivo_de_tiempo_en_rutina"]);
+  assert.equal(by.fecha_invalida.sets, 1);
+  assert.equal(by.fuera_de_ventana.sets, 1);
+  assert.equal(by["kg<=0"].sets, 1);
+  assert.equal(by["reps<=0"].sets, 1);
+  assert.equal(by.no_resoluble.sets, 1);
+});
+await test("exclusion: no_resoluble (custom_* y cualquier id fuera del catalogo; sin heuristica reps<=50)", () => {
+  const m = compute([rowOff("custom_1778697447353", 20, 10, 1), rowOff("zzz", 20, 10, 1), rowOff(null, 20, 10, 1), rowOff("custom_x", 20, 30, 1), rowOff("custom_y", 20, 60, 1)]);
+  assert.equal(m.diagnostics.byReason.no_resoluble.sets, 5);
+  assert.equal(m.currentTotal, 0);
+  assert.deepEqual(Object.keys(m.currentByExercise), []);
+});
+await test("custom sin metadata accesible => no_resoluble aunque haya snapshot de rutina con pattern/equip", () => {
+  const defs = collectRoutineExerciseDefs([{ days: [{ exercises: [{ id: "custom_9", pattern: "rodilla", equip: "Barra", name: "Mi custom" }] }] }]);
+  assert.equal(classifyExercise("custom_9", undefined, defs).reason, "no_resoluble");
+  const m = compute([rowOff("custom_9", 40, 10, 1)], { routineExerciseDefs: defs });
+  assert.equal(m.currentTotal, 0);
+  assert.equal(m.diagnostics.byReason.no_resoluble.sets, 1);
+});
+await test("exclusion: patron_no_fuerza (core, cardio, movilidad) y normalizacion trim/lowercase", () => {
+  const catalog = {
+    c1: { id: "c1", pattern: "core", equip: "Mancuernas" }, c2: { id: "c2", pattern: "cardio", equip: "Bicicleta" },
+    c3: { id: "c3", pattern: " MOVILIDAD ", equip: "Barra" }, c4: { id: "c4", pattern: "", equip: "Barra" },
+    n1: { id: "n1", pattern: "  RoDiLLa ", equip: "Barra", name: "normalizado" }, n2: { id: "n2", pattern: " Oly", equip: "Barra" },
+  };
+  const m = compute([rowOff("c1", 10, 10, 1), rowOff("c2", 10, 10, 1), rowOff("c3", 10, 10, 1), rowOff("c4", 10, 10, 1), rowOff("n1", 10, 10, 1), rowOff("n2", 10, 10, 1)], { catalog });
+  assert.equal(m.diagnostics.byReason.patron_no_fuerza.sets, 4);
+  assert.equal(m.currentTotal, 200, "n1 y n2 (rodilla/oly normalizados) cuentan");
+  const real = compute([rowOff("bike", 5, 20, 1), rowOff("core_remo_renegado", 12, 12, 1)]);
+  assert.equal(real.diagnostics.byReason.patron_no_fuerza.sets, 2);
+});
+await test("patrones de fuerza validos: rodilla, empuje, traccion, bisagra, oly", () => {
+  const catalog = {};
+  ["rodilla", "empuje", "traccion", "bisagra", "oly"].forEach((p) => { catalog["p_" + p] = { id: "p_" + p, pattern: p, equip: "Barra" }; });
+  assert.equal(compute(Object.keys(catalog).map((id) => rowOff(id, 10, 10, 1)), { catalog }).currentTotal, 500);
+});
+await test("exclusion: equipo_sin_carga_externa (case-insensitive, trim; 'Banco 45' y 'Banco' ambos)", () => {
+  const equips = ["Libre", "Colchoneta", "Paralelas", "Anillas", "Banco", "Banco 45", "Rueda", "Soga", "Fitball", "LIBRE", " banco 45 ", "fitBALL"];
+  const catalog = {};
+  equips.forEach((e, i) => { catalog["e" + i] = { id: "e" + i, pattern: "empuje", equip: e, name: "x" }; });
+  catalog.okEquip = { id: "okEquip", pattern: "empuje", equip: "Mancuerna", name: "x" };
+  const m = compute(equips.map((e, i) => rowOff("e" + i, 10, 10, 1)).concat([rowOff("okEquip", 10, 10, 1)]), { catalog });
+  assert.equal(m.diagnostics.byReason.equipo_sin_carga_externa.sets, equips.length);
+  assert.equal(m.currentTotal, 100);
+});
+await test("exclusion: peso_corporal_o_asistido (dominadas; exerciseIsBodyweightLike)", () => {
+  const m = compute([rowOff("pu", 10, 5, 1), rowOff("pusu", 10, 5, 1), rowOff("punu", 10, 5, 1)]);
+  assert.equal(m.diagnostics.byReason.peso_corporal_o_asistido.sets, 3);
+  assert.equal(m.currentTotal, 0);
+});
+await test("exclusion: objetivo_de_tiempo_en_rutina (solo por snapshot; un snapshot sin tiempo no excluye)", () => {
+  const timed = collectRoutineExerciseDefs([{ days: [{ exercises: [{ id: "sq", reps: "30 seg" }] }] }]);
+  assert.equal(compute([rowOff("sq", 20, 30, 1)], { routineExerciseDefs: timed }).diagnostics.byReason.objetivo_de_tiempo_en_rutina.sets, 1);
+  const normal = collectRoutineExerciseDefs([{ days: [{ warmup: [{ id: "lp", reps: "12" }], exercises: [{ id: "sq", reps: "8-10" }] }] }]);
+  const m = compute([rowOff("sq", 60, 8, 1), rowOff("lp", 100, 10, 1)], { routineExerciseDefs: normal });
+  assert.equal(m.currentTotal, 480 + 1000);
+  assert.equal(m.diagnostics.byReason.objetivo_de_tiempo_en_rutina.sets, 0);
+});
+await test("clasificacion real del catalogo: legext valido; core/cardio/dominadas excluidos", () => {
+  assert.deepEqual(classifyExercise("legext"), { ok: true });
+  assert.equal(classifyExercise("sq").ok, true);
+  assert.equal(classifyExercise("core_remo_renegado").reason, "patron_no_fuerza");
+  assert.equal(classifyExercise("bike").reason, "patron_no_fuerza");
+  assert.equal(classifyExercise("pusu").reason, "peso_corporal_o_asistido");
+  assert.equal(classifyExercise("custom_1778697447353").reason, "no_resoluble");
+});
+
+// ------------------------------------------------------------------ 5. multiplicidad / merge remoto + local
+const localSet = (kg, reps, date, week = 1, note = "") => ({ kg, reps, date, week, note });
+const remoteRow = (id, kg, reps, fecha, semana = 1, nota = "") => ({ ejercicio_id: id, kg, reps, fecha, semana, nota, created_at: "2026-10-04T12:00:00Z" });
+const mergedFor = (nLocal, nRemote, fechaLocal = "4/10/2026", fechaRemote = "4/10/2026") => {
+  const local = { sq: { sets: Array.from({ length: nLocal }, () => localSet(60, 8, fechaLocal)), max: 60 } };
+  const remote = Array.from({ length: nRemote }, () => remoteRow("sq", 60, 8, fechaRemote));
+  return mergeRemoteAndLocalRows(remote, local);
+};
+await test("merge: 3/0 => 3, 0/3 => 3, 3/3 => 3, 3/2 => 3, 2/3 => 3, 4 local/3 remoto => 4", () => {
+  [[3, 0, 3], [0, 3, 3], [3, 3, 3], [3, 2, 3], [2, 3, 3], [4, 3, 4], [0, 0, 0]].forEach(([l, r, exp]) => {
+    assert.equal(mergedFor(l, r).length, exp, l + "/" + r);
+  });
+  assert.equal(compute(mergedFor(4, 3)).currentTotal, 4 * 480, "el volumen refleja 4 series");
+});
+await test("merge: misma firma pero otra fecha => no colapsa", () => {
+  assert.equal(mergedFor(1, 1, "3/10/2026", "4/10/2026").length, 2);
+});
+await test("merge: otra firma (kg/reps/semana/nota) => no colapsa; ejercicios distintos independientes", () => {
+  const local = { sq: { sets: [localSet(60, 8, "4/10/2026"), localSet(60, 8, "4/10/2026", 2), localSet(60, 8, "4/10/2026", 1, "nota")], max: 60 } };
+  const rows = mergeRemoteAndLocalRows([remoteRow("sq", 60, 8, "4/10/2026"), remoteRow("lp", 60, 8, "4/10/2026")], local);
+  assert.equal(rows.filter((r) => r.ejercicio_id === "sq").length, 3);
+  assert.equal(rows.filter((r) => r.ejercicio_id === "lp").length, 1);
+});
+await test("merge: tolera progress/remoto vacios o malformados", () => {
+  assert.deepEqual(mergeRemoteAndLocalRows(null, null), []);
+  assert.deepEqual(mergeRemoteAndLocalRows([null, { kg: 1 }], { sq: null, lp: {} }), []);
+  assert.equal(mergeRemoteAndLocalRows([remoteRow("sq", "60", "8", "4/10/2026")], undefined)[0].kg, 60);
+});
+await test("el 'progress' local (tope de 50) no es la fuente: 80 filas remotas siguen contando 80", () => {
+  const remote = Array.from({ length: 80 }, () => remoteRow("sq", 10, 10, "4/10/2026"));
+  assert.equal(compute(mergeRemoteAndLocalRows(remote, { sq: { sets: [], max: 0 } })).currentTotal, 80 * 100);
+});
+
+// ------------------------------------------------------------------ 6. like-for-like y porcentaje
+const exSets = (id, off, n = 1) => Array.from({ length: n }, () => rowOff(id, 10, 10, off));
+await test("like-for-like: ejercicio solo en CURRENT afecta currentTotal pero no el comparable ni el pct", () => {
+  const base = [].concat(exSets("sq", 2), exSets("lp", 2), exSets("sq", 30), exSets("lp", 30), exSets("sq", 8), exSets("lp", 8));
+  const a = compute(base);
+  const b = compute(base.concat(exSets("legext", 3, 5)));
+  assert.equal(b.currentTotal, a.currentTotal + 500);
+  assert.equal(b.currentComparable, a.currentComparable);
+  assert.equal(b.previousComparable, a.previousComparable);
+  assert.equal(b.pct, a.pct);
+  assert.deepEqual(b.commonExercises.sort(), ["lp", "sq"]);
+});
+await test("like-for-like: ejercicio solo en PREVIOUS no entra al comparable", () => {
+  const base = [].concat(exSets("sq", 2), exSets("lp", 2), exSets("sq", 30), exSets("lp", 30));
+  const m = compute(base.concat(exSets("legext", 31, 4)));
+  assert.equal(m.previousTotal, 200 + 400);
+  assert.equal(m.previousComparable, 200);
+  assert.deepEqual(m.commonExercises.sort(), ["lp", "sq"]);
+});
+await test("pct = (currentComparable - previousComparable) / previousComparable * 100; currentTotal no interviene", () => {
+  // comunes: sq y lp. CURRENT comparable 600, PREVIOUS comparable 400 -> +50%. currentTotal incluye 900 extra no comparables.
+  const rows = [].concat(
+    exSets("sq", 1), exSets("sq", 10, 2), exSets("lp", 20, 3),        // 600 (3 dias)
+    exSets("sq", 30), exSets("lp", 38), exSets("sq", 50, 1), exSets("lp", 45), // 400 en P4, P3.. (ver abajo)
+    exSets("legext", 2, 9),                                              // 900 solo CURRENT
+  );
+  const m = compute(rows);
+  assert.equal(m.currentComparable, 600);
+  assert.equal(m.previousComparable, 400);
+  assert.equal(m.currentTotal, 1500);
+  assert.equal(m.pct, 50);
+  assert.equal(m.pctLabel, "+50%");
+  assert.notEqual(Math.round(((m.currentTotal - m.previousComparable) / m.previousComparable) * 100), m.pct);
+});
+const goodPctRows = () => [].concat(
+  exSets("sq", 1), exSets("lp", 9),                      // CURRENT: 2 dias comparables
+  exSets("sq", 30), exSets("lp", 44),                    // PREVIOUS: 2 dias en P4 (off 30) y P2 (off 44)
+);
+await test("showPct: caso base positivo (todas las condiciones)", () => {
+  const m = compute(goodPctRows());
+  assert.deepEqual(m.pctHiddenReasons, []);
+  assert.equal(m.showPct, true);
+  assert.deepEqual(m.comparablePreviousBlocks, ["P2", "P4"]);
+  assert.equal(m.pctLabel, "0%");
+});
+await test("showPct: commonExercises < 2 => oculto", () => {
+  const m = compute([].concat(exSets("sq", 1), exSets("sq", 9), exSets("sq", 30), exSets("sq", 44)));
+  assert.equal(m.showPct, false);
+  assert.ok(m.pctHiddenReasons.includes(PCT_HIDDEN_REASONS.COMMON_LT_2));
+});
+await test("showPct: previousComparable = 0 => oculto (y pct null)", () => {
+  const m = compute([].concat(exSets("sq", 1), exSets("lp", 9)));
+  assert.equal(m.showPct, false);
+  assert.equal(m.pct, null);
+  assert.ok(m.pctHiddenReasons.includes(PCT_HIDDEN_REASONS.PREVIOUS_ZERO));
+});
+await test("showPct: CURRENT comparable en < 2 dias => oculto", () => {
+  const m = compute([].concat(exSets("sq", 1), exSets("lp", 1), exSets("sq", 30), exSets("lp", 44), exSets("legext", 9)));
+  assert.equal(m.showPct, false);
+  assert.deepEqual(m.pctHiddenReasons, [PCT_HIDDEN_REASONS.CURRENT_DAYS]);
+});
+await test("showPct: PREVIOUS comparable en < 2 dias => oculto", () => {
+  const m = compute([].concat(exSets("sq", 1), exSets("lp", 9), exSets("sq", 30), exSets("lp", 30)));
+  assert.equal(m.showPct, false);
+  assert.ok(m.pctHiddenReasons.includes(PCT_HIDDEN_REASONS.PREVIOUS_DAYS));
+});
+await test("showPct: PREVIOUS comparable en un solo bloque (P4) aunque haya 3 dias => oculto", () => {
+  const m = compute([].concat(exSets("sq", 1), exSets("lp", 9), exSets("sq", 28), exSets("lp", 32), exSets("sq", 34)));
+  assert.equal(m.comparablePreviousDays.length, 3);
+  assert.deepEqual(m.comparablePreviousBlocks, ["P4"]);
+  assert.equal(m.showPct, false);
+  assert.deepEqual(m.pctHiddenReasons, [PCT_HIDDEN_REASONS.PREVIOUS_BLOCKS]);
+  assert.equal(PCT_HIDDEN_REASONS.PREVIOUS_BLOCKS, "PREVIOUS_en_<2_bloques");
+  assert.ok(Number.isFinite(m.pct), "el pct matematico existe aunque no se muestre");
+});
+await test("showPct: bloques P1..P4 borde a borde (55/49, 48/42, 41/35, 34/28)", () => {
+  const blocks = (offs) => compute([].concat(exSets("sq", 1), exSets("lp", 9), offs.flatMap((o) => exSets(o % 2 ? "sq" : "lp", o)), exSets("sq", 29), exSets("lp", 30))).comparablePreviousBlocks;
+  assert.deepEqual(blocks([55, 49]), ["P1", "P4"]);
+  assert.deepEqual(blocks([48, 42]), ["P2", "P4"]);
+  assert.deepEqual(blocks([41, 35]), ["P3", "P4"]);
+});
+await test("showPct: retrieval incompleto => modelo vacio, card y pct ocultos", () => {
+  const m = compute(goodPctRows(), { complete: false });
+  assert.equal(m.showCard, false);
+  assert.equal(m.showPct, false);
+  assert.deepEqual(m.pctHiddenReasons, [PCT_HIDDEN_REASONS.INCOMPLETE]);
+  assert.equal(m.currentTotal, 0);
+});
+await test("pct: formato +12%, negativos, 0% si |delta| < 0.5", () => {
+  assert.equal(formatPct(12.4), "+12%");
+  assert.equal(formatPct(-27.727), "-28%");
+  assert.equal(formatPct(0.49), "0%");
+  assert.equal(formatPct(-0.49), "0%");
+  assert.equal(formatPct(0), "0%");
+  assert.equal(formatPct(100), "+100%");
+});
+
+// ------------------------------------------------------------------ 7. card / barras
+await test("card: visible solo con currentTotal > 0 y >= 2 dias CURRENT", () => {
+  assert.equal(compute([]).showCard, false);
+  assert.equal(compute([rowOff("sq", 50, 5, 1), rowOff("sq", 50, 5, 1)]).showCard, false, "1 solo dia");
+  assert.equal(compute([rowOff("sq", 50, 5, 1), rowOff("sq", 50, 5, 2)]).showCard, true);
+  assert.equal(compute([rowOff("sq", 50, 5, 30), rowOff("sq", 50, 5, 31)]).showCard, false, "solo PREVIOUS");
+  assert.equal(compute([rowOff("sq", 50, 5, 1), rowOff("custom_1", 50, 5, 2)]).showCard, false, "el 2.o dia no es valido");
+});
+await test("barras: siempre cuatro (B1..B4), semanas vacias = 0, B4 = off 6..0", () => {
+  const m = compute([rowOff("sq", 10, 10, 27), rowOff("sq", 10, 10, 21), rowOff("sq", 10, 10, 6), rowOff("sq", 10, 10, 0)]);
+  assert.deepEqual(m.blocks.map((b) => b.key), ["B1", "B2", "B3", "B4"]);
+  assert.deepEqual(m.blocks.map((b) => b.kg), [200, 0, 0, 200]);
+  assert.deepEqual(m.blocks.map((b) => [b.from, b.to]), [[27, 21], [20, 14], [13, 7], [6, 0]]);
+  assert.equal(m.blocks[3].startDay, T - 6);
+  assert.equal(m.blocks[3].endDay, T);
+  assert.equal(formatDayShort(m.blocks[3].startDay), "29/09");
+  assert.equal(formatDayShort(m.blocks[3].endDay), "05/10");
+  assert.equal(formatDayShort(m.blocks[0].startDay), "08/09");
+  assert.equal(m.blocks.reduce((a, b) => a + b.kg, 0), m.currentTotal);
+});
+await test("barras: bordes de cada bloque (27|26.. 21|20, 14|13, 7|6)", () => {
+  const at = (off) => compute([rowOff("sq", 10, 1, off)]).blocks.map((b) => b.kg);
+  assert.deepEqual(at(27), [10, 0, 0, 0]);
+  assert.deepEqual(at(21), [10, 0, 0, 0]);
+  assert.deepEqual(at(20), [0, 10, 0, 0]);
+  assert.deepEqual(at(14), [0, 10, 0, 0]);
+  assert.deepEqual(at(13), [0, 0, 10, 0]);
+  assert.deepEqual(at(7), [0, 0, 10, 0]);
+  assert.deepEqual(at(6), [0, 0, 0, 10]);
+  assert.deepEqual(at(0), [0, 0, 0, 10]);
+  assert.deepEqual(at(28), [0, 0, 0, 0], "off 28 es PREVIOUS");
+});
+
+// ------------------------------------------------------------------ 8. formato
+await test("formato: 840 / 999 / 999.6 / 1000 / 3200 (redondea primero)", () => {
+  assert.equal(formatVolume(840), "840 kg");
+  assert.equal(formatVolume(999), "999 kg");
+  assert.equal(formatVolume(999.4), "999 kg");
+  assert.equal(formatVolume(999.6), "1,0 t");
+  assert.equal(formatVolume(1000), "1,0 t");
+  assert.equal(formatVolume(3200), "3,2 t");
+  assert.equal(formatVolume(12075), "12,1 t");
+  assert.equal(formatVolume(0), "0 kg");
+  assert.equal(formatVolume(null), "0 kg");
+});
+
+// ------------------------------------------------------------------ 9. recuperacion paginada
+const makeRows = (n, start = 0) => Array.from({ length: n }, (_, i) => ({ id: start + i, ejercicio_id: "sq", kg: 10, reps: 10, fecha: "4/10/2026", semana: 1, nota: "", created_at: "2026-10-04T10:00:00Z" }));
+const pagedFetcher = (total, opts = {}) => {
+  const calls = [];
+  const fn = async (p) => {
+    calls.push(p);
+    const offset = Number(/offset=(\d+)/.exec(p)[1]);
+    if (opts.failAtOffset === offset) return opts.failWith === undefined ? null : opts.failWith;
+    if (opts.throwAtOffset === offset) throw new Error("red");
+    return makeRows(Math.max(0, Math.min(PAGE_SIZE, total - offset)), offset);
+  };
+  fn.calls = calls;
+  return fn;
+};
+await test("retrieval: 2300 filas => 3 paginas (offsets 0,1000,2000), completo", async () => {
+  const f = pagedFetcher(2300);
+  const res = await fetchTrainingVolumeRows(f, "alumno-1", { now: new Date(2026, 9, 5, 12) });
+  assert.equal(res.complete, true);
+  assert.equal(res.rows.length, 2300);
+  assert.equal(res.pages, 3);
+  assert.deepEqual(f.calls.map((p) => /offset=(\d+)/.exec(p)[1]), ["0", "1000", "2000"]);
+});
+await test("retrieval: exactamente 1000 filas => pide una 2.a pagina vacia y completa", async () => {
+  const f = pagedFetcher(1000);
+  const res = await fetchTrainingVolumeRows(f, "a");
+  assert.equal(res.complete, true);
+  assert.equal(res.rows.length, 1000);
+  assert.equal(f.calls.length, 2);
+});
+await test("retrieval: 0 filas => completo con 0 filas (distinto de error)", async () => {
+  const res = await fetchTrainingVolumeRows(pagedFetcher(0), "a");
+  assert.equal(res.complete, true);
+  assert.equal(res.rows.length, 0);
+});
+await test("retrieval: pagina 2 con error (null) => INCOMPLETE", async () => {
+  const res = await fetchTrainingVolumeRows(pagedFetcher(2300, { failAtOffset: 1000 }), "a");
+  assert.equal(res.complete, false);
+});
+await test("retrieval: pagina 2 lanza excepcion o devuelve no-array => INCOMPLETE", async () => {
+  assert.equal((await fetchTrainingVolumeRows(pagedFetcher(2300, { throwAtOffset: 1000 }), "a")).complete, false);
+  assert.equal((await fetchTrainingVolumeRows(pagedFetcher(2300, { failAtOffset: 1000, failWith: { message: "x" } }), "a")).complete, false);
+});
+await test("retrieval: primera pagina null => INCOMPLETE; nunca se convierte en 0", async () => {
+  const res = await fetchTrainingVolumeRows(async () => null, "a");
+  assert.equal(res.complete, false);
+  const m = compute(res.rows, { complete: res.complete });
+  assert.equal(m.showCard, false);
+});
+await test("retrieval: safety cap sin pagina corta => INCOMPLETE", async () => {
+  const f = pagedFetcher(1e9);
+  const res = await fetchTrainingVolumeRows(f, "a", { maxPages: 3 });
+  assert.equal(res.complete, false);
+  assert.equal(f.calls.length, 3);
+  assert.equal(res.rows.length, 3000);
+  assert.ok(DEFAULT_MAX_PAGES >= 5);
+});
+await test("retrieval: alumnoId o fetchPage ausentes => INCOMPLETE (sin pedir nada)", async () => {
+  assert.equal((await fetchTrainingVolumeRows(null, "a")).complete, false);
+  const f = pagedFetcher(10);
+  assert.equal((await fetchTrainingVolumeRows(f, "")).complete, false);
+  assert.equal((await fetchTrainingVolumeRows(f, null)).complete, false);
+  assert.equal(f.calls.length, 0);
+});
+await test("retrieval: ruta = columnas minimas, alumno, created_at gte cutoff (prefiltro), orden estable, limit/offset", () => {
+  const p = buildProgressPagePath("76fb8876-270a-4fa6-9b7a-f664e0b42799", "2026-08-08T00:00:00.000Z", 2000);
+  assert.ok(p.startsWith("progreso?alumno_id=eq.76fb8876-270a-4fa6-9b7a-f664e0b42799"));
+  assert.ok(p.includes("select=id,ejercicio_id,kg,reps,fecha,semana,nota,created_at"));
+  assert.ok(p.includes("created_at=gte.2026-08-08T00%3A00%3A00.000Z"));
+  assert.ok(p.includes("order=created_at.desc,id.desc"));
+  assert.ok(p.endsWith("limit=1000&offset=2000"));
+  assert.ok(!/fecha=(gte|lte|gt|lt)\./.test(p), "no filtra por fecha (texto) en el servidor");
+});
+
+// ------------------------------------------------------------------ 10. Evi (referencia)
+// Q1 agregado por ejercicio+fecha (3 series cada una). Se reproduce con UNA fila sintetica por agregado
+// (kg = volumen, reps = 1): preserva exactamente totales por ejercicio/dia; la multiplicidad se prueba arriba.
+const EVI = [
+  ["dbrow", "1/9/2026", 300], ["land", "1/9/2026", 435], ["legext", "1/9/2026", 1755], ["lp", "1/9/2026", 2400], ["sldl", "1/9/2026", 480], ["sq", "1/9/2026", 640], ["tric3", "1/9/2026", 300],
+  ["bsq", "3/9/2026", 300], ["ccurl", "3/9/2026", 150], ["core_remo_renegado", "3/9/2026", 144], ["custom_1778697447353", "3/9/2026", 200], ["hip", "3/9/2026", 1860], ["lboxup", "3/9/2026", 270], ["lc", "3/9/2026", 1080], ["pullover", "3/9/2026", 180], ["pusu", "3/9/2026", 230],
+  ["dbrow", "7/9/2026", 300], ["land", "7/9/2026", 437.5], ["legext", "7/9/2026", 2025], ["lp", "7/9/2026", 2600], ["sldl", "7/9/2026", 440], ["sq", "7/9/2026", 680], ["tric3", "7/9/2026", 75],
+  ["bsq", "9/9/2026", 300], ["ccurl", "9/9/2026", 150], ["core_remo_renegado", "9/9/2026", 144], ["custom_1778697447353", "9/9/2026", 270], ["hip", "9/9/2026", 2160], ["lboxup", "9/9/2026", 360], ["lc", "9/9/2026", 1080], ["pullover", "9/9/2026", 150], ["pusu", "9/9/2026", 150],
+  ["dbrow", "14/9/2026", 300], ["land", "14/9/2026", 495], ["sq", "14/9/2026", 900],
+  ["dbrow", "29/9/2026", 300], ["land", "29/9/2026", 180], ["legext", "29/9/2026", 2250], ["lp", "29/9/2026", 2400], ["sldl", "29/9/2026", 360], ["sq", "29/9/2026", 600], ["tric3", "29/9/2026", 90],
+];
+await test("Evi (today=2026-10-05): resultado de referencia del preflight", () => {
+  const rows = EVI.map(([id, fecha, vol]) => row(id, vol, 1, fecha));
+  const m = compute(rows);
+  assert.equal(m.currentTotal, 12075);
+  assert.equal(formatVolume(m.currentTotal), "12,1 t");
+  assert.deepEqual(m.blocks.map((b) => b.kg), [5895, 0, 0, 6180]);
+  assert.equal(m.previousTotal, 16707.5);
+  assert.equal(m.commonExercises.length, 13);
+  assert.equal(m.currentComparable, 12075);
+  assert.equal(m.previousComparable, 16707.5);
+  assert.ok(Math.abs(m.pct - -27.727068681729764) < 1e-9);
+  assert.equal(Math.round(m.pct), -28);
+  assert.equal(m.showPct, false);
+  assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_en_<2_bloques"]);
+  assert.deepEqual(m.currentDays.map(formatDayShort), ["09/09", "14/09", "29/09"]);
+  assert.deepEqual(m.previousDays.map(formatDayShort), ["01/09", "03/09", "07/09"]);
+  assert.equal(m.comparableCurrentDays.length, 3);
+  assert.equal(m.comparablePreviousDays.length, 3);
+  assert.deepEqual(m.comparablePreviousBlocks, ["P4"]);
+  assert.equal(m.showCard, true);
+  const by = m.diagnostics.byReason;
+  assert.deepEqual(Object.keys(by.patron_no_fuerza.ids), ["core_remo_renegado"]);
+  assert.deepEqual(Object.keys(by.no_resoluble.ids), ["custom_1778697447353"]);
+  assert.deepEqual(Object.keys(by.peso_corporal_o_asistido.ids), ["pusu"]);
+  assert.equal(by.patron_no_fuerza.volume, 288);
+  assert.equal(by.no_resoluble.volume, 470);
+  assert.equal(by.peso_corporal_o_asistido.volume, 380);
+  assert.deepEqual(Object.keys(m.currentByExercise).concat(Object.keys(m.previousByExercise)).filter((id) => id.startsWith("custom")), [], "ningun custom se cuenta");
+});
+
+// ------------------------------------------------------------------ 11. vista (copy, accesibilidad, color neutro)
+const reactVersionDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const outDir = path.join(reactVersionDir, "node_modules", ".cache", "irontrack-tests");
+mkdirSync(outDir, { recursive: true });
+const { build } = await import("esbuild");
+const outfile = path.join(outDir, "StudentTrainingVolumeCard.mjs");
+await build({
+  entryPoints: [path.join(reactVersionDir, "components/student-plan/StudentTrainingVolumeCard.jsx")],
+  bundle: true, format: "esm", platform: "node", outfile, external: ["react", "react-dom"], logLevel: "silent",
+});
+const { TrainingVolumeCardView } = await import(pathToFileURL(outfile).href + "?t=" + Date.now());
+const React = (await import("react")).default;
+const { renderToStaticMarkup } = (await import("react-dom/server")).default || (await import("react-dom/server"));
+const msg = (es) => es;
+const render = (model, dm = false) => renderToStaticMarkup(React.createElement(TrainingVolumeCardView, { model, _dm: dm, textMuted: "#64748B", msg }));
+const eviModel = () => compute(EVI.map(([id, fecha, vol]) => row(id, vol, 1, fecha)));
+
+await test("vista Evi: titulo, subtitulo, 12,1 t, SIN porcentaje, 4 barras 5895/0/0/6180", () => {
+  const html = render(eviModel());
+  assert.ok(html.includes("Volumen de entrenamiento"));
+  assert.ok(html.includes("Últimas 4 semanas · kg × reps"));
+  assert.ok(html.includes("12,1 t"));
+  assert.ok(!html.includes("training-volume-pct"), "sin porcentaje");
+  assert.ok(!html.includes("vs 4 sem. anteriores"));
+  ["B1", "B2", "B3", "B4"].forEach((k) => assert.ok(html.includes('data-block="' + k + '"'), k));
+  assert.deepEqual([...html.matchAll(/data-block="B\d" data-kg="(\d+)"/g)].map((m) => Number(m[1])), [5895, 0, 0, 6180]);
+});
+await test("vista: aria-label describe los 4 volumenes y rangos (B4 = 29/09 al 05/10)", () => {
+  const html = render(eviModel());
+  const label = /role="img" aria-label="([^"]+)"/.exec(html)[1];
+  assert.ok(label.includes("08/09 al 14/09: 5895 kg"));
+  assert.ok(label.includes("15/09 al 21/09: 0 kg"));
+  assert.ok(label.includes("22/09 al 28/09: 0 kg"));
+  assert.ok(label.includes("29/09 al 05/10: 6180 kg"));
+});
+await test("vista: tooltip con los tres textos aprobados", () => {
+  const html = render(eviModel());
+  assert.ok(html.includes("El porcentaje compara únicamente ejercicios que registraste en ambos períodos."));
+  assert.ok(html.includes("Más volumen no siempre significa mejor rendimiento."));
+  assert.ok(html.includes("No incluye ejercicios con peso corporal ni de tiempo."));
+});
+await test("vista: con porcentaje visible muestra '+50% vs 4 sem. anteriores' en color neutro", () => {
+  const rows = [].concat(exSets("sq", 1), exSets("sq", 10, 2), exSets("lp", 20, 3), exSets("sq", 30), exSets("lp", 44), exSets("sq", 38), exSets("lp", 50));
+  const m = compute(rows);
+  assert.equal(m.showPct, true);
+  const html = render(m);
+  assert.ok(html.includes("training-volume-pct"));
+  assert.match(html, />\+?-?\d+% vs 4 sem\. anteriores</);
+  assert.ok(html.includes(m.pctLabel + " vs 4 sem. anteriores"));
+});
+await test("vista: color neutro (ni verde, ni rojo, ni ambar) con pct positivo y negativo, claro y oscuro", () => {
+  const forbidden = /#22C55E|#16A34A|#4ADE80|#10B981|#EF4444|#DC2626|#F87171|#B91C1C|#F59E0B|#D97706|#FBBF24|#EAB308/i;
+  const mk = (cur, prev) => compute([].concat(exSets("sq", 1, cur), exSets("lp", 9, cur), exSets("sq", 30, prev), exSets("lp", 44, prev)));
+  [mk(5, 1), mk(1, 5), mk(2, 2)].forEach((m) => {
+    assert.equal(m.showPct, true);
+    [false, true].forEach((dm) => assert.ok(!forbidden.test(render(m, dm)), "pct " + m.pctLabel));
+  });
+  // el pct se pinta con el color neutro textMuted, no con uno dependiente del signo
+  const colors = [mk(5, 1), mk(1, 5)].map((m) => /training-volume-pct" style="[^"]*color:([^;"]+)/.exec(render(m))[1]);
+  assert.equal(colors[0], colors[1]);
+  assert.equal(colors[0], "#64748B");
+});
+await test("vista: B4 destacada (unica barra azul de marca) y semanas vacias presentes", () => {
+  const html = render(eviModel());
+  const bars = [...html.matchAll(/data-block="(B\d)"[^>]*>.*?background:([^;]+);/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(bars.map((b) => b[0]), ["B1", "B2", "B3", "B4"]);
+  assert.deepEqual(bars.filter((b) => b[1] === "#2563EB").map((b) => b[0]), ["B4"]);
+});
+await test("vista: oculta (null) si no hay modelo o showCard=false (incluye retrieval incompleto)", () => {
+  assert.equal(render(null), "");
+  assert.equal(render(compute([rowOff("sq", 50, 5, 1)])), "");
+  assert.equal(render(compute(goodPctRows(), { complete: false })), "");
+});
+await test("vista: ingles", () => {
+  const html = renderToStaticMarkup(React.createElement(TrainingVolumeCardView, { model: eviModel(), _dm: false, textMuted: "#64748B", msg: (es, en) => en }));
+  assert.ok(html.includes("Training volume"));
+  assert.ok(html.includes("Last 4 weeks · kg × reps"));
+});
+
+console.log(count + " tests OK");

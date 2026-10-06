@@ -92,7 +92,7 @@ import StudentNoRoutinesEmptyState from './components/student-plan/StudentNoRout
 import RoutinePdfDownloadButton from './components/student-plan/RoutinePdfDownloadButton.jsx';
 import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyProgressCard.jsx';
 import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
-import StudentExerciseSparkline from './components/student-plan/StudentExerciseSparkline.jsx';
+import StudentTrainingVolumeCard from './components/student-plan/StudentTrainingVolumeCard.jsx';
 import StudentPlanExerciseRows from './components/student-plan/StudentPlanExerciseRows.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import WorkoutSessionSummary from './components/workout/WorkoutSessionSummary.jsx';
@@ -3974,8 +3974,8 @@ function GymApp() {
                     <RoutinePdfDownloadButton msg={msg} onDownload={function(){ downloadRoutinePdf(r); }} />
                   )}
 
-                  {/* Sparkline de tendencia 30 días */}
-                <StudentExerciseSparkline progress={progress} _dm={darkMode} textMuted={textMuted} msg={msg} />
+                  {/* Volumen de entrenamiento: últimas 4 semanas, kg × reps (lectura propia de progreso, sin el tope de 50 sets) */}
+                <StudentTrainingVolumeCard alumnoId={sessionData?.alumnoId} progress={progress} routines={routines} fetchPage={sbFetch} _dm={darkMode} textMuted={textMuted} msg={msg} />
                 </div>
               );
             })}
