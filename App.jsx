@@ -92,7 +92,7 @@ import StudentNoRoutinesEmptyState from './components/student-plan/StudentNoRout
 import RoutinePdfDownloadButton from './components/student-plan/RoutinePdfDownloadButton.jsx';
 import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyProgressCard.jsx';
 import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
-import StudentExerciseSparkline from './components/student-plan/StudentExerciseSparkline.jsx';
+import StudentTrainingVolumeCard from './components/student-plan/StudentTrainingVolumeCard.jsx';
 import StudentPlanExerciseRows from './components/student-plan/StudentPlanExerciseRows.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import WorkoutSessionSummary from './components/workout/WorkoutSessionSummary.jsx';
@@ -139,6 +139,9 @@ import {
 } from './lib/routineStore.js';
 import { getActiveStudentRoutinePosition } from './lib/studentWeeklyProgress.js';
 import { updateRutinaSemanaActiva as updateRutinaSemanaActivaLib } from './lib/updateRutinaSemanaActiva.js';
+import { updateRutinaPreservingOperational, withInitialSemanaActiva } from './lib/rutinaOperationalState.js';
+import { reconcileCurrentRoutineForAlumno } from './lib/reconcileCurrentRoutine.js';
+import { applySemanaActivaToRutinas } from './lib/rutinaOperationalState.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import {
   prepareExerciseHistoryModalData,
@@ -301,18 +304,36 @@ const sb = {
     return data || [];
   },
   createRutina: async (data) => {
-    const body = cleanRutinaWriteBody(data);
+    // Toda rutina asignada nace con semana_activa = 1 explicita (las plantillas no).
+    const body = withInitialSemanaActiva(cleanRutinaWriteBody(data));
     const { data: created, error } = await supabase.from("rutinas").insert([body]).select();
     if (error) { console.error("[rutinas INSERT ERROR]", error); return null; }
     return created || [];
   },
-  updateRutina: async (id, data) => {
+  // Los guardados del entrenador NO pisan el estado operativo (semana_activa, semana_reiniciada, semana_reiniciada_at): se fusiona contra
+  // `datos` fresco de la DB. Solo las acciones explicitas de reinicio pasan options.writeOperationalState = true.
+  updateRutina: async (id, data, options) => {
     const body = cleanRutinaWriteBody(data);
-    const { data: updated, error } = await supabase.from("rutinas").update(body).eq("id", id).select();
-    if (error) { console.error("[rutinas UPDATE ERROR]", error); return null; }
-    return updated || [];
+    return updateRutinaPreservingOperational(supabase, id, body, options);
   },
+  // Avance MONOTONO (nunca retrocede) de la semana del alumno; lo usa finalizeStudentSession.
   updateRutinaSemanaActiva: (rutinaId, nextWeek) => updateRutinaSemanaActivaLib(supabase, rutinaId, nextWeek),
+  // Una pagina de sesiones de una rutina (para reconciliar la semana). Lanza ante error: la reconciliacion no escribe si falta algo.
+  getSesionesPageByRutina: async ({ rutinaId, alumnoId, from, to }) => {
+    var q = supabase.from("sesiones").select("id,alumno_id,rutina_id,semana,dia_idx,fecha,created_at").eq("rutina_id", String(rutinaId));
+    if (alumnoId != null && alumnoId !== "") q = q.eq("alumno_id", String(alumnoId));
+    const { data, error } = await q.order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to);
+    if (error) throw error;
+    return data || [];
+  },
+  // Reconciliacion de semana_activa de la rutina VIGENTE de UN alumno. Helper unico: lo usan el alumno logueado y el entrenador al tocar VER.
+  reconcileSemanaActivaAlumno: (alumnoId, rutinas, source) => reconcileCurrentRoutineForAlumno({
+    client: supabase,
+    alumnoId: alumnoId,
+    rutinas: rutinas,
+    fetchSesionesPage: sb.getSesionesPageByRutina,
+    source: source,
+  }),
   deleteRutina: async function (id) {
     const { error } = await supabase.from("rutinas").delete().eq("id", id);
     if (error) throw error;
@@ -1679,6 +1700,14 @@ function GymApp() {
             if (Number.isFinite(persistedWeekNum) && persistedWeekNum >= 1 && persistedWeekNum <= 4) {
               setCurrentWeek(persistedWeekNum - 1);
             }
+            // Reconciliar semana_activa con las sesiones (null o atrasada con la semana W ya completa => W+1). Idempotente, monotono y sin
+            // escribir si las sesiones no se pudieron leer completas. No bloquea la carga.
+            sb.reconcileSemanaActivaAlumno(sessionData.alumnoId, rutsRaw, "alumno").then(function (rec) {
+              if (rec && rec.status === "advanced") {
+                setRoutines(function (prev) { return applySemanaActivaToRutinas(prev, rec.rutinaId, rec.semanaActiva); });
+                setCurrentWeek(rec.semanaActiva - 1);
+              }
+            }).catch(function (e) { console.error("[reconcileSemanaActiva]", e); });
           }
           setSesiones(ses || []);
           sb.getNota(sessionData.alumnoId).then(function(res) {
@@ -2305,7 +2334,7 @@ function GymApp() {
         alumno_id: aid,
         entrenador_id: rut.entrenador_id || ENTRENADOR_ID,
         datos: resetDatos,
-      });
+      }, { writeOperationalState: true });
       setRutinasSBEntrenador(function (prev) {
         return (prev || []).map(function (r0) {
           return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetDatos }) : r0;
@@ -2525,7 +2554,7 @@ function GymApp() {
         alumno_id: aid,
         entrenador_id: rut.entrenador_id || ENTRENADOR_ID,
         datos: resetAllDatos,
-      });
+      }, { writeOperationalState: true });
       setRutinasSBEntrenador(function (prev) {
         return (prev || []).map(function (r0) {
           return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetAllDatos }) : r0;
@@ -2802,6 +2831,7 @@ function GymApp() {
               email: c.a.email || "",
             },
             note: c.rutinaLocal.datos?.note || "",
+            semana_activa: 1,
           },
         };
         console.error("[assignRut legacy error]", {
@@ -3974,8 +4004,8 @@ function GymApp() {
                     <RoutinePdfDownloadButton msg={msg} onDownload={function(){ downloadRoutinePdf(r); }} />
                   )}
 
-                  {/* Sparkline de tendencia 30 días */}
-                <StudentExerciseSparkline progress={progress} _dm={darkMode} textMuted={textMuted} msg={msg} />
+                  {/* Volumen de entrenamiento: últimas 4 semanas, kg × reps (lectura propia de progreso, sin el tope de 50 sets) */}
+                <StudentTrainingVolumeCard alumnoId={sessionData?.alumnoId} progress={progress} routines={routines} fetchPage={sbFetch} _dm={darkMode} textMuted={textMuted} msg={msg} />
                 </div>
               );
             })}
