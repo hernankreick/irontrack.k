@@ -1,4 +1,5 @@
 import React from 'react';
+import { parseProgressDate } from './progressMetrics.js';
 
 function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, es, darkMode, sesiones, allEx}) {
   const [sbData, setSbData] = React.useState([]);
@@ -18,9 +19,9 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
     const local = (progress[exId]?.sets||[]).map(s=>({kg:parseFloat(s.kg)||0,reps:parseInt(s.reps)||0,fecha:s.date})).filter(s=>s.kg>0);
     const remote = sbData.filter(d=>d.ejercicio_id===exId&&d.kg>0).map(d=>({kg:parseFloat(d.kg),reps:parseInt(d.reps)||0,fecha:d.fecha}));
     const todos = [...local,...remote].sort(function(a,b){
-      var da=a.fecha?a.fecha.split('/').reverse().join('-'):'';
-      var db=b.fecha?b.fecha.split('/').reverse().join('-'):'';
-      return da>db?1:-1;
+      var da=parseProgressDate(a.fecha), db=parseProgressDate(b.fecha);
+      var ta=da?da.getTime():-Infinity, tb=db?db.getTime():-Infinity;
+      return ta===tb?0:(ta>tb?1:-1);
     });
     const seen = new Set();
     return todos.filter(d=>{ const k=d.fecha+d.kg; if(seen.has(k))return false; seen.add(k); return true; }).slice(-20);
@@ -95,7 +96,7 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
             {(() => {
               const mesActual = new Date().getMonth();
               return sbData.filter(d => {
-                const f = d.fecha ? new Date(d.fecha) : null;
+                const f = parseProgressDate(d.fecha);
                 return f && f.getMonth() === mesActual;
               }).length;
             })()}

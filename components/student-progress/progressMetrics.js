@@ -1,12 +1,30 @@
 /** @typedef {{ kg: number, reps: number, fecha: string }} RawSet */
 
+import { parseFechaDMYToLocalDate } from '../../lib/progressDate.js'
+
+const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/
+
+/**
+ * progreso.fecha es d/m/yyyy (toLocaleDateString es-AR). Se parsea de forma estricta; nunca Date.parse
+ * sobre strings con "/". ISO explícito (YYYY-MM-DD[ T...]) solo para created_at como fallback.
+ * Devuelve Date local o null.
+ */
 export function parseProgressDate(str) {
-  if (!str) return null
-  const t = Date.parse(str)
-  if (!Number.isNaN(t)) return new Date(t)
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(str).trim())
-  if (m) return new Date(+m[3], +m[2] - 1, +m[1])
-  return null
+  if (typeof str !== 'string') return null
+  const s = str.trim()
+  if (!s) return null
+  const dmy = parseFechaDMYToLocalDate(s)
+  if (dmy) return dmy
+  const m = ISO_RE.exec(s)
+  if (!m) return null
+  const y = +m[1]
+  const mo = +m[2]
+  const d = +m[3]
+  const chk = new Date(Date.UTC(y, mo - 1, d))
+  if (chk.getUTCFullYear() !== y || chk.getUTCMonth() !== mo - 1 || chk.getUTCDate() !== d) return null
+  if (s.length === 10) return new Date(y, mo - 1, d)
+  const t = new Date(s)
+  return Number.isNaN(t.getTime()) ? null : t
 }
 
 export function dayKeyFromAny(str) {
@@ -33,10 +51,11 @@ export function mergeSetsForExercise(exId, progress, sbData) {
       reps: parseInt(d.reps, 10) || 0,
       fecha: d.fecha,
     }))
+  const ms = (r) => parseProgressDate(r.fecha)?.getTime() ?? -Infinity
   const todos = [...local, ...remote].sort((a, b) => {
-    const da = a.fecha ? String(a.fecha).split('/').reverse().join('-') : ''
-    const db = b.fecha ? String(b.fecha).split('/').reverse().join('-') : ''
-    return da > db ? 1 : -1
+    const ta = ms(a)
+    const tb = ms(b)
+    return ta === tb ? 0 : ta > tb ? 1 : -1
   })
   const seen = new Set()
   return todos.filter((d) => {
