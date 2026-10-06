@@ -1,7 +1,7 @@
+import { loadAlumnoFicha } from "../../lib/studentFicha.js";
 import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
-import { getRutinaAlumnoId } from '../../lib/routineStore.js';
 import { getActiveStudentRoutinePosition } from '../../lib/studentWeeklyProgress.js';
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
@@ -268,19 +268,15 @@ export default function StudentsSection(props) {
                   setCoachCardMenuId(null);
                   if (alumnoActivo?.id === a.id) { setAlumnoActivo(null); return; }
                   setAlumnoActivo(a); setRegistrosSubTab(0); setLoadingSB(true);
-                  const ruts = await sb.getRutinas(a.id); setRutinasSB(ruts || []);
-                  setRutinasSBEntrenador(function (prev) {
-                    var fresh = Array.isArray(ruts) ? ruts : [];
-                    return mergeRutinasAsignadas(
-                      fresh,
-                      (prev || []).filter(function (r) {
-                        var alumnoRutinaId = getRutinaAlumnoId(r);
-                        return alumnoRutinaId == null || String(alumnoRutinaId) !== String(a.id);
-                      })
-                    );
+                  await loadAlumnoFicha({
+                    alumno: a,
+                    sb: sb,
+                    mergeRutinasAsignadas: mergeRutinasAsignadas,
+                    setRutinasSB: setRutinasSB,
+                    setRutinasSBEntrenador: setRutinasSBEntrenador,
+                    setAlumnoProgreso: setAlumnoProgreso,
+                    setAlumnoSesiones: setAlumnoSesiones,
                   });
-                  const prog = await sb.getProgreso(a.id); setAlumnoProgreso(prog || []);
-                  const ses = await sb.getSesiones(a.id); setAlumnoSesiones(ses || []);
                   setLoadingSB(false);
                 }}
                 onToggleMenu={function (e) { e.stopPropagation(); setCoachCardMenuId(coachCardMenuId === a.id ? null : a.id); }}

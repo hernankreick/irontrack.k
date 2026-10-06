@@ -140,7 +140,8 @@ import {
 import { getActiveStudentRoutinePosition } from './lib/studentWeeklyProgress.js';
 import { updateRutinaSemanaActiva as updateRutinaSemanaActivaLib } from './lib/updateRutinaSemanaActiva.js';
 import { updateRutinaPreservingOperational, withInitialSemanaActiva } from './lib/rutinaOperationalState.js';
-import { reconcileSemanaActiva } from './lib/reconcileSemanaActiva.js';
+import { reconcileCurrentRoutineForAlumno } from './lib/reconcileCurrentRoutine.js';
+import { applySemanaActivaToRutinas } from './lib/rutinaOperationalState.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import {
   prepareExerciseHistoryModalData,
@@ -325,6 +326,14 @@ const sb = {
     if (error) throw error;
     return data || [];
   },
+  // Reconciliacion de semana_activa de la rutina VIGENTE de UN alumno. Helper unico: lo usan el alumno logueado y el entrenador al tocar VER.
+  reconcileSemanaActivaAlumno: (alumnoId, rutinas, source) => reconcileCurrentRoutineForAlumno({
+    client: supabase,
+    alumnoId: alumnoId,
+    rutinas: rutinas,
+    fetchSesionesPage: sb.getSesionesPageByRutina,
+    source: source,
+  }),
   deleteRutina: async function (id) {
     const { error } = await supabase.from("rutinas").delete().eq("id", id);
     if (error) throw error;
@@ -1693,21 +1702,10 @@ function GymApp() {
             }
             // Reconciliar semana_activa con las sesiones (null o atrasada con la semana W ya completa => W+1). Idempotente, monotono y sin
             // escribir si las sesiones no se pudieron leer completas. No bloquea la carga.
-            reconcileSemanaActiva({
-              client: supabase,
-              rutinaId: rSB.id,
-              alumnoId: sessionData.alumnoId,
-              fetchSesionesPage: sb.getSesionesPageByRutina,
-            }).then(function (rec) {
+            sb.reconcileSemanaActivaAlumno(sessionData.alumnoId, rutsRaw, "alumno").then(function (rec) {
               if (rec && rec.status === "advanced") {
-                setRoutines(function (prev) {
-                  return (prev || []).map(function (r0) {
-                    return String(r0 && r0.id) === String(rSB.id)
-                      ? Object.assign({}, r0, { datos: Object.assign({}, r0.datos || {}, { semana_activa: rec.to }) })
-                      : r0;
-                  });
-                });
-                setCurrentWeek(rec.to - 1);
+                setRoutines(function (prev) { return applySemanaActivaToRutinas(prev, rec.rutinaId, rec.semanaActiva); });
+                setCurrentWeek(rec.semanaActiva - 1);
               }
             }).catch(function (e) { console.error("[reconcileSemanaActiva]", e); });
           }
