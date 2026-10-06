@@ -569,4 +569,65 @@ await test("vista: ingles", () => {
   assert.ok(html.includes("Last 4 weeks · kg × reps"));
 });
 
+// ------------------------------------------------------------------ 12. regresion QA preview: pct matematico existente + showPct=false => NO se renderiza
+const { buildTrainingVolumeModel } = V;
+const eviRemote = () => EVI.map(([id, fecha, vol], i) => ({ id: i + 1, ejercicio_id: id, kg: vol, reps: 1, fecha, semana: 1, nota: "", created_at: "2026-09-01T00:00:00Z" }));
+// Misma tuberia que el contenedor: fetch paginado -> merge remoto+local -> modelo -> vista.
+const eviPipeline = async (now) => {
+  const remote = await fetchTrainingVolumeRows(async (p) => (/offset=0\b/.test(p) ? eviRemote() : []), "76fb8876-270a-4fa6-9b7a-f664e0b42799", { now });
+  return buildTrainingVolumeModel(remote, {}, [], now);
+};
+const noPctMarkup = (html) => !html.includes("training-volume-pct") && !html.includes("vs 4 sem. anteriores") && !/-?\d+% vs/.test(html) && !html.includes("-28%");
+
+await test("vista (gate): pct matematico finito + showPct=false => NO renderiza porcentaje, aunque exista pctLabel", () => {
+  const m = eviModel();
+  assert.ok(Number.isFinite(m.pct), "el pct matematico existe");
+  assert.equal(m.showPct, false);
+  assert.ok(noPctMarkup(render(m)));
+  // aun si pctLabel llegara poblado, la vista respeta showPct
+  const forced = Object.assign({}, m, { pctLabel: "-28%", showPct: false });
+  assert.ok(noPctMarkup(render(forced)));
+  assert.ok(noPctMarkup(render(forced, true)));
+  // y con showPct=true si se renderiza (el gate es la unica diferencia)
+  assert.ok(render(Object.assign({}, forced, { showPct: true })).includes("-28% vs 4 sem. anteriores"));
+});
+await test("integracion Evi, hoy = 2026-10-05: showPct=false (PREVIOUS solo P4) y la UI NO muestra '-28% vs 4 sem. anteriores'", async () => {
+  const now = new Date(2026, 9, 5, 10);
+  const m = await eviPipeline(now);
+  assert.equal(todayDayNum(now), T);
+  assert.equal(m.currentTotal, 12075);
+  assert.deepEqual(m.blocks.map((b) => b.kg), [5895, 0, 0, 6180]);
+  assert.ok(Math.abs(m.pct - -27.727068681729764) < 1e-9);
+  assert.equal(m.showPct, false);
+  assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_en_<2_bloques"]);
+  assert.deepEqual(m.comparablePreviousBlocks, ["P4"]);
+  const html = render(m);
+  assert.ok(html.includes("12,1 t"));
+  assert.ok(noPctMarkup(html));
+});
+await test("integracion: lectura incompleta o con error => sin modelo => sin card (nunca pct ni 0 kg)", async () => {
+  const bad = await fetchTrainingVolumeRows(async () => null, "a", { now: new Date(2026, 9, 5) });
+  assert.equal(buildTrainingVolumeModel(bad, {}, [], new Date(2026, 9, 5)), null);
+  assert.equal(render(buildTrainingVolumeModel(bad, {}, [], new Date(2026, 9, 5))), "");
+  assert.equal(buildTrainingVolumeModel(null, {}, [], new Date()), null);
+});
+// CARACTERIZACION del contrato vigente (no lo cambia): los bloques P1..P4 y todo el calculo dependen de la fecha
+// del dispositivo. Con hoy = 2026-10-06 el 1/9 pasa de off 34 (P4) a off 35 (P3); entonces PREVIOUS comparable
+// ocupa P3 y P4 (2 bloques) y el contrato aprobado SI muestra el porcentaje (-28%). Es lo que vio QA el 6/10.
+await test("caracterizacion Evi, hoy = 2026-10-06: 1/9 pasa a P3 => showPct=true, -28% (contrato vigente, depende de la fecha)", async () => {
+  const m = await eviPipeline(new Date(2026, 9, 6, 10));
+  assert.equal(m.currentTotal, 12075);
+  assert.equal(formatVolume(m.currentTotal), "12,1 t");
+  assert.deepEqual(m.blocks.map((b) => b.kg), [5895, 0, 6180, 0], "29/9 es off 7 => B3; B4 (off 6..0) queda en 0");
+  assert.deepEqual(m.comparablePreviousBlocks, ["P3", "P4"]);
+  assert.equal(m.showPct, true);
+  assert.equal(m.pctLabel, "-28%");
+  assert.ok(render(m).includes("-28% vs 4 sem. anteriores"));
+});
+await test("borde de bloque: 1/9 es off 34 (P4) el 5/10 y off 35 (P3) el 6/10; 3/9 y 7/9 siguen en P4", () => {
+  const rows = [row("sq", 10, 1, "1/9/2026"), row("lp", 10, 1, "1/9/2026")];
+  assert.deepEqual(computeTrainingVolume(rows.concat([row("sq", 1, 1, "5/10/2026"), row("lp", 1, 1, "5/10/2026")]), { today: dayNum(2026, 10, 5) }).comparablePreviousBlocks, ["P4"]);
+  assert.deepEqual(computeTrainingVolume(rows.concat([row("sq", 1, 1, "6/10/2026"), row("lp", 1, 1, "6/10/2026")]), { today: dayNum(2026, 10, 6) }).comparablePreviousBlocks, ["P3"]);
+});
+
 console.log(count + " tests OK");

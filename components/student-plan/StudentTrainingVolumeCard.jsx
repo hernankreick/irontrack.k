@@ -1,12 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  collectRoutineExerciseDefs,
-  computeTrainingVolume,
+  buildTrainingVolumeModel,
   fetchTrainingVolumeRows,
   formatDayShort,
   formatVolume,
-  mergeRemoteAndLocalRows,
-  todayDayNum,
 } from '../../lib/trainingVolume.js';
 
 const BAR_AREA_H = 36;
@@ -132,13 +129,7 @@ export default function StudentTrainingVolumeCard({ alumnoId, progress, routines
   }, [alumnoId, fetchPage]);
 
   const model = useMemo(function () {
-    if (!remote || !remote.complete) return null;
-    const rows = mergeRemoteAndLocalRows(remote.rows, progress);
-    return computeTrainingVolume(rows, {
-      today: todayDayNum(new Date()),
-      complete: true,
-      routineExerciseDefs: collectRoutineExerciseDefs(routines),
-    });
+    return buildTrainingVolumeModel(remote, progress, routines, new Date());
   }, [remote, progress, routines]);
 
   return <TrainingVolumeCardView model={model} _dm={_dm} textMuted={textMuted} msg={msg} />;
