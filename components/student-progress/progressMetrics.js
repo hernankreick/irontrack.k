@@ -1,6 +1,6 @@
 /** @typedef {{ kg: number, reps: number, fecha: string }} RawSet */
 
-import { parseFechaDMYToLocalDate } from '../../lib/progressDate.js'
+import { parseFechaDMY, parseFechaDMYToLocalDate } from '../../lib/progressDate.js'
 
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/
 
@@ -34,7 +34,44 @@ export function dayKeyFromAny(str) {
 }
 
 /**
- * Igual que getDatos en GraficoProgreso: combina local + Supabase y dedupe.
+ * Firma de una serie real: ejercicio + día + kg + reps. El día se normaliza (05/10/2026 == 5/10/2026);
+ * si la fecha no es d/m/yyyy válido se usa el texto tal cual.
+ */
+function setSignature(exId, fecha, kg, reps) {
+  const f = typeof fecha === 'string' ? fecha.trim() : fecha
+  const day = parseFechaDMY(f)
+  return `${String(exId)}|${day == null ? `raw:${String(fecha)}` : day}|${kg}|${reps}`
+}
+
+/**
+ * Reconcilia filas locales (caché) con remotas (Supabase) por multiplicidad máxima:
+ * para cada firma conserva max(cantidad local, cantidad remota) filas — nunca la suma (caché + servidor
+ * duplicados) ni una sola (series reales idénticas del mismo día). Las filas repetidas dentro de una
+ * misma fuente se conservan. Se prefieren las copias remotas en el solape; las locales sobrantes se agregan.
+ * Pura y determinista: el orden de salida sigue el de primera aparición de cada firma.
+ */
+export function reconcileRowsByMaxMultiplicity(localRows, remoteRows, signatureOf) {
+  const groups = new Map()
+  const slot = (key) => {
+    let g = groups.get(key)
+    if (!g) {
+      g = { local: [], remote: [] }
+      groups.set(key, g)
+    }
+    return g
+  }
+  ;(localRows || []).forEach((r) => slot(signatureOf(r)).local.push(r))
+  ;(remoteRows || []).forEach((r) => slot(signatureOf(r)).remote.push(r))
+  const out = []
+  groups.forEach((g) => {
+    const keep = Math.max(g.local.length, g.remote.length)
+    for (let i = 0; i < keep; i++) out.push(i < g.remote.length ? g.remote[i] : g.local[i])
+  })
+  return out
+}
+
+/**
+ * Igual que getDatos en GraficoProgreso: combina local + Supabase (multiplicidad máxima) y ordena por fecha.
  */
 export function mergeSetsForExercise(exId, progress, sbData) {
   const local = (progress[exId]?.sets || [])
@@ -52,18 +89,14 @@ export function mergeSetsForExercise(exId, progress, sbData) {
       fecha: d.fecha,
     }))
   const ms = (r) => parseProgressDate(r.fecha)?.getTime() ?? -Infinity
-  const todos = [...local, ...remote].sort((a, b) => {
-    const ta = ms(a)
-    const tb = ms(b)
-    return ta === tb ? 0 : ta > tb ? 1 : -1
-  })
-  const seen = new Set()
-  return todos.filter((d) => {
-    const k = String(d.fecha) + d.kg
-    if (seen.has(k)) return false
-    seen.add(k)
-    return true
-  }).slice(-20)
+  const todos = reconcileRowsByMaxMultiplicity(local, remote, (r) => setSignature(exId, r.fecha, r.kg, r.reps)).sort(
+    (a, b) => {
+      const ta = ms(a)
+      const tb = ms(b)
+      return ta === tb ? 0 : ta > tb ? 1 : -1
+    }
+  )
+  return todos.slice(-20)
 }
 
 export function exercisesWithData(allEx, EX, progress, sbData) {
@@ -199,35 +232,27 @@ export function rowVolumeKg(row) {
 }
 
 /**
- * Todos los sets sueltos (local + remoto, dedupe por ejercicio+fecha+kg como mergeSets).
+ * Todos los sets sueltos (local + remoto). Misma reconciliación que mergeSetsForExercise: multiplicidad máxima
+ * por ejercicio + día + kg + reps (las series reales repetidas se conservan; caché + servidor no se duplican).
  */
 export function collectAllProgressRows(progress, sbData) {
-  const out = []
-  const seen = new Set()
+  const local = []
   Object.keys(progress || {}).forEach((exId) => {
     ;(progress[exId]?.sets || []).forEach((s) => {
       const kg = parseFloat(s.kg) || 0
       const reps = parseInt(s.reps, 10) || 0
       if (kg <= 0) return
-      const fecha = s.date
-      const k = `${exId}|${fecha}|${kg}|${reps}`
-      if (seen.has(k)) return
-      seen.add(k)
-      out.push({ ejercicio_id: exId, kg, reps, fecha })
+      local.push({ ejercicio_id: exId, kg, reps, fecha: s.date })
     })
   })
+  const remote = []
   ;(sbData || []).forEach((d) => {
     const kg = parseFloat(d.kg) || 0
     const reps = parseInt(d.reps, 10) || 0
     if (kg <= 0) return
-    const exId = d.ejercicio_id
-    const fecha = d.fecha
-    const k = `${exId}|${fecha}|${kg}|${reps}`
-    if (seen.has(k)) return
-    seen.add(k)
-    out.push({ ejercicio_id: exId, kg, reps, fecha })
+    remote.push({ ejercicio_id: d.ejercicio_id, kg, reps, fecha: d.fecha })
   })
-  return out
+  return reconcileRowsByMaxMultiplicity(local, remote, (r) => setSignature(r.ejercicio_id, r.fecha, r.kg, r.reps))
 }
 
 function volumeInRange(rows, startMs, endMs) {

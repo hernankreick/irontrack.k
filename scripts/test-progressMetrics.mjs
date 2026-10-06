@@ -14,7 +14,8 @@ const PM = await import("../components/student-progress/progressMetrics.js");
 const TV = await import("../lib/trainingVolume.js");
 const {
   parseProgressDate, dayKeyFromAny, mergeSetsForExercise, buildWeeklyVolumeModel, trainingDaysThisWeek,
-  computeDayStreak, countPRsThisMonth, filterRowsByRange, averageImprovementPercent,
+  computeDayStreak, countPRsThisMonth, filterRowsByRange, averageImprovementPercent, collectAllProgressRows,
+  hasAnyTrainingData,
 } = PM;
 
 let count = 0;
@@ -147,7 +148,7 @@ test("D. slice(-20) cruzando de mes: octubre queda al final", () => {
 
 test("D. dedupe existente (fecha + kg) preservado; ejercicio y kg<=0 filtrados", () => {
   const progress = { e1: { sets: [{ kg: "100", reps: "5", date: "5/10/2026" }] } };
-  const sb = [row("5/10/2026", 100), row("5/10/2026", 105), row("4/10/2026", 0), { ...row("3/10/2026", 90), ejercicio_id: "otro" }];
+  const sb = [row("5/10/2026", 100, 5), row("5/10/2026", 105), row("4/10/2026", 0), { ...row("3/10/2026", 90), ejercicio_id: "otro" }];
   const out = mergeSetsForExercise("e1", progress, sb);
   assert.equal(out.length, 2);
   assert.deepEqual(out.map((r) => r.kg).sort(), [100, 105]);
@@ -244,6 +245,137 @@ test("E. averageImprovementPercent usa primero/ultimo cronologicos", () => {
   // string-sort viejo habria dejado 1/10 antes de 14/9 y dado 100% de mejora al reves
   const sb = [row("1/10/2026", 120), row("14/9/2026", 100)];
   assert.equal(averageImprovementPercent([{ id: "e1" }], [], {}, sb), 20);
+});
+
+// ---------------------------------------------------------------- F. series reales repetidas (multiplicidad maxima local<->remoto)
+const rep = (n, fecha, kg, reps, ex) => Array.from({ length: n }, () => row(fecha, kg, reps, ex));
+const loc = (n, date, kg, reps) => ({ e1: { sets: Array.from({ length: n }, () => ({ kg: String(kg), reps: String(reps), date })) } });
+const merged = (progress, sb) => mergeSetsForExercise("e1", progress, sb);
+const collected = (progress, sb) => collectAllProgressRows(progress, sb);
+
+test("F1. remote: 3 filas identicas el mismo dia => 3", () => {
+  const sb = rep(3, "29/9/2026", 50, 15);
+  assert.equal(merged({}, sb).length, 3);
+  assert.equal(collected({}, sb).length, 3);
+});
+
+test("F2. local 1 + remote 1 identicas => 1", () => {
+  const p = loc(1, "29/9/2026", 50, 15);
+  const sb = rep(1, "29/9/2026", 50, 15);
+  assert.equal(merged(p, sb).length, 1);
+  assert.equal(collected(p, sb).length, 1);
+});
+
+test("F3. local 2 + remote 3 => 3 (max, no suma)", () => {
+  const p = loc(2, "29/9/2026", 50, 15);
+  const sb = rep(3, "29/9/2026", 50, 15);
+  assert.equal(merged(p, sb).length, 3);
+  assert.equal(collected(p, sb).length, 3);
+});
+
+test("F4. local 3 + remote 2 => 3 (max, no suma)", () => {
+  const p = loc(3, "29/9/2026", 50, 15);
+  const sb = rep(2, "29/9/2026", 50, 15);
+  assert.equal(merged(p, sb).length, 3);
+  assert.equal(collected(p, sb).length, 3);
+});
+
+test("F4b. solo local con 3 identicas => 3", () => {
+  assert.equal(merged(loc(3, "29/9/2026", 50, 15), []).length, 3);
+  assert.equal(collected(loc(3, "29/9/2026", 50, 15), []).length, 3);
+});
+
+test("F5. misma fecha y kg, reps distintas => ambas sobreviven", () => {
+  const sb = [row("29/9/2026", 50, 15), row("29/9/2026", 50, 12)];
+  assert.deepEqual(merged({}, sb).map((r) => r.reps).sort(), [12, 15]);
+  assert.equal(collected({}, sb).length, 2);
+  const p = loc(1, "29/9/2026", 50, 15);
+  assert.equal(merged(p, [row("29/9/2026", 50, 12)]).length, 2);
+  assert.equal(collected(p, [row("29/9/2026", 50, 12)]).length, 2);
+});
+
+test("F6. mismo ejercicio/fecha, pesos distintos => sobreviven", () => {
+  const sb = [row("29/9/2026", 50, 15), row("29/9/2026", 55, 15), row("29/9/2026", 60, 15)];
+  assert.equal(merged({}, sb).length, 3);
+  assert.equal(collected({}, sb).length, 3);
+});
+
+test("F7. fechas distintas, mismo kg/reps => sobreviven", () => {
+  const sb = [row("29/9/2026", 50, 15), row("30/9/2026", 50, 15), row("1/10/2026", 50, 15)];
+  assert.deepEqual(merged({}, sb).map((r) => r.fecha), ["29/9/2026", "30/9/2026", "1/10/2026"]);
+  assert.equal(collected({}, sb).length, 3);
+});
+
+test("F8. ejercicios distintos con misma fecha/kg/reps no se mezclan (collectAllProgressRows)", () => {
+  const sb = [row("29/9/2026", 50, 15, "e1"), row("29/9/2026", 50, 15, "e2"), row("29/9/2026", 50, 15, "e2")];
+  const out = collected({}, sb);
+  assert.equal(out.filter((r) => r.ejercicio_id === "e1").length, 1);
+  assert.equal(out.filter((r) => r.ejercicio_id === "e2").length, 2);
+  const p = { e1: { sets: [{ kg: "50", reps: "15", date: "29/9/2026" }] }, e2: { sets: [{ kg: "50", reps: "15", date: "29/9/2026" }] } };
+  assert.equal(collected(p, sb).length, 3); // max por ejercicio: e1 -> 1, e2 -> max(1,2) = 2
+});
+
+test("F8b. 05/10/2026 local y 5/10/2026 remoto son la misma firma; kg<=0 se ignora", () => {
+  assert.equal(merged(loc(1, "05/10/2026", 50, 15), rep(1, "5/10/2026", 50, 15)).length, 1);
+  assert.equal(collected(loc(1, "05/10/2026", 50, 15), rep(1, "5/10/2026", 50, 15)).length, 1);
+  assert.equal(collected({}, [row("5/10/2026", 0, 15)]).length, 0);
+});
+
+test("F8c. kg/reps como texto y numero comparten firma", () => {
+  const p = { e1: { sets: [{ kg: "50", reps: "15", date: "29/9/2026" }] } };
+  const sb = [{ ejercicio_id: "e1", fecha: "29/9/2026", kg: "50.0", reps: "15" }];
+  assert.equal(merged(p, sb).length, 1);
+  assert.equal(collected(p, sb).length, 1);
+});
+
+test("F9. volumen usa TODAS las series: 3 x (50 x 15) = 2250 kg, no 750", () => {
+  const sb = rep(3, "5/10/2026", 50, 15);
+  const m = buildWeeklyVolumeModel({}, sb, [], NOW);
+  assert.equal(m.volWeekTon * 1000, 2250);
+  // local 2 + remote 3 => 3 series; local 3 + remote 2 => 3 series
+  assert.equal(buildWeeklyVolumeModel(loc(2, "5/10/2026", 50, 15), sb, [], NOW).volWeekTon * 1000, 2250);
+  assert.equal(buildWeeklyVolumeModel(loc(3, "5/10/2026", 50, 15), rep(2, "5/10/2026", 50, 15), [], NOW).volWeekTon * 1000, 2250);
+  // local 1 + remote 1 = una sola serie
+  assert.equal(buildWeeklyVolumeModel(loc(1, "5/10/2026", 50, 15), rep(1, "5/10/2026", 50, 15), [], NOW).volWeekTon * 1000, 750);
+});
+
+test("F9b. otros consumidores de collectAllProgressRows reciben la multiplicidad", () => {
+  assert.equal(hasAnyTrainingData([], {}, rep(3, "5/10/2026", 50, 15)), true);
+  // spark de hoy (6/10) y semana previa con series repetidas
+  const m = buildWeeklyVolumeModel({}, [...rep(3, "6/10/2026", 50, 15), ...rep(2, "29/9/2026", 50, 15)], [], NOW);
+  assert.equal(m.sparkDaily[6] * 1000, 2250);
+  assert.equal(m.volPrevTon * 1000, 1500);
+  assert.equal(trainingDaysThisWeek([], {}, rep(3, "6/10/2026", 50, 15), NOW), 1);
+});
+
+test("F10. orden cronologico y slice(-20) con series repetidas", () => {
+  const sb = [];
+  for (let d = 1; d <= 24; d++) sb.push(row(d + "/9/2026", 40 + d, 10));
+  sb.push(...rep(3, "1/10/2026", 50, 15));
+  const out = merged({}, sb);
+  assert.equal(out.length, 20);
+  assert.deepEqual(out.slice(-3).map((r) => r.fecha), ["1/10/2026", "1/10/2026", "1/10/2026"]);
+  assert.equal(out[0].fecha, "8/9/2026"); // 27 filas -> ultimas 20
+  const t = out.map((r) => parseProgressDate(r.fecha).getTime());
+  assert.deepEqual(t, [...t].sort((a, b) => a - b));
+});
+
+test("F10b. determinista: mismo input => mismo output, sin mutar entradas", () => {
+  const p = loc(2, "29/9/2026", 50, 15);
+  const sb = [...rep(3, "29/9/2026", 50, 15), row("28/9/2026", 40, 10)];
+  const snap = JSON.stringify([p, sb]);
+  const a = JSON.stringify(merged(p, sb));
+  assert.equal(JSON.stringify(merged(p, sb)), a);
+  assert.equal(JSON.stringify([p, sb]), snap);
+});
+
+test("F11. metricas derivadas: PRs y mejora no se rompen con series repetidas", () => {
+  withNow(2026, 10, 6, () => {
+    const sb = [row("14/9/2026", 80), ...rep(3, "1/10/2026", 100, 5), ...rep(2, "5/10/2026", 110, 5)];
+    // PR = superar el maximo previo: series iguales al maximo no cuentan
+    assert.equal(countPRsThisMonth([{ id: "e1" }], [], {}, sb), 2);
+  });
+  assert.equal(averageImprovementPercent([{ id: "e1" }], [], {}, [row("14/9/2026", 100), ...rep(3, "5/10/2026", 120, 5)]), 20);
 });
 
 console.log(count + " tests OK");
