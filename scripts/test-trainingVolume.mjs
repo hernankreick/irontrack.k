@@ -256,7 +256,7 @@ await test("pct = (currentComparable - previousComparable) / previousComparable 
   // comunes: sq y lp. CURRENT comparable 600, PREVIOUS comparable 400 -> +50%. currentTotal incluye 900 extra no comparables.
   const rows = [].concat(
     exSets("sq", 1), exSets("sq", 10, 2), exSets("lp", 20, 3),        // 600 (3 dias)
-    exSets("sq", 30), exSets("lp", 38), exSets("sq", 50, 1), exSets("lp", 45), // 400 en P4, P3.. (ver abajo)
+    exSets("sq", 30), exSets("lp", 38), exSets("sq", 50, 1), exSets("lp", 45), // 400 en PREVIOUS (4 dias, span 20)
     exSets("legext", 2, 9),                                              // 900 solo CURRENT
   );
   const m = compute(rows);
@@ -269,13 +269,13 @@ await test("pct = (currentComparable - previousComparable) / previousComparable 
 });
 const goodPctRows = () => [].concat(
   exSets("sq", 1), exSets("lp", 9),                      // CURRENT: 2 dias comparables
-  exSets("sq", 30), exSets("lp", 44),                    // PREVIOUS: 2 dias en P4 (off 30) y P2 (off 44)
+  exSets("sq", 30), exSets("lp", 44),                    // PREVIOUS: 2 dias (off 30 y 44, span 14)
 );
 await test("showPct: caso base positivo (todas las condiciones)", () => {
   const m = compute(goodPctRows());
   assert.deepEqual(m.pctHiddenReasons, []);
   assert.equal(m.showPct, true);
-  assert.deepEqual(m.comparablePreviousBlocks, ["P2", "P4"]);
+  assert.equal(m.previousHistorySpan, 14);
   assert.equal(m.pctLabel, "0%");
 });
 await test("showPct: commonExercises < 2 => oculto", () => {
@@ -299,22 +299,50 @@ await test("showPct: PREVIOUS comparable en < 2 dias => oculto", () => {
   assert.equal(m.showPct, false);
   assert.ok(m.pctHiddenReasons.includes(PCT_HIDDEN_REASONS.PREVIOUS_DAYS));
 });
-await test("showPct: PREVIOUS comparable en un solo bloque (P4) aunque haya 3 dias => oculto", () => {
+await test("showPct: PREVIOUS comparable con span < 7 dias (3 dias dentro de 6) => oculto, pct matematico existe", () => {
   const m = compute([].concat(exSets("sq", 1), exSets("lp", 9), exSets("sq", 28), exSets("lp", 32), exSets("sq", 34)));
   assert.equal(m.comparablePreviousDays.length, 3);
-  assert.deepEqual(m.comparablePreviousBlocks, ["P4"]);
+  assert.equal(m.previousHistorySpan, 6);
   assert.equal(m.showPct, false);
-  assert.deepEqual(m.pctHiddenReasons, [PCT_HIDDEN_REASONS.PREVIOUS_BLOCKS]);
-  assert.equal(PCT_HIDDEN_REASONS.PREVIOUS_BLOCKS, "PREVIOUS_en_<2_bloques");
+  assert.deepEqual(m.pctHiddenReasons, [PCT_HIDDEN_REASONS.PREVIOUS_SPAN]);
+  assert.equal(PCT_HIDDEN_REASONS.PREVIOUS_SPAN, "PREVIOUS_span_<7_dias");
   assert.ok(Number.isFinite(m.pct), "el pct matematico existe aunque no se muestre");
+});const prevSpan = (offA, offB) => compute([].concat(exSets("sq", 1), exSets("lp", 9), exSets("sq", offA), exSets("lp", offB)));
+await test("span PREVIOUS: dias 1 y 7 (span 6) => oculto; dias 1 y 8 (span 7) => permitido", () => {
+  // 11/8/2026 es off 55 y 17/8 off 49 (span 6); 18/8 es off 48 (span 7). Todo PREVIOUS con today = 2026-10-05.
+  const hidden = compute([].concat(exSets("sq", 1), exSets("lp", 9), [row("sq", 10, 10, "11/8/2026"), row("lp", 10, 10, "17/8/2026")]));
+  assert.equal(hidden.previousHistorySpan, 6);
+  assert.equal(hidden.showPct, false);
+  assert.deepEqual(hidden.pctHiddenReasons, [PCT_HIDDEN_REASONS.PREVIOUS_SPAN]);
+  const ok = compute([].concat(exSets("sq", 1), exSets("lp", 9), [row("sq", 10, 10, "11/8/2026"), row("lp", 10, 10, "18/8/2026")]));
+  assert.equal(ok.previousHistorySpan, 7);
+  assert.equal(ok.showPct, true);
+  assert.deepEqual(ok.pctHiddenReasons, []);
 });
-await test("showPct: bloques P1..P4 borde a borde (55/49, 48/42, 41/35, 34/28)", () => {
-  const blocks = (offs) => compute([].concat(exSets("sq", 1), exSets("lp", 9), offs.flatMap((o) => exSets(o % 2 ? "sq" : "lp", o)), exSets("sq", 29), exSets("lp", 30))).comparablePreviousBlocks;
-  assert.deepEqual(blocks([55, 49]), ["P1", "P4"]);
-  assert.deepEqual(blocks([48, 42]), ["P2", "P4"]);
-  assert.deepEqual(blocks([41, 35]), ["P3", "P4"]);
+await test("span PREVIOUS: varios entrenamientos concentrados en <= 6 dias => oculto; distribuidos >= 7 => permitido", () => {
+  const concentrated = [].concat(exSets("sq", 1), exSets("lp", 9), [55, 54, 53, 52, 51, 50, 49].flatMap((o, i) => exSets(i % 2 ? "lp" : "sq", o)));
+  const c = compute(concentrated);
+  assert.equal(c.comparablePreviousDays.length, 7);
+  assert.equal(c.previousHistorySpan, 6);
+  assert.equal(c.showPct, false);
+  const spread = compute([].concat(exSets("sq", 1), exSets("lp", 9), [55, 54, 53, 52, 51, 50, 48].flatMap((o, i) => exSets(i % 2 ? "lp" : "sq", o))));
+  assert.equal(spread.previousHistorySpan, 7);
+  assert.equal(spread.showPct, true);
+  assert.equal(prevSpan(30, 50).previousHistorySpan, 20);
+  assert.equal(prevSpan(30, 50).showPct, true);
 });
-await test("showPct: retrieval incompleto => modelo vacio, card y pct ocultos", () => {
+await test("span PREVIOUS: depende de la separacion entre dias, no de la posicion respecto de today (sin efectos de borde)", () => {
+  // misma separacion (6 y 7 dias) desplazada dia a dia a lo largo de todo PREVIOUS: el resultado no cambia.
+  for (let hi = 34; hi <= 55; hi++) {
+    const sixAgo = compute([].concat(exSets("sq", 1), exSets("lp", 9), exSets("sq", hi - 6 >= 28 ? hi - 6 : hi), exSets("lp", hi)));
+    if (hi - 6 >= 28) { assert.equal(sixAgo.previousHistorySpan, 6, "hi=" + hi); assert.equal(sixAgo.showPct, false, "hi=" + hi); }
+    if (hi - 7 >= 28) {
+      const seven = compute([].concat(exSets("sq", 1), exSets("lp", 9), exSets("sq", hi - 7), exSets("lp", hi)));
+      assert.equal(seven.previousHistorySpan, 7, "hi=" + hi);
+      assert.equal(seven.showPct, true, "hi=" + hi);
+    }
+  }
+});await test("showPct: retrieval incompleto => modelo vacio, card y pct ocultos", () => {
   const m = compute(goodPctRows(), { complete: false });
   assert.equal(m.showCard, false);
   assert.equal(m.showPct, false);
@@ -473,12 +501,12 @@ await test("Evi (today=2026-10-05): resultado de referencia del preflight", () =
   assert.ok(Math.abs(m.pct - -27.727068681729764) < 1e-9);
   assert.equal(Math.round(m.pct), -28);
   assert.equal(m.showPct, false);
-  assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_en_<2_bloques"]);
+  assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_span_<7_dias"]);
   assert.deepEqual(m.currentDays.map(formatDayShort), ["09/09", "14/09", "29/09"]);
   assert.deepEqual(m.previousDays.map(formatDayShort), ["01/09", "03/09", "07/09"]);
   assert.equal(m.comparableCurrentDays.length, 3);
   assert.equal(m.comparablePreviousDays.length, 3);
-  assert.deepEqual(m.comparablePreviousBlocks, ["P4"]);
+  assert.equal(m.previousHistorySpan, 6, "7/9 - 1/9");
   assert.equal(m.showCard, true);
   const by = m.diagnostics.byReason;
   assert.deepEqual(Object.keys(by.patron_no_fuerza.ids), ["core_remo_renegado"]);
@@ -591,7 +619,7 @@ await test("vista (gate): pct matematico finito + showPct=false => NO renderiza 
   // y con showPct=true si se renderiza (el gate es la unica diferencia)
   assert.ok(render(Object.assign({}, forced, { showPct: true })).includes("-28% vs 4 sem. anteriores"));
 });
-await test("integracion Evi, hoy = 2026-10-05: showPct=false (PREVIOUS solo P4) y la UI NO muestra '-28% vs 4 sem. anteriores'", async () => {
+await test("integracion Evi, hoy = 2026-10-05: showPct=false (span PREVIOUS 6) y la UI NO muestra '-28% vs 4 sem. anteriores'", async () => {
   const now = new Date(2026, 9, 5, 10);
   const m = await eviPipeline(now);
   assert.equal(todayDayNum(now), T);
@@ -599,8 +627,8 @@ await test("integracion Evi, hoy = 2026-10-05: showPct=false (PREVIOUS solo P4) 
   assert.deepEqual(m.blocks.map((b) => b.kg), [5895, 0, 0, 6180]);
   assert.ok(Math.abs(m.pct - -27.727068681729764) < 1e-9);
   assert.equal(m.showPct, false);
-  assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_en_<2_bloques"]);
-  assert.deepEqual(m.comparablePreviousBlocks, ["P4"]);
+  assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_span_<7_dias"]);
+  assert.equal(m.previousHistorySpan, 6);
   const html = render(m);
   assert.ok(html.includes("12,1 t"));
   assert.ok(noPctMarkup(html));
@@ -611,23 +639,34 @@ await test("integracion: lectura incompleta o con error => sin modelo => sin car
   assert.equal(render(buildTrainingVolumeModel(bad, {}, [], new Date(2026, 9, 5))), "");
   assert.equal(buildTrainingVolumeModel(null, {}, [], new Date()), null);
 });
-// CARACTERIZACION del contrato vigente (no lo cambia): los bloques P1..P4 y todo el calculo dependen de la fecha
-// del dispositivo. Con hoy = 2026-10-06 el 1/9 pasa de off 34 (P4) a off 35 (P3); entonces PREVIOUS comparable
-// ocupa P3 y P4 (2 bloques) y el contrato aprobado SI muestra el porcentaje (-28%). Es lo que vio QA el 6/10.
-await test("caracterizacion Evi, hoy = 2026-10-06: 1/9 pasa a P3 => showPct=true, -28% (contrato vigente, depende de la fecha)", async () => {
+// Evi con today = 2026-10-06: el 1/9 cruza de P4 a P3 (off 34 -> 35), pero la regla de confianza ya NO usa bloques de
+// 7 dias sino la separacion entre dias comparables (7/9 - 1/9 = 6 < 7), asi que el porcentaje sigue oculto.
+await test("Evi, hoy = 2026-10-06: sin porcentaje (span 6); el pct matematico sigue siendo ~-28%; 12,1 t; barras 5895/0/6180/0", async () => {
   const m = await eviPipeline(new Date(2026, 9, 6, 10));
   assert.equal(m.currentTotal, 12075);
   assert.equal(formatVolume(m.currentTotal), "12,1 t");
   assert.deepEqual(m.blocks.map((b) => b.kg), [5895, 0, 6180, 0], "29/9 es off 7 => B3; B4 (off 6..0) queda en 0");
-  assert.deepEqual(m.comparablePreviousBlocks, ["P3", "P4"]);
-  assert.equal(m.showPct, true);
-  assert.equal(m.pctLabel, "-28%");
-  assert.ok(render(m).includes("-28% vs 4 sem. anteriores"));
+  assert.equal(m.previousHistorySpan, 6);
+  assert.ok(Math.abs(m.pct - -27.727068681729764) < 1e-9);
+  assert.equal(Math.round(m.pct), -28);
+  assert.equal(m.showPct, false);
+  assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_span_<7_dias"]);
+  assert.equal(m.pctLabel, null);
+  const html = render(m);
+  assert.ok(html.includes("12,1 t"));
+  assert.ok(noPctMarkup(html));
 });
-await test("borde de bloque: 1/9 es off 34 (P4) el 5/10 y off 35 (P3) el 6/10; 3/9 y 7/9 siguen en P4", () => {
-  const rows = [row("sq", 10, 1, "1/9/2026"), row("lp", 10, 1, "1/9/2026")];
-  assert.deepEqual(computeTrainingVolume(rows.concat([row("sq", 1, 1, "5/10/2026"), row("lp", 1, 1, "5/10/2026")]), { today: dayNum(2026, 10, 5) }).comparablePreviousBlocks, ["P4"]);
-  assert.deepEqual(computeTrainingVolume(rows.concat([row("sq", 1, 1, "6/10/2026"), row("lp", 1, 1, "6/10/2026")]), { today: dayNum(2026, 10, 6) }).comparablePreviousBlocks, ["P3"]);
+await test("mover today un dia (5/10 -> 6/10) no habilita el porcentaje de Evi solo por cruzar el borde de un bloque", async () => {
+  const a = await eviPipeline(new Date(2026, 9, 5, 10));
+  const b = await eviPipeline(new Date(2026, 9, 6, 10));
+  assert.equal(a.showPct, false);
+  assert.equal(b.showPct, false);
+  assert.equal(a.previousHistorySpan, b.previousHistorySpan);
+  assert.deepEqual(a.comparablePreviousDays, b.comparablePreviousDays);
+  assert.deepEqual(a.pctHiddenReasons, b.pctHiddenReasons);
+  assert.equal(a.pct, b.pct, "el calculo matematico no cambia");
+  assert.equal(a.currentTotal, b.currentTotal);
+  assert.ok(noPctMarkup(render(a)) && noPctMarkup(render(b)));
 });
 
 console.log(count + " tests OK");
