@@ -139,6 +139,8 @@ import {
 } from './lib/routineStore.js';
 import { getActiveStudentRoutinePosition } from './lib/studentWeeklyProgress.js';
 import { updateRutinaSemanaActiva as updateRutinaSemanaActivaLib } from './lib/updateRutinaSemanaActiva.js';
+import { updateRutinaPreservingOperational, withInitialSemanaActiva } from './lib/rutinaOperationalState.js';
+import { reconcileSemanaActiva } from './lib/reconcileSemanaActiva.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import {
   prepareExerciseHistoryModalData,
@@ -301,18 +303,28 @@ const sb = {
     return data || [];
   },
   createRutina: async (data) => {
-    const body = cleanRutinaWriteBody(data);
+    // Toda rutina asignada nace con semana_activa = 1 explicita (las plantillas no).
+    const body = withInitialSemanaActiva(cleanRutinaWriteBody(data));
     const { data: created, error } = await supabase.from("rutinas").insert([body]).select();
     if (error) { console.error("[rutinas INSERT ERROR]", error); return null; }
     return created || [];
   },
-  updateRutina: async (id, data) => {
+  // Los guardados del entrenador NO pisan el estado operativo (semana_activa, semana_reiniciada, semana_reiniciada_at): se fusiona contra
+  // `datos` fresco de la DB. Solo las acciones explicitas de reinicio pasan options.writeOperationalState = true.
+  updateRutina: async (id, data, options) => {
     const body = cleanRutinaWriteBody(data);
-    const { data: updated, error } = await supabase.from("rutinas").update(body).eq("id", id).select();
-    if (error) { console.error("[rutinas UPDATE ERROR]", error); return null; }
-    return updated || [];
+    return updateRutinaPreservingOperational(supabase, id, body, options);
   },
+  // Avance MONOTONO (nunca retrocede) de la semana del alumno; lo usa finalizeStudentSession.
   updateRutinaSemanaActiva: (rutinaId, nextWeek) => updateRutinaSemanaActivaLib(supabase, rutinaId, nextWeek),
+  // Una pagina de sesiones de una rutina (para reconciliar la semana). Lanza ante error: la reconciliacion no escribe si falta algo.
+  getSesionesPageByRutina: async ({ rutinaId, alumnoId, from, to }) => {
+    var q = supabase.from("sesiones").select("id,alumno_id,rutina_id,semana,dia_idx,fecha,created_at").eq("rutina_id", String(rutinaId));
+    if (alumnoId != null && alumnoId !== "") q = q.eq("alumno_id", String(alumnoId));
+    const { data, error } = await q.order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to);
+    if (error) throw error;
+    return data || [];
+  },
   deleteRutina: async function (id) {
     const { error } = await supabase.from("rutinas").delete().eq("id", id);
     if (error) throw error;
@@ -1679,6 +1691,25 @@ function GymApp() {
             if (Number.isFinite(persistedWeekNum) && persistedWeekNum >= 1 && persistedWeekNum <= 4) {
               setCurrentWeek(persistedWeekNum - 1);
             }
+            // Reconciliar semana_activa con las sesiones (null o atrasada con la semana W ya completa => W+1). Idempotente, monotono y sin
+            // escribir si las sesiones no se pudieron leer completas. No bloquea la carga.
+            reconcileSemanaActiva({
+              client: supabase,
+              rutinaId: rSB.id,
+              alumnoId: sessionData.alumnoId,
+              fetchSesionesPage: sb.getSesionesPageByRutina,
+            }).then(function (rec) {
+              if (rec && rec.status === "advanced") {
+                setRoutines(function (prev) {
+                  return (prev || []).map(function (r0) {
+                    return String(r0 && r0.id) === String(rSB.id)
+                      ? Object.assign({}, r0, { datos: Object.assign({}, r0.datos || {}, { semana_activa: rec.to }) })
+                      : r0;
+                  });
+                });
+                setCurrentWeek(rec.to - 1);
+              }
+            }).catch(function (e) { console.error("[reconcileSemanaActiva]", e); });
           }
           setSesiones(ses || []);
           sb.getNota(sessionData.alumnoId).then(function(res) {
@@ -2305,7 +2336,7 @@ function GymApp() {
         alumno_id: aid,
         entrenador_id: rut.entrenador_id || ENTRENADOR_ID,
         datos: resetDatos,
-      });
+      }, { writeOperationalState: true });
       setRutinasSBEntrenador(function (prev) {
         return (prev || []).map(function (r0) {
           return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetDatos }) : r0;
@@ -2525,7 +2556,7 @@ function GymApp() {
         alumno_id: aid,
         entrenador_id: rut.entrenador_id || ENTRENADOR_ID,
         datos: resetAllDatos,
-      });
+      }, { writeOperationalState: true });
       setRutinasSBEntrenador(function (prev) {
         return (prev || []).map(function (r0) {
           return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetAllDatos }) : r0;
@@ -2802,6 +2833,7 @@ function GymApp() {
               email: c.a.email || "",
             },
             note: c.rutinaLocal.datos?.note || "",
+            semana_activa: 1,
           },
         };
         console.error("[assignRut legacy error]", {
