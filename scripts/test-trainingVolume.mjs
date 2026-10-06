@@ -794,13 +794,13 @@ await test("card: kg, 'Ver detalle ›' discreto, 4 barras, sin toneladas", asyn
   assert.ok(!/<(div|span)[^>]*data-block="B\d"[^>]*onclick/i.test(html), "las barras no son el mecanismo de navegacion");
   assert.ok(!/<button[^>]*data-block/.test(html));
 });
-await test("detalle: encabezado, rango, referencia, total, 'Volumen de la semana', Entrenamientos y filas por dia", async () => {
+await test("detalle: encabezado, rango, referencia, total, 'Volumen del período', Entrenamientos y filas por dia", async () => {
   const m = await eviOct6();
   const html = renderDetail(m, 2); // B3: 23 – 29 sep
   assert.ok(html.includes("Detalle de volumen") && html.includes("Historial de las últimas 4 semanas"));
   assert.ok(html.includes(">23 – 29 sep<") && html.includes(">8–14 días atrás<"));
   assert.match(html, /data-testid="training-volume-period-total"[^>]*>6\.180 kg</);
-  assert.ok(html.includes("Volumen de la semana") && html.includes("Entrenamientos"));
+  assert.ok(html.includes("Volumen del período") && html.includes("Entrenamientos"));
   const rows = [...html.matchAll(/data-testid="training-volume-day"[^>]*>(.*?)<\/div>/g)];
   assert.equal(rows.length, 1);
   assert.ok(rows[0][1].includes(formatDayRow(dayNum(2026, 9, 29), "es")) && rows[0][1].includes("6.180 kg"));

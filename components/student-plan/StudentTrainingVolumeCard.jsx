@@ -217,7 +217,7 @@ export function TrainingVolumeDetailView({ model, selected, onSelect, onBack, _d
           {formatVolume(period.kg)}
         </div>
         <div style={{ fontSize: 12, color: neutral, fontWeight: 600, marginTop: 2 }}>
-          {msg('Volumen de la semana', 'Volume for the week')}
+          {msg('Volumen del período', 'Volume for the period')}
         </div>
       </div>
 
