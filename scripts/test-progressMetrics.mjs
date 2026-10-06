@@ -8,6 +8,7 @@
 process.env.TZ = "America/New_York";
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 const PD = await import("../lib/progressDate.js");
 const PM = await import("../components/student-progress/progressMetrics.js");
@@ -376,6 +377,46 @@ test("F11. metricas derivadas: PRs y mejora no se rompen con series repetidas", 
     assert.equal(countPRsThisMonth([{ id: "e1" }], [], {}, sb), 2);
   });
   assert.equal(averageImprovementPercent([{ id: "e1" }], [], {}, [row("14/9/2026", 100), ...rep(3, "5/10/2026", 120, 5)]), 20);
+});
+
+// ---------------------------------------------------------------- G. GraficoProgreso usa la misma reconciliacion
+// GraficoProgreso.getDatos(exId) = mergeSetsForExercise(exId, progress, sbData): se prueba la funcion compartida con
+// las mismas formas de entrada del componente (sbData de Supabase con kg/reps numericos o texto, progress local).
+const GRAFICO_SRC = readFileSync(new URL("../components/student-progress/GraficoProgreso.jsx", import.meta.url), "utf8");
+
+test("G0. GraficoProgreso delega en mergeSetsForExercise y no tiene dedupe propio fecha+kg", () => {
+  assert.match(GRAFICO_SRC, /import \{[^}]*mergeSetsForExercise[^}]*\} from '\.\/progressMetrics\.js'/);
+  assert.match(GRAFICO_SRC, /const getDatos = \(exId\) => mergeSetsForExercise\(exId, progress, sbData\)/);
+  assert.doesNotMatch(GRAFICO_SRC, /d\.fecha\s*\+\s*d\.kg/);
+  assert.doesNotMatch(GRAFICO_SRC, /seen\.(has|add)/);
+  assert.doesNotMatch(GRAFICO_SRC, /split\('\/'\)\.reverse\(\)/);
+});
+
+test("G1. grafico: remote 3 x 50x15 => 3 series", () => {
+  assert.equal(merged({}, rep(3, "29/9/2026", 50, 15)).length, 3);
+  assert.equal(merged({}, rep(3, "29/9/2026", "50", "15")).length, 3);
+});
+
+test("G2. grafico: local 1 + remote 1 => 1", () => {
+  assert.equal(merged(loc(1, "29/9/2026", 50, 15), rep(1, "29/9/2026", 50, 15)).length, 1);
+});
+
+test("G3. grafico: local 2 + remote 3 => 3", () => {
+  assert.equal(merged(loc(2, "29/9/2026", 50, 15), rep(3, "29/9/2026", 50, 15)).length, 3);
+});
+
+test("G3b. grafico: local 3 + remote 2 => 3", () => {
+  assert.equal(merged(loc(3, "29/9/2026", 50, 15), rep(2, "29/9/2026", 50, 15)).length, 3);
+});
+
+test("G4. grafico: misma fecha y kg con reps distintas => ambas sobreviven", () => {
+  const out = merged({}, [row("29/9/2026", 50, 15), row("29/9/2026", 50, 12)]);
+  assert.deepEqual(out.map((r) => r.reps).sort((a, b) => a - b), [12, 15]);
+});
+
+test("G5. grafico: orden cronologico con series repetidas y cruce de mes", () => {
+  const sb = [...rep(2, "1/10/2026", 55, 10), row("14/9/2026", 40, 10), ...rep(2, "29/9/2026", 50, 15), row("5/10/2026", 60, 8)];
+  assert.deepEqual(merged({}, sb).map((r) => r.fecha), ["14/9/2026", "29/9/2026", "29/9/2026", "1/10/2026", "1/10/2026", "5/10/2026"]);
 });
 
 console.log(count + " tests OK");
