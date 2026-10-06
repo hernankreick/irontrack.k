@@ -392,14 +392,14 @@ await test("barras: bordes de cada bloque (27|26.. 21|20, 14|13, 7|6)", () => {
 });
 
 // ------------------------------------------------------------------ 8. formato
-await test("formato: 840 / 999 / 999.6 / 1000 / 3200 (redondea primero)", () => {
+await test("formato: siempre kg, entero, separador de miles espanol (840 / 999 / 999.6 / 1000 / 3200 / 12075)", () => {
   assert.equal(formatVolume(840), "840 kg");
   assert.equal(formatVolume(999), "999 kg");
   assert.equal(formatVolume(999.4), "999 kg");
-  assert.equal(formatVolume(999.6), "1,0 t");
-  assert.equal(formatVolume(1000), "1,0 t");
-  assert.equal(formatVolume(3200), "3,2 t");
-  assert.equal(formatVolume(12075), "12,1 t");
+  assert.equal(formatVolume(999.6), "1.000 kg");
+  assert.equal(formatVolume(1000), "1.000 kg");
+  assert.equal(formatVolume(3200), "3.200 kg");
+  assert.equal(formatVolume(12075), "12.075 kg");
   assert.equal(formatVolume(0), "0 kg");
   assert.equal(formatVolume(null), "0 kg");
 });
@@ -492,7 +492,7 @@ await test("Evi (today=2026-10-05): resultado de referencia del preflight", () =
   const rows = EVI.map(([id, fecha, vol]) => row(id, vol, 1, fecha));
   const m = compute(rows);
   assert.equal(m.currentTotal, 12075);
-  assert.equal(formatVolume(m.currentTotal), "12,1 t");
+  assert.equal(formatVolume(m.currentTotal), "12.075 kg");
   assert.deepEqual(m.blocks.map((b) => b.kg), [5895, 0, 0, 6180]);
   assert.equal(m.previousTotal, 16707.5);
   assert.equal(m.commonExercises.length, 13);
@@ -528,18 +528,18 @@ await build({
   entryPoints: [path.join(reactVersionDir, "components/student-plan/StudentTrainingVolumeCard.jsx")],
   bundle: true, format: "esm", platform: "node", outfile, external: ["react", "react-dom"], logLevel: "silent",
 });
-const { TrainingVolumeCardView } = await import(pathToFileURL(outfile).href + "?t=" + Date.now());
+const { TrainingVolumeCardView, TrainingVolumeDetailView } = await import(pathToFileURL(outfile).href + "?t=" + Date.now());
 const React = (await import("react")).default;
 const { renderToStaticMarkup } = (await import("react-dom/server")).default || (await import("react-dom/server"));
 const msg = (es) => es;
 const render = (model, dm = false) => renderToStaticMarkup(React.createElement(TrainingVolumeCardView, { model, _dm: dm, textMuted: "#64748B", msg }));
 const eviModel = () => compute(EVI.map(([id, fecha, vol]) => row(id, vol, 1, fecha)));
 
-await test("vista Evi: titulo, subtitulo, 12,1 t, SIN porcentaje, 4 barras 5895/0/0/6180", () => {
+await test("vista Evi: titulo, subtitulo, 12.075 kg, SIN porcentaje, 4 barras 5895/0/0/6180", () => {
   const html = render(eviModel());
   assert.ok(html.includes("Volumen de entrenamiento"));
   assert.ok(html.includes("Últimas 4 semanas · kg × reps"));
-  assert.ok(html.includes("12,1 t"));
+  assert.ok(html.includes("12.075 kg"));
   assert.ok(!html.includes("training-volume-pct"), "sin porcentaje");
   assert.ok(!html.includes("vs 4 sem. anteriores"));
   ["B1", "B2", "B3", "B4"].forEach((k) => assert.ok(html.includes('data-block="' + k + '"'), k));
@@ -548,10 +548,10 @@ await test("vista Evi: titulo, subtitulo, 12,1 t, SIN porcentaje, 4 barras 5895/
 await test("vista: aria-label describe los 4 volumenes y rangos (B4 = 29/09 al 05/10)", () => {
   const html = render(eviModel());
   const label = /role="img" aria-label="([^"]+)"/.exec(html)[1];
-  assert.ok(label.includes("08/09 al 14/09: 5895 kg"));
+  assert.ok(label.includes("08/09 al 14/09: 5.895 kg"));
   assert.ok(label.includes("15/09 al 21/09: 0 kg"));
   assert.ok(label.includes("22/09 al 28/09: 0 kg"));
-  assert.ok(label.includes("29/09 al 05/10: 6180 kg"));
+  assert.ok(label.includes("29/09 al 05/10: 6.180 kg"));
 });
 await test("vista: tooltip con los tres textos aprobados", () => {
   const html = render(eviModel());
@@ -630,7 +630,7 @@ await test("integracion Evi, hoy = 2026-10-05: showPct=false (span PREVIOUS 6) y
   assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_span_<7_dias"]);
   assert.equal(m.previousHistorySpan, 6);
   const html = render(m);
-  assert.ok(html.includes("12,1 t"));
+  assert.ok(html.includes("12.075 kg"));
   assert.ok(noPctMarkup(html));
 });
 await test("integracion: lectura incompleta o con error => sin modelo => sin card (nunca pct ni 0 kg)", async () => {
@@ -641,10 +641,10 @@ await test("integracion: lectura incompleta o con error => sin modelo => sin car
 });
 // Evi con today = 2026-10-06: el 1/9 cruza de P4 a P3 (off 34 -> 35), pero la regla de confianza ya NO usa bloques de
 // 7 dias sino la separacion entre dias comparables (7/9 - 1/9 = 6 < 7), asi que el porcentaje sigue oculto.
-await test("Evi, hoy = 2026-10-06: sin porcentaje (span 6); el pct matematico sigue siendo ~-28%; 12,1 t; barras 5895/0/6180/0", async () => {
+await test("Evi, hoy = 2026-10-06: sin porcentaje (span 6); el pct matematico sigue siendo ~-28%; 12.075 kg; barras 5895/0/6180/0", async () => {
   const m = await eviPipeline(new Date(2026, 9, 6, 10));
   assert.equal(m.currentTotal, 12075);
-  assert.equal(formatVolume(m.currentTotal), "12,1 t");
+  assert.equal(formatVolume(m.currentTotal), "12.075 kg");
   assert.deepEqual(m.blocks.map((b) => b.kg), [5895, 0, 6180, 0], "29/9 es off 7 => B3; B4 (off 6..0) queda en 0");
   assert.equal(m.previousHistorySpan, 6);
   assert.ok(Math.abs(m.pct - -27.727068681729764) < 1e-9);
@@ -653,7 +653,7 @@ await test("Evi, hoy = 2026-10-06: sin porcentaje (span 6); el pct matematico si
   assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_span_<7_dias"]);
   assert.equal(m.pctLabel, null);
   const html = render(m);
-  assert.ok(html.includes("12,1 t"));
+  assert.ok(html.includes("12.075 kg"));
   assert.ok(noPctMarkup(html));
 });
 await test("mover today un dia (5/10 -> 6/10) no habilita el porcentaje de Evi solo por cruzar el borde de un bloque", async () => {
@@ -667,6 +667,176 @@ await test("mover today un dia (5/10 -> 6/10) no habilita el porcentaje de Evi s
   assert.equal(a.pct, b.pct, "el calculo matematico no cambia");
   assert.equal(a.currentTotal, b.currentTotal);
   assert.ok(noPctMarkup(render(a)) && noPctMarkup(render(b)));
+});
+
+// ------------------------------------------------------------------ 13. unidad kg + detalle por periodo
+const { groupThousandsEs, formatDayRange, formatDayRow, blockAxisLabel, blockRelativeReference, stepPeriod } = V;
+const WD = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const sumDays = (b) => b.days.reduce((a, d) => a + d.kg, 0);
+const renderDetail = (model, selected, dm = false) => renderToStaticMarkup(React.createElement(TrainingVolumeDetailView, { model, selected, _dm: dm, textMuted: "#64748B", msg }));
+const eviOct5 = () => eviPipeline(new Date(2026, 9, 5, 10));
+const eviOct6 = () => eviPipeline(new Date(2026, 9, 6, 10));
+
+await test("kg: 12075 -> '12.075 kg' (separador de miles espanol, tambien en 4 digitos: 6.180)", () => {
+  assert.equal(formatVolume(12075), "12.075 kg");
+  assert.equal(formatVolume(6180), "6.180 kg");
+  assert.equal(formatVolume(1234567), "1.234.567 kg");
+  assert.equal(formatVolume(999.6), "1.000 kg");
+  assert.equal(formatVolume(0), "0 kg");
+  assert.equal(groupThousandsEs(1000), "1.000");
+  assert.equal(groupThousandsEs(999), "999");
+});
+await test("kg: nunca se convierte a toneladas (barrido de valores y de markup)", async () => {
+  const values = [0, 0.4, 1, 840, 999, 999.5, 1000, 1500.5, 3200, 9999, 12075, 99999.9, 100000, 1e6, 12345678];
+  for (let i = 0; i < 500; i++) values.push(Math.random() * 3e5);
+  values.forEach((v) => {
+    const f = formatVolume(v);
+    assert.match(f, /^\d{1,3}(\.\d{3})* kg$/, String(v));
+    assert.ok(!/ t$/.test(f) && !f.includes(","), String(v));
+  });
+  const m = await eviOct6();
+  const markups = [render(m), render(m, true)].concat([0, 1, 2, 3].map((i) => renderDetail(m, i)));
+  markups.forEach((html) => {
+    assert.ok(!/\d,\d t\b/.test(html) && !/\d t</.test(html), "sin toneladas");
+    assert.ok(!html.includes("12,1"));
+  });
+});
+
+await test("totales de cada uno de los cuatro periodos (Evi 5/10 y 6/10)", async () => {
+  assert.deepEqual((await eviOct5()).blocks.map((b) => b.kg), [5895, 0, 0, 6180]);
+  assert.deepEqual((await eviOct6()).blocks.map((b) => b.kg), [5895, 0, 6180, 0]);
+});
+await test("agregacion por dia (Evi): solo dias con volumen valido > 0, mismas series validas que el total", async () => {
+  const a = await eviOct5();
+  const dayList = (b) => b.days.map((d) => formatDayShort(d.day) + "=" + d.kg);
+  assert.deepEqual(dayList(a.blocks[0]), ["09/09=4200", "14/09=1695"]);
+  assert.deepEqual(dayList(a.blocks[1]), []);
+  assert.deepEqual(dayList(a.blocks[2]), []);
+  assert.deepEqual(dayList(a.blocks[3]), ["29/09=6180"]);
+  const b = await eviOct6();
+  assert.deepEqual(dayList(b.blocks[2]), ["29/09=6180"]);
+  assert.deepEqual(dayList(b.blocks[3]), []);
+  // 9/9 tuvo 564 kg de series excluidas (remo renegado, custom, dominadas): NO suman al dia
+  assert.equal(a.blocks[0].days[0].kg, 4200);
+});
+await test("multiples entrenamientos en el mismo periodo y varias series el mismo dia", () => {
+  const m = compute([
+    rowOff("sq", 60, 8, 6), rowOff("sq", 60, 8, 6), rowOff("lp", 100, 10, 6),   // dia off 6: 480+480+1000 = 1960
+    rowOff("sq", 50, 5, 4),                                                    // 250
+    rowOff("lp", 80, 10, 0),                                                   // 800
+  ]);
+  const b4 = m.blocks[3];
+  assert.equal(b4.kg, 1960 + 250 + 800);
+  assert.deepEqual(b4.days.map((d) => d.kg), [1960, 250, 800]);
+  assert.deepEqual(b4.days.map((d) => d.day), [T - 6, T - 4, T], "orden cronologico (mas antiguo primero)");
+  assert.equal(b4.days.length, 3, "tres dias entrenados => tres filas");
+});
+await test("periodo vacio: 0 kg, sin dias (no se inventan dias ni sesiones)", () => {
+  const m = compute([rowOff("sq", 10, 10, 27), rowOff("sq", 10, 10, 1)]);
+  [1, 2].forEach((i) => { assert.equal(m.blocks[i].kg, 0); assert.deepEqual(m.blocks[i].days, []); });
+  assert.deepEqual(compute([]).blocks.map((b) => b.days.length), [0, 0, 0, 0]);
+});
+await test("suma de los dias = total del periodo; suma de periodos = currentTotal", async () => {
+  [await eviOct5(), await eviOct6(), compute([rowOff("sq", 62.5, 8, 3), rowOff("lp", 87.5, 12, 3), rowOff("sq", 32.5, 6, 17), rowOff("legext", 41.25, 9, 25), rowOff("legext", 41.25, 9, 24)])].forEach((m) => {
+    m.blocks.forEach((b) => assert.equal(sumDays(b), b.kg, b.key));
+    assert.equal(m.blocks.reduce((a, b) => a + b.kg, 0), m.currentTotal);
+  });
+});
+await test("limites exactos de los periodos: off 0/6 (B4), 7/13 (B3), 14/20 (B2), 21/27 (B1); 28 no entra", () => {
+  const expectBlock = { 0: 3, 6: 3, 7: 2, 13: 2, 14: 1, 20: 1, 21: 0, 27: 0 };
+  Object.keys(expectBlock).forEach((off) => {
+    const only = compute([rowOff("sq", 10, 1, Number(off))]);
+    only.blocks.forEach((b, i) => {
+      assert.equal(b.kg, i === expectBlock[off] ? 10 : 0, "off " + off + " bloque " + b.key);
+      assert.equal(b.days.length, i === expectBlock[off] ? 1 : 0);
+    });
+    assert.equal(only.blocks[expectBlock[off]].days[0].day, T - Number(off));
+  });
+  assert.equal(compute([rowOff("sq", 10, 1, 28)]).blocks.every((b) => b.kg === 0 && b.days.length === 0), true);
+});
+await test("etiquetas del grafico (pasado -> presente): 22-28 dias, 15-21 dias, 8-14 dias, Ult. 7 dias", async () => {
+  const m = await eviOct5();
+  assert.deepEqual(m.blocks.map((b) => blockAxisLabel(b, "es")), ["22–28 días", "15–21 días", "8–14 días", "Últ. 7 días"]);
+  assert.deepEqual(m.blocks.map((b) => blockAxisLabel(b, "en")), ["22–28 days", "15–21 days", "8–14 days", "Last 7 days"]);
+  assert.deepEqual(m.blocks.map((b) => [b.from, b.to]), [[27, 21], [20, 14], [13, 7], [6, 0]], "limites matematicos intactos");
+  const html = render(m);
+  const pos = ["22–28 días", "15–21 días", "8–14 días", "Últ. 7 días"].map((l) => html.indexOf(l));
+  assert.ok(pos.every((p) => p >= 0) && pos.every((p, i) => !i || p > pos[i - 1]), "orden cronologico izquierda -> derecha");
+});
+await test("fechas del detalle: rango calendario real, referencia relativa y dia de la semana", async () => {
+  const m = await eviOct6();
+  assert.deepEqual(m.blocks.map((b) => formatDayRange(b.startDay, b.endDay, "es")), ["9 – 15 sep", "16 – 22 sep", "23 – 29 sep", "30 sep – 6 oct"]);
+  assert.equal(blockRelativeReference(m.blocks[2], "es"), "8–14 días atrás");
+  assert.equal(blockRelativeReference(m.blocks[3], "es"), "Últimos 7 días");
+  assert.equal(formatDayRange(dayNum(2026, 9, 28), dayNum(2026, 10, 4), "es"), "28 sep – 4 oct");
+  const wd = new Date(Date.UTC(2026, 8, 29)).getUTCDay();
+  assert.equal(formatDayRow(dayNum(2026, 9, 29), "es"), WD[wd] + " 29 sep");
+  assert.equal(formatDayRow(dayNum(2026, 9, 28), "es"), WD[(wd + 6) % 7] + " 28 sep");
+});
+await test("navegacion anterior/siguiente: se detiene en los limites de los 4 periodos", () => {
+  assert.equal(stepPeriod(0, -1), 0);
+  assert.equal(stepPeriod(3, 1), 3);
+  assert.equal(stepPeriod(1, -1), 0);
+  assert.equal(stepPeriod(2, 1), 3);
+  assert.equal(stepPeriod(3, -1), 2);
+  assert.equal(stepPeriod(-5, 0), 0);
+  assert.equal(stepPeriod(9, 0), 3);
+  let i = 3; for (let k = 0; k < 10; k++) i = stepPeriod(i, -1); assert.equal(i, 0);
+  for (let k = 0; k < 10; k++) i = stepPeriod(i, 1); assert.equal(i, 3);
+});
+await test("card: kg, 'Ver detalle ›' discreto, 4 barras, sin toneladas", async () => {
+  const html = render(await eviOct5());
+  assert.ok(html.includes("12.075 kg"));
+  assert.ok(html.includes("Volumen de entrenamiento") && html.includes("Últimas 4 semanas · kg × reps"));
+  assert.match(html, /data-testid="training-volume-open-detail"[^>]*>Ver detalle ›</);
+  assert.ok(html.includes("min-height:44px"), "target tactil >= 44px");
+  assert.deepEqual([...html.matchAll(/data-block="B\d" data-kg="(\d+)"/g)].map((x) => Number(x[1])), [5895, 0, 0, 6180]);
+  assert.ok(!/<(div|span)[^>]*data-block="B\d"[^>]*onclick/i.test(html), "las barras no son el mecanismo de navegacion");
+  assert.ok(!/<button[^>]*data-block/.test(html));
+});
+await test("detalle: encabezado, rango, referencia, total, 'Volumen de la semana', Entrenamientos y filas por dia", async () => {
+  const m = await eviOct6();
+  const html = renderDetail(m, 2); // B3: 23 – 29 sep
+  assert.ok(html.includes("Detalle de volumen") && html.includes("Historial de las últimas 4 semanas"));
+  assert.ok(html.includes(">23 – 29 sep<") && html.includes(">8–14 días atrás<"));
+  assert.match(html, /data-testid="training-volume-period-total"[^>]*>6\.180 kg</);
+  assert.ok(html.includes("Volumen de la semana") && html.includes("Entrenamientos"));
+  const rows = [...html.matchAll(/data-testid="training-volume-day"[^>]*>(.*?)<\/div>/g)];
+  assert.equal(rows.length, 1);
+  assert.ok(rows[0][1].includes(formatDayRow(dayNum(2026, 9, 29), "es")) && rows[0][1].includes("6.180 kg"));
+  // varios dias: B1 de Evi tiene dos filas con 4.200 y 1.695
+  const b1 = renderDetail(m, 0);
+  assert.equal([...b1.matchAll(/data-testid="training-volume-day"/g)].length, 2);
+  assert.ok(b1.includes("4.200 kg") && b1.includes("1.695 kg") && b1.includes(">5.895 kg<"));
+});
+await test("detalle: tres dias entrenados => tres filas; periodo vacio => '0 kg' + mensaje y ninguna fila", async () => {
+  const three = compute([rowOff("sq", 60, 8, 6), rowOff("sq", 60, 8, 3), rowOff("lp", 100, 10, 0), rowOff("sq", 50, 5, 20)]);
+  assert.equal([...renderDetail(three, 3).matchAll(/data-testid="training-volume-day"/g)].length, 3);
+  const empty = renderDetail(await eviOct6(), 1); // B2 vacio
+  assert.match(empty, /data-testid="training-volume-period-total"[^>]*>0 kg</);
+  assert.ok(empty.includes("Sin entrenamientos registrados en este período."));
+  assert.ok(!empty.includes("training-volume-day"));
+  assert.ok(empty.includes(">16 – 22 sep<"));
+});
+await test("detalle: flechas anterior/siguiente deshabilitadas en los extremos; volver accesible; targets tactiles >= 44px", async () => {
+  const m = await eviOct5();
+  const disabled = (html, id) => new RegExp('data-testid="' + id + '"[^>]*disabled').test(html);
+  [[0, true, false], [1, false, false], [2, false, false], [3, false, true]].forEach(([i, prevD, nextD]) => {
+    const html = renderDetail(m, i);
+    assert.equal(disabled(html, "training-volume-prev"), prevD, "prev en " + i);
+    assert.equal(disabled(html, "training-volume-next"), nextD, "next en " + i);
+    assert.ok(html.includes('aria-label="Período anterior"') && html.includes('aria-label="Período siguiente"'));
+    assert.match(html, /data-testid="training-volume-back"[^>]*aria-label="Volver"/);
+    assert.ok((html.match(/width:44px;height:44px/g) || []).length >= 3, "volver, anterior y siguiente >= 44px");
+  });
+  assert.equal(renderDetail(m, 99).includes(">Últimos 7 días<"), true, "indice fuera de rango se acota al ultimo periodo");
+  assert.equal(renderDetail(m, -3).includes(">22–28 días atrás<"), true, "indice negativo se acota al primero");
+});
+await test("detalle: oculto si no hay modelo / card oculta; ingles", async () => {
+  assert.equal(renderDetail(null, 0), "");
+  assert.equal(renderDetail(compute([rowOff("sq", 50, 5, 1)]), 0), "");
+  const en = renderToStaticMarkup(React.createElement(TrainingVolumeDetailView, { model: await eviOct5(), selected: 3, _dm: false, textMuted: "#64748B", msg: (es, en2) => en2 }));
+  assert.ok(en.includes("Volume detail") && en.includes("Workouts") && en.includes("Last 7 days"));
 });
 
 console.log(count + " tests OK");
