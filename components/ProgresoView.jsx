@@ -264,6 +264,13 @@ export default function ProgresoView({
   useEffect(
     function () {
       setDiaIdx(0);
+      // Nada del alumno anterior debe quedar visible: drill-down, patrones abiertos, hover y sheets individuales.
+      setEjercicioDrilldown(null);
+      setPatronExpanded({});
+      setVolBarHoverIdx(null);
+      setActiveSheet(function (cur) {
+        return cur === "carga" || cur === "prs" || cur === "vol" ? null : cur;
+      });
     },
     [alumnoSel]
   );
@@ -383,6 +390,14 @@ export default function ProgresoView({
     }).concat([0])
   );
 
+  var alumnoName = (function () {
+    var a = alumnosSorted.find(function (x) {
+      return String(x.id) === String(alumnoSel);
+    });
+    return a ? a.nombre || a.email || "—" : "—";
+  })();
+  var teamScopeLabel = M(lang, "Todos tus alumnos", "All your athletes", "Todos os seus alunos");
+
   var rankingTop3 = (model.ranking || []).slice(0, 3);
   var rankingRest = (model.ranking || []).slice(3);
 
@@ -411,6 +426,213 @@ export default function ProgresoView({
       </div>
     );
   }
+
+  var mobileScrollRow = {
+    display: "flex",
+    gap: 10,
+    overflowX: "auto",
+    padding: "0 4px 8px",
+    scrollSnapType: "x mandatory",
+    WebkitOverflowScrolling: "touch",
+    msOverflowStyle: "none",
+    scrollbarWidth: "none",
+  };
+
+  /** Fila de chips: scroll horizontal en móvil, grilla de `cols` columnas en desktop. */
+  function renderChips(chips, cols) {
+    return isUnder768 ? (
+      <div style={mobileScrollRow}>
+        {chips.map(function (c) {
+          return (
+            <div
+              key={c.key}
+              style={{
+                flex: "0 0 44%",
+                scrollSnapAlign: "start",
+                background: C.cardDark,
+                border: "1px solid " + C.brd,
+                borderRadius: 8,
+                padding: "12px 14px",
+                minWidth: 0,
+                boxSizing: "border-box",
+              }}
+            >
+              <div style={{ ...T.numberStat, color: c.color }}>{c.val}</div>
+              <div style={{ ...T.meta, color: C.t2, marginTop: 4 }}>{c.label}</div>
+              <div style={{ ...T.meta, color: c.deltaColor, marginTop: 4 }}>{c.delta}</div>
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(" + cols + ", minmax(0, 1fr))", gap: S.chipGridGap }}>
+        {chips.map(function (c) {
+          return (
+            <div
+              key={c.key}
+              style={{
+                background: C.cardDark,
+                border: "1px solid " + C.brd,
+                borderRadius: 8,
+                padding: "12px 14px",
+                minWidth: 0,
+              }}
+            >
+              <div style={{ ...T.numberStat, color: c.color }}>{c.val}</div>
+              <div style={{ ...T.meta, color: C.t2, marginTop: 4 }}>{c.label}</div>
+              <div style={{ ...T.meta, color: c.deltaColor, marginTop: 4 }}>{c.delta}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function sectionTitle(title, subtitle) {
+    return (
+      <div>
+        <h3 style={{ ...T.cardTitle, color: C.t, margin: 0 }}>{title}</h3>
+        {subtitle ? <p style={{ ...T.subtitle, color: C.t2, margin: "4px 0 0 0" }}>{subtitle}</p> : null}
+      </div>
+    );
+  }
+
+  /** Mini-card móvil que abre un bottom sheet. */
+  function miniCard(sheetId, icon, title, bigValue, bigColor, caption) {
+    return (
+      <div
+        onClick={function () { setActiveSheet(sheetId); }}
+        style={{
+          flex: "0 0 82%",
+          scrollSnapAlign: "start",
+          background: C.card,
+          border: "1px solid " + C.brd,
+          borderRadius: 14,
+          padding: 16,
+          cursor: "pointer",
+          boxSizing: "border-box",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          {icon}
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>{title}</span>
+        </div>
+        <div style={{ fontSize: 28, fontWeight: 900, color: bigColor, lineHeight: 1.1 }}>{bigValue}</div>
+        <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>{caption}</div>
+        <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
+          {M(lang, "Ver detalle →", "See detail →")}
+        </div>
+      </div>
+    );
+  }
+
+  var loadHasChartScope = rutinaActiva && diasRutina.length > 0 && (model.exerciseOptions || []).length > 0;
+  var loadBody = (
+    <>
+      <ProgressLoadControls
+        diasRutina={diasRutina}
+        diaIdx={diaIdx}
+        setDiaIdx={setDiaIdx}
+        ejercicioSelId={ejercicioSelId}
+        setEjercicioSelId={setEjercicioSelId}
+        exerciseOptions={model.exerciseOptions}
+        rutinaActiva={rutinaActiva}
+        selectBaseStyle={selectBaseStyle}
+        C={C}
+        T={T}
+        S={S}
+        lang={lang}
+        M={M}
+        emptyBox={emptyBox}
+      />
+      {loadHasChartScope ? (
+        !model.hasChartData || chartComputed.empty ? (
+          emptyBox(lang, M(lang, "No hay registros de carga para este ejercicio", "No load records for this exercise", "Sem registros de carga para este exercício"), C)
+        ) : (
+          <ProgressLoadChart
+            chartComputed={chartComputed}
+            weekLabels={model.chartWeekLabels}
+            alumnoColor={alumnoColor}
+            C={C}
+            T={T}
+            lang={lang}
+            M={M}
+          />
+        )
+      ) : null}
+    </>
+  );
+  var loadTitleRow = (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGapLoose }}>
+      <TrendingUp size={16} color={C.blue} strokeWidth={2} />
+      <span style={{ ...T.cardTitle, color: C.t }}>{M(lang, "Evolución de carga", "Load progression")}</span>
+    </div>
+  );
+
+  var prsCard = function (mobile) {
+    return (
+      <ProgressRecentPrsCard
+        prs={model.prsRecientes}
+        alumnoName={alumnoName}
+        limit={model.recentPrsLimit}
+        C={C}
+        lang={lang}
+        emptyBox={emptyBox}
+        isUnder768={mobile}
+      />
+    );
+  };
+  var volumeCard = function (mobile) {
+    return (
+      <ProgressWeeklyVolumeCard
+        volBars={model.volBars}
+        currentRoutineWeekIndex={model.currentRoutineWeekIndex != null ? model.currentRoutineWeekIndex : 0}
+        maxV={maxV}
+        volBarHoverIdx={volBarHoverIdx}
+        setVolBarHoverIdx={setVolBarHoverIdx}
+        C={C}
+        lang={lang}
+        formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
+        formatWeeklyVolKgFull={formatWeeklyVolKgFull}
+        isUnder768={mobile}
+      />
+    );
+  };
+  var patternCard = (
+    <PatternDrilldownContext.Provider value={patternDrilldownCtx}>
+      <ProgressMovementPatternVolumeCard
+        patterns={model.patronPatterns}
+        totalVol={model.patronTotalVol}
+        weekNumber={(model.currentRoutineWeekIndex != null ? model.currentRoutineWeekIndex : 0) + 1}
+        patronExpanded={patronExpanded}
+        togglePatronRow={togglePatronRow}
+        C={C}
+        lang={lang}
+        formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
+      />
+    </PatternDrilldownContext.Provider>
+  );
+  var adherenceCard = (
+    <ProgressAdherenceCard rows={model.adherenciaRows} C={C} lang={lang} emptyBox={emptyBox} />
+  );
+  var rankingCard = function (mobile) {
+    return (
+      <ProgressRankingCard
+        ranking={model.ranking}
+        rankingTop3={rankingTop3}
+        rankingRest={rankingRest}
+        rankingCardUi={rankingCardUi}
+        rankingSessionsLine={rankingSessionsLine}
+        C={C}
+        lang={lang}
+        emptyBox={emptyBox}
+        isUnder768={mobile}
+      />
+    );
+  };
+
+  var topPr = (model.prsRecientes || [])[0];
+  var sheetIsTeam = activeSheet === "adherencia" || activeSheet === "ranking";
 
   return (
     <div
@@ -484,283 +706,141 @@ export default function ProgresoView({
           gap: S.pageGap,
         }}
       >
-        {isUnder768 ? (
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              overflowX: "auto",
-              padding: "0 4px 8px",
-              scrollSnapType: "x mandatory",
-              WebkitOverflowScrolling: "touch",
-              msOverflowStyle: "none",
-              scrollbarWidth: "none",
-            }}
-          >
-            {model.summaryChips.map(function (c) {
-              return (
+        {/* ===== ALUMNO SELECCIONADO: todo lo de esta sección depende de alumnoSel ===== */}
+        <section data-section="alumno" style={{ display: "flex", flexDirection: "column", gap: S.pageGap, minWidth: 0 }}>
+          {sectionTitle(M(lang, "Alumno seleccionado", "Selected athlete", "Aluno selecionado"))}
+          <div style={{ maxWidth: isUnder768 ? "100%" : 360 }}>
+            <label style={{ display: "block", ...T.labelMd, color: C.t2, marginBottom: 6 }}>
+              {M(lang, "Alumno", "Athlete")}
+            </label>
+            <select
+              value={alumnoSel != null ? String(alumnoSel) : ""}
+              onChange={function (e) {
+                setAlumnoSel(e.target.value || null);
+              }}
+              style={selectBaseStyle}
+            >
+              {alumnosSorted.map(function (a) {
+                return (
+                  <option key={String(a.id)} value={String(a.id)}>
+                    {a.nombre || a.email || "—"}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          {renderChips(model.alumnoChips, 3)}
+
+          {isUnder768 ? (
+            <>
+              <div style={mobileScrollRow}>
                 <div
-                  key={c.label}
+                  onClick={function () { setActiveSheet("carga"); }}
                   style={{
-                    flex: "0 0 44%",
+                    flex: "0 0 82%",
                     scrollSnapAlign: "start",
-                    background: C.cardDark,
+                    background: C.card,
                     border: "1px solid " + C.brd,
-                    borderRadius: 8,
-                    padding: "12px 14px",
-                    minWidth: 0,
+                    borderRadius: 14,
+                    padding: 16,
+                    cursor: "pointer",
                     boxSizing: "border-box",
                   }}
                 >
-                  <div style={{ ...T.numberStat, color: c.color }}>{c.val}</div>
-                  <div style={{ ...T.meta, color: C.t2, marginTop: 4 }}>{c.label}</div>
-                  <div style={{ ...T.meta, color: c.deltaColor, marginTop: 4 }}>{c.delta}</div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: S.chipGridGap }}>
-            {model.summaryChips.map(function (c) {
-              return (
-                <div
-                  key={c.label}
-                  style={{
-                    background: C.cardDark,
-                    border: "1px solid " + C.brd,
-                    borderRadius: 8,
-                    padding: "12px 14px",
-                    flex: 1,
-                    minWidth: 0,
-                  }}
-                >
-                  <div style={{ ...T.numberStat, color: c.color }}>{c.val}</div>
-                  <div style={{ ...T.meta, color: C.t2, marginTop: 4 }}>{c.label}</div>
-                  <div style={{ ...T.meta, color: c.deltaColor, marginTop: 4 }}>{c.delta}</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {isUnder768 ? (
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              overflowX: "auto",
-              padding: "0 4px 8px",
-              scrollSnapType: "x mandatory",
-              WebkitOverflowScrolling: "touch",
-              msOverflowStyle: "none",
-              scrollbarWidth: "none",
-            }}
-          >
-            <div
-              onClick={function () { setActiveSheet("carga"); }}
-              style={{
-                flex: "0 0 88%",
-                scrollSnapAlign: "start",
-                background: C.card,
-                border: "1px solid " + C.brd,
-                borderRadius: 14,
-                padding: 16,
-                cursor: "pointer",
-                boxSizing: "border-box",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <TrendingUp size={15} color={C.blue} strokeWidth={2} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
-                  {M(lang, "Evolución de carga", "Load progression")}
-                </span>
-              </div>
-              <div style={{ fontSize: 13, color: C.t2, marginTop: 4 }}>
-                {(function () {
-                  var a = alumnosSorted.find(function (x) { return String(x.id) === String(alumnoSel); });
-                  return a ? (a.nombre || a.email || "—") : "—";
-                })()}
-              </div>
-              <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
-                {M(lang, "Ver detalle →", "See detail →")}
-              </div>
-            </div>
-
-            <div
-              onClick={function () { setActiveSheet("adherencia"); }}
-              style={{
-                flex: "0 0 88%",
-                scrollSnapAlign: "start",
-                background: C.card,
-                border: "1px solid " + C.brd,
-                borderRadius: 14,
-                padding: 16,
-                cursor: "pointer",
-                boxSizing: "border-box",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <CheckCircle size={15} color={C.green} strokeWidth={2} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
-                  {M(lang, "Adherencia al plan", "Plan adherence")}
-                </span>
-              </div>
-              {model.adherenciaRows.length > 0 ? (
-                <>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: model.adherenciaRows[0].color, lineHeight: 1.1 }}>
-                    {model.adherenciaRows[0].p}%
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                    <TrendingUp size={15} color={C.blue} strokeWidth={2} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
+                      {M(lang, "Evolución de carga", "Load progression")}
+                    </span>
                   </div>
-                  <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>
-                    {"🏆 " + model.adherenciaRows[0].n}
+                  <div style={{ fontSize: 13, color: C.t2, marginTop: 4 }}>{alumnoName}</div>
+                  <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
+                    {M(lang, "Ver detalle →", "See detail →")}
                   </div>
-                </>
-              ) : (
-                <div style={{ fontSize: 22, fontWeight: 900, color: C.t2, lineHeight: 1.1 }}>—</div>
-              )}
-              <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
-                {M(lang, "Ver detalle →", "See detail →")}
+                </div>
+                {miniCard(
+                  "prs",
+                  <Star size={15} color={C.yel} strokeWidth={2} />,
+                  M(lang, "PRs recientes", "Recent PRs"),
+                  topPr ? topPr.val : "—",
+                  C.green,
+                  topPr ? M(lang, "Último: ", "Latest: ") + topPr.ex : M(lang, "Sin PRs todavía", "No PRs yet")
+                )}
+                {miniCard(
+                  "vol",
+                  <BarChart2 size={15} color={C.blue} strokeWidth={2} />,
+                  M(lang, "Volumen semanal", "Weekly volume"),
+                  maxV > 0 ? formatWeeklyVolKgAbbrev(maxV) : "—",
+                  C.blue,
+                  M(lang, "Pico del bloque", "Block peak")
+                )}
               </div>
+              {patternCard}
+            </>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: S.gridGap, alignItems: "start" }}>
+              <div
+                style={{
+                  background: C.card,
+                  border: "1px solid " + C.brd,
+                  borderRadius: 12,
+                  padding: S.cardPadding,
+                  minWidth: 0,
+                }}
+              >
+                {loadTitleRow}
+                {loadBody}
+              </div>
+              {prsCard(false)}
+              {volumeCard(false)}
+              {patternCard}
             </div>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: S.gridGap }}>
-            <div
-              style={{
-                background: C.card,
-                border: "1px solid " + C.brd,
-                borderRadius: 12,
-                padding: S.cardPadding,
-                minWidth: 0,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGapLoose }}>
-                <TrendingUp size={16} color={C.blue} strokeWidth={2} />
-                <span style={{ ...T.cardTitle, color: C.t }}>
-                  {M(lang, "Evolución de carga", "Load progression")}
-                </span>
-              </div>
-              <ProgressLoadControls
-                alumnosSorted={alumnosSorted}
-                alumnoSel={alumnoSel}
-                setAlumnoSel={setAlumnoSel}
-                diasRutina={diasRutina}
-                diaIdx={diaIdx}
-                setDiaIdx={setDiaIdx}
-                ejercicioSelId={ejercicioSelId}
-                setEjercicioSelId={setEjercicioSelId}
-                exerciseOptions={model.exerciseOptions}
-                alumnoColor={alumnoColor}
-                rutinaActiva={rutinaActiva}
-                selectBaseStyle={selectBaseStyle}
-                C={C}
-                T={T}
-                S={S}
-                lang={lang}
-                M={M}
-                emptyBox={emptyBox}
-              />
+          )}
+        </section>
 
-              {rutinaActiva && diasRutina.length > 0 && (model.exerciseOptions || []).length > 0 ? (
-                !model.hasChartData || chartComputed.empty ? (
-                  emptyBox(lang, M(lang, "No hay registros de carga para este ejercicio", "No load records for this exercise", "Sem registros de carga para este exercício"), C)
+        {/* ===== EQUIPO: global, no depende de alumnoSel ===== */}
+        <section data-section="equipo" style={{ display: "flex", flexDirection: "column", gap: S.pageGap, minWidth: 0 }}>
+          {sectionTitle(M(lang, "Equipo", "Team", "Equipe"), teamScopeLabel)}
+          {renderChips(model.teamChips, 2)}
+
+          {isUnder768 ? (
+            <div style={mobileScrollRow}>
+              <div
+                onClick={function () { setActiveSheet("adherencia"); }}
+                style={{
+                  flex: "0 0 82%",
+                  scrollSnapAlign: "start",
+                  background: C.card,
+                  border: "1px solid " + C.brd,
+                  borderRadius: 14,
+                  padding: 16,
+                  cursor: "pointer",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <CheckCircle size={15} color={C.green} strokeWidth={2} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
+                    {M(lang, "Adherencia al plan", "Plan adherence")}
+                  </span>
+                </div>
+                {model.adherenciaRows.length > 0 ? (
+                  <>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: model.adherenciaRows[0].color, lineHeight: 1.1 }}>
+                      {model.adherenciaRows[0].p}%
+                    </div>
+                    <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>
+                      {"🏆 " + model.adherenciaRows[0].n}
+                    </div>
+                  </>
                 ) : (
-                  <ProgressLoadChart
-                    chartComputed={chartComputed}
-                    weekLabels={model.chartWeekLabels}
-                    alumnoColor={alumnoColor}
-                    C={C}
-                    T={T}
-                    lang={lang}
-                    M={M}
-                  />
-                )
-              ) : null}
-            </div>
-
-            <ProgressAdherenceCard
-              rows={model.adherenciaRows}
-              C={C}
-              lang={lang}
-              emptyBox={emptyBox}
-            />
-          </div>
-        )}
-
-        {isUnder768 ? (
-          <>
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                overflowX: "auto",
-                padding: "0 4px 8px",
-                scrollSnapType: "x mandatory",
-                WebkitOverflowScrolling: "touch",
-                msOverflowStyle: "none",
-                scrollbarWidth: "none",
-                paddingRight: "4px",
-              }}
-            >
-              <div
-                onClick={function () { setActiveSheet("prs"); }}
-                style={{
-                  flex: "0 0 82%",
-                  scrollSnapAlign: "start",
-                  background: C.card,
-                  border: "1px solid " + C.brd,
-                  borderRadius: 14,
-                  padding: 16,
-                  cursor: "pointer",
-                  boxSizing: "border-box",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <Star size={15} color={C.yel} strokeWidth={2} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
-                    {M(lang, "PRs recientes", "Recent PRs")}
-                  </span>
-                </div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: C.green, lineHeight: 1.1 }}>
-                  {(model.prsRecientes || []).length}
-                </div>
-                <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>
-                  {M(lang, "PRs registrados", "PRs logged")}
-                </div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: C.t2, lineHeight: 1.1 }}>—</div>
+                )}
                 <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
                   {M(lang, "Ver detalle →", "See detail →")}
                 </div>
               </div>
-
-              <div
-                onClick={function () { setActiveSheet("vol"); }}
-                style={{
-                  flex: "0 0 82%",
-                  scrollSnapAlign: "start",
-                  background: C.card,
-                  border: "1px solid " + C.brd,
-                  borderRadius: 14,
-                  padding: 16,
-                  cursor: "pointer",
-                  boxSizing: "border-box",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <BarChart2 size={15} color={C.blue} strokeWidth={2} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: C.t }}>
-                    {M(lang, "Volumen semanal", "Weekly volume")}
-                  </span>
-                </div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: C.blue, lineHeight: 1.1 }}>
-                  {maxV > 0 ? formatWeeklyVolKgAbbrev(maxV) : "—"}
-                </div>
-                <div style={{ fontSize: 11, color: C.t2, marginTop: 4 }}>
-                  {M(lang, "Pico del bloque", "Block peak")}
-                </div>
-                <div style={{ fontSize: 11, color: C.blue, marginTop: 14, fontWeight: 600 }}>
-                  {M(lang, "Ver detalle →", "See detail →")}
-                </div>
-              </div>
-
               <div
                 onClick={function () { setActiveSheet("ranking"); }}
                 style={{
@@ -797,200 +877,84 @@ export default function ProgresoView({
                 </div>
               </div>
             </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: S.gridGap, alignItems: "start" }}>
+              {adherenceCard}
+              {rankingCard(false)}
+            </div>
+          )}
+        </section>
 
-            {activeSheet !== null && (
+        {isUnder768 && activeSheet !== null ? (
+          <div
+            onClick={function () { setActiveSheet(null); }}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0,0,0,0.6)",
+              zIndex: 1000,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "flex-end",
+            }}
+          >
+            <div
+              onClick={function (e) { e.stopPropagation(); }}
+              style={{
+                background: darkMode !== false ? "#0D1424" : C.card,
+                borderRadius: "18px 18px 0 0",
+                maxHeight: "80vh",
+                overflowY: "auto",
+                padding: "16px 16px 36px",
+              }}
+            >
               <div
-                onClick={function () { setActiveSheet(null); }}
                 style={{
-                  position: "fixed",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: "rgba(0,0,0,0.6)",
-                  zIndex: 1000,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-end",
+                  width: 40,
+                  height: 4,
+                  background: C.brd,
+                  borderRadius: 99,
+                  margin: "0 auto 16px",
                 }}
-              >
-                <div
-                  onClick={function (e) { e.stopPropagation(); }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ ...T.meta, color: C.t2 }}>
+                  {sheetIsTeam
+                    ? M(lang, "Equipo", "Team", "Equipe") + " · " + teamScopeLabel
+                    : M(lang, "Alumno seleccionado", "Selected athlete", "Aluno selecionado") + " · " + alumnoName}
+                </span>
+                <button
+                  type="button"
+                  onClick={function () { setActiveSheet(null); }}
                   style={{
-                    background: darkMode !== false ? "#0D1424" : C.card,
-                    borderRadius: "18px 18px 0 0",
-                    maxHeight: "80vh",
-                    overflowY: "auto",
-                    padding: "16px 16px 36px",
+                    background: "none",
+                    border: "none",
+                    color: C.t2,
+                    fontSize: 22,
+                    cursor: "pointer",
+                    lineHeight: 1,
+                    padding: "4px 8px",
                   }}
                 >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 4,
-                      background: C.brd,
-                      borderRadius: 99,
-                      margin: "0 auto 16px",
-                    }}
-                  />
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                    <button
-                      type="button"
-                      onClick={function () { setActiveSheet(null); }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: C.t2,
-                        fontSize: 22,
-                        cursor: "pointer",
-                        lineHeight: 1,
-                        padding: "4px 8px",
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  {activeSheet === "prs" && (
-                    <ProgressRecentPrsCard
-                      prs={model.prsRecientes}
-                      C={C}
-                      lang={lang}
-                      emptyBox={emptyBox}
-                      isUnder768={true}
-                    />
-                  )}
-                  {activeSheet === "vol" && (
-                    <ProgressWeeklyVolumeCard
-                      volBars={model.volBars}
-                      currentRoutineWeekIndex={model.currentRoutineWeekIndex != null ? model.currentRoutineWeekIndex : 0}
-                      maxV={maxV}
-                      volBarHoverIdx={volBarHoverIdx}
-                      setVolBarHoverIdx={setVolBarHoverIdx}
-                      C={C}
-                      lang={lang}
-                      formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
-                      formatWeeklyVolKgFull={formatWeeklyVolKgFull}
-                      isUnder768={true}
-                    />
-                  )}
-                  {activeSheet === "ranking" && (
-                    <ProgressRankingCard
-                      ranking={model.ranking}
-                      rankingTop3={rankingTop3}
-                      rankingRest={rankingRest}
-                      rankingCardUi={rankingCardUi}
-                      rankingSessionsLine={rankingSessionsLine}
-                      C={C}
-                      lang={lang}
-                      emptyBox={emptyBox}
-                      isUnder768={true}
-                    />
-                  )}
-                  {activeSheet === "carga" && (
-                    <>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGapLoose }}>
-                        <TrendingUp size={16} color={C.blue} strokeWidth={2} />
-                        <span style={{ ...T.cardTitle, color: C.t }}>
-                          {M(lang, "Evolución de carga", "Load progression")}
-                        </span>
-                      </div>
-                      <ProgressLoadControls
-                        alumnosSorted={alumnosSorted}
-                        alumnoSel={alumnoSel}
-                        setAlumnoSel={setAlumnoSel}
-                        diasRutina={diasRutina}
-                        diaIdx={diaIdx}
-                        setDiaIdx={setDiaIdx}
-                        ejercicioSelId={ejercicioSelId}
-                        setEjercicioSelId={setEjercicioSelId}
-                        exerciseOptions={model.exerciseOptions}
-                        alumnoColor={alumnoColor}
-                        rutinaActiva={rutinaActiva}
-                        selectBaseStyle={selectBaseStyle}
-                        C={C}
-                        T={T}
-                        S={S}
-                        lang={lang}
-                        M={M}
-                        emptyBox={emptyBox}
-                      />
-                      {rutinaActiva && diasRutina.length > 0 && (model.exerciseOptions || []).length > 0 ? (
-                        !model.hasChartData || chartComputed.empty ? (
-                          emptyBox(lang, M(lang, "No hay registros de carga para este ejercicio", "No load records for this exercise", "Sem registros de carga para este exercício"), C)
-                        ) : (
-                          <ProgressLoadChart
-                            chartComputed={chartComputed}
-                            weekLabels={model.chartWeekLabels}
-                            alumnoColor={alumnoColor}
-                            C={C}
-                            T={T}
-                            lang={lang}
-                            M={M}
-                          />
-                        )
-                      ) : null}
-                    </>
-                  )}
-                  {activeSheet === "adherencia" && (
-                    <ProgressAdherenceCard
-                      rows={model.adherenciaRows}
-                      C={C}
-                      lang={lang}
-                      emptyBox={emptyBox}
-                    />
-                  )}
-                </div>
+                  ×
+                </button>
               </div>
-            )}
-          </>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: S.gridGapTight }}>
-            <ProgressRecentPrsCard
-              prs={model.prsRecientes}
-              C={C}
-              lang={lang}
-              emptyBox={emptyBox}
-              isUnder768={false}
-            />
-
-            <ProgressWeeklyVolumeCard
-              volBars={model.volBars}
-              currentRoutineWeekIndex={model.currentRoutineWeekIndex != null ? model.currentRoutineWeekIndex : 0}
-              maxV={maxV}
-              volBarHoverIdx={volBarHoverIdx}
-              setVolBarHoverIdx={setVolBarHoverIdx}
-              C={C}
-              lang={lang}
-              formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
-              formatWeeklyVolKgFull={formatWeeklyVolKgFull}
-              isUnder768={false}
-            />
-
-            <ProgressRankingCard
-              ranking={model.ranking}
-              rankingTop3={rankingTop3}
-              rankingRest={rankingRest}
-              rankingCardUi={rankingCardUi}
-              rankingSessionsLine={rankingSessionsLine}
-              C={C}
-              lang={lang}
-              emptyBox={emptyBox}
-              isUnder768={false}
-            />
+              {activeSheet === "prs" && prsCard(true)}
+              {activeSheet === "vol" && volumeCard(true)}
+              {activeSheet === "carga" && (
+                <>
+                  {loadTitleRow}
+                  {loadBody}
+                </>
+              )}
+              {activeSheet === "adherencia" && adherenceCard}
+              {activeSheet === "ranking" && rankingCard(true)}
+            </div>
           </div>
-        )}
-
-        <PatternDrilldownContext.Provider value={patternDrilldownCtx}>
-          <ProgressMovementPatternVolumeCard
-            patterns={model.patronPatterns}
-            totalVol={model.patronTotalVol}
-            patronExpanded={patronExpanded}
-            togglePatronRow={togglePatronRow}
-            C={C}
-            lang={lang}
-            formatWeeklyVolKgAbbrev={formatWeeklyVolKgAbbrev}
-          />
-        </PatternDrilldownContext.Provider>
+        ) : null}
 
         {ejercicioDrilldown ? (
           <EjercicioHistorialCoach

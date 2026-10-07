@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, TrendingUp, TrendingDown } from "lucide-react";
-import { parseProgresoDate } from "../coachProgresoMetrics.js";
+import { parseProgresoDate, rowVolumeKg } from "../coachProgresoMetrics.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
 
 var SWIPE_CLOSE_PX = 90;
@@ -35,8 +35,7 @@ function buildSessions(rows) {
     var topKg = 0;
     sets.forEach(function (r) {
       var kg = parseFloat(r.kg) || 0;
-      var reps = parseInt(r.reps, 10) || 0;
-      vol += kg * Math.max(1, reps);
+      vol += rowVolumeKg(r);
       if (kg > topKg) topKg = kg;
     });
     var d = parseProgresoDate(key);

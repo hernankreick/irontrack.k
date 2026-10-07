@@ -8,6 +8,8 @@ import { selectCurrentRoutine } from "../lib/routineStore.js";
 import { irontrackMsg as M, pickExerciseName } from "../lib/irontrackMsg.js";
 
 const DAY_MS = 86400000;
+/** Máximo de PRs en «PRs recientes». Único punto de verdad: lo usan el modelo y la vista. */
+export const RECENT_PRS_LIMIT = 5;
 const PALETTE = ["#22c55e", "#f59e0b", "#3b82f6", "#a78bfa", "#ec4899", "#14b8a6", "#eab308", "#64748b"];
 
 /**
@@ -54,6 +56,62 @@ export function parseProgresoDate(str) {
   }
   var d2 = new Date(s.slice(0, 10));
   return isNaN(d2.getTime()) ? null : d2;
+}
+
+/**
+ * Volumen de una fila de progreso en kg: kg × reps. kg y reps deben ser > 0; en otro caso aporta 0.
+ * Cada fila es una serie real: no se deduplica ni se colapsa nada.
+ */
+export function rowVolumeKg(row) {
+  if (!row) return 0;
+  var kg = parseFloat(row.kg);
+  var reps = parseInt(row.reps, 10);
+  if (!(kg > 0) || !(reps > 0)) return 0;
+  return kg * reps;
+}
+
+/**
+ * Eventos PR de UN alumno a partir de TODO su historial (no del subconjunto filtrado por rutina).
+ * Semántica histórica (se mantiene a propósito): el primer registro de un ejercicio cuenta como PR
+ * y un mismo ejercicio puede generar varios PRs el mismo día.
+ * @returns {Array<{ejercicio_id:any,kg:number,deltaKg:number,prevKg:(number|null),fechaMs:number}>} más recientes primero
+ */
+export function buildPrEvents(rows) {
+  var sorted = (rows || []).slice().sort(function (x, y) {
+    var dx = parseProgresoDate(x.fecha);
+    var dy = parseProgresoDate(y.fecha);
+    return (dx ? dx.getTime() : 0) - (dy ? dy.getTime() : 0);
+  });
+  var best = {};
+  var events = [];
+  for (var i = 0; i < sorted.length; i++) {
+    var row = sorted[i];
+    var kg = parseFloat(row.kg) || 0;
+    if (kg <= 0) continue;
+    var prev = best[row.ejercicio_id] != null ? best[row.ejercicio_id] : -1;
+    if (kg > prev) {
+      var d = parseProgresoDate(row.fecha);
+      events.push({
+        ejercicio_id: row.ejercicio_id,
+        kg: kg,
+        deltaKg: prev < 0 ? kg : kg - prev,
+        prevKg: prev >= 0 ? prev : null,
+        fechaMs: d ? d.getTime() : 0,
+      });
+      best[row.ejercicio_id] = kg;
+    }
+  }
+  return events.sort(function (a, b) {
+    return b.fechaMs - a.fechaMs;
+  });
+}
+
+function countPrEventsBetween(events, t0, t1) {
+  var c = 0;
+  for (var i = 0; i < events.length; i++) {
+    if (events[i].fechaMs >= t0 && events[i].fechaMs <= t1) c++;
+  }
+  return c;
 }
 
 function parseSessionDate(s) {
@@ -295,8 +353,8 @@ export function buildCoachProgresoModel(params) {
     };
   });
 
-  /** Adherencia: sesiones completadas vs planificadas en el período */
-  function adherenceForAlumno(aid) {
+  /** Adherencia: sesiones completadas vs planificadas en la ventana [t0, t1] (período actual o anterior). */
+  function adherenceForAlumno(aid, t0, t1) {
     var rut = getRoutineForAlumno(rutinasSBEntrenador, aid);
     var diasPorSemana = rut && rut.datos && rut.datos.days ? rut.datos.days.length : 0;
     var semanas = Math.max(1, Math.ceil(bounds.durDays / 7));
@@ -308,7 +366,7 @@ export function buildCoachProgresoModel(params) {
       var dt = parseSessionDate(ses);
       if (!dt) continue;
       var t = dt.getTime();
-      if (t >= start && t <= end) completed++;
+      if (t >= t0 && t <= t1) completed++;
     }
     var pct = planned > 0 ? Math.min(100, Math.round((100 * completed) / planned)) : completed > 0 ? 100 : 0;
     return { planned: planned, completed: completed, pct: pct, tienePlan: planned > 0 };
@@ -316,7 +374,7 @@ export function buildCoachProgresoModel(params) {
 
   var adherenciaRows = alumnos
     .map(function (a) {
-      var ad = adherenceForAlumno(a.id);
+      var ad = adherenceForAlumno(a.id, start, end);
       return {
         id: a.id,
         n: a.nombre || a.email || "—",
@@ -334,50 +392,13 @@ export function buildCoachProgresoModel(params) {
       return b.p - a.p;
     });
 
-  /** PRs en rango: contar eventos donde kg supera el máximo previo por (alumno, ejercicio) */
-  function countPRsBetween(t0, t1) {
-    var flat = [];
-    Object.keys(progresoGlobal).forEach(function (aid) {
-      var rows = progresoGlobal[aid] || [];
-      rows.forEach(function (r) {
-        flat.push({
-          alumno_id: aid,
-          ejercicio_id: r.ejercicio_id,
-          kg: parseFloat(r.kg) || 0,
-          reps: parseInt(r.reps, 10) || 0,
-          fecha: r.fecha,
-        });
-      });
-    });
-    flat.sort(function (a, b) {
-      var da = parseProgresoDate(a.fecha);
-      var db = parseProgresoDate(b.fecha);
-      var ta = da ? da.getTime() : 0;
-      var tb = db ? db.getTime() : 0;
-      return ta - tb;
-    });
-    var best = {};
-    var count = 0;
-    for (var i = 0; i < flat.length; i++) {
-      var row = flat[i];
-      if (row.kg <= 0) continue;
-      var key = row.alumno_id + "::" + row.ejercicio_id;
-      var prev = best[key] != null ? best[key] : -1;
-      var d = parseProgresoDate(row.fecha);
-      var t = d ? d.getTime() : 0;
-      if (t >= t0 && t <= t1 && row.kg > prev) {
-        count++;
-      }
-      if (row.kg > prev) best[key] = row.kg;
-    }
-    return count;
-  }
-
-  var prsPeriod = countPRsBetween(start, end);
-  var prsPrev = countPRsBetween(pStart, pEnd);
+  /** PRs del alumno seleccionado (historial completo de ese alumno, nunca el de otros). */
+  var alumnoPrEvents = alumnoSel ? buildPrEvents(progresoGlobal[alumnoSel] || []) : [];
+  var prsPeriod = countPrEventsBetween(alumnoPrEvents, start, end);
+  var prsPrev = countPrEventsBetween(alumnoPrEvents, pStart, pEnd);
   var prDelta = prsPeriod - prsPrev;
 
-  /** Volumen total kg*reps en período */
+  /** Volumen total (kg × reps) del alumno seleccionado en la ventana */
   function volumeBetween(t0, t1) {
     var vol = 0;
     for (var j = 0; j < selectedProgressRows.length; j++) {
@@ -386,9 +407,7 @@ export function buildCoachProgresoModel(params) {
       if (!d) continue;
       var tt = d.getTime();
       if (tt < t0 || tt > t1) continue;
-      var kg = parseFloat(r.kg) || 0;
-      var reps = parseInt(r.reps, 10) || 0;
-      vol += kg * Math.max(1, reps);
+      vol += rowVolumeKg(r);
     }
     return vol;
   }
@@ -396,73 +415,29 @@ export function buildCoachProgresoModel(params) {
   var volPeriod = volumeBetween(start, end);
   var volPrev = volumeBetween(pStart, pEnd);
   var semanasPeriodo = Math.max(1, bounds.durDays / 7);
-  var volSemPromTon = volPeriod / semanasPeriodo / 1000;
-  var volPrevSemProm = volPrev / semanasPeriodo / 1000;
-  var volTonDelta = volSemPromTon - volPrevSemProm;
+  var volSemPromKg = volPeriod / semanasPeriodo;
+  var volPrevSemPromKg = volPrev / semanasPeriodo;
+  var volKgDelta = volSemPromKg - volPrevSemPromKg;
 
   /** Adherencia promedio (solo alumnos con plan) */
   var adherSum = 0;
   var adherN = 0;
-  alumnos.forEach(function (a) {
-    var ad = adherenceForAlumno(a.id);
-    if (ad.tienePlan) {
-      adherSum += ad.pct;
-      adherN++;
-    }
-  });
-  var adherAvg = adherN > 0 ? Math.round(adherSum / adherN) : 0;
-
   var adherPrevSum = 0;
   var adherPrevN = 0;
   alumnos.forEach(function (a) {
-    var rut = getRoutineForAlumno(rutinasSBEntrenador, a.id);
-    var diasPorSemana = rut && rut.datos && rut.datos.days ? rut.datos.days.length : 0;
-    var semanas = Math.max(1, Math.ceil(bounds.durDays / 7));
-    var planned = diasPorSemana > 0 ? diasPorSemana * semanas : 0;
-    if (planned <= 0) return;
-    var completed = 0;
-    for (var s = 0; s < sesionesGlobales.length; s++) {
-      var ses = sesionesGlobales[s];
-      if (String(ses.alumno_id) !== String(a.id)) continue;
-      var dt = parseSessionDate(ses);
-      if (!dt) continue;
-      var t = dt.getTime();
-      if (t >= pStart && t <= pEnd) completed++;
-    }
-    var pct = Math.min(100, Math.round((100 * completed) / planned));
-    adherPrevSum += pct;
+    var ad = adherenceForAlumno(a.id, start, end);
+    if (!ad.tienePlan) return;
+    adherSum += ad.pct;
+    adherN++;
+    adherPrevSum += adherenceForAlumno(a.id, pStart, pEnd).pct;
     adherPrevN++;
   });
+  var adherAvg = adherN > 0 ? Math.round(adherSum / adherN) : 0;
   var adherAvgPrev = adherPrevN > 0 ? Math.round(adherPrevSum / adherPrevN) : 0;
   var adherDeltaPct = adherAvg - adherAvgPrev;
 
   /** Estancados: rutina + actividad en últimos 21d pero sin PR en esa ventana */
   var cutoffStall = Date.now() - 21 * DAY_MS;
-
-  function countPRsForAlumnoBetween(aid, t0, t1) {
-    var rows = progresoGlobal[aid] || [];
-    var sorted = rows
-      .slice()
-      .sort(function (x, y) {
-        var dx = parseProgresoDate(x.fecha);
-        var dy = parseProgresoDate(y.fecha);
-        return (dx ? dx.getTime() : 0) - (dy ? dy.getTime() : 0);
-      });
-    var best = {};
-    var c = 0;
-    for (var i = 0; i < sorted.length; i++) {
-      var row = sorted[i];
-      var kg = parseFloat(row.kg) || 0;
-      if (kg <= 0) continue;
-      var ej = row.ejercicio_id;
-      var prev = best[ej] != null ? best[ej] : -1;
-      var d = parseProgresoDate(row.fecha);
-      var t = d ? d.getTime() : 0;
-      if (t >= t0 && t <= t1 && kg > prev) c++;
-      if (kg > prev) best[ej] = kg;
-    }
-    return c;
-  }
 
   function hadActivityRecent(aid) {
     for (var s = 0; s < sesionesGlobales.length; s++) {
@@ -484,7 +459,7 @@ export function buildCoachProgresoModel(params) {
     var rut = getRoutineForAlumno(rutinasSBEntrenador, a.id);
     if (!rut) return;
     if (!hadActivityRecent(a.id)) return;
-    if (countPRsForAlumnoBetween(a.id, cutoffStall, end) === 0) stalled++;
+    if (countPrEventsBetween(buildPrEvents(progresoGlobal[a.id] || []), cutoffStall, end) === 0) stalled++;
   });
 
   /** Evolución de carga: semanas de la rutina activa del alumno seleccionado. */
@@ -513,47 +488,9 @@ export function buildCoachProgresoModel(params) {
     series.push(maxKg == null ? null : Math.round(maxKg * 10) / 10);
   }
 
-  /** PRs recientes (global): últimos eventos PR con fecha */
-  var prEvents = [];
-  var flatAll = [];
-  Object.keys(progresoGlobal).forEach(function (aid) {
-    (progresoGlobal[aid] || []).forEach(function (r) {
-      flatAll.push({
-        alumno_id: aid,
-        ejercicio_id: r.ejercicio_id,
-        kg: parseFloat(r.kg) || 0,
-        fecha: r.fecha,
-      });
-    });
-  });
-  flatAll.sort(function (a, b) {
-    var da = parseProgresoDate(a.fecha);
-    var db = parseProgresoDate(b.fecha);
-    return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
-  });
-  var bestG = {};
-  for (var fi = 0; fi < flatAll.length; fi++) {
-    var fr = flatAll[fi];
-    if (fr.kg <= 0) continue;
-    var k = fr.alumno_id + "::" + fr.ejercicio_id;
-    var prevB = bestG[k] != null ? bestG[k] : -1;
-    var df = parseProgresoDate(fr.fecha);
-    var tf = df ? df.getTime() : 0;
-    if (fr.kg > prevB) {
-      var deltaKg = prevB < 0 ? fr.kg : fr.kg - prevB;
-      prEvents.push({
-        alumno_id: fr.alumno_id,
-        ejercicio_id: fr.ejercicio_id,
-        kg: fr.kg,
-        deltaKg: deltaKg,
-        prevKg: prevB >= 0 ? prevB : null,
-        fechaMs: tf,
-      });
-      bestG[k] = fr.kg;
-    }
-  }
-  prEvents.sort(function (a, b) {
-    return b.fechaMs - a.fechaMs;
+  /** PRs recientes: solo eventos del alumno seleccionado (alumnoPrEvents, ya ordenados del más reciente). */
+  var prEvents = alumnoPrEvents.map(function (ev) {
+    return Object.assign({ alumno_id: alumnoSel }, ev);
   });
 
   function fmtRel(ms, loc) {
@@ -571,7 +508,7 @@ export function buildCoachProgresoModel(params) {
     return d.toLocaleDateString(l, { day: "2-digit", month: "short" });
   }
 
-  var prsRecientes = prEvents.slice(0, 8).map(function (ev) {
+  var prsRecientes = prEvents.slice(0, RECENT_PRS_LIMIT).map(function (ev) {
     var alum = alumnos.find(function (x) {
       return String(x.id) === String(ev.alumno_id);
     });
@@ -604,9 +541,7 @@ export function buildCoachProgresoModel(params) {
       if (!d) return;
       var t = d.getTime();
       if (t >= wkStartMsV && t < wkEndMsV) {
-        var kg = parseFloat(r.kg) || 0;
-        var reps = parseInt(r.reps, 10) || 0;
-        vsum += kg * Math.max(1, reps);
+        vsum += rowVolumeKg(r);
       }
     });
     volBars.push({
@@ -652,9 +587,7 @@ export function buildCoachProgresoModel(params) {
     var ex = exMap[r.ejercicio_id];
     var mk = patternToMovementKey(ex ? ex.pattern : "");
     if (!mk) return;
-    var kg = parseFloat(r.kg) || 0;
-    var reps = parseInt(r.reps, 10) || 0;
-    volByKey[mk] += kg * Math.max(1, reps);
+    volByKey[mk] += rowVolumeKg(r);
     var ejId = r.ejercicio_id;
     if (ejId == null) return;
     var sid = String(ejId);
@@ -689,42 +622,26 @@ export function buildCoachProgresoModel(params) {
     };
   });
 
-  /** Chips resumen */
-  var summaryChips = [
+  var noData = M(lang, "Sin datos suficientes", "Not enough data", "Dados insuficientes");
+  var vsPrev = M(lang, "vs período anterior", "vs prev. period", "vs período anterior");
+
+  /** EQUIPO: global, no depende de alumnoSel (solo del período). */
+  var teamChips = [
     {
+      key: "teamAdherence",
+      value: adherN > 0 ? adherAvg : null,
       val: adherN > 0 ? adherAvg + "%" : "—",
       color: "#3b82f6",
-      label: M(lang, "Adherencia promedio", "Avg. adherence", "Aderência média"),
+      label: M(lang, "Adherencia promedio del equipo", "Team avg. adherence", "Aderência média da equipe"),
       delta:
         adherN > 0
-          ? (adherDeltaPct >= 0 ? "↑ " : "↓ ") +
-            Math.abs(adherDeltaPct) +
-            "% " +
-            M(lang, "vs período anterior", "vs prev. period", "vs período anterior")
-          : M(lang, "Sin datos suficientes", "Not enough data", "Dados insuficientes"),
+          ? (adherDeltaPct >= 0 ? "↑ " : "↓ ") + Math.abs(adherDeltaPct) + "% " + vsPrev
+          : noData,
       deltaColor: adherDeltaPct >= 0 ? "#22c55e" : "#ef4444",
     },
     {
-      val: String(prsPeriod),
-      color: "#22c55e",
-      label: M(lang, "PRs este período", "PRs this period", "PRs neste período"),
-      delta:
-        prsPrev > 0 || prsPeriod > 0
-          ? (prDelta >= 0 ? "↑ " : "↓ ") + Math.abs(prDelta) + " " + M(lang, "vs período anterior", "vs prev.", "vs período anterior")
-          : M(lang, "Sin datos suficientes", "Not enough data", "Dados insuficientes"),
-      deltaColor: prDelta >= 0 ? "#22c55e" : "#eab308",
-    },
-    {
-      val: volPeriod > 0 ? volSemPromTon.toFixed(1) + "t" : "—",
-      color: "#eab308",
-      label: M(lang, "Volumen semanal prom.", "Avg. weekly volume", "Volume semanal médio"),
-      delta:
-        volPeriod > 0
-          ? (volTonDelta >= 0 ? "↑ " : "↓ ") + Math.abs(volTonDelta).toFixed(2) + "t " + M(lang, "vs ant.", "vs prev.", "vs ant.")
-          : M(lang, "Sin datos suficientes", "Not enough data", "Dados insuficientes"),
-      deltaColor: volTonDelta >= 0 ? "#22c55e" : "#ef4444",
-    },
-    {
+      key: "teamStalled",
+      value: stalled,
       val: String(stalled),
       color: stalled > 0 ? "#ef4444" : "#71717a",
       label: M(lang, "Alumnos estancados", "Athletes stalled", "Alunos estagnados"),
@@ -735,6 +652,57 @@ export function buildCoachProgresoModel(params) {
         "Sem melhora (PR) em 3 sem. · com rotina"
       ),
       deltaColor: stalled > 0 ? "#ef4444" : "#71717a",
+    },
+  ];
+
+  /** ALUMNO seleccionado: solo sesiones/progreso de alumnoSel. Volumen en kg (kg × reps). */
+  var selAlumno = alumnoSel
+    ? alumnos.find(function (x) {
+        return String(x.id) === String(alumnoSel);
+      })
+    : null;
+  var selName = selAlumno ? selAlumno.nombre || selAlumno.email || "—" : "";
+  var selAd = alumnoSel ? adherenceForAlumno(alumnoSel, start, end) : null;
+  var selAdPrev = alumnoSel ? adherenceForAlumno(alumnoSel, pStart, pEnd) : null;
+  var selAdDelta = selAd && selAdPrev ? selAd.pct - selAdPrev.pct : 0;
+  var selHasAd = !!(selAd && selAd.tienePlan);
+  var alumnoChips = [
+    {
+      key: "alumnoAdherence",
+      value: selHasAd ? selAd.pct : null,
+      val: selHasAd ? selAd.pct + "%" : "—",
+      color: "#3b82f6",
+      label: M(lang, "Adherencia de " + selName, selName + " adherence", "Aderência de " + selName),
+      delta: selHasAd
+        ? (selAdDelta >= 0 ? "↑ " : "↓ ") + Math.abs(selAdDelta) + "% " + vsPrev
+        : alumnoSel
+          ? M(lang, "Sin rutina asignada", "No routine assigned", "Sem rotina atribuída")
+          : noData,
+      deltaColor: selAdDelta >= 0 ? "#22c55e" : "#ef4444",
+    },
+    {
+      key: "alumnoPrs",
+      value: prsPeriod,
+      val: String(prsPeriod),
+      color: "#22c55e",
+      label: M(lang, "PRs en el período", "PRs in the period", "PRs no período"),
+      delta:
+        prsPrev > 0 || prsPeriod > 0
+          ? (prDelta >= 0 ? "↑ " : "↓ ") + Math.abs(prDelta) + " " + vsPrev
+          : noData,
+      deltaColor: prDelta >= 0 ? "#22c55e" : "#eab308",
+    },
+    {
+      key: "alumnoVolume",
+      value: volSemPromKg,
+      val: volPeriod > 0 ? Math.round(volSemPromKg) + " kg" : "—",
+      color: "#eab308",
+      label: M(lang, "Volumen semanal prom.", "Avg. weekly volume", "Volume semanal médio"),
+      delta:
+        volPeriod > 0
+          ? (volKgDelta >= 0 ? "↑ " : "↓ ") + Math.abs(Math.round(volKgDelta)) + " kg " + M(lang, "vs ant.", "vs prev.", "vs ant.")
+          : noData,
+      deltaColor: volKgDelta >= 0 ? "#22c55e" : "#ef4444",
     },
   ];
 
@@ -761,7 +729,13 @@ export function buildCoachProgresoModel(params) {
     maxVol: maxVol,
     patronPatterns: patronPatterns,
     patronTotalVol: patronTotalVol,
-    summaryChips: summaryChips,
+    teamChips: teamChips,
+    alumnoChips: alumnoChips,
+    recentPrsLimit: RECENT_PRS_LIMIT,
+    prsPeriod: prsPeriod,
+    prsPrev: prsPrev,
+    volSemPromKg: volSemPromKg,
+    volKgDelta: volKgDelta,
     chartSeries: series,
     chartWeekLabels: weekLabels,
     currentRoutineWeekIndex: routineWeekContext.currentRoutineWeekIndex,

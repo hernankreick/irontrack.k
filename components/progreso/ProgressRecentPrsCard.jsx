@@ -2,11 +2,13 @@ import React from "react";
 import { Star } from "lucide-react";
 import { coachType as _T, coachSpace as _S, coachTypeMobile, coachSpaceMobile } from "../coachUiScale.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
+import { recentPrsSubtitle, recentPrsLimitLabel } from "./progressCopy.js";
 
-export default function ProgressRecentPrsCard({ prs, C, lang, emptyBox, isUnder768 }) {
+export default function ProgressRecentPrsCard({ prs, alumnoName, limit, C, lang, emptyBox, isUnder768 }) {
   const T = isUnder768 ? coachTypeMobile : _T;
   const S = isUnder768 ? coachSpaceMobile : _S;
-  var visiblePrs = prs.slice(0, 4);
+  /** El modelo ya entrega los PRs del alumno seleccionado, acotados a `limit`. */
+  var visiblePrs = prs || [];
 
   return (
     <div
@@ -18,13 +20,23 @@ export default function ProgressRecentPrsCard({ prs, C, lang, emptyBox, isUnder7
         minWidth: 0,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: S.blockGap }}>
-        <Star size={16} color={C.yel} strokeWidth={2} />
-        <span style={{ ...T.cardTitle, color: C.t }}>
-          {M(lang, "PRs recientes", "Recent PRs")}
-        </span>
+      <div style={{ marginBottom: S.blockGap }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Star size={16} color={C.yel} strokeWidth={2} />
+          <span style={{ ...T.cardTitle, color: C.t }}>
+            {M(lang, "PRs recientes", "Recent PRs")}
+          </span>
+          {limit ? (
+            <span style={{ ...T.meta, color: C.t2, marginLeft: "auto" }}>{recentPrsLimitLabel(lang, limit)}</span>
+          ) : null}
+        </div>
+        {alumnoName ? (
+          <p style={{ ...T.subtitle, color: C.t2, margin: "6px 0 0 0", paddingLeft: 26 }}>
+            {recentPrsSubtitle(lang, alumnoName)}
+          </p>
+        ) : null}
       </div>
-      {prs.length === 0 ? (
+      {visiblePrs.length === 0 ? (
         emptyBox(lang, M(lang, "Todavía no hay PRs registrados", "No PRs logged yet", "Ainda não há PRs registrados"), C)
       ) : (
         visiblePrs.map(function (row, idx) {

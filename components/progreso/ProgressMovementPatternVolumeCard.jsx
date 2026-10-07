@@ -2,11 +2,13 @@ import React from "react";
 import { PieChart } from "lucide-react";
 import { coachType as T, coachSpace as S } from "../coachUiScale.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
+import { patternWindowLabel, patternEmptyLabel } from "./progressCopy.js";
 import ProgressMovementPatternRow from "./ProgressMovementPatternRow.jsx";
 
 export default function ProgressMovementPatternVolumeCard({
   patterns,
   totalVol,
+  weekNumber,
   patronExpanded,
   togglePatronRow,
   C,
@@ -34,7 +36,7 @@ export default function ProgressMovementPatternVolumeCard({
           </span>
         </div>
         <p style={{ ...T.subtitle, color: C.t2, margin: 0, paddingLeft: 26 }}>
-          {M(lang, "Bloque actual · 4 semanas", "Current block · 4 weeks")}
+          {patternWindowLabel(lang, weekNumber)}
         </p>
       </div>
       {safeTotalVol <= 0 ? (
@@ -49,12 +51,7 @@ export default function ProgressMovementPatternVolumeCard({
             border: "1px solid " + C.brd,
           }}
         >
-          {M(
-            lang,
-            "Sin volumen registrado en el bloque para estos patrones (últimas 4 semanas).",
-            "No volume logged in this block for these patterns (last 4 weeks).",
-            "Sem volume registrado no bloco para estes padrões (últimas 4 semanas)."
-          )}
+          {patternEmptyLabel(lang)}
         </p>
       ) : null}
       <div style={{ display: "flex", flexDirection: "column", gap: S.blockGapLoose }}>
