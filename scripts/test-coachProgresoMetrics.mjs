@@ -7,12 +7,17 @@
 //   node scripts/test-coachProgresoMetrics.mjs
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildCoachProgresoModel,
   buildPrEvents,
   rowVolumeKg,
   getPeriodBounds,
+  RECENT_PRS_LIMIT,
 } from "../components/coachProgresoMetrics.js";
+import { patternWindowLabel, patternEmptyLabel, recentPrsSubtitle } from "../components/progreso/progressCopy.js";
+
+const src = (rel) => readFileSync(new URL("../components/" + rel, import.meta.url), "utf8");
 
 let count = 0;
 function test(name, fn) { fn(); count++; console.log("ok - " + name); }
@@ -111,6 +116,7 @@ test("A: Evi seleccionada -> alumnoChips solo usa Evi", () => {
   assert.equal(chip(mEvi.alumnoChips, "alumnoPrs").value, 3); // sq50, sq60, bp20 (Julieta tiene 2 mas: no suman)
   assert.equal(chip(mEvi.alumnoChips, "alumnoVolume").value, 612.5); // 2450 kg / 4 semanas
   assert.equal(chip(mEvi.alumnoChips, "alumnoVolume").val, "613 kg");
+  assert.equal(mEvi.alumnoChips.length, 3);
   assert.deepEqual(mEvi.alumnoChips.map((c) => c.key), ["alumnoAdherence", "alumnoPrs", "alumnoVolume"]);
 });
 
@@ -126,6 +132,7 @@ test("B: Julieta seleccionada -> alumnoChips cambia a Julieta", () => {
 test("C: teamChips identico con Evi, Julieta o sin seleccion", () => {
   assert.deepEqual(mEvi.teamChips, mJul.teamChips);
   assert.deepEqual(mEvi.teamChips, mNone.teamChips);
+  assert.equal(mEvi.teamChips.length, 2);
   assert.deepEqual(mEvi.teamChips.map((c) => c.key), ["teamAdherence", "teamStalled"]);
   assert.equal(chip(mEvi.teamChips, "teamAdherence").value, GLOBAL_ADHER_AVG);
   assert.equal(chip(mEvi.teamChips, "teamStalled").value, GLOBAL_STALLED);
@@ -253,13 +260,118 @@ test("PRs: semantica historica (primer registro = PR, varios PR el mismo dia) y 
   assert.deepEqual(buildPrEvents(null), []);
 });
 
-test("compat temporal: summaryChips = equipo + alumno (sin mezclar globales)", () => {
-  assert.deepEqual(mEvi.summaryChips.map((c) => c.key), ["teamAdherence", "alumnoPrs", "alumnoVolume", "teamStalled"]);
-  assert.equal(mEvi.summaryChips[1].val, "3");
-  assert.equal(mJul.summaryChips[1].val, "2");
-  assert.equal(mEvi.summaryChips[0].val, mJul.summaryChips[0].val);
-  assert.equal(mEvi.volSemPromTon, undefined);
-  assert.equal(mEvi.volTonDelta, undefined);
+test("C2: summaryChips y la semantica en toneladas ya no existen en el modelo", () => {
+  for (const m of [mEvi, mJul, mNone]) {
+    assert.equal("summaryChips" in m, false);
+    assert.equal("volSemPromTon" in m, false);
+    assert.equal("volTonDelta" in m, false);
+  }
+});
+
+test("F2: volumen en kg (valor y texto), delta tambien en kg, nunca toneladas", () => {
+  const v = chip(mEvi.alumnoChips, "alumnoVolume");
+  assert.match(v.val, /^\d+ kg$/);
+  assert.match(v.delta, / kg /);
+  assert.doesNotMatch(v.val + v.delta, /\dt\b/);
+});
+
+test("D2/E: PRs recientes del alumno y limite unico modelo/vista", () => {
+  const muchos = [];
+  for (let i = 1; i <= 12; i++) muchos.push(row("r-evi", "sq", i + "/9/2026", String(40 + i), "5"));
+  const m = build(EVI, { progresoGlobal: Object.assign({}, progresoGlobal, { [EVI]: muchos }) });
+  assert.equal(m.prsRecientes.length, RECENT_PRS_LIMIT);
+  assert.equal(m.recentPrsLimit, RECENT_PRS_LIMIT);
+  assert.ok(m.prsRecientes.every((p) => p.n === "Evi"));
+  const card = src("progreso/ProgressRecentPrsCard.jsx");
+  assert.doesNotMatch(card, /slice\(0, *\d+\)/, "la card no aplica un limite propio");
+  assert.match(src("ProgresoView.jsx"), /model\.recentPrsLimit/);
+  assert.doesNotMatch(src("ProgresoView.jsx"), /PRs registrados|PRs logged/, "el limite no se muestra como metrica");
+  assert.match(recentPrsSubtitle("es", "Evi"), /Evi/);
+});
+
+test("G2: reps 0 = 0 tambien en el drill-down (EjercicioHistorialCoach usa rowVolumeKg)", () => {
+  const h = src("coach/EjercicioHistorialCoach.jsx");
+  assert.match(h, /rowVolumeKg/);
+  assert.doesNotMatch(h, /Math\.max\(1, *reps\)/);
+  assert.doesNotMatch(src("coachProgresoMetrics.js"), /Math\.max\(1, *reps\)/);
+  assert.equal(rowVolumeKg({ kg: "50", reps: "0" }), 0);
+});
+
+test("H2: copy del patron describe la ventana calculada (semana actual de la rutina, no 4 semanas)", () => {
+  const w = patternWindowLabel("es", 4);
+  assert.match(w, /Semana actual de la rutina/);
+  assert.match(w, /4/);
+  assert.doesNotMatch(w + patternEmptyLabel("es") + patternWindowLabel("en", 2) + patternEmptyLabel("en"), /4 semanas|4 weeks|últimas 4/i);
+  const card = src("progreso/ProgressMovementPatternVolumeCard.jsx");
+  assert.doesNotMatch(card, /4 semanas|4 weeks/);
+  // la ventana del modelo es la semana actual de la rutina: soloTres suma solo filas de esa semana (lunes 5/10)
+  const m = build(EVI, { sesionesGlobales: sesEvi, progresoGlobal: { [EVI]: [
+    row("r-evi", "sq", "6/10/2026", "50", "15"),
+    row("r-evi", "sq", "1/10/2026", "50", "15"), // semana anterior de la rutina: no entra al patron
+  ] } });
+  assert.equal(m.patronPatterns.find((p) => p.key === "rodilla").vol, 750);
+  assert.equal(m.currentRoutineWeekIndex, 3);
+});
+
+test("I: ProgressLoadControls ya no tiene selector de alumno (solo Dia y Ejercicio)", () => {
+  const c = src("progreso/ProgressLoadControls.jsx");
+  assert.doesNotMatch(c, /alumnoSel|setAlumnoSel|alumnosSorted/);
+  assert.doesNotMatch(c, /"Alumno", "Athlete"/);
+  const v = src("ProgresoView.jsx");
+  assert.equal((v.match(/setAlumnoSel\(e\.target\.value/g) || []).length, 1, "un unico selector de alumno");
+  assert.doesNotMatch(v, /<ProgressLoadControls[^>]*alumnoSel/);
+});
+
+test("J/K: ProgresoView consume alumnoChips y teamChips, no summaryChips", () => {
+  const v = src("ProgresoView.jsx");
+  assert.match(v, /model\.alumnoChips/);
+  assert.match(v, /model\.teamChips/);
+  assert.doesNotMatch(v, /summaryChips/);
+  assert.doesNotMatch(src("coachProgresoMetrics.js"), /summaryChips/);
+});
+
+test("L: tarjetas Equipo separadas de las del alumno", () => {
+  const v = src("ProgresoView.jsx");
+  const iAlu = v.indexOf('data-section="alumno"');
+  const iEq = v.indexOf('data-section="equipo"');
+  assert.ok(iAlu > 0 && iEq > iAlu);
+  const alu = v.slice(iAlu, iEq);
+  const rest = v.slice(iEq);
+  const eqEnd = rest.indexOf("</section>");
+  const eq = rest.slice(0, eqEnd);
+  for (const tag of ["{prsCard(", "{volumeCard(", "{patternCard}", "{loadBody}"]) {
+    assert.ok(alu.includes(tag), "alumno incluye " + tag);
+    assert.ok(!eq.includes(tag), "equipo no incluye " + tag);
+  }
+  for (const tag of ["{adherenceCard}", "{rankingCard(", "model.teamChips"]) {
+    assert.ok(eq.includes(tag), "equipo incluye " + tag);
+    assert.ok(!alu.includes(tag), "alumno no incluye " + tag);
+  }
+  assert.ok(alu.includes("model.alumnoChips"));
+});
+
+test("M: no hay formato en toneladas en la cadena de Progreso del entrenador", () => {
+  const files = ["coachProgresoMetrics.js", "ProgresoView.jsx", "coach/EjercicioHistorialCoach.jsx", "progreso/ProgressWeeklyVolumeCard.jsx", "progreso/ProgressMovementPatternVolumeCard.jsx", "progreso/ProgressMovementPatternRow.jsx", "progreso/ProgressWeeklyVolumeBar.jsx"];
+  for (const f of files) {
+    const t = src(f);
+    assert.doesNotMatch(t, /tonelad|volSemPromTon|volTonDelta|\+ *"t"|\+ *"t "|\/ *1000\)\.toFixed/i, f);
+  }
+});
+
+test("estados vacios: alumno sin rutina / sin PRs / sin volumen, sin datos del alumno anterior", () => {
+  const sinRut = build(EVI, { rutinasSBEntrenador: rutinas.filter((r) => r.alumno_id !== EVI) });
+  const ad = chip(sinRut.alumnoChips, "alumnoAdherence");
+  assert.equal(ad.val, "—");
+  assert.equal(ad.value, null);
+  assert.equal(ad.delta, "Sin rutina asignada");
+  const vacio = build(EVI, { progresoGlobal: { [JUL]: progresoGlobal[JUL] } });
+  assert.equal(chip(vacio.alumnoChips, "alumnoPrs").value, 0);
+  assert.deepEqual(vacio.prsRecientes, []);
+  assert.equal(chip(vacio.alumnoChips, "alumnoVolume").val, "—");
+  assert.equal(vacio.volBars.every((b) => b.v === 0), true);
+  assert.equal(vacio.patronTotalVol, 0);
+  // equipo intacto aunque Evi no tenga datos
+  assert.deepEqual(vacio.ranking, mEvi.ranking);
 });
 
 globalThis.Date = RealDate;

@@ -1,9 +1,6 @@
 import React from "react";
 
 export default function ProgressLoadControls({
-  alumnosSorted,
-  alumnoSel,
-  setAlumnoSel,
   diasRutina,
   diaIdx,
   setDiaIdx,
@@ -29,35 +26,6 @@ export default function ProgressLoadControls({
 
   return (
     <>
-      <div style={{ marginBottom: S.blockGapLoose }}>
-        <label
-          style={{
-            display: "block",
-            ...T.labelMd,
-            color: C.t2,
-            marginBottom: 6,
-          }}
-        >
-          {M(lang, "Alumno", "Athlete")}
-        </label>
-        <select
-          value={alumnoSel != null ? String(alumnoSel) : ""}
-          onChange={function (e) {
-            var v = e.target.value;
-            setAlumnoSel(v || null);
-          }}
-          style={selectBaseStyle}
-        >
-          {alumnosSorted.map(function (a) {
-            return (
-              <option key={String(a.id)} value={String(a.id)}>
-                {a.nombre || a.email || "—"}
-              </option>
-            );
-          })}
-        </select>
-      </div>
-
       {!rutinaActiva || diasRutina.length === 0 ? (
         <div style={{ marginBottom: S.blockGapLoose }}>
           {emptyBox(

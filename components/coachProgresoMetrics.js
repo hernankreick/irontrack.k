@@ -8,6 +8,8 @@ import { selectCurrentRoutine } from "../lib/routineStore.js";
 import { irontrackMsg as M, pickExerciseName } from "../lib/irontrackMsg.js";
 
 const DAY_MS = 86400000;
+/** Máximo de PRs en «PRs recientes». Único punto de verdad: lo usan el modelo y la vista. */
+export const RECENT_PRS_LIMIT = 5;
 const PALETTE = ["#22c55e", "#f59e0b", "#3b82f6", "#a78bfa", "#ec4899", "#14b8a6", "#eab308", "#64748b"];
 
 /**
@@ -506,7 +508,7 @@ export function buildCoachProgresoModel(params) {
     return d.toLocaleDateString(l, { day: "2-digit", month: "short" });
   }
 
-  var prsRecientes = prEvents.slice(0, 8).map(function (ev) {
+  var prsRecientes = prEvents.slice(0, RECENT_PRS_LIMIT).map(function (ev) {
     var alum = alumnos.find(function (x) {
       return String(x.id) === String(ev.alumno_id);
     });
@@ -671,7 +673,11 @@ export function buildCoachProgresoModel(params) {
       val: selHasAd ? selAd.pct + "%" : "—",
       color: "#3b82f6",
       label: M(lang, "Adherencia de " + selName, selName + " adherence", "Aderência de " + selName),
-      delta: selHasAd ? (selAdDelta >= 0 ? "↑ " : "↓ ") + Math.abs(selAdDelta) + "% " + vsPrev : noData,
+      delta: selHasAd
+        ? (selAdDelta >= 0 ? "↑ " : "↓ ") + Math.abs(selAdDelta) + "% " + vsPrev
+        : alumnoSel
+          ? M(lang, "Sin rutina asignada", "No routine assigned", "Sem rotina atribuída")
+          : noData,
       deltaColor: selAdDelta >= 0 ? "#22c55e" : "#ef4444",
     },
     {
@@ -700,13 +706,6 @@ export function buildCoachProgresoModel(params) {
     },
   ];
 
-  /**
-   * COMPATIBILIDAD TEMPORAL: ProgresoView todavía consume `summaryChips` (4 chips, orden histórico).
-   * Se compone con los chips nuevos (ya no mezcla globales con alumno: adherencia/estancados = equipo,
-   * PRs/volumen = alumno seleccionado). Se elimina cuando la vista pase a teamChips/alumnoChips.
-   */
-  var summaryChips = [teamChips[0], alumnoChips[1], alumnoChips[2], teamChips[1]];
-
   var exerciseOptions = exercisesForRoutineDay(rutinasSBEntrenador, alumnoSel, diaIdx, exMap, lang);
 
   if (import.meta.env && import.meta.env.DEV) {
@@ -732,7 +731,7 @@ export function buildCoachProgresoModel(params) {
     patronTotalVol: patronTotalVol,
     teamChips: teamChips,
     alumnoChips: alumnoChips,
-    summaryChips: summaryChips, // compat temporal, ver comentario arriba
+    recentPrsLimit: RECENT_PRS_LIMIT,
     prsPeriod: prsPeriod,
     prsPrev: prsPrev,
     volSemPromKg: volSemPromKg,
