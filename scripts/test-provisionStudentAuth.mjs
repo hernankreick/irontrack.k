@@ -10,7 +10,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  provisionStudentAuth, parseCoachConfig, isCoachUser, canManageAlumno, extractBearer, escapeLike, LEGACY_COACH_ID,
+  provisionStudentAuth, resolveTargetAlumnoId, parseCoachConfig, isCoachUser, canManageAlumno, extractBearer, escapeLike, LEGACY_COACH_ID,
 } from "../supabase/functions/update-alumno-password/provisioning.js";
 
 let count = 0;
@@ -63,7 +63,7 @@ function makeAdmin(opts) {
   const users = o.users || baseUsers();
   const alumnos = o.alumnos || baseAlumnos();
   const tokens = o.tokens || { [TOK_COACH]: COACH, [TOK_ALUMNO_A]: U_A };
-  const log = { passwordUpdates: [], created: [], deleted: [], alumnoWrites: [] };
+  const log = { passwordUpdates: [], created: [], deleted: [], alumnoWrites: [], authLookups: [], ilikePatterns: [] };
   let nextId = 0;
 
   const admin = {
@@ -76,10 +76,12 @@ function makeAdmin(opts) {
       },
       admin: {
         async getUserById(id) {
+          log.authLookups.push("getUserById:" + id);
           const user = users.find((u) => u.id === id);
           return user ? { data: { user }, error: null } : { data: { user: null }, error: { message: "not found" } };
         },
         async listUsers({ page, perPage }) {
+          log.authLookups.push("listUsers");
           return { data: { users: users.slice((page - 1) * perPage, page * perPage) }, error: null };
         },
         async createUser({ email, password }) {
@@ -110,7 +112,7 @@ function makeAdmin(opts) {
         select(cols) { if (q.op === "update") q.returning = true; q.cols = cols; return builder; },
         update(patch) { q.op = "update"; q.patch = patch; return builder; },
         eq(col, val) { q.filters.push((r) => String(r[col]) === String(val)); return builder; },
-        ilike(col, pat) { const re = likeToRegex(pat); q.filters.push((r) => r[col] != null && re.test(r[col])); return builder; },
+        ilike(col, pat) { log.ilikePatterns.push(pat); const re = likeToRegex(pat); q.filters.push((r) => r[col] != null && re.test(r[col])); return builder; },
         is(col, val) { q.filters.push((r) => (val === null ? r[col] == null : r[col] === val)); return builder; },
         maybeSingle() { q.single = true; return builder; },
         then(resolve, reject) { return Promise.resolve(run()).then(resolve, reject); },
@@ -151,7 +153,7 @@ function call(admin, alumnoId, over) {
   const o = over || {};
   return provisionStudentAuth(
     { admin, coach: o.coach || COACH_CFG, log: console },
-    { authorization: "authorization" in o ? o.authorization : "Bearer " + TOK_COACH, alumnoId, newPassword: "newPassword" in o ? o.newPassword : PASSWORD },
+    { authorization: "authorization" in o ? o.authorization : "Bearer " + TOK_COACH, alumnoId, alumnoEmail: o.alumnoEmail, newPassword: "newPassword" in o ? o.newPassword : PASSWORD },
   );
 }
 
@@ -418,6 +420,187 @@ await test("L. el cliente NO escribe auth_uid: ninguna escritura/PATCH/insert co
   const m = /functions\.invoke\("update-alumno-password",\{\s*body:\{([^}]*)\}/.exec(app);
   assert.ok(m, "no se encontro la invocacion");
   assert.ok(/alumnoId:editAlumnoModal\.id/.test(m[1]) && !/alumnoEmail|auth_uid/.test(m[1]), m[1]);
+});
+
+
+// ── S0.6.2: contrato legacy { alumnoEmail, newPassword } ──────────────────────────────────────────────────
+
+startCapture();
+
+await test("S0.6.2-A. contrato nuevo alumnoId sigue funcionando, y con ambos manda alumnoId (alumnoEmail se ignora)", async () => {
+  let admin = makeAdmin();
+  let r = await call(admin, ID_A);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.authUid, U_A);
+  // alumnoId de A + alumnoEmail de B -> se opera sobre A
+  admin = makeAdmin();
+  r = await call(admin, ID_A, { alumnoEmail: "alumno.b@mail.com" });
+  assert.equal(r.status, 200);
+  assert.deepEqual(admin.log.passwordUpdates.map((p) => p.id), [U_A]);
+  assert.equal(admin.log.ilikePatterns.length, 0, "con alumnoId no se consulta por email");
+});
+
+await test("S0.6.2-B. legacy con email exacto y unico -> resuelve alumno.id y sigue el flujo seguro", async () => {
+  const admin = makeAdmin();
+  const r = await call(admin, undefined, { alumnoEmail: "alumno.b@mail.com" });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body, { ok: true, authUid: U_B, linked: false, created: false });
+  assert.deepEqual(admin.log.passwordUpdates, [{ id: U_B, password: PASSWORD }]);
+  assert.equal(admin.log.alumnoWrites.length, 0);
+});
+
+await test("S0.6.2-C/D. legacy con mayusculas/minusculas y espacios externos se normaliza", async () => {
+  // la fila de A guarda "Alumno.A@Mail.com"
+  for (const email of ["ALUMNO.A@MAIL.COM", "alumno.a@mail.com", "  Alumno.A@Mail.com \n"]) {
+    const admin = makeAdmin();
+    const r = await call(admin, undefined, { alumnoEmail: email });
+    assert.equal(r.status, 200, JSON.stringify(email));
+    assert.equal(r.body.authUid, U_A);
+  }
+  // alumno nuevo (auth_uid NULL) por email legacy -> provisioning seguro (vincula)
+  const admin = makeAdmin();
+  const r = await call(admin, undefined, { alumnoEmail: " NUEVO@mail.com " });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.linked, true);
+  assert.equal(admin.alumnos.find((a) => a.id === ID_N).auth_uid, U_FREE);
+});
+
+await test("S0.6.2-E. legacy con email inexistente / invalido / vacio / no-string -> fail-closed sin tocar Auth", async () => {
+  const cases = [["nadie@mail.com", 404], ["no-es-email", 400], ["", 400], ["   ", 400], [123, 400], [{ a: 1 }, 400], [["a@b.com"], 400]];
+  for (const [email, status] of cases) {
+    const admin = makeAdmin();
+    const r = await call(admin, undefined, { alumnoEmail: email });
+    assert.equal(r.status, status, JSON.stringify(email));
+    assert.equal(admin.log.authLookups.length, 0, "no se consulta Auth");
+    assert.equal(admin.log.passwordUpdates.length, 0);
+    assert.equal(admin.log.created.length, 0);
+  }
+  // sin alumnoId ni alumnoEmail
+  const r2 = await call(makeAdmin(), undefined, {});
+  assert.equal(r2.status, 400);
+});
+
+await test("S0.6.2-F. legacy con email duplicado entre alumnos -> 409", async () => {
+  const alumnos = baseAlumnos();
+  alumnos.push({ id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", nombre: "Dup", email: "ALUMNO.B@mail.com", entrenador_id: LEGACY_COACH_ID, auth_uid: null });
+  const admin = makeAdmin({ alumnos });
+  const r = await call(admin, undefined, { alumnoEmail: "alumno.b@mail.com" });
+  assert.equal(r.status, 409);
+  assert.equal(admin.log.authLookups.length, 0);
+  assert.equal(admin.log.passwordUpdates.length, 0);
+});
+
+await test("S0.6.2-G. legacy con %, _ o \\ NO funciona como comodin", async () => {
+  for (const email of ["%@mail.com", "alumno_a@mail.com", "alumno.%@mail.com", "a%@mail.com", "alumno.a@mail.co_", "\\@mail.com"]) {
+    const admin = makeAdmin();
+    const r = await call(admin, undefined, { alumnoEmail: email });
+    assert.ok(r.status === 404 || r.status === 400, email + " -> " + r.status);
+    assert.equal(admin.log.passwordUpdates.length, 0, email);
+    assert.equal(admin.log.authLookups.length, 0, email);
+  }
+  // el patron enviado a la DB esta escapado
+  const admin = makeAdmin();
+  await call(admin, undefined, { alumnoEmail: "a_b%c@mail.com" });
+  assert.deepEqual(admin.log.ilikePatterns, ["a\\_b\\%c@mail.com"]);
+});
+
+await test("S0.6.2-H. caller alumno + email valido de otro alumno -> 403 ANTES de resolver/revelar nada", async () => {
+  const admin = makeAdmin();
+  const real = await call(admin, undefined, { authorization: "Bearer " + TOK_ALUMNO_A, alumnoEmail: "alumno.b@mail.com" });
+  const ghost = await call(admin, undefined, { authorization: "Bearer " + TOK_ALUMNO_A, alumnoEmail: "no-existe@mail.com" });
+  assert.equal(real.status, 403);
+  assert.equal(ghost.status, 403);
+  assert.deepEqual(real.body, ghost.body, "misma respuesta exista o no el alumno (sin enumeracion)");
+  assert.equal(admin.log.ilikePatterns.length, 0, "no se consulto alumnos por email");
+  assert.equal(admin.log.authLookups.length, 0);
+  assert.equal(admin.log.passwordUpdates.length, 0);
+});
+
+await test("S0.6.2-I. caller no autorizado + email valido -> 403 (y 401 sin JWT) sin consultar por email", async () => {
+  const users = baseUsers(); users[0] = { id: COACH, email: "entrenador@irontrack.app", email_confirmed_at: null };
+  let admin = makeAdmin({ users });
+  assert.equal((await call(admin, undefined, { alumnoEmail: "alumno.b@mail.com" })).status, 403);
+  assert.equal(admin.log.ilikePatterns.length, 0);
+  admin = makeAdmin();
+  assert.equal((await call(admin, undefined, { alumnoEmail: "alumno.b@mail.com", coach: parseCoachConfig({ COACH_AUTH_UIDS: U_B }) })).status, 403);
+  assert.equal((await call(admin, undefined, { alumnoEmail: "alumno.b@mail.com", authorization: "" })).status, 401);
+  assert.equal(admin.log.ilikePatterns.length, 0);
+  assert.equal(admin.log.passwordUpdates.length, 0);
+  // y con COACH_AUTH_UIDS = uid del coach, el legacy funciona
+  admin = makeAdmin();
+  assert.equal((await call(admin, undefined, { alumnoEmail: "alumno.b@mail.com", coach: parseCoachConfig({ COACH_AUTH_UIDS: COACH }) })).status, 200);
+});
+
+await test("S0.6.2-J. el email legacy NUNCA selecciona directamente un Auth user", async () => {
+  // (1) email legacy de un Auth user que NO tiene fila en alumnos -> 404 y Auth jamas consultado
+  let admin = makeAdmin({ alumnos: baseAlumnos().filter((a) => a.id !== ID_N) });
+  let r = await call(admin, undefined, { alumnoEmail: "nuevo@mail.com" }); // existe en auth.users (U_FREE)
+  assert.equal(r.status, 404);
+  assert.deepEqual(admin.log.authLookups, []);
+  assert.equal(admin.log.passwordUpdates.length, 0);
+  assert.equal(admin.log.created.length, 0);
+  // (2) email legacy que coincide con el coach y con ninguna fila -> nada
+  admin = makeAdmin();
+  r = await call(admin, undefined, { alumnoEmail: "entrenador@irontrack.app" });
+  assert.equal(r.status, 404);
+  assert.equal(admin.log.passwordUpdates.length, 0);
+  // (3) estatico: alumnoEmail solo se lee dentro de resolveTargetAlumnoId; el resto del modulo no lo referencia
+  const src = readFileSync(join(fileURLToPath(new URL(".", import.meta.url)), "..", "supabase", "functions", "update-alumno-password", "provisioning.js"), "utf8");
+  const start = src.indexOf("export async function resolveTargetAlumnoId");
+  const end = src.indexOf("/**", start);
+  const rest = src.slice(0, start) + src.slice(end);
+  const restCode = rest.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n").replace(/"[^"\n]*"/g, '""');
+  assert.ok(!/alumnoEmail/.test(restCode), "alumnoEmail solo debe usarse en resolveTargetAlumnoId");
+  // el unico input de findAuthUsersByEmail es el email de la fila (alumno.email normalizado)
+  assert.ok(/var email = normalizeEmail\(alumno\.email\);/.test(src));
+  assert.equal((src.match(/await findAuthUsersByEmail\(admin, email\)/g) || []).length, 2);
+});
+
+await test("S0.6.2-K. legacy + fila con auth_uid -> se usa ese auth_uid aunque el email de Auth sea otro", async () => {
+  // la fila "Alumno.A@Mail.com" apunta a U_B (cuyo email en Auth es alumno.b@mail.com)
+  const alumnos = [{ id: ID_A, nombre: "A", email: "Alumno.A@Mail.com", entrenador_id: LEGACY_COACH_ID, auth_uid: U_B }];
+  const admin = makeAdmin({ alumnos });
+  const r = await call(admin, undefined, { alumnoEmail: "alumno.a@mail.com" }); // en Auth existe un user con ese email (U_A)
+  assert.equal(r.status, 200);
+  assert.equal(r.body.authUid, U_B);
+  assert.deepEqual(admin.log.passwordUpdates.map((p) => p.id), [U_B]);
+  assert.ok(!admin.log.authLookups.includes("listUsers"), "no se busca por email en Auth");
+  assert.equal(admin.alumnos[0].auth_uid, U_B);
+});
+
+await test("S0.6.2-K2. legacy: alumno de otro coach -> 403 (ownership intacto)", async () => {
+  const alumnos = baseAlumnos(); alumnos[1].entrenador_id = "99999999-9999-4999-8999-999999999999";
+  const admin = makeAdmin({ alumnos });
+  const r = await call(admin, undefined, { alumnoEmail: "alumno.b@mail.com" });
+  assert.equal(r.status, 403);
+  assert.equal(admin.log.passwordUpdates.length, 0);
+});
+
+await test("S0.6.2-L. el frontend nuevo envia alumnoId y NO alumnoEmail", async () => {
+  const app = readFileSync(join(fileURLToPath(new URL(".", import.meta.url)), "..", "App.jsx"), "utf8");
+  const m = /functions\.invoke\("update-alumno-password",\{\s*body:\{([^}]*)\}/.exec(app);
+  assert.ok(m);
+  assert.ok(/alumnoId:editAlumnoModal\.id/.test(m[1]) && !/alumnoEmail/.test(m[1]), m[1]);
+});
+
+await test("resolveTargetAlumnoId: alumnoId presente pero invalido NO cae al email", async () => {
+  const admin = makeAdmin();
+  for (const bad of ["", "   ", 5, {}, "x".repeat(200)]) {
+    const r = await resolveTargetAlumnoId(admin, { alumnoId: bad, alumnoEmail: "alumno.a@mail.com" });
+    assert.equal(r.ok, false);
+    assert.equal(r.response.status, 400);
+  }
+  assert.equal(admin.log.ilikePatterns.length, 0);
+});
+
+stopCapture();
+
+await test("S0.6.2-logs. el contrato legacy tampoco filtra password, JWT, service role ni el email enviado a los logs", async () => {
+  const all = captured.join("\n");
+  [PASSWORD, TOK_COACH, TOK_ALUMNO_A, SERVICE_KEY, "Bearer", "alumno.b@mail.com", "nadie@mail.com"].forEach((secret) => {
+    assert.ok(!all.includes(secret), "no debe loguearse: " + secret);
+  });
+  assert.ok(all.includes("contrato legacy"), "se registra el uso del contrato legacy (solo con alumnoId)");
 });
 
 console.log("\n" + count + " tests ok");

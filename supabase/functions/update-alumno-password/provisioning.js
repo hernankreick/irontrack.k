@@ -3,7 +3,10 @@
 // Sin dependencias de Deno: index.ts inyecta el cliente admin (service role) y la configuracion; los tests
 // (scripts/test-provisionStudentAuth.mjs) inyectan dobles. NUNCA se loguea password, JWT ni claves.
 //
-// Contrato de entrada: { alumnoId, newPassword }. El email NO viene del cliente: sale de la fila public.alumnos.
+// Contrato de entrada preferido: { alumnoId, newPassword }. El email de Auth NO viene del cliente: sale de la fila public.alumnos.
+// Contrato LEGACY transitorio (PWA/frontend viejo cacheado): { alumnoEmail, newPassword }. alumnoEmail solo sirve para localizar
+// EXACTAMENTE una fila de public.alumnos (despues de autorizar al caller); desde ahi todo sigue por alumno.id. Nunca se usa para
+// buscar un Auth user. Si llegan ambos, manda alumnoId y alumnoEmail se ignora.
 //
 // Modelo de autorizacion (fail-closed):
 //   1. JWT valido resuelto por Auth (admin.auth.getUser) -> caller.
@@ -120,8 +123,33 @@ async function setPassword(admin, authUid, newPassword) {
 }
 
 /**
+ * Resuelve el alumno objetivo -> alumno.id. UNICO lugar donde se lee `alumnoEmail` (contrato legacy).
+ * Se invoca solo con un caller ya autorizado como coach (y que no es alumno). El email solo selecciona UNA fila de public.alumnos
+ * (coincidencia exacta normalizada, comodines de LIKE escapados); nunca busca ni toca un Auth user.
+ */
+export async function resolveTargetAlumnoId(admin, inp) {
+  var input = inp || {};
+  if (input.alumnoId !== undefined && input.alumnoId !== null) {
+    var id = input.alumnoId;
+    if (typeof id !== "string" || id.trim() === "" || id.length > 128) return { ok: false, response: fail(400, "alumnoId required") };
+    return { ok: true, alumnoId: id.trim(), via: "id" };
+  }
+  var raw = input.alumnoEmail;
+  if (raw === undefined || raw === null) return { ok: false, response: fail(400, "alumnoId required") };
+  var email = normalizeEmail(raw);
+  if (typeof raw !== "string" || !isValidEmail(email)) return { ok: false, response: fail(400, "alumnoEmail invalid") };
+  var res = await admin.from("alumnos").select("id,email").ilike("email", escapeLike(email));
+  if (res.error || !Array.isArray(res.data)) return { ok: false, response: fail(500, "lookup failed") };
+  var rows = res.data.filter(function (r) { return normalizeEmail(r.email) === email; });
+  if (rows.length === 0) return { ok: false, response: fail(404, "alumno not found") };
+  if (rows.length > 1) return { ok: false, response: fail(409, "ambiguous student email") };
+  if (rows[0].id == null || String(rows[0].id).trim() === "") return { ok: false, response: fail(500, "lookup failed") };
+  return { ok: true, alumnoId: String(rows[0].id), via: "email" };
+}
+
+/**
  * @param {{admin:object, coach:{uids:Set,emails:Set}, log?:object}} deps
- * @param {{authorization?:string, alumnoId?:string, newPassword?:string}} input
+ * @param {{authorization?:string, alumnoId?:string, alumnoEmail?:string, newPassword?:string}} input
  * @returns {Promise<{status:number, body:object}>}
  */
 export async function provisionStudentAuth(deps, input) {
@@ -149,10 +177,7 @@ export async function provisionStudentAuth(deps, input) {
     return fail(403, "not authorized");
   }
 
-  // body (despues de autenticar/autorizar para no revelar nada a callers no autorizados)
-  var alumnoId = inp.alumnoId;
-  if (typeof alumnoId !== "string" || alumnoId.trim() === "" || alumnoId.length > 128) return fail(400, "alumnoId required");
-  alumnoId = alumnoId.trim();
+  // forma del body (sin tocar la DB; despues de autenticar/autorizar para no revelar nada a callers no autorizados)
   if (typeof inp.newPassword !== "string" || inp.newPassword.length === 0) return fail(400, "newPassword required");
   var newPassword = inp.newPassword;
 
@@ -164,7 +189,11 @@ export async function provisionStudentAuth(deps, input) {
     return fail(403, "not authorized");
   }
 
-  // 4) alumno objetivo: fila real desde la DB
+  // 4) alumno objetivo: alumnoId (preferido) o alumnoEmail legacy -> UNA fila -> alumno.id; luego la fila real desde la DB por id
+  var resolved = await resolveTargetAlumnoId(admin, inp);
+  if (!resolved.ok) return resolved.response;
+  if (resolved.via === "email") log.warn("[update-alumno-password] contrato legacy alumnoEmail utilizado", { alumnoId: resolved.alumnoId });
+  var alumnoId = resolved.alumnoId;
   var target = await admin.from("alumnos").select("id,email,entrenador_id,auth_uid").eq("id", alumnoId).maybeSingle();
   if (target.error) return target.error.code === "22P02" ? fail(404, "alumno not found") : fail(500, "lookup failed");
   if (!target.data) return fail(404, "alumno not found");

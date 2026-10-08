@@ -3,7 +3,8 @@ import { parseCoachConfig, provisionStudentAuth } from './provisioning.js'
 
 // update-alumno-password (S0.6.1)
 //
-// Body: { alumnoId, newPassword }.  El email NO se acepta del cliente: se lee de public.alumnos.
+// Body: { alumnoId, newPassword } (preferido) o, transitoriamente, { alumnoEmail, newPassword } (clientes viejos):
+// alumnoEmail solo localiza UNA fila de public.alumnos; el email de Auth siempre sale de esa fila.
 // Solo el entrenador autenticado puede llamarla (ver provisioning.js). Server-side:
 //   - si alumnos.auth_uid existe: cambia la contrasena de ESE Auth user;
 //   - si es NULL: localiza (o crea) el Auth user del email de la fila, vincula alumnos.auth_uid y cambia la contrasena.
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    let payload: { alumnoId?: unknown; newPassword?: unknown } = {}
+    let payload: { alumnoId?: unknown; alumnoEmail?: unknown; newPassword?: unknown } = {}
     try {
       payload = await req.json()
     } catch (_e) {
@@ -53,6 +54,7 @@ Deno.serve(async (req) => {
       {
         authorization: req.headers.get('Authorization') ?? '',
         alumnoId: payload.alumnoId as string,
+        alumnoEmail: payload.alumnoEmail as string, // legacy transitorio: solo localiza una fila de alumnos
         newPassword: payload.newPassword as string,
       },
     )
