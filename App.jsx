@@ -16,6 +16,7 @@ import { ChatFlotante } from './components/ChatFlotante.jsx';
 import AlumnoRestTimerBar from './components/student/AlumnoRestTimerBar.jsx';
 import StudentMainView from './components/student/StudentMainView.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
+import { loginStudent, restoreStudentSession, shouldSkipEntrenadorUpsert } from './lib/studentIdentity.js';
 import { useAppShellUIState } from './hooks/useAppShellUIState.js';
 import { useCoachUIState } from './hooks/useCoachUIState.js';
 import { useStudentUIState } from './hooks/useStudentUIState.js';
@@ -638,7 +639,8 @@ function GymApp() {
   const readOnly = !!sharedParam;
   const [sharedLoaded, setSharedLoaded] = useState(false);
   // Login
-  const [sessionData, setSessionData] = useState(()=>{ try{return JSON.parse(localStorage.getItem("it_session")||"null")}catch(e){return null} });
+  // S0.6: una it_session de alumno en localStorage NO es autoridad; se verifica contra Supabase Auth + alumnos.auth_uid (ver useLayoutEffect de restauracion).
+  const [sessionData, setSessionData] = useState(()=>{ try{ const s0 = JSON.parse(localStorage.getItem("it_session")||"null"); return s0 && s0.role==="alumno" ? null : s0; }catch(e){return null} });
   const esAlumno = readOnly || sessionData?.role==="alumno";
   const [supabaseSessionUserId, setSupabaseSessionUserId] = useState(null);
   const [loginScreen, setLoginScreen] = useState(()=>{ try{return !localStorage.getItem("it_session")}catch(e){return true} });
@@ -649,6 +651,8 @@ function GymApp() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const loginSubmitRef = React.useRef(null);
+  /** true mientras corre el login de alumno: SIGNED_IN dispara antes de que exista it_session (evita upsertEntrenador de un alumno). */
+  const studentAuthFlowRef = React.useRef(false);
   const handleLoginEnterKey = (e) => { if (e.key === "Enter") loginSubmitRef.current?.click(); };
   /** Evita mostrar onboarding/login hasta leer `it_session` / flags en localStorage (post-login, refresh). */
   const [authLoading, setAuthLoading] = useState(function () { return !sharedParam; });
@@ -1269,16 +1273,54 @@ function GymApp() {
       setAuthLoading(false);
       return;
     }
+    var cancelledRestore = false;
     try {
       var raw = localStorage.getItem("it_session");
       var parsed = null;
       if (raw) {
         try { parsed = JSON.parse(raw); } catch (e1) { parsed = null; }
       }
+      if (parsed && parsed.role === "alumno") {
+        // S0.6: localStorage no autoriza una sesion de alumno. Se exige sesion real de Supabase Auth y la identidad
+        // se reconstruye desde public.alumnos (auth_uid = user.id). El alumnoId/authUid almacenados se ignoran.
+        // Mientras tanto authLoading sigue true (splash) y sessionData sigue null.
+        if (!supabase) {
+          try { localStorage.removeItem("it_session"); } catch (e3) {}
+          setSessionData(null);
+          setLoginScreen(true);
+          setAuthLoading(false);
+          return;
+        }
+        restoreStudentSession(supabase, parsed).then(function (r) {
+          if (cancelledRestore) return;
+          if (r.ok) {
+            try { localStorage.setItem("it_session", JSON.stringify(r.session)); } catch (e4) {}
+            try { localStorage.setItem("it_onboard_done", "1"); } catch (e5) {}
+            setSessionData(r.session);
+            setLoginScreen(false);
+            setOnboardDone(true);
+          } else {
+            console.error("[AUTH] restauracion de sesion de alumno rechazada", { reason: r.reason, detail: r.detail || undefined });
+            try { localStorage.removeItem("it_session"); } catch (e6) {}
+            setSessionData(null);
+            setLoginScreen(true);
+            try { setOnboardDone(!!localStorage.getItem("it_onboard_done")); } catch (e7) { setOnboardDone(false); }
+          }
+          setAuthLoading(false);
+        }).catch(function (eRestore) {
+          if (cancelledRestore) return;
+          console.error("[AUTH] restauracion de sesion de alumno fallo", eRestore && eRestore.message ? eRestore.message : eRestore);
+          try { localStorage.removeItem("it_session"); } catch (e8) {}
+          setSessionData(null);
+          setLoginScreen(true);
+          setAuthLoading(false);
+        });
+        return function () { cancelledRestore = true; };
+      }
       setSessionData(parsed);
       setLoginScreen(!raw);
       var fromLs = !!localStorage.getItem("it_onboard_done");
-      if (parsed && (parsed.role === "entrenador" || parsed.role === "alumno")) {
+      if (parsed && parsed.role === "entrenador") {
         fromLs = true;
         try { localStorage.setItem("it_onboard_done", "1"); } catch (e2) {}
       }
@@ -1327,6 +1369,7 @@ function GymApp() {
 
     function upsertEntrenador(user) {
       if (cancelled || !user || !user.id) return;
+      if (shouldSkipEntrenadorUpsert(localStorage, studentAuthFlowRef.current)) return;
       supabase
         .from('entrenadores')
         .upsert({ id: user.id, email: user.email ?? null }, { onConflict: 'id' })
@@ -3081,27 +3124,24 @@ function GymApp() {
                 setLoginError("No se pudo iniciar sesión con Supabase");
                 return;
               }
-              // La contraseña del alumno vive en Supabase Auth (la asigna el coach desde
-              // "Editar alumno"). Antes esta rama solo buscaba por email y no la validaba.
-              const authLoginAlumno = await supabase.auth.signInWithPassword({
-                email: loginEmailNorm,
-                password: loginPass,
-              });
-              if (authLoginAlumno.error || !authLoginAlumno.data || !authLoginAlumno.data.session) {
+              // S0.6: la contraseña se valida con signInWithPassword; la identidad es user.id -> alumnos.auth_uid -> alumnos.id.
+              // Sin fallback por email: si no hay EXACTAMENTE un alumno para ese auth_uid, loginStudent hace signOut y falla.
+              studentAuthFlowRef.current = true;
+              const studentLogin = await loginStudent(supabase, loginEmailNorm, loginPass);
+              if (!studentLogin.ok) {
                 setLoginError("Email o contraseña incorrectos");
                 return;
               }
-              const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmailNorm)+"&select=id,nombre,entrenador_id");
-              if(res&&res.length>0){
-                const alumno=res[0];
+              {
+                const alumno=studentLogin.alumno;
                 const rutsRaw=await sb.getRutinas(alumno.id);
                 const ruts=[selectCurrentRoutine(rutsRaw, alumno.id)].filter(Boolean);
                 clearIronTrackStorageForNewLogin();
-                const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id,entrenadorId:alumno.entrenador_id};
+                const s=studentLogin.session;
                 localStorage.setItem("it_session",JSON.stringify(s));
                 localStorage.setItem("it_show_welcome","1");
                 if(ruts&&ruts[0]){const rutLocal={id:ruts[0].id,name:ruts[0].nombre||"Rutina",days:ruts[0].datos?.days||[],datos:ruts[0].datos||{},alumno:ruts[0].datos?.alumno||alumno.nombre||"",note:ruts[0].datos?.note||"",alumno_id:alumno.id,saved:true};localStorage.setItem("it_rt",JSON.stringify([rutLocal]));}
-                // Registrar OneSignal
+                // Registrar OneSignal (solo despues de resolver la identidad canonica)
                 try {
                   window.OneSignalDeferred = window.OneSignalDeferred || [];
                   window.OneSignalDeferred.push(async function(OS) {
@@ -3114,13 +3154,10 @@ function GymApp() {
                 setLoginEmail("");
                 setLoginPass("");
                 setShowPassword(false);
-              } else {
-                console.error("[AUTH] Login de alumno autenticado en Auth pero sin fila en alumnos", loginEmailNorm);
-                try { await supabase.auth.signOut(); } catch(e) {}
-                setLoginError("Email o contraseña incorrectos");
               }
             }
           } finally {
+            studentAuthFlowRef.current = false;
             clearTimeout(loginSafetyTimeout);
             setLoginLoading(false);
           }
@@ -3140,7 +3177,25 @@ function GymApp() {
                 }});
                 if(cred) {
                   const saved = JSON.parse(localStorage.getItem("it_biometric_user")||"null");
-                  if(saved) {
+                  if(saved && saved.role==="alumno") {
+                    // S0.6: la biometria NO crea una sesion de alumno desde localStorage; exige sesion real de Supabase Auth
+                    // y reconstruye la identidad desde alumnos.auth_uid (misma validacion que la restauracion).
+                    setLoginLoading(true);
+                    try {
+                      const bio = supabase ? await restoreStudentSession(supabase, saved) : { ok: false, reason: "no_client" };
+                      if(bio.ok) {
+                        localStorage.setItem("it_session", JSON.stringify(bio.session));
+                        syncStateWithLocalStorage();
+                        setLoginEmail("");
+                        setLoginPass("");
+                      } else {
+                        console.error("[AUTH] biometria de alumno rechazada", { reason: bio.reason });
+                        toast2(msg("Ingresá con tu email y contraseña", "Sign in with your email and password"));
+                      }
+                    } finally {
+                      setLoginLoading(false);
+                    }
+                  } else if(saved) {
                     setLoginLoading(true);
                     setTimeout(function(){
                       try { localStorage.setItem("it_session", JSON.stringify(saved)); } catch(e) {}
