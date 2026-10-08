@@ -29,6 +29,7 @@ import {
   formatBibMuscleDisplay,
   isValidUuid,
 } from './lib/appHelpers.js';
+import { alumnosIdsKey } from './lib/coachAlumnosLoad.js';
 import { getYTVideoId } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
 import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVideoUrl, isValidHttpUrlString, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from './lib/exerciseResolve.js';
@@ -697,7 +698,7 @@ function GymApp() {
 
   // ── useAlumnos ────────────────────────────────────────────────────────
   const {
-    alumnos, setAlumnos, alumnosStatus,
+    alumnos, setAlumnos, alumnosStatus, refrescarAlumnos, resetAlumnos,
     sesiones, setSesiones,
     alumnoActivo, setAlumnoActivo,
     alumnoSesiones, setAlumnoSesiones,
@@ -826,13 +827,8 @@ function GymApp() {
 
   const cargarSesionesGlobales = React.useCallback(async function(alumnosActuales) {
     var lista = alumnosActuales || alumnosActivosLimpios;
-    if(!lista || lista.length === 0) {
-      try {
-        var clean = cleanActiveCoachAlumnos(await sb.getAlumnosStrict('entrenador_principal'), ENTRENADOR_ID);
-        if(clean && clean.length > 0) { lista = clean; }
-        else return;
-      } catch(e) { return; }
-    }
+    // La lista de alumnos la carga solo cargarAlumnos; aca no se reconsulta (sin segundo escritor).
+    if(!lista || lista.length === 0) return;
     try {
       lista = cleanActiveCoachAlumnos(lista, ENTRENADOR_ID);
       var ids = lista.map(function(a){return a.id}).filter(function(id){return id && typeof id === 'string'});
@@ -856,20 +852,45 @@ function GymApp() {
     } catch(e) { console.error('[cargarSesionesGlobales]', e); }
   }, [alumnosActivosLimpios, ENTRENADOR_ID]);
 
+  // Refs para que el intervalo use siempre la version vigente (sin cierres obsoletos).
+  const cargarSesionesGlobalesRef = React.useRef(null);
+  cargarSesionesGlobalesRef.current = cargarSesionesGlobales;
+  const rutinasInicialesRef = React.useRef(null);
+  const alumnosActivosLimpiosRef = React.useRef(alumnosActivosLimpios);
+  alumnosActivosLimpiosRef.current = alumnosActivosLimpios;
+  const alumnosIdsClave = alumnosIdsKey(alumnosActivosLimpios);
+
+  // Cierre de sesion / cambio de usuario o rol: invalida consultas en vuelo y vuelve a vacio+idle.
+  useEffect(function() {
+    return function() { resetAlumnos(); };
+  }, [sessionData?.role, sessionData?.entrenadorId, resetAlumnos]);
+
+  // Carga inicial: solo pide rutinas y alumnos. Sesiones/rutinas por alumno se cargan abajo, con la lista vigente.
   useEffect(function() {
     if(sessionData && sessionData.role==='entrenador') {
-      var init = async function() {
-        var rutinasPromise = cargarRutinasEntrenador();
-        var sbAlumnos = await cargarAlumnos();
-        if(sbAlumnos && sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
-        await rutinasPromise;
-        if(sbAlumnos && sbAlumnos.length > 0) await cargarRutinasEntrenador(sbAlumnos);
-      };
-      init();
-      var intervalo = setInterval(function() { cargarSesionesGlobales(); }, 30000);
-      return function() { clearInterval(intervalo); };
+      rutinasInicialesRef.current = cargarRutinasEntrenador();
+      cargarAlumnos();
     }
   }, [sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, cargarRutinasEntrenador, cargarAlumnos]);
+
+  // Refresco y reintento automatico cada 30 s (refrescarAlumnos no abre otra consulta si hay una en vuelo).
+  useEffect(function() {
+    if(!sessionData || sessionData.role!=='entrenador') return;
+    var intervalo = setInterval(function() {
+      refrescarAlumnos();
+      if(cargarSesionesGlobalesRef.current) cargarSesionesGlobalesRef.current();
+    }, 30000);
+    return function() { clearInterval(intervalo); };
+  }, [sessionData?.role, sessionData?.entrenadorId, refrescarAlumnos]);
+
+  // Sesiones y rutinas con la lista vigente, cuando cambia el conjunto de alumnos (primera carga, altas, bajas,
+  // cambios hechos desde otro dispositivo). Una carga superada por otra no deja datos sin cargar.
+  useEffect(function() {
+    if(!sessionData || sessionData.role!=='entrenador' || !alumnosIdsClave) return;
+    var lista = alumnosActivosLimpiosRef.current;
+    cargarSesionesGlobales(lista);
+    Promise.resolve(rutinasInicialesRef.current).then(function() { return cargarRutinasEntrenador(lista); });
+  }, [sessionData?.role, alumnosIdsClave]);
 
   useEffect(function () {
     if (sessionData?.role !== "entrenador" || tab !== "alumnos") return;

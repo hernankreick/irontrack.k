@@ -10,7 +10,7 @@ import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import GlobalSearch from "./GlobalSearch.jsx";
 import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
-import { ALUMNOS_STATUS, alumnosEmptyKind } from "../lib/coachAlumnosLoad.js";
+import { ALUMNOS_STATUS, alumnosEmptyKind, alumnosRefreshFailed } from "../lib/coachAlumnosLoad.js";
 import CoachActiveStudentsCard from "./coach/CoachActiveStudentsCard.jsx";
 import CoachDashboardAttentionCard from "./coach/CoachDashboardAttentionCard.jsx";
 import CoachDashboardSummaryGrid from "./coach/CoachDashboardSummaryGrid.jsx";
@@ -1307,6 +1307,11 @@ export default function CoachDashboard({
             isMobile={isMobile}
           />
 
+          {alumnosRefreshFailed(alumnosStatus, alumnos.length) && (
+            <div role="status" style={{ fontSize: 12, color: dashMuted, padding: "0 4px" }}>
+              {M(lang, "No pudimos actualizar tus alumnos. Reintentamos automáticamente; mostramos los últimos datos.", "We couldn't refresh your athletes. Retrying automatically; showing the latest data.", "Não foi possível atualizar seus alunos. Tentando de novo; mostrando os últimos dados.")}
+            </div>
+          )}
           <CoachActiveStudentsCard
             title={M(lang, "Alumnos activos", "Active athletes", "Alunos ativos")}
             seeAllLabel={M(lang, "Ver todos →", "See all →", "Ver todos →")}

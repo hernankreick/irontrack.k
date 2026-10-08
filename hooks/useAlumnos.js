@@ -1,7 +1,7 @@
 // ── hooks/useAlumnos.js ──────────────────────────────────────────────────
 import { useState, useCallback, useRef } from 'react';
 import { cleanActiveCoachAlumnos } from '../lib/appHelpers.js';
-import { ALUMNOS_STATUS, createLoadGate, loadCoachAlumnos } from '../lib/coachAlumnosLoad.js';
+import { ALUMNOS_STATUS, createAlumnosController } from '../lib/coachAlumnosLoad.js';
 
 const ONESIGNAL_APP_ID = '8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7';
 const ONESIGNAL_KEY = 'os_v2_app_rrpcxujkzbexve7l7ud6lttu24fxxofjnc3eke5wljs2bkhvuto27d46nxt5r7pvgtnpsrxphnbgr35vfdsiesntivkncl75aq4gyuy';
@@ -9,10 +9,26 @@ const ONESIGNAL_KEY = 'os_v2_app_rrpcxujkzbexve7l7ud6lttu24fxxofjnc3eke5wljs2bkh
 export function useAlumnos({ sb }) {
 
   // ── Estados ──────────────────────────────────────────────────────────
-  const [alumnos,         setAlumnos]         = useState([]);
-  const [alumnosStatus,   setAlumnosStatus]   = useState(ALUMNOS_STATUS.IDLE);
-  const gateRef = useRef(null);
-  if (!gateRef.current) gateRef.current = createLoadGate();
+  // `alumnos` y `alumnosStatus` los gobierna un unico controlador (ver lib/coachAlumnosLoad.js).
+  const [alumnosSnap,     setAlumnosSnap]     = useState({ alumnos: [], status: ALUMNOS_STATUS.IDLE });
+  const sbRef = useRef(sb);
+  sbRef.current = sb;
+  const ctrlRef = useRef(null);
+  if (!ctrlRef.current) {
+    ctrlRef.current = createAlumnosController({
+      fetchRows: (entrenadorId) => sbRef.current.getAlumnosStrict(entrenadorId),
+      clean: cleanActiveCoachAlumnos,
+      onChange: setAlumnosSnap,
+    });
+  }
+  const ctrl = ctrlRef.current;
+  const alumnos = alumnosSnap.alumnos;
+  const alumnosStatus = alumnosSnap.status;
+  // Misma firma que setState: las escrituras locales (alta/baja/edicion) invalidan consultas en vuelo.
+  const setAlumnos = ctrl.mutate;
+  const cargarAlumnos = ctrl.load;
+  const refrescarAlumnos = ctrl.refresh;
+  const resetAlumnos = ctrl.reset;
   const [sesiones,        setSesiones]        = useState([]);
   const [alumnoActivo,    setAlumnoActivo]    = useState(null);
   const [alumnoSesiones,  setAlumnoSesiones]  = useState([]);
@@ -26,25 +42,6 @@ export function useAlumnos({ sb }) {
   const [editAlumnoPass,  setEditAlumnoPass]  = useState('');
 
   // ── Funciones ─────────────────────────────────────────────────────────
-
-  // Unica carga que escribe `alumnos`. Devuelve la lista limpia, o null si hubo error / quedo obsoleta.
-  const cargarAlumnos = useCallback(async () => {
-    setAlumnosStatus(ALUMNOS_STATUS.LOADING);
-    const res = await loadCoachAlumnos({
-      gate: gateRef.current,
-      fetchRows: sb.getAlumnosStrict,
-      clean: cleanActiveCoachAlumnos,
-    });
-    if (res.status === 'stale') return null;
-    if (res.status === 'error') {
-      console.error('[cargarAlumnos]', res.error);
-      setAlumnosStatus(ALUMNOS_STATUS.ERROR);
-      return null;
-    }
-    setAlumnos(res.alumnos);
-    setAlumnosStatus(ALUMNOS_STATUS.READY);
-    return res.alumnos;
-  }, [sb]);
 
   const notifyAlumno = useCallback(async (alumnoId, mensaje) => {
     try {
@@ -72,6 +69,7 @@ export function useAlumnos({ sb }) {
     // Estados
     alumnos,         setAlumnos,
     alumnosStatus,
+    refrescarAlumnos, resetAlumnos,
     sesiones,        setSesiones,
     alumnoActivo,    setAlumnoActivo,
     alumnoSesiones,  setAlumnoSesiones,

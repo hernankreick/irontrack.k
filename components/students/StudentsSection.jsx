@@ -175,6 +175,9 @@ export default function StudentsSection(props) {
             {loadingSB&&(
               <StudentsSectionStates {...studentsStateProps} />
             )}
+            {alumnosStatus==='error'&&alumnos.length>0&&!loadingSB&&coachAlumnosListaFiltrada.length>0&&(
+              <StudentsSectionStates {...studentsStateProps} />
+            )}
             {alumnos.length===0&&!loadingSB&&(
               <StudentsSectionStates {...studentsStateProps} />
             )}

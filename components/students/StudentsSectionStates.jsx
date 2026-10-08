@@ -1,5 +1,5 @@
 import React from 'react';
-import { alumnosEmptyKind } from '../../lib/coachAlumnosLoad.js';
+import { alumnosEmptyKind, alumnosRefreshFailed } from '../../lib/coachAlumnosLoad.js';
 
 export default function StudentsSectionStates({
   loadingSB,
@@ -17,6 +17,11 @@ export default function StudentsSectionStates({
   var showLoading = loadingSB || emptyKind === 'loading';
   return (
     <>
+      {alumnosRefreshFailed(alumnosStatus, alumnosLength)&&(
+        <div role="status" style={{textAlign:"center",padding:"6px 12px",color:textMuted,fontSize:12}}>
+          {msg("No pudimos actualizar tus alumnos. Reintentamos automáticamente.", "We couldn't refresh your athletes. Retrying automatically.")}
+        </div>
+      )}
       {showLoading&&(
         <div>
           {[1,2,3].map(i=>(
