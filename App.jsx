@@ -279,8 +279,23 @@ const sbFetch = async (path, method="GET", body=null) => {
   return text ? JSON.parse(text) : null;
 };
 
+// Variante estricta: lanza ante error HTTP/red en vez de devolver null (no confundir error con "sin alumnos").
+const sbFetchStrict = async (path) => {
+  var activeSession = await getActiveSupabaseSession();
+  var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
+  const r = await fetch(SB_URL+"/rest/v1/"+path, { method: "GET", headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json" } });
+  if(!r.ok) {
+    var errText = "";
+    try { errText = await r.text(); } catch (e) {}
+    throw new Error("[Supabase "+r.status+"] "+path+" "+(errText || r.statusText));
+  }
+  const text = await r.text();
+  return text ? JSON.parse(text) : [];
+};
+
 const sb = {
   getAlumnos: (entId) => sbFetch("alumnos?entrenador_id=eq."+entId+"&select=*"),
+  getAlumnosStrict: (entId) => sbFetchStrict("alumnos?entrenador_id=eq."+encodeURIComponent(entId)+"&select=*"),
   createAlumno: async (alumnoData) => {
     const { data, error } = await supabase.from("alumnos").insert([alumnoData]).select();
     if (error) console.error("[createAlumno]", error);
@@ -682,7 +697,7 @@ function GymApp() {
 
   // ── useAlumnos ────────────────────────────────────────────────────────
   const {
-    alumnos, setAlumnos,
+    alumnos, setAlumnos, alumnosStatus,
     sesiones, setSesiones,
     alumnoActivo, setAlumnoActivo,
     alumnoSesiones, setAlumnoSesiones,
@@ -813,9 +828,8 @@ function GymApp() {
     var lista = alumnosActuales || alumnosActivosLimpios;
     if(!lista || lista.length === 0) {
       try {
-        var sbAlumnos = await sb.getAlumnos('entrenador_principal');
-        var clean = cleanActiveCoachAlumnos(sbAlumnos || [], ENTRENADOR_ID);
-        if(clean && clean.length > 0) { setAlumnos(clean); lista = clean; }
+        var clean = cleanActiveCoachAlumnos(await sb.getAlumnosStrict('entrenador_principal'), ENTRENADOR_ID);
+        if(clean && clean.length > 0) { lista = clean; }
         else return;
       } catch(e) { return; }
     }
@@ -846,17 +860,16 @@ function GymApp() {
     if(sessionData && sessionData.role==='entrenador') {
       var init = async function() {
         var rutinasPromise = cargarRutinasEntrenador();
-        var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos('entrenador_principal') || [], ENTRENADOR_ID);
-        setAlumnos(sbAlumnos);
-        if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
+        var sbAlumnos = await cargarAlumnos();
+        if(sbAlumnos && sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
         await rutinasPromise;
-        if(sbAlumnos.length > 0) await cargarRutinasEntrenador(sbAlumnos);
+        if(sbAlumnos && sbAlumnos.length > 0) await cargarRutinasEntrenador(sbAlumnos);
       };
       init();
       var intervalo = setInterval(function() { cargarSesionesGlobales(); }, 30000);
       return function() { clearInterval(intervalo); };
     }
-  }, [sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, cargarRutinasEntrenador]);
+  }, [sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, cargarRutinasEntrenador, cargarAlumnos]);
 
   useEffect(function () {
     if (sessionData?.role !== "entrenador" || tab !== "alumnos") return;
@@ -1627,12 +1640,6 @@ function GymApp() {
     };
   }, [timer?.endAt, es]);
   useEffect(() => { localStorage.setItem("it_week",String(currentWeek)); },[currentWeek]);
-
-  useEffect(() => {
-    if(!readOnly && sessionData?.role==="entrenador") {
-      cargarAlumnos();
-    }
-  }, [sessionData?.role]);
 
   // Refrescar rutinas del alumno desde Supabase siempre al cargar
   useEffect(() => {
@@ -3264,6 +3271,7 @@ function GymApp() {
       coachDesktop1024: coachDesktop1024,
       dashboardProps: {
         alumnos: alumnosActivosLimpios,
+        alumnosStatus: alumnosStatus,
         sesionesGlobales: sesionesGlobalesLimpias,
         mensajesEntrenadorPendientes: mensajesEntrenadorPendientes,
         progresoGlobal: progresoGlobalLimpio,
@@ -3334,7 +3342,8 @@ function GymApp() {
         alumnoActivo: alumnoActivo,
         alumnoProgreso: alumnoProgreso,
         alumnoSesiones: alumnoSesiones,
-        alumnos: alumnos,
+        alumnos: alumnosActivosLimpios,
+        alumnosStatus: alumnosStatus,
         bgCard: bgCard,
         bgSub: bgSub,
         border: border,

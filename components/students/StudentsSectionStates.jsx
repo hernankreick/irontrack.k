@@ -1,8 +1,10 @@
 import React from 'react';
+import { alumnosEmptyKind } from '../../lib/coachAlumnosLoad.js';
 
 export default function StudentsSectionStates({
   loadingSB,
   alumnosLength,
+  alumnosStatus,
   filteredLength,
   bgCard,
   border,
@@ -11,9 +13,11 @@ export default function StudentsSectionStates({
   msg,
   Ic,
 }) {
+  var emptyKind = alumnosEmptyKind(alumnosStatus || 'ready', alumnosLength);
+  var showLoading = loadingSB || emptyKind === 'loading';
   return (
     <>
-      {loadingSB&&(
+      {showLoading&&(
         <div>
           {[1,2,3].map(i=>(
             <div key={"alumno-list-skel-"+i} style={{background:bgCard,borderRadius:12,padding:"16px",marginBottom:8,border:"1px solid "+border}}>
@@ -32,7 +36,12 @@ export default function StudentsSectionStates({
           ))}
         </div>
       )}
-      {alumnosLength===0&&!loadingSB&&(
+      {emptyKind==='error'&&!loadingSB&&(
+        <div style={{textAlign:"center",padding:"24px 12px",color:textMuted,fontSize:15,fontWeight:600}}>
+          {msg("No pudimos cargar tus alumnos. Probá actualizar.", "We couldn't load your athletes. Try refreshing.")}
+        </div>
+      )}
+      {emptyKind==='empty'&&!loadingSB&&(
         <div style={{textAlign:"center",padding:"30px 0",color:textMuted}}>
           <div style={{fontSize:36,marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
             <Ic name="users" size={34} color={textMuted}/>

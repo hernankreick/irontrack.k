@@ -9,7 +9,7 @@ import StudentsSectionStates from './StudentsSectionStates.jsx';
 
 export default function StudentsSection(props) {
   const {
-    allEx = [], alumnoActivo, alumnoProgreso = [], alumnoSesiones = [], alumnos = [], bgCard, bgSub, border, cargarAlumnos, cleanActiveCoachAlumnos,
+    allEx = [], alumnoActivo, alumnoProgreso = [], alumnoSesiones = [], alumnos = [], bgCard, bgSub, border, cargarAlumnos, alumnosStatus, cleanActiveCoachAlumnos,
     coachAluBorderSoft, coachAluDropdown, coachAluDropdownShadow, coachAluGhostBtn, coachAluShell, coachAluSubtle, coachAluSurface, coachAluTrack,
     coachAlumnosCounts = { todos: 0, activos: 0, inactivos: 0, sin_rutina: 0 }, coachAlumnosFilter, coachAlumnosListaFiltrada = [], coachAlumnosSearch, coachCardMenuId, coachDiaSecsOpen = {}, coachRoutineDiaIdx, coachRutinaMenuOpen,
     completedDays = [], currentWeek, darkMode, ENTRENADOR_ID, es, EX = [], generarSugerenciasAlumno, getRutinaAsignadaAlumno, loadingSB, mergeRutinasAsignadas, msg,
@@ -26,6 +26,7 @@ export default function StudentsSection(props) {
   const studentsStateProps = {
     loadingSB,
     alumnosLength: alumnos.length,
+    alumnosStatus,
     filteredLength: coachAlumnosListaFiltrada.length,
     bgCard,
     border,

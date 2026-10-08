@@ -4,6 +4,7 @@ import CoachDashboard from '../CoachDashboard.jsx';
 export default function CoachDashboardMain({
   activeNav,
   alumnos,
+  alumnosStatus,
   sesionesGlobales,
   mensajesEntrenadorPendientes,
   progresoGlobal,
@@ -33,6 +34,7 @@ export default function CoachDashboardMain({
     <CoachDashboard
       activeNav={activeNav}
       alumnos={alumnos}
+      alumnosStatus={alumnosStatus}
       sesionesGlobales={sesionesGlobales}
       mensajesEntrenadorPendientes={mensajesEntrenadorPendientes}
       progresoGlobal={progresoGlobal}
