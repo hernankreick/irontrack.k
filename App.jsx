@@ -4310,9 +4310,10 @@ function GymApp() {
                   if(res===null){toast2("Error al guardar");return;}
                 }
                 if(editAlumnoPass){
-                  const alumnoEmailActual=updates.email||editAlumnoModal.email;
+                  // S0.6.1: se envia alumnoId (no el email). El servidor lee el email de public.alumnos, autoriza al entrenador
+                  // y es el UNICO que vincula alumnos.auth_uid; el cliente nunca escribe auth_uid.
                   const{data:fnData,error:fnError}=await supabase.functions.invoke("update-alumno-password",{
-                    body:{alumnoEmail:alumnoEmailActual,newPassword:editAlumnoPass}
+                    body:{alumnoId:editAlumnoModal.id,newPassword:editAlumnoPass}
                   });
                   if(fnError||(fnData&&fnData.error)){
                     // fnError.message del SDK es genérico ("Edge Function returned a non-2xx
