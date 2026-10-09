@@ -11,6 +11,7 @@ export default function CoachStudentsMain({
   bgSub,
   border,
   cargarAlumnos,
+  alumnosStatus,
   cleanActiveCoachAlumnos,
   coachAluBorderSoft,
   coachAluDropdown,
@@ -95,6 +96,7 @@ export default function CoachStudentsMain({
       bgSub={bgSub}
       border={border}
       cargarAlumnos={cargarAlumnos}
+      alumnosStatus={alumnosStatus}
       cleanActiveCoachAlumnos={cleanActiveCoachAlumnos}
       coachAluBorderSoft={coachAluBorderSoft}
       coachAluDropdown={coachAluDropdown}
