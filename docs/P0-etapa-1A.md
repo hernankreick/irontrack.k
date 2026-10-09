@@ -69,6 +69,19 @@ Escrituras alcanzables desde ese modo (auditadas en el código) y su defensa:
 El chat sigue siendo **legible** desde el enlace (como antes). Si eso es deseable es una decisión de producto aparte.
 Es una barrera del **cliente**: no sustituye a la RLS, que no se modificó.
 
+## 3b. Cola antigua `it_pending_sync` (array): nunca bajo la identidad equivocada
+
+Problema (P0-3): el vaciado antiguo enviaba todo el array con el `alumno_id` de la sesión ACTUAL. Si cambiaba la sesión entre registrar y sincronizar (logout/login, otra pestaña), las series de un alumno se grababan bajo otro.
+
+Corrección mínima (no toca `logSet` salvo el estampado, ni el sincronizador nuevo):
+
+- Al encolar offline, cada serie lleva `alumno_id` (`buildPendingProgressItem(..., alumnoId)`).
+- `lib/legacyPendingFlush.js`: el vaciado antiguo solo envía series con `alumno_id` igual al de la sesión, y usa el `alumno_id` de la SERIE. Sin `alumno_id` (desconocida) o de otro alumno: no se envía y no se borra. Tras enviar relee el array y quita solo lo enviado con éxito (una vez por ocurrencia).
+- Login/logout (`preserveLegacyPendingQueue`): el array se traslada con `migrateSync()` (diario, idempotente, reanudable): con `alumno_id` va a la cola nueva; sin `alumno_id` va a cuarentena verbatim, sin atribuirse a nadie. Si la migración falla (cuota, interrupción) se copia el array literal a `it_pending_sync_raw:<ts>` y solo entonces se retira; si ni eso es posible, o el array cambió durante la copia, queda intacto (estado `kept`) y se reintenta tras liberar espacio. El array que queda sigue siendo seguro porque el vaciado antiguo ya no envía lo desconocido ni lo ajeno.
+- Nunca se borra un registro para resolver un conflicto.
+
+Riesgos abiertos: una pestaña con la versión VIEJA de App.jsx sigue enviando todo bajo la sesión de esa pestaña (no se puede corregir desde el cliente nuevo); duplicados por dos vaciados simultáneos o por respuestas ambiguas siguen pendientes de la Etapa 1B (idempotencia por UUID); la cuarentena no tiene recuperación automática (decisión D7).
+
 ## 4. Web Locks (`lib/pendingSets.js`)
 
 - Web Locks disponible → exclusión mutua real.
@@ -80,6 +93,8 @@ Es una barrera del **cliente**: no sustituye a la RLS, que no se modificó.
 - `migrateSync()` es la variante síncrona sin lock para limpiezas de almacenamiento.
 
 ## 5. Pruebas
+
+- `node scripts/test-legacyQueueSafety.mjs` (cola antigua, escenarios 1–7).
 
 ```
 node scripts/test-pendingSets.mjs

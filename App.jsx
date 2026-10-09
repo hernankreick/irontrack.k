@@ -121,6 +121,7 @@ import { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys, clearRoutineLocalKeysForAlumno } from './lib/irontrackLocalStorage.js';
 import { guardSharedWrites, isSharedReadOnlyMode, isWriteMethod } from './lib/sharedMode.js';
+import { flushLegacyPendingQueue } from './lib/legacyPendingFlush.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
 import { buildCoachGlobalSearchData } from './lib/coachGlobalSearchSelectors.js';
@@ -1511,38 +1512,16 @@ function GymApp() {
   useEffect(()=>{
     const flushPendingSync = async () => {
       setIsOnline(true);
-      // Sincronizar sets pendientes
-      let pending = [];
-      try {
-        pending = JSON.parse(localStorage.getItem('it_pending_sync')||'[]');
-      } catch(e) {
-        console.warn('[offline sync] it_pending_sync corrupto; se conserva sin sincronizar', e);
-        return;
-      }
-      if(!Array.isArray(pending)) {
-        console.warn('[offline sync] it_pending_sync no es una lista; se conserva sin sincronizar');
-        return;
-      }
-      if(pending.length === 0) return;
+      // Sincronizar sets pendientes (cola ANTIGUA). Solo se envian las series cuyo alumno_id coincide con el de la sesion actual;
+      // las de identidad desconocida o de otro alumno NO se envian ni se borran (lib/legacyPendingFlush.js).
       const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
-      if(!alumnoIdSync) return;
-      const results = await Promise.allSettled(pending.map(item => {
-        return Promise.resolve().then(function() {
-          return sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana));
-        });
-      }));
-      const failed = pending.filter(function(item, idx) {
-        var res = results[idx];
-        return !res || res.status !== 'fulfilled' || res.value == null;
-      });
-      if(failed.length > 0) {
-        try{localStorage.setItem('it_pending_sync', JSON.stringify(failed));}catch(e){}
-      } else {
-        localStorage.removeItem('it_pending_sync');
+      const out = await flushLegacyPendingQueue({ alumnoId: alumnoIdSync, send: function (payload) { return sb.addProgreso(payload); } });
+      if(out.withheldUnknown > 0 || out.withheldForeign > 0) {
+        console.warn('[offline sync] series antiguas NO enviadas por identidad no verificada:', { desconocidas: out.withheldUnknown, deOtroAlumno: out.withheldForeign });
       }
-      setPendingSync(failed);
-      const syncedCount = pending.length - failed.length;
-      if(syncedCount > 0) toast2(syncedCount+' set'+(syncedCount>1?'s':'')+' sincronizados ✓');
+      if(out.status !== 'done') return;
+      setPendingSync(out.remaining);
+      if(out.sent > 0) toast2(out.sent+' set'+(out.sent>1?'s':'')+' sincronizados ✓');
     };
     const goOnline = () => { flushPendingSync(); };
     const goOffline = () => setIsOnline(false);
@@ -1956,7 +1935,7 @@ function GymApp() {
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
     if(alumnoIdSync) {
       if(!isOnline) {
-        const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet);
+        const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, alumnoIdSync);
         const updated = [...pendingSync, item];
         setPendingSync(updated);
         try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
