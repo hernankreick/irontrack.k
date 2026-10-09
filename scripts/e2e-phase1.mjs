@@ -1,5 +1,5 @@
-// Pruebas de navegador (Chromium real) de la Fase 1 de S0.6: logout, logout offline con token residual, cambio de alumno,
-// dos pestanas y barrera de la cola antigua. El backend de Supabase esta SIMULADO con page.route sobre un host inexistente: no se
+// Pruebas de navegador (Chromium real) de S0.6 Fase 1 + Etapa 1A integradas: logout, logout offline con token residual, cambio de
+// alumno, dos pestanas, enlace compartido y cola antigua (barrera + preservacion de 1A). El backend de Supabase esta SIMULADO con page.route sobre un host inexistente: no se
 // toca ningun proyecto real ni produccion.
 //
 // Requisitos (fuera del repo, en un directorio temporal):
@@ -114,8 +114,13 @@ const loginVisible = (page) => page.waitForFunction(() => !localStorage.getItem(
 const pendingMarker = (page) => ls(page, "irontrack_logout_pending");
 const seedQueue = (page, items) => page.evaluate((v) => localStorage.setItem("it_pending_sync", v), JSON.stringify(items));
 const queue = async (page) => JSON.parse((await ls(page, "it_pending_sync")) || "null");
+// 1A traslada el array antiguo: series con dueño -> it_pending_sync:item:*, sin dueño -> it_pending_sync_legacy:* (cuarentena)
+const preserved = (page) => page.evaluate(() => {
+  const keys = Object.keys(localStorage);
+  return { array: localStorage.getItem("it_pending_sync"), items: keys.filter((k) => k.startsWith("it_pending_sync:item:")).length, quarantine: keys.filter((k) => k.startsWith("it_pending_sync_legacy:")).length };
+});
 
-await test("E1 logout ONLINE: login visible, it_session fuera, Auth cerrado (scope=local), sin marcador, cola intacta", async (ctx, be) => {
+await test("E1 logout ONLINE: login visible, it_session fuera, Auth cerrado (scope=local), sin marcador, series conservadas por 1A", async (ctx, be) => {
   const page = await ctx.newPage();
   await login(page, "a@test.com");
   await page.waitForTimeout(1500);
@@ -127,7 +132,7 @@ await test("E1 logout ONLINE: login visible, it_session fuera, Auth cerrado (sco
   await page.waitForFunction(() => !localStorage.getItem("irontrack_logout_pending") && !Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k)), null, { timeout: 8000 });
   assert.equal(await ls(page, "it_session"), null);
   assert.equal(be.log.filter((r) => r.path === "/auth/v1/logout").map((r) => r.scope).join(), "local");
-  assert.deepEqual(await queue(page), q, "las series pendientes siguen identicas");
+  assert.deepEqual(await preserved(page), { array: null, items: 1, quarantine: 1 }, "1A conserva las series: con dueño en la cola nueva, sin dueño en cuarentena");
 });
 
 await test("E2 logout OFFLINE: acceso invalidado al instante, marcador, token residual sin uso; recarga; reconexion completa el cierre", async (ctx, be) => {
@@ -162,7 +167,7 @@ await test("E2 logout OFFLINE: acceso invalidado al instante, marcador, token re
   await loginVisible(page);
 });
 
-await test("E3 cambio de alumno: A cierra sesion con series, entra B; la cola de A no sale bajo B ni se modifica", async (ctx, be) => {
+await test("E3 cambio de alumno: A cierra sesion con series, entra B; lo de A queda conservado y no sale bajo B", async (ctx, be) => {
   const page = await ctx.newPage();
   await login(page, "a@test.com");
   await page.waitForTimeout(1200);
@@ -175,19 +180,20 @@ await test("E3 cambio de alumno: A cierra sesion con series, entra B; la cola de
   await page.evaluate(() => window.dispatchEvent(new Event("online"))); // dispara el vaciado
   await page.waitForTimeout(1500);
   assert.deepEqual(be.progreso, [], "nada se envio a progreso bajo B");
-  assert.deepEqual(await queue(page), q, "cola identica");
+  assert.deepEqual(await preserved(page), { array: null, items: 1, quarantine: 1 }, "series de A conservadas, B no hereda nada");
   assert.equal(JSON.parse(await ls(page, "it_session")).alumnoId, ID_B);
 });
 
-await test("E4 vuelve A: sus series propias salen con SU alumno_id y las desconocidas siguen retenidas", async (ctx, be) => {
+await test("E4 barrera de la cola antigua en sesion: solo sale lo propio con SU alumno_id; lo ajeno y lo desconocido se retienen intactos", async (ctx, be) => {
   const page = await ctx.newPage();
-  await page.addInitScript((q) => { if (!localStorage.getItem("it_pending_sync")) localStorage.setItem("it_pending_sync", q); }, JSON.stringify([
+  await login(page, "a@test.com");
+  await page.waitForTimeout(1500);
+  // series encoladas offline durante la sesion de A (logSet las estampa con alumno_id); una ajena y una desconocida
+  await seedQueue(page, [
     { exId: "e1", kg: 50, reps: 5, date: "1/10/2026", semana: 0, alumno_id: ID_A },
     { exId: "e0", kg: 5, reps: 5, date: "1/10/2026", semana: 0 },
     { exId: "e9", kg: 9, reps: 9, date: "1/10/2026", semana: 0, alumno_id: ID_B },
-  ]));
-  await login(page, "a@test.com");
-  await page.waitForTimeout(1500);
+  ]);
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await page.waitForFunction(() => (JSON.parse(localStorage.getItem("it_pending_sync") || "[]")).length === 2, null, { timeout: 8000 });
   assert.equal(be.progreso.length, 1);
@@ -195,6 +201,20 @@ await test("E4 vuelve A: sus series propias salen con SU alumno_id y las descono
   assert.equal(sent.alumno_id, ID_A);
   assert.equal(sent.ejercicio_id, "e1");
   assert.deepEqual((await queue(page)).map((i) => i.exId).sort(), ["e0", "e9"]);
+});
+
+await test("E4b series preexistentes (antes de iniciar sesion) se conservan por 1A y no se envian solas", async (ctx, be) => {
+  const page = await ctx.newPage();
+  await page.addInitScript((q) => { if (!localStorage.getItem("it_pending_sync") && !localStorage.getItem("it_session")) localStorage.setItem("it_pending_sync", q); }, JSON.stringify([
+    { exId: "e1", kg: 50, reps: 5, date: "1/10/2026", semana: 0, alumno_id: ID_A },
+    { exId: "e0", kg: 5, reps: 5, date: "1/10/2026", semana: 0 },
+  ]));
+  await login(page, "a@test.com");
+  await page.waitForTimeout(2000);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await page.waitForTimeout(1000);
+  assert.deepEqual(be.progreso, [], "ninguna serie antigua salio");
+  assert.deepEqual(await preserved(page), { array: null, items: 1, quarantine: 1 });
 });
 
 await test("E5 dos pestanas: el logout en una lleva a la otra al login; solo una cierra Auth", async (ctx, be) => {
@@ -210,6 +230,29 @@ await test("E5 dos pestanas: el logout en una lleva a la otra al login; solo una
   await p1.waitForTimeout(1500);
   assert.equal(be.log.filter((r) => r.path === "/auth/v1/logout").length >= 1, true);
   assert.equal(await ls(p2, "it_session"), null);
+});
+
+await test("E7 enlace compartido con logout offline pendiente: solo lecturas anonimas (nunca el token residual) y ninguna escritura", async (ctx, be) => {
+  const page = await ctx.newPage();
+  await login(page, "a@test.com");
+  await page.waitForTimeout(1500);
+  const residual = Object.keys(be.tokens)[0];
+  assert.ok(residual);
+  be.logout = "abort"; // el cierre de Auth no responde: queda el token residual y el marcador
+  await uiLogout(page);
+  await loginVisible(page);
+  assert.ok(await pendingMarker(page));
+  assert.ok(await authToken(page), "token residual en el dispositivo");
+  const mark = be.log.length;
+  const link = Buffer.from(JSON.stringify({ alumnoId: ID_A })).toString("base64");
+  await page.goto(BASE + "/?r=" + encodeURIComponent(link));
+  await page.waitForTimeout(3500);
+  const rest = be.log.slice(mark).filter((r) => r.path.startsWith("/rest/v1/"));
+  assert.ok(rest.length > 0, "el enlace compartido hizo lecturas");
+  assert.ok(rest.every((r) => r.method === "GET"), "ninguna escritura: " + JSON.stringify(rest.filter((r) => r.method !== "GET")));
+  assert.ok(rest.every((r) => !r.auth.includes(residual)), "ninguna lectura uso el token residual");
+  assert.ok(rest.every((r) => r.auth === "Bearer anon-test"), "todas salieron como anon: " + JSON.stringify([...new Set(rest.map((r) => r.auth))]));
+  assert.ok(await pendingMarker(page), "el visitante del enlace no cierra ni reabre la sesion");
 });
 
 await test("E6 recarga normal con sesion valida sigue restaurando al alumno (sin regresion online)", async (ctx, be) => {
