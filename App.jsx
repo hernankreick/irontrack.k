@@ -119,7 +119,8 @@ import CoachDesktopShellFrame from './components/layout/CoachDesktopShellFrame.j
 import OfflineSyncBanner from './components/layout/OfflineSyncBanner.jsx';
 import { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
-import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
+import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys, clearRoutineLocalKeysForAlumno } from './lib/irontrackLocalStorage.js';
+import { guardSharedWrites } from './lib/sharedMode.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
 import { buildCoachGlobalSearchData } from './lib/coachGlobalSearchSelectors.js';
@@ -583,6 +584,10 @@ const sb = {
     return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
   },
 };
+
+// P0 Etapa 1A: en un enlace compartido (?r=) las escrituras de entrenamiento NO salen (solo lectura). Defensa en la capa de
+// datos ademas de la de la interfaz (startStudentWorkout, logSet, finalizarSesion). Ver lib/sharedMode.js.
+guardSharedWrites(sb);
 
 /**
  * ── Plan alumno: diagnóstico scroll / micro-saltos (Chrome mobile) ─────────────────
@@ -1917,6 +1922,11 @@ function GymApp() {
   };
 
   const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe, weekOverride) => {
+    // Enlace compartido (?r=): solo lectura. No se registra ni en memoria ni en Supabase (defensa de la interfaz).
+    if (readOnly) {
+      toast2(es?'Modo solo lectura: iniciá sesión para registrar tu entrenamiento':'Read-only mode: sign in to log your workout');
+      return;
+    }
     const d = new Date().toLocaleDateString("es-AR");
     // Mismo criterio que al finalizar una sesión: si la rutina tiene una semana persistida
     // en el servidor, es la fuente de verdad por sobre el currentWeek local (que puede
@@ -1935,7 +1945,8 @@ function GymApp() {
       return {...prev,[exId]:ex};
     });
     // Guardar en Supabase — si offline, guardar en cola local
-    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
+    // El alumno sale de la sesion propia; el alumnoId de un enlace compartido ya NO se usa para escribir (solo lectura).
+    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
     if(alumnoIdSync) {
       if(!isOnline) {
         const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet);
@@ -2141,6 +2152,11 @@ function GymApp() {
     : getWeekCompletionGate({});
   // Defensa central: TODO inicio de entrenamiento del alumno pasa por aqui; con el gate activo no se ejecuta setSession.
   const startStudentWorkout = function (nextSession) {
+    // Enlace compartido (?r=): solo lectura, no se puede iniciar un entrenamiento.
+    if (readOnly) {
+      toast2(es ? "Modo solo lectura: iniciá sesión para registrar tu entrenamiento" : "Read-only mode: sign in to log your workout");
+      return false;
+    }
     if (weekGate.active) return false;
     setSession(nextSession);
     return true;
@@ -2464,27 +2480,6 @@ function GymApp() {
     } catch (e) {}
     await cargarSesionesGlobales();
     return true;
-  }
-
-  function clearRoutineLocalKeysForAlumno(alumnoId, rutinaId) {
-    try {
-      localStorage.removeItem('it_last_week_advance_date');
-      var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
-      var cd = JSON.parse(localStorage.getItem("it_cd") || "[]");
-      if (Array.isArray(cd)) {
-        localStorage.setItem("it_cd", JSON.stringify(cd.filter(function (k) {
-          var text = String(k);
-          return !((rid && text.indexOf(rid) >= 0) || text.indexOf(String(alumnoId)) >= 0);
-        })));
-      }
-      for (var i = localStorage.length - 1; i >= 0; i--) {
-        var key = localStorage.key(i);
-        if (!key || key.indexOf("it_") !== 0) continue;
-        if (key.indexOf(String(alumnoId)) >= 0 || (rid && key.indexOf(rid) >= 0)) {
-          localStorage.removeItem(key);
-        }
-      }
-    } catch (e) {}
   }
 
   async function resetAlumnoRoutineHistory(alumno, rutina) {

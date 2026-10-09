@@ -15,7 +15,6 @@ import {
   getWorkoutExerciseStatus,
   mergeCompletedDay,
   removeUndefinedPayloadFields,
-  sessionAlreadyExists,
 } from '../lib/workoutSession.js';
 import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
 
@@ -126,8 +125,14 @@ export function WorkoutScreen(props) {
   // ── Finalizar ─────────────────────────────────────────────────────
   // Alumno logueado (T01.2): se persiste y CONFIRMA la sesion en `sesiones` ANTES de completar,
   // mostrar el resumen, cerrar o avanzar de semana. Si no se confirma, el entrenamiento sigue abierto.
-  // Otros flujos (readOnly/compartido y entrenador): comportamiento previo.
+  // Otros flujos (entrenador): comportamiento previo. El modo compartido (readOnly) no escribe nada.
   const finalizarSesion = async () => {
+    // Enlace compartido (?r=): solo lectura. No se finaliza ni se escribe en `sesiones` (defensa de la interfaz; la capa
+    // de datos `sb` tambien bloquea addSesion/addProgreso en este modo).
+    if (readOnly) {
+      if (typeof toast2 === "function") toast2(es ? "Modo solo lectura: iniciá sesión para registrar tu entrenamiento" : "Read-only mode: sign in to log your workout");
+      return;
+    }
     if (finalizeGuardRef.current.isBusy()) return;
     const r = activeR;
     // La semana local (currentWeek) puede quedar desincronizada de la semana real de la
@@ -237,7 +242,7 @@ export function WorkoutScreen(props) {
       return;
     }
 
-    // ── Flujo previo (readOnly/compartido y entrenador) ──
+    // ── Flujo previo (entrenador; el modo compartido ya salio arriba) ──
     if (hasPersistedWeek && effectiveWeek !== currentWeek) {
       setCurrentWeek(effectiveWeek);
     }
@@ -245,29 +250,6 @@ export function WorkoutScreen(props) {
     setCompletedDays(newCompleted);
     setResumenSesion(buildSummary());
     setSession(null);
-    if (readOnly && sharedParam) {
-      try {
-        const rutData = JSON.parse(atob(sharedParam));
-        if (rutData.alumnoId) {
-          const existentes = await sb.getSesiones(rutData.alumnoId);
-          const yaExiste = sessionAlreadyExists(existentes, hoyFin, session.dIdx, semanaParaGuardar);
-          if (!yaExiste) {
-            // .catch: evita un rechazo no manejado (sigue siendo fire-and-forget, sin cambios de flujo).
-            Promise.resolve(sb.addSesion(removeUndefinedPayloadFields(buildSessionPayload({
-              alumnoId: rutData.alumnoId,
-              session: session,
-              activeDay: activeDay,
-              activeRoutine: r,
-              exercises: exercises,
-              weekToSave: semanaParaGuardar,
-              date: hoyFin,
-              time: horaFin,
-              includeRoutineId: false,
-            })))).catch(function (e) { console.error("[addSesion shared]", e); });
-          }
-        }
-      } catch(e) {}
-    }
     const lastAdvance = localStorage.getItem("it_last_week_advance_date");
     const todayStr = new Date().toDateString();
     if (daysThisWeek >= totalDays && effectiveWeek < 3 && lastAdvance !== todayStr) {
