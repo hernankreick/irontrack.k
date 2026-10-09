@@ -217,14 +217,19 @@ await test("J. flujo entrenador intacto: no pasa por la restauracion de alumno y
   assert.equal(r.reason, "not_student_session");
   assert.equal(c.log.queries.length, 0);
 
-  const store = (v) => ({ getItem: () => v });
-  // entrenador / sin sesion / it_session corrupto -> el upsert de entrenadores sigue como antes
+  // Almacenamiento que distingue claves (it_session / marcador de logout pendiente).
+  const store = (session, extra) => ({ getItem: (k) => (k === "it_session" ? session : (extra && k in extra ? extra[k] : null)) });
+  // S0.6 Fase 1: el upsert en entrenadores es POSITIVO: solo con una it_session de entrenador.
   assert.equal(shouldSkipEntrenadorUpsert(store(JSON.stringify({ role: "entrenador" })), false), false);
-  assert.equal(shouldSkipEntrenadorUpsert(store(null), false), false);
-  assert.equal(shouldSkipEntrenadorUpsert(store("{no json"), false), false);
+  // Sin it_session (o ilegible) un evento Auth ya NO crea una fila en entrenadores (puede ser el de un alumno).
+  assert.equal(shouldSkipEntrenadorUpsert(store(null), false), true);
+  assert.equal(shouldSkipEntrenadorUpsert(store("{no json"), false), true);
   // alumno (almacenado o login en curso) -> no se crea fila en entrenadores
   assert.equal(shouldSkipEntrenadorUpsert(store(JSON.stringify({ role: "alumno" })), false), true);
   assert.equal(shouldSkipEntrenadorUpsert(store(null), true), true);
+  assert.equal(shouldSkipEntrenadorUpsert(store(JSON.stringify({ role: "entrenador" })), true), true);
+  // Logout pendiente: nada se escribe aunque quede una it_session de entrenador.
+  assert.equal(shouldSkipEntrenadorUpsert(store(JSON.stringify({ role: "entrenador" }), { irontrack_logout_pending: "{\"v\":1}" }), false), true);
 
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
   // La rama del entrenador del login y de la restauracion sigue en su sitio.
@@ -234,6 +239,17 @@ await test("J. flujo entrenador intacto: no pasa por la restauracion de alumno y
 });
 
 // ── Piezas auxiliares y revisiones estaticas del cableado ───────────────────────────────────────────────
+
+await test("restoreStudentSession no restaura con un logout pendiente aunque haya sesion Auth valida", async () => {
+  const c = makeClient({ sessionUserId: UID_A });
+  const pending = { getItem: (k) => (k === "irontrack_logout_pending" ? "{\"v\":1}" : null) };
+  const r = await restoreStudentSession(c, { role: "alumno", alumnoId: ID_A }, pending);
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, "logout_pending");
+  assert.equal(c.log.queries.length, 0, "ni siquiera consulta alumnos");
+  const free = { getItem: () => null };
+  assert.equal((await restoreStudentSession(c, { role: "alumno", alumnoId: ID_A }, free)).ok, true);
+});
 
 await test("resolveAlumnoByAuthUid rechaza auth_uid que no sea UUID sin consultar", async () => {
   const c = makeClient();
@@ -254,8 +270,8 @@ await test("buildStudentSession: role/alumnoId/entrenadorId/authUid siempre cano
 await test("cableado en App.jsx: localStorage de alumno no es autoridad al arrancar; biometria no crea sesion de alumno sin Auth", async () => {
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
   assert.ok(/s0\.role==="alumno" \? null : s0/.test(app), "el estado inicial no confia en it_session de alumno");
-  assert.ok(/restoreStudentSession\(supabase, parsed\)/.test(app));
-  assert.ok(/saved\.role==="alumno"/.test(app) && /restoreStudentSession\(supabase, saved\)/.test(app));
+  assert.ok(/restoreStudentSession\(supabase, parsed, localStorage\)/.test(app));
+  assert.ok(/saved\.role==="alumno"/.test(app) && /restoreStudentSession\(supabase, saved, localStorage\)/.test(app));
   assert.ok(!/service_role/i.test(app));
 });
 
