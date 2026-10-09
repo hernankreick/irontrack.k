@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
+import { performLogout } from '../../lib/sessionLogout.js';
+import { clearAllIronTrackPrefixedKeys } from '../../lib/irontrackLocalStorage.js';
 import coachSettingsPalette from './coachSettingsPalette.js';
 import coachUiStrings from './coachUiStrings.js';
 import {
@@ -373,12 +375,17 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
   const [deletePhrase, setDeletePhrase] = useState('');
   const [showConfirm,  setShowConfirm]  = useState(false);
 
+  // Logout central (lib/sessionLogout.js): el acceso local se invalida de inmediato y sin red; Auth se cierra despues (acotado por
+  // timeout). Si no hay red queda el marcador de logout pendiente y se completa al reconectar. Las series pendientes se conservan.
   const doLogout = async () => {
-    try { if (supabase) await supabase.auth.signOut(); } catch(e) {}
     try {
-      Object.keys(localStorage).filter(k => k.startsWith('it_')).forEach(k => localStorage.removeItem(k));
-    } catch(e) {}
-    syncStateWithLocalStorage && syncStateWithLocalStorage();
+      await performLogout({
+        client: supabase,
+        storage: localStorage,
+        clearLocal: clearAllIronTrackPrefixedKeys,
+        onLocalInvalidated: function () { syncStateWithLocalStorage && syncStateWithLocalStorage(); },
+      });
+    } catch (e) {}
     onClose && onClose();
     window.location.href = window.location.pathname || '/';
   };

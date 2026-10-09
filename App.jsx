@@ -17,6 +17,8 @@ import AlumnoRestTimerBar from './components/student/AlumnoRestTimerBar.jsx';
 import StudentMainView from './components/student/StudentMainView.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
 import { loginStudent, restoreStudentSession, shouldSkipEntrenadorUpsert } from './lib/studentIdentity.js';
+import { performLogout, completePendingLogout, isLogoutPending, clearLogoutPending, enforceLogoutPending, LOGOUT_PENDING_KEY } from './lib/sessionLogout.js';
+import { decideRestAuth, isSharedLinkLocation, AuthRequiredError } from './lib/restAuth.js';
 import { useAppShellUIState } from './hooks/useAppShellUIState.js';
 import { useCoachUIState } from './hooks/useCoachUIState.js';
 import { useStudentUIState } from './hooks/useStudentUIState.js';
@@ -164,6 +166,10 @@ import { usePWAInstall } from './hooks/usePWAInstall.js';
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// S0.6 Fase 1: si quedo un logout sin completar (cerrado offline / cierre interrumpido) el acceso local se invalida ANTES de que
+// cualquier estado inicial de React lea it_session. No usa red.
+try { enforceLogoutPending(localStorage); } catch (e) {}
+
 function getStoredEntrenadorId() {
   try {
     return JSON.parse(localStorage.getItem("it_session") || "null")?.entrenadorId || "entrenador_principal";
@@ -243,6 +249,8 @@ function readLocalCustomExercisesForMigration() {
 
 async function getActiveSupabaseSession() {
   if (!supabase || !supabase.auth || typeof supabase.auth.getSession !== "function") return null;
+  // Logout pedido y sin completar: el token residual del SDK no se usa para nada.
+  if (isLogoutPending()) return null;
   try {
     var result = await supabase.auth.getSession();
     if (result && result.error) {
@@ -256,9 +264,27 @@ async function getActiveSupabaseSession() {
   }
 }
 
-const sbFetch = async (path, method="GET", body=null) => {
+// Token para /rest/v1. Sin sesion Auth NO se cae a la anon key salvo los accesos anonimos identificados (lib/restAuth.js).
+async function resolveRestToken(path, method) {
   var activeSession = await getActiveSupabaseSession();
-  var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
+  var decision = decideRestAuth({
+    session: activeSession,
+    method: method,
+    path: path,
+    sharedLink: isSharedLinkLocation(),
+    logoutPending: isLogoutPending(),
+  });
+  if (!decision.ok) return { ok: false, reason: decision.reason };
+  return { ok: true, token: decision.kind === "user" ? activeSession.access_token : SB_KEY };
+}
+
+const sbFetch = async (path, method="GET", body=null) => {
+  var restAuth = await resolveRestToken(path, method);
+  if (!restAuth.ok) {
+    console.error("[AUTH] " + method + " " + String(path).split("?")[0] + " no enviada: " + restAuth.reason + " (sin fallback anonimo)");
+    return null;
+  }
+  var accessToken = restAuth.token;
   const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json", "Prefer": "return=representation" } };
   if(body) opts.body = JSON.stringify(body);
   const r = await fetch(SB_URL+"/rest/v1/"+path, opts);
@@ -451,8 +477,9 @@ const sb = {
   },
   deleteAlumno: async function (id) {
     var sid = encodeURIComponent(String(id));
-    var activeSession = await getActiveSupabaseSession();
-    var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
+    var restAuth = await resolveRestToken("alumnos?id=eq." + sid, "DELETE");
+    if (!restAuth.ok) throw new AuthRequiredError(restAuth.reason);
+    var accessToken = restAuth.token;
     var r = await fetch(SB_URL + "/rest/v1/alumnos?id=eq." + sid, {
       method: "DELETE",
       headers: {
@@ -483,8 +510,12 @@ const sb = {
   marcarMensajesLeidos: async (alumnoId, esEntrenador) => {
   const deQuien = esEntrenador ? "false" : "true";
   const url = "mensajes?alumno_id=eq."+alumnoId+"&de_entrenador=eq."+deQuien+"&leido=eq.false";
-  const activeSession = await getActiveSupabaseSession();
-  const accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
+  const restAuth = await resolveRestToken(url, "PATCH");
+  if (!restAuth.ok) {
+    console.error("[AUTH] marcarMensajesLeidos no enviada: " + restAuth.reason + " (sin fallback anonimo)");
+    return;
+  }
+  const accessToken = restAuth.token;
   const r = await fetch(SB_URL+"/rest/v1/"+url, {
     method: "PATCH",
     headers: {
@@ -1268,6 +1299,25 @@ function GymApp() {
     setTimer(null);
   }
 
+  /**
+   * Logout unico (S0.6 Fase 1) para entrenador y alumno. Invalida el acceso local YA (sin red) y despues cierra Supabase Auth en
+   * segundo plano; si no hay red queda el marcador `irontrack_logout_pending` y se completa al reconectar. Las series pendientes se
+   * conservan (clearAllIronTrackPrefixedKeys no las borra).
+   */
+  function performAppLogout() {
+    return performLogout({
+      client: supabase,
+      storage: localStorage,
+      clearLocal: clearAllIronTrackPrefixedKeys,
+      onLocalInvalidated: syncStateWithLocalStorage,
+    }).then(function (res) {
+      if (res.remote && res.remote.status === "pending") console.warn("[LOGOUT] cierre de Auth pendiente; se reintentara al reconectar", res.remote.reason || "");
+      return res;
+    }).catch(function (e) {
+      console.error("[LOGOUT] fallo", e && e.message ? e.message : e);
+    });
+  }
+
   useLayoutEffect(function () {
     if (sharedParam) {
       setAuthLoading(false);
@@ -1280,6 +1330,12 @@ function GymApp() {
       if (raw) {
         try { parsed = JSON.parse(raw); } catch (e1) { parsed = null; }
       }
+      if (parsed && isLogoutPending(localStorage)) {
+        // Logout pedido y sin completar (p. ej. cerrado offline): no se restaura nada; se termina de cerrar Auth en segundo plano.
+        try { localStorage.removeItem("it_session"); } catch (eLp) {}
+        parsed = null;
+        raw = null;
+      }
       if (parsed && parsed.role === "alumno") {
         // S0.6: localStorage no autoriza una sesion de alumno. Se exige sesion real de Supabase Auth y la identidad
         // se reconstruye desde public.alumnos (auth_uid = user.id). El alumnoId/authUid almacenados se ignoran.
@@ -1291,7 +1347,7 @@ function GymApp() {
           setAuthLoading(false);
           return;
         }
-        restoreStudentSession(supabase, parsed).then(function (r) {
+        restoreStudentSession(supabase, parsed, localStorage).then(function (r) {
           if (cancelledRestore) return;
           if (r.ok) {
             try { localStorage.setItem("it_session", JSON.stringify(r.session)); } catch (e4) {}
@@ -1395,6 +1451,20 @@ function GymApp() {
 
     var sub = supabase.auth.onAuthStateChange(function (event, session) {
       if (cancelled) return;
+      if (event === 'SIGNED_OUT') {
+        // El SDK cerro la sesion Auth: refresh token revocado/invalido, o logout hecho en otra pestana/dispositivo. Un alumno sin
+        // sesion Auth no tiene acceso: se invalida el acceso local (las series pendientes se conservan). Un logout propio ya
+        // quito it_session antes de que llegue este evento, y un login de alumno en curso no se toca.
+        // Tambien cuenta la sesion en memoria: otra pestana puede haber quitado ya it_session del almacenamiento compartido.
+        var storedAtSignOut = null;
+        try { storedAtSignOut = JSON.parse(localStorage.getItem('it_session') || 'null'); } catch (eSo) {}
+        var memAtSignOut = sessionDataRef.current;
+        var studentAtSignOut = (storedAtSignOut && storedAtSignOut.role === 'alumno') || (memAtSignOut && memAtSignOut.role === 'alumno');
+        if (studentAtSignOut && !studentAuthFlowRef.current) {
+          clearAllIronTrackPrefixedKeys();
+          syncStateWithLocalStorage();
+        }
+      }
       if (session && session.user) {
         setSupabaseSessionUserId(String(session.user.id));
         if (event !== 'INITIAL_SESSION') upsertEntrenador(session.user);
@@ -1408,6 +1478,50 @@ function GymApp() {
       try {
         if (sub && sub.data && sub.data.subscription) sub.data.subscription.unsubscribe();
       } catch (e) {}
+    };
+  }, []);
+
+  // ── Logout pendiente y sincronizacion entre pestanas (S0.6 Fase 1) ──
+  useEffect(function () {
+    if (sharedParam || !supabase) return;
+    function tryCompleteLogout() {
+      if (!isLogoutPending(localStorage)) return;
+      completePendingLogout({ client: supabase, storage: localStorage }).catch(function () {});
+    }
+    function onVisible() {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') tryCompleteLogout();
+    }
+    function onStorage(e) {
+      if (e.storageArea && e.storageArea !== localStorage) return;
+      if (e.key === LOGOUT_PENDING_KEY && e.newValue) {
+        // Otra pestana cerro sesion: esta pasa al login ahora mismo.
+        enforceLogoutPending(localStorage);
+        syncStateWithLocalStorage();
+        return;
+      }
+      if (e.key !== 'it_session') return;
+      var cur = sessionDataRef.current;
+      if (!cur || (cur.role !== 'alumno' && cur.role !== 'entrenador')) return;
+      var next = null;
+      try { next = JSON.parse(localStorage.getItem('it_session') || 'null'); } catch (eSt) {}
+      // Que otra pestana QUITE it_session no cierra esta (p. ej. una restauracion fallida al abrir sin red): el cierre explicito llega por
+      // el marcador de logout y el forzado por SIGNED_OUT. Solo se reacciona a que otra cuenta inicie sesion.
+      if (!next) return;
+      var curId = String(cur.alumnoId || cur.entrenadorId || '');
+      var nextId = String(next.alumnoId || next.entrenadorId || '');
+      // Otra cuenta inicio sesion en otra pestana: esta recarga y vuelve a verificar su identidad contra Auth.
+      if (next.role !== cur.role || curId !== nextId) window.location.reload();
+    }
+    window.addEventListener('online', tryCompleteLogout);
+    window.addEventListener('focus', tryCompleteLogout);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('storage', onStorage);
+    tryCompleteLogout();
+    return function () {
+      window.removeEventListener('online', tryCompleteLogout);
+      window.removeEventListener('focus', tryCompleteLogout);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('storage', onStorage);
     };
   }, []);
 
@@ -2934,8 +3048,7 @@ function GymApp() {
       }
       if (c.t === 'logout' || c.t === 'logoutSettings') {
         if (c.t === 'logoutSettings') setSettingsOpen(false);
-        clearAllIronTrackPrefixedKeys();
-        syncStateWithLocalStorage();
+        performAppLogout();
         setCoachDialog({ t: 'none' });
         return;
       }
@@ -3025,6 +3138,11 @@ function GymApp() {
             setLoginError(msg("La conexión está tardando demasiado. Revisá tu internet e intentá de nuevo.", "The connection is taking too long. Check your internet and try again."));
           }, 15000);
           try {
+            // S0.6 Fase 1: un logout sin completar se intenta cerrar ANTES de iniciar la sesion nueva (si no, el signOut tardio
+            // podria alcanzar a la sesion nueva). Acotado y no bloqueante: si falla, el login nuevo reemplaza la sesion residual.
+            if (isLogoutPending(localStorage)) {
+              try { await completePendingLogout({ client: supabase, storage: localStorage, timeoutMs: 4000 }); } catch (eLp) {}
+            }
             const sp = typeof window!=="undefined"?(localStorage.getItem("it_tpass")||"irontrack2024"):"irontrack2024";
             const loginEmailNorm = loginEmail.trim().toLowerCase();
             const isEntrenador = loginEmailNorm==="entrenador@irontrack.app";
@@ -3113,6 +3231,7 @@ function GymApp() {
                 if (upCoach && upCoach.error) console.error("[AUTH] entrenadores upsert migracion fallo", upCoach.error);
                 const s={role:"entrenador",name: demoName,email:authLogin.data.user.email||loginEmailNorm,entrenadorId:String(authLogin.data.user.id)};
                 localStorage.setItem("it_session",JSON.stringify(s));
+                clearLogoutPending(localStorage); // login nuevo exitoso: reemplaza la sesion Auth residual
                 syncStateWithLocalStorage();
                 setLoginEmail("");
                 setLoginPass("");
@@ -3139,6 +3258,7 @@ function GymApp() {
                 clearIronTrackStorageForNewLogin();
                 const s=studentLogin.session;
                 localStorage.setItem("it_session",JSON.stringify(s));
+                clearLogoutPending(localStorage); // login nuevo exitoso: reemplaza la sesion Auth residual
                 localStorage.setItem("it_show_welcome","1");
                 if(ruts&&ruts[0]){const rutLocal={id:ruts[0].id,name:ruts[0].nombre||"Rutina",days:ruts[0].datos?.days||[],datos:ruts[0].datos||{},alumno:ruts[0].datos?.alumno||alumno.nombre||"",note:ruts[0].datos?.note||"",alumno_id:alumno.id,saved:true};localStorage.setItem("it_rt",JSON.stringify([rutLocal]));}
                 // Registrar OneSignal (solo despues de resolver la identidad canonica)
@@ -3176,13 +3296,14 @@ function GymApp() {
                   timeout:60000
                 }});
                 if(cred) {
+                  if (isLogoutPending(localStorage)) { toast2(msg("Ingresá con tu email y contraseña", "Sign in with your email and password")); return; }
                   const saved = JSON.parse(localStorage.getItem("it_biometric_user")||"null");
                   if(saved && saved.role==="alumno") {
                     // S0.6: la biometria NO crea una sesion de alumno desde localStorage; exige sesion real de Supabase Auth
                     // y reconstruye la identidad desde alumnos.auth_uid (misma validacion que la restauracion).
                     setLoginLoading(true);
                     try {
-                      const bio = supabase ? await restoreStudentSession(supabase, saved) : { ok: false, reason: "no_client" };
+                      const bio = supabase ? await restoreStudentSession(supabase, saved, localStorage) : { ok: false, reason: "no_client" };
                       if(bio.ok) {
                         localStorage.setItem("it_session", JSON.stringify(bio.session));
                         syncStateWithLocalStorage();
@@ -3303,8 +3424,7 @@ function GymApp() {
     });
   };
   const handleCoachLogout = function () {
-    clearAllIronTrackPrefixedKeys();
-    syncStateWithLocalStorage();
+    performAppLogout();
   };
   const handleCoachSettingsClose = function () {
     setTab("plan");
@@ -3559,7 +3679,7 @@ function GymApp() {
       <CoachDesktopShellFrame
         showCoachDesktopShell={showCoachDesktopShell} tab={tab} onNavigate={setTab}
         onSettings={function () { setTab("settings"); }} onPerfil={function () { setTab("perfil"); }}
-        onLogout={function () { clearAllIronTrackPrefixedKeys(); syncStateWithLocalStorage(); }}
+        onLogout={function () { performAppLogout(); }}
         coachAvatarUrl={sessionData?.avatarUrl} coachName={sessionData?.name} darkMode={darkMode}
       >
       {!coachSuppressTopNav && !hideAlumnoTopBarForSession && (
@@ -3591,7 +3711,7 @@ function GymApp() {
         userMenuOpen={userMenuOpen}
         onToggleUserMenu={setUserMenuOpen}
         coachLogoutButtonStyle={{background:"#2563EB22",color:"#2563EB",border:"none",borderRadius:8,padding:"8px 14px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
-        onCoachLogout={()=>{clearAllIronTrackPrefixedKeys();syncStateWithLocalStorage();}}
+        onCoachLogout={()=>{performAppLogout();}}
         loginButtonStyle={{...btn(),padding:"4px 8px",fontSize:13}}
         onLogin={()=>setLoginModal(true)}
       />
