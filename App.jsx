@@ -18,7 +18,8 @@ import StudentMainView from './components/student/StudentMainView.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
 import { loginStudent, restoreStudentSession, shouldSkipEntrenadorUpsert } from './lib/studentIdentity.js';
 import { performLogout, completePendingLogout, isLogoutPending, clearLogoutPending, enforceLogoutPending, LOGOUT_PENDING_KEY } from './lib/sessionLogout.js';
-import { decideRestAuth, isSharedLinkLocation, AuthRequiredError } from './lib/restAuth.js';
+import { createRestAuthResolver, AuthRequiredError } from './lib/restAuth.js';
+import { flushLegacyPendingQueue } from './lib/legacyPendingFlush.js';
 import { useAppShellUIState } from './hooks/useAppShellUIState.js';
 import { useCoachUIState } from './hooks/useCoachUIState.js';
 import { useStudentUIState } from './hooks/useStudentUIState.js';
@@ -247,36 +248,16 @@ function readLocalCustomExercisesForMigration() {
   });
 }
 
-async function getActiveSupabaseSession() {
-  if (!supabase || !supabase.auth || typeof supabase.auth.getSession !== "function") return null;
-  // Logout pedido y sin completar: el token residual del SDK no se usa para nada.
-  if (isLogoutPending()) return null;
-  try {
-    var result = await supabase.auth.getSession();
-    if (result && result.error) {
-      console.error("[AUTH] getSession error", result.error);
-      return null;
-    }
-    return result && result.data ? result.data.session : null;
-  } catch (e) {
-    console.error("[AUTH] getSession exception", e);
-    return null;
-  }
-}
-
-// Token para /rest/v1. Sin sesion Auth NO se cae a la anon key salvo los accesos anonimos identificados (lib/restAuth.js).
-async function resolveRestToken(path, method) {
-  var activeSession = await getActiveSupabaseSession();
-  var decision = decideRestAuth({
-    session: activeSession,
-    method: method,
-    path: path,
-    sharedLink: isSharedLinkLocation(),
-    logoutPending: isLogoutPending(),
-  });
-  if (!decision.ok) return { ok: false, reason: decision.reason };
-  return { ok: true, token: decision.kind === "user" ? activeSession.access_token : SB_KEY };
-}
+// Credenciales de las llamadas REST propias (lib/restAuth.js): sesion Auth del SDK, nunca con un logout pendiente y sin fallback
+// anonimo salvo los accesos identificados.
+const restAuthResolver = createRestAuthResolver({
+  client: supabase,
+  storage: typeof localStorage !== "undefined" ? localStorage : undefined,
+  anonKey: SB_KEY,
+  getSearch: function () { return typeof window !== "undefined" && window.location ? window.location.search : ""; },
+});
+const getActiveSupabaseSession = restAuthResolver.getActiveSession;
+const resolveRestToken = restAuthResolver.resolve;
 
 const sbFetch = async (path, method="GET", body=null) => {
   var restAuth = await resolveRestToken(path, method);
@@ -1441,7 +1422,8 @@ function GymApp() {
         return;
       }
       var session = sessionResult.data && sessionResult.data.session;
-      if (!session || !session.user) {
+      // Logout pendiente: la sesion Auth residual no se adopta (ni su user.id) ni se usa para escribir.
+      if (!session || !session.user || isLogoutPending()) {
         setSupabaseSessionUserId(null);
         return;
       }
@@ -1465,7 +1447,7 @@ function GymApp() {
           syncStateWithLocalStorage();
         }
       }
-      if (session && session.user) {
+      if (session && session.user && !isLogoutPending()) {
         setSupabaseSessionUserId(String(session.user.id));
         if (event !== 'INITIAL_SESSION') upsertEntrenador(session.user);
       } else {
@@ -1532,6 +1514,8 @@ function GymApp() {
 
     (async function () {
       try {
+        // Logout pendiente: no se lee `entrenadores` con la sesion Auth residual.
+        if (isLogoutPending()) return;
         var sessionRes = await supabase.auth.getSession();
         if (sessionRes.error) {
           console.error('[App] coach entrenadores getSession', sessionRes.error);
@@ -1622,38 +1606,16 @@ function GymApp() {
   useEffect(()=>{
     const flushPendingSync = async () => {
       setIsOnline(true);
-      // Sincronizar sets pendientes
-      let pending = [];
-      try {
-        pending = JSON.parse(localStorage.getItem('it_pending_sync')||'[]');
-      } catch(e) {
-        console.warn('[offline sync] it_pending_sync corrupto; se conserva sin sincronizar', e);
-        return;
-      }
-      if(!Array.isArray(pending)) {
-        console.warn('[offline sync] it_pending_sync no es una lista; se conserva sin sincronizar');
-        return;
-      }
-      if(pending.length === 0) return;
+      // Sincronizar sets pendientes (cola ANTIGUA). Solo se envian las series cuyo alumno_id coincide con el de la sesion actual;
+      // las de identidad desconocida o de otro alumno NO se envian ni se borran (lib/legacyPendingFlush.js).
       const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
-      if(!alumnoIdSync) return;
-      const results = await Promise.allSettled(pending.map(item => {
-        return Promise.resolve().then(function() {
-          return sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana));
-        });
-      }));
-      const failed = pending.filter(function(item, idx) {
-        var res = results[idx];
-        return !res || res.status !== 'fulfilled' || res.value == null;
-      });
-      if(failed.length > 0) {
-        try{localStorage.setItem('it_pending_sync', JSON.stringify(failed));}catch(e){}
-      } else {
-        localStorage.removeItem('it_pending_sync');
+      const out = await flushLegacyPendingQueue({ alumnoId: alumnoIdSync, send: function (payload) { return sb.addProgreso(payload); } });
+      if(out.withheldUnknown > 0 || out.withheldForeign > 0) {
+        console.warn('[offline sync] series antiguas NO enviadas por identidad no verificada:', { desconocidas: out.withheldUnknown, deOtroAlumno: out.withheldForeign });
       }
-      setPendingSync(failed);
-      const syncedCount = pending.length - failed.length;
-      if(syncedCount > 0) toast2(syncedCount+' set'+(syncedCount>1?'s':'')+' sincronizados ✓');
+      if(out.status !== 'done') return;
+      setPendingSync(out.remaining);
+      if(out.sent > 0) toast2(out.sent+' set'+(out.sent>1?'s':'')+' sincronizados ✓');
     };
     const goOnline = () => { flushPendingSync(); };
     const goOffline = () => setIsOnline(false);
@@ -2067,7 +2029,7 @@ function GymApp() {
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     if(alumnoIdSync) {
       if(!isOnline) {
-        const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet);
+        const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, alumnoIdSync);
         const updated = [...pendingSync, item];
         setPendingSync(updated);
         try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}

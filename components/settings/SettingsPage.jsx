@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient.js';
 import { performLogout } from '../../lib/sessionLogout.js';
-import { clearAllIronTrackPrefixedKeys } from '../../lib/irontrackLocalStorage.js';
+import { clearAllIronTrackPrefixedKeys, isPendingSyncKey } from '../../lib/irontrackLocalStorage.js';
 import coachSettingsPalette from './coachSettingsPalette.js';
 import coachUiStrings from './coachUiStrings.js';
 import {
@@ -424,7 +424,8 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
       {dangerRow(t.exportData, t.exportDataDesc, t.export, () => {
         try {
           const data = {};
-          Object.keys(localStorage).filter(k => k.startsWith('it_')).forEach(k => { data[k] = localStorage.getItem(k); });
+          // Las series pendientes pueden ser de otros alumnos del mismo dispositivo: no se exportan.
+          Object.keys(localStorage).filter(k => k.startsWith('it_') && !isPendingSyncKey(k)).forEach(k => { data[k] = localStorage.getItem(k); });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
           a.download = `irontrack-export-${Date.now()}.json`;
