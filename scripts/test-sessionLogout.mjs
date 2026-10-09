@@ -11,7 +11,7 @@ import {
   LOGOUT_PENDING_KEY, beginLogout, completePendingLogout, performLogout, isLogoutPending, readLogoutPending,
   clearLogoutPending, enforceLogoutPending, _resetSessionLogoutForTests,
 } from "../lib/sessionLogout.js";
-import { restoreStudentSession } from "../lib/studentIdentity.js";
+import { restoreStudentSession, shouldSkipEntrenadorUpsert } from "../lib/studentIdentity.js";
 import { decideRestAuth } from "../lib/restAuth.js";
 
 const require = createRequire(import.meta.url);
@@ -365,6 +365,51 @@ await test("logout con token VENCIDO y sin red: la espera de la app esta acotada
   assert.ok(Date.now() - t0 < 3000, "performLogout vuelve por timeout (el SDK real tarda ~25 s en rendirse)");
   assert.equal(st.getItem("it_session"), null, "el acceso local ya estaba invalidado desde el inicio");
   assert.equal(isLogoutPending(st), true);
+}));
+
+// ── 9. Eventos Auth de alumnos y escrituras en entrenadores ────────────────────────────────────────────────
+
+function fakeJwt(uid, exp) {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  return b64({ alg: "HS256", typ: "JWT" }) + "." + b64({ sub: uid, aud: "authenticated", exp, role: "authenticated" }) + ".sig";
+}
+
+await test("eventos Auth (SIGNED_IN / TOKEN_REFRESHED) de un alumno NO escriben en entrenadores aunque falte it_session; el entrenador si", () => withGlobalStorage(makeStorage(), async function () {
+  const st = globalThis.localStorage;
+  const userBody = (uid) => ({ id: uid, aud: "authenticated", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z", email: "x@y.z" });
+  async function authEventsFor(uid, setup) {
+    st.m.clear(); setup(st);
+    const upserts = [];
+    const fetchImpl = async (url) => {
+      if (String(url).indexOf("/token") >= 0) {
+        return new Response(JSON.stringify({ ...authSession(uid, NOW() + 3600), access_token: fakeJwt(uid, NOW() + 3600) }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify(userBody(uid)), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const auth = new GoTrueClient({ url: "http://auth.test", headers: {}, storageKey: AUTH_KEY, storage: st, persistSession: true, autoRefreshToken: false, fetch: fetchImpl });
+    // Mismo criterio que el efecto de Auth de App.jsx: upsertEntrenador(user) salvo INITIAL_SESSION, filtrado por shouldSkipEntrenadorUpsert
+    const seen = [];
+    auth.onAuthStateChange((event, session) => {
+      seen.push(event);
+      if (session && session.user && event !== "INITIAL_SESSION" && !shouldSkipEntrenadorUpsert(st, false)) upserts.push({ event, id: session.user.id });
+    });
+    await auth.setSession({ access_token: fakeJwt(uid, NOW() + 3600), refresh_token: "rt" }); // SIGNED_IN
+    await auth.refreshSession({ refresh_token: "rt" }); // TOKEN_REFRESHED
+    return { upserts, seen };
+  }
+  // alumno sin it_session (p. ej. tras una restauracion fallida)
+  let r = await authEventsFor(UID_A, () => {});
+  assert.ok(r.seen.includes("SIGNED_IN") && r.seen.includes("TOKEN_REFRESHED"), "los eventos si ocurrieron: " + r.seen.join());
+  assert.deepEqual(r.upserts, [], "sin it_session no se escribe en entrenadores");
+  // alumno con it_session
+  r = await authEventsFor(UID_A, (s) => s.setItem("it_session", JSON.stringify({ role: "alumno", alumnoId: ID_A })));
+  assert.deepEqual(r.upserts, []);
+  // alumno con logout pendiente y una it_session de entrenador residual: tampoco
+  r = await authEventsFor(UID_A, (s) => { s.setItem("it_session", JSON.stringify({ role: "entrenador" })); s.setItem(LOGOUT_PENDING_KEY, "{\"v\":1}"); });
+  assert.deepEqual(r.upserts, []);
+  // entrenador legitimo: el upsert sigue funcionando
+  r = await authEventsFor(UID_B, (s) => s.setItem("it_session", JSON.stringify({ role: "entrenador", entrenadorId: UID_B })));
+  assert.ok(r.upserts.length >= 1 && r.upserts.every((u) => u.id === UID_B));
 }));
 
 // (console.error queda silenciado: el SDK sigue logueando fallos de red simulados en segundo plano)
