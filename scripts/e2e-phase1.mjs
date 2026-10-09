@@ -17,18 +17,20 @@ const BASE = process.env.E2E_BASE || "http://localhost:4173";
 const SB = "https://example.invalid";
 const UID_A = "11111111-1111-4111-8111-111111111111";
 const UID_B = "22222222-2222-4222-8222-222222222222";
+const UID_C = "33333333-3333-4333-8333-333333333333";
 const ID_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const ID_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const jwt = (uid, exp) => b64({ alg: "HS256", typ: "JWT" }) + "." + b64({ sub: uid, aud: "authenticated", exp, role: "authenticated" }) + ".sig";
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*", "access-control-expose-headers": "*" };
 
-// Backend simulado. state: { logout: 'ok'|'abort', users: {email:{uid,alumnoId,nombre}}, log: [], restCalls: [] }
+// Backend simulado. state: { logout: 'ok'|'abort'|'500'|'slow' (cierre de Auth: ok, sin red, error 5xx o lento), users: {email:{uid,alumnoId,nombre}}, log: [], restCalls: [] }
 function makeBackend() {
-  const st = { logout: "ok", log: [], tokens: {}, progreso: [] };
+  const st = { logout: "ok", logoutDelayMs: 5000, log: [], tokens: {}, progreso: [] };
   const users = {
     "a@test.com": { uid: UID_A, alumnoId: ID_A, nombre: "Alumno A" },
     "b@test.com": { uid: UID_B, alumnoId: ID_B, nombre: "Alumno B" },
+    "entrenador@irontrack.app": { uid: UID_C, alumnoId: null, nombre: "Entrenador", password: "irontrack2024" },
   };
   st.install = async (context) => {
     await context.route(SB + "/**", async (route) => {
@@ -37,13 +39,13 @@ function makeBackend() {
       const method = req.method();
       const auth = req.headers()["authorization"] || "";
       if (method === "OPTIONS") return route.fulfill({ status: 204, headers: CORS });
-      const entry = { method, path: url.pathname, search: url.search, auth };
+      const entry = { method, path: url.pathname, search: url.search, auth, t: Date.now() };
       st.log.push(entry);
       const json = (status, body) => route.fulfill({ status, headers: { ...CORS, "content-type": "application/json" }, body: JSON.stringify(body) });
       if (url.pathname === "/auth/v1/token") {
         let body = {}; try { body = JSON.parse(req.postData() || "{}"); } catch (e) {}
         const u = users[String(body.email || "").toLowerCase()];
-        if (!u || body.password !== "pw") return json(400, { error: "invalid_grant", error_description: "Invalid login credentials" });
+        if (!u || body.password !== (u.password || "pw")) return json(400, { error: "invalid_grant", error_description: "Invalid login credentials" });
         const exp = Math.floor(Date.now() / 1000) + 3600;
         const at = jwt(u.uid, exp);
         st.tokens[at] = u.uid;
@@ -52,6 +54,8 @@ function makeBackend() {
       if (url.pathname === "/auth/v1/logout") {
         entry.scope = url.searchParams.get("scope");
         if (st.logout === "abort") return route.abort("failed");
+        if (st.logout === "500") return json(500, { msg: "internal" });
+        if (st.logout === "slow") { await new Promise((r) => setTimeout(r, st.logoutDelayMs)); entry.doneAt = Date.now(); }
         return route.fulfill({ status: 204, headers: CORS });
       }
       if (url.pathname === "/auth/v1/user") return json(200, { id: UID_A, aud: "authenticated" });
@@ -253,6 +257,127 @@ await test("E7 enlace compartido con logout offline pendiente: solo lecturas ano
   assert.ok(rest.every((r) => !r.auth.includes(residual)), "ninguna lectura uso el token residual");
   assert.ok(rest.every((r) => r.auth === "Bearer anon-test"), "todas salieron como anon: " + JSON.stringify([...new Set(rest.map((r) => r.auth))]));
   assert.ok(await pendingMarker(page), "el visitante del enlace no cierra ni reabre la sesion");
+});
+
+// ── Correccion P0-1 / P1-1: login con un logout pendiente que no logra completarse ────────────────────────────
+
+// Cierra sesion de A SIN red (/logout cae): queda el marcador y el token residual. Deja la app en la pantalla de bienvenida/login.
+async function logoutAOffline(page, be) {
+  await login(page, "a@test.com");
+  await page.waitForTimeout(1500);
+  be.logout = "abort";
+  await uiLogout(page);
+  await loginVisible(page);
+  assert.ok(await pendingMarker(page), "marcador de A pendiente");
+  assert.ok(await authToken(page), "token residual de A en el dispositivo");
+}
+const tokenOf = (be, uid) => Object.keys(be.tokens).filter((t) => be.tokens[t] === uid);
+async function submitLogin(page, email, pass) {
+  await page.goto(BASE + "/");
+  await page.waitForSelector('input[type="email"]', { timeout: 15000 });
+  await page.fill('input[type="email"]', email);
+  await page.fill('input[type="password"]', pass);
+  await page.click("text=INGRESAR");
+}
+
+await test("E8 logout offline de A + /logout en 5xx: el login valido de B ENTRA, B conserva la sesion tras recargar y nunca se revoca; series de A y B intactas", async (ctx, be) => {
+  const page = await ctx.newPage();
+  await login(page, "a@test.com");
+  await page.waitForTimeout(1200);
+  await seedQueue(page, [
+    { exId: "a1", kg: 50, reps: 5, date: "1/10/2026", semana: 0, alumno_id: ID_A },
+    { exId: "u1", kg: 5, reps: 5, date: "1/10/2026", semana: 0 },
+  ]);
+  be.logout = "abort";
+  await uiLogout(page);
+  await loginVisible(page);
+  assert.ok(await pendingMarker(page));
+  const aTokens = tokenOf(be, UID_A);
+  be.logout = "500"; // /auth/v1/logout responde 5xx; /token y /rest funcionan
+  const mark = be.log.length;
+  await submitLogin(page, "b@test.com", "pw");
+  await page.waitForFunction(() => { try { return JSON.parse(localStorage.getItem("it_session") || "null")?.role === "alumno"; } catch (e) { return false; } }, null, { timeout: 20000 });
+  assert.equal(JSON.parse(await ls(page, "it_session")).alumnoId, ID_B, "entro B");
+  assert.equal(await pendingMarker(page), null, "el marcador de A se borro al autenticar B");
+  await page.waitForTimeout(2500);
+  const after = be.log.slice(mark);
+  const rest = after.filter((r) => r.path.startsWith("/rest/v1/"));
+  assert.ok(!rest.some((r) => aTokens.some((t) => r.auth.includes(t))), "el token residual de A no llego a REST");
+  assert.ok(rest.every((r) => r.method === "GET" ? true : !r.auth.includes("anon-test")), "ninguna escritura anonima");
+  const bTokens = tokenOf(be, UID_B);
+  assert.ok(!after.some((r) => r.path === "/auth/v1/logout" && bTokens.some((t) => r.auth.includes(t))), "ningun /logout con el token de B (B no se revoca)");
+  // recarga tras el nuevo login: se restaura B
+  await page.reload();
+  await page.waitForFunction(() => document.body.innerText.includes("Modo alumno"), null, { timeout: 15000 });
+  assert.equal(JSON.parse(await ls(page, "it_session")).alumnoId, ID_B);
+  assert.equal(await pendingMarker(page), null);
+  // series de A conservadas por 1A (cola nueva + cuarentena), sin enviar nada
+  assert.deepEqual(await preserved(page), { array: null, items: 1, quarantine: 1 });
+  assert.deepEqual(be.progreso, []);
+});
+
+await test("E9 login FALLIDO de B con el logout de A pendiente: el marcador y la proteccion siguen; despues un login valido entra", async (ctx, be) => {
+  const page = await ctx.newPage();
+  await logoutAOffline(page, be);
+  const aTokens = tokenOf(be, UID_A);
+  be.logout = "500";
+  const mark = be.log.length;
+  await submitLogin(page, "b@test.com", "mala");
+  await page.waitForFunction(() => document.body.innerText.includes("Email o contraseña incorrectos"), null, { timeout: 15000 });
+  assert.ok(await pendingMarker(page), "el marcador de A sigue");
+  assert.equal(await ls(page, "it_session"), null);
+  await page.waitForTimeout(1500);
+  const rest = be.log.slice(mark).filter((r) => r.path.startsWith("/rest/v1/"));
+  assert.ok(!rest.some((r) => aTokens.some((t) => r.auth.includes(t))), "el token residual de A sigue sin usarse");
+  // login valido a continuacion
+  await page.fill('input[type="password"]', "pw");
+  await page.click("text=INGRESAR");
+  await page.waitForFunction(() => { try { return JSON.parse(localStorage.getItem("it_session") || "null")?.role === "alumno"; } catch (e) { return false; } }, null, { timeout: 20000 });
+  assert.equal(await pendingMarker(page), null);
+});
+
+await test("E10 login de ENTRENADOR con marcador pendiente: entra, el marcador se borra y sus consultas a entrenadores usan SU token", async (ctx, be) => {
+  const page = await ctx.newPage();
+  await logoutAOffline(page, be);
+  be.logout = "500";
+  const mark = be.log.length;
+  await submitLogin(page, "entrenador@irontrack.app", "irontrack2024");
+  await page.waitForFunction(() => { try { return JSON.parse(localStorage.getItem("it_session") || "null")?.role === "entrenador"; } catch (e) { return false; } }, null, { timeout: 20000 });
+  assert.equal(await pendingMarker(page), null);
+  await page.waitForTimeout(2000);
+  const coachTokens = tokenOf(be, UID_C), aTokens = tokenOf(be, UID_A);
+  const ent = be.log.slice(mark).filter((r) => r.path === "/rest/v1/entrenadores");
+  assert.ok(ent.length >= 1, "hubo consultas a entrenadores");
+  assert.ok(ent.every((r) => coachTokens.some((t) => r.auth.includes(t))), "todas con el token del entrenador: " + JSON.stringify(ent.map((r) => r.method + " " + r.auth.slice(7, 20))));
+  assert.ok(!be.log.slice(mark).some((r) => r.path.startsWith("/rest/v1/") && aTokens.some((t) => r.auth.includes(t))), "nunca con el residual de A");
+});
+
+await test("E11 dos pestanas: una completa el logout antiguo (servidor LENTO) mientras la otra inicia sesion: A se revoca con su token y B queda con sesion", async (ctx, be) => {
+  const p1 = await ctx.newPage();
+  await logoutAOffline(p1, be);
+  const aTokens = tokenOf(be, UID_A);
+  be.logout = "slow"; be.logoutDelayMs = 5000;
+  const nLogouts = be.log.filter((r) => r.path === "/auth/v1/logout").length;
+  await p1.evaluate(() => window.dispatchEvent(new Event("online"))); // la pestana 1 empieza a cerrar Auth (tarda 5 s)
+  await p1.waitForFunction(() => true);
+  await new Promise((r) => setTimeout(r, 400));
+  const p2 = await ctx.newPage();
+  await submitLogin(p2, "b@test.com", "pw"); // la pestana 2 inicia sesion mientras el cierre antiguo sigue en curso
+  await p2.waitForFunction(() => { try { return JSON.parse(localStorage.getItem("it_session") || "null")?.alumnoId; } catch (e) { return false; } }, null, { timeout: 30000 });
+  assert.equal(JSON.parse(await ls(p2, "it_session")).alumnoId, ID_B);
+  await p2.waitForTimeout(6500); // deja terminar cualquier cierre tardio
+  const bTokens = tokenOf(be, UID_B);
+  const logouts = be.log.filter((r) => r.path === "/auth/v1/logout").slice(nLogouts);
+  assert.ok(logouts.length >= 1, "el cierre antiguo se envio");
+  assert.ok(logouts.every((r) => aTokens.some((t) => r.auth.includes(t))), "todo /logout llevo el token de A: " + JSON.stringify(logouts.map((r) => r.auth.slice(7, 40))));
+  // el login de B ESPERO el lock: su solicitud de token salio despues de terminar el cierre lento de A (exclusion entre pestanas)
+  const slowLogout = logouts.find((r) => r.doneAt);
+  const bToken = be.log.filter((r) => r.path === "/auth/v1/token" && r.t > slowLogout.t).pop();
+  assert.ok(slowLogout && bToken && bToken.t >= slowLogout.doneAt - 100, "el login de B esperaba al cierre antiguo: token a " + (bToken && bToken.t - slowLogout.t) + " ms, cierre termino a " + (slowLogout && slowLogout.doneAt - slowLogout.t) + " ms");
+  assert.ok(!logouts.some((r) => bTokens.some((t) => r.auth.includes(t))), "B no fue revocado");
+  assert.equal(JSON.parse(await ls(p2, "it_session")).alumnoId, ID_B, "B conserva la sesion de la app");
+  assert.ok(await authKey(p2), "y la sesion de Auth");
+  assert.equal(await pendingMarker(p2), null);
 });
 
 await test("E6 recarga normal con sesion valida sigue restaurando al alumno (sin regresion online)", async (ctx, be) => {
