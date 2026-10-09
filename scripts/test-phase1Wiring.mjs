@@ -79,4 +79,18 @@ await test("cableado P0-1/P1-1: todo inicio de sesion (alumno, entrenador y su s
   assert.ok(/signOutIfCurrentUser\(client, String\(userId\)\)/.test(ident));
 });
 
+await test("cableado carrera Auth: auth_busy es un estado recuperable en alumno y entrenador (sin signUp de migracion) y el logout tiene tope de red", () => {
+  const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
+  const guard = readFileSync(new URL("../lib/residualTokenGuard.js", import.meta.url), "utf8");
+  const ident = readFileSync(new URL("../lib/studentIdentity.js", import.meta.url), "utf8");
+  const logout = readFileSync(new URL("../lib/sessionLogout.js", import.meta.url), "utf8");
+  assert.ok(/studentLogin\.reason === "auth_busy"/.test(app), "alumno");
+  assert.ok(/authLogin\.error\.code === "auth_busy"/.test(app) && /authSignup\.error\.code === "auth_busy"/.test(app), "entrenador (signIn y signUp)");
+  assert.ok(app.indexOf('authLogin.error.code === "auth_busy"') < app.indexOf("intentando migracion segura"), "auth_busy se atiende ANTES del signUp de migracion");
+  assert.ok(/auth_busy/.test(ident));
+  assert.ok(/LOGOUT_REQUEST_TIMEOUT_MS = 7000/.test(guard) && /isLogoutRequest\(urlOf\(input\), methodOf\(input, init\)\)/.test(guard));
+  assert.ok(!/onTimeout/.test(logout), "ya no existe la salida 'ejecutar sin exclusion'");
+  assert.ok(/AUTH_LEASE_KEY = "irontrack_auth_lease"/.test(logout));
+});
+
 console.log("\n" + count + " tests ok");

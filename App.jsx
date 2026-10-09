@@ -3154,6 +3154,11 @@ function GymApp() {
                     password: loginPass,
                   });
                 });
+                if (authLogin && authLogin.error && authLogin.error.code === "auth_busy") {
+                  // Sin exclusion no se inicio el login (ni se intenta el signUp de migracion): estado recuperable.
+                  setLoginError(msg("Se está cerrando la sesión anterior. Esperá unos segundos y volvé a intentar.", "The previous session is still being closed. Wait a few seconds and try again."));
+                  return;
+                }
                 if (authLogin.error || !authLogin.data || !authLogin.data.session) {
                   console.error("[AUTH] signInWithPassword fallo; intentando migracion segura", authLogin.error || authLogin);
                   var authSignup = await signInReplacingResidual({}, function () {
@@ -3165,6 +3170,10 @@ function GymApp() {
                       },
                     });
                   });
+                  if (authSignup.error && authSignup.error.code === "auth_busy") {
+                    setLoginError(msg("Se está cerrando la sesión anterior. Esperá unos segundos y volvé a intentar.", "The previous session is still being closed. Wait a few seconds and try again."));
+                    return;
+                  }
                   if (authSignup.error) {
                     console.error("[AUTH] signUp migracion fallo", authSignup.error);
                     setLoginError("No se pudo crear tu usuario en Supabase Auth. Revisá la consola para ver el error real.");
@@ -3247,7 +3256,10 @@ function GymApp() {
               studentAuthFlowRef.current = true;
               const studentLogin = await loginStudent(supabase, loginEmailNorm, loginPass);
               if (!studentLogin.ok) {
-                setLoginError("Email o contraseña incorrectos");
+                // auth_busy: un cierre de sesion anterior sigue en curso (estado recuperable, no se tocó nada): reintentar.
+                setLoginError(studentLogin.reason === "auth_busy"
+                  ? msg("Se está cerrando la sesión anterior. Esperá unos segundos y volvé a intentar.", "The previous session is still being closed. Wait a few seconds and try again.")
+                  : "Email o contraseña incorrectos");
                 return;
               }
               {

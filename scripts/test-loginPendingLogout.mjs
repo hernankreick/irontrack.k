@@ -89,7 +89,10 @@ function makeServer() {
       return json(200, sessionFor(u.uid));
     }
     if (url.pathname === "/auth/v1/logout") {
-      if (srv.gates.logout) await srv.gates.logout;
+      const sig = init && init.signal;
+      const aborted = sig ? new Promise((_, rej) => { const f = () => rej(Object.assign(new Error("The operation was aborted"), { name: "AbortError" })); if (sig.aborted) f(); else sig.addEventListener("abort", f); }) : null;
+      if (srv.gates.logout) await (aborted ? Promise.race([srv.gates.logout, aborted]) : srv.gates.logout);
+      if (srv.logout === "hang") await (aborted || new Promise(() => {}));
       if (srv.logout === "offline") throw new TypeError("Failed to fetch");
       if (srv.logout === "500") return json(500, { msg: "internal" });
       return new Response(null, { status: 204 });
@@ -110,10 +113,10 @@ function makeServer() {
 }
 
 // "Pestana": un cliente supabase-js real, con el fetch compuesto de lib/supabaseClient.js, sobre el almacenamiento compartido
-function makeTab(st, srv) {
+function makeTab(st, srv, o) {
   return createClient(URL_BASE, ANON, {
     auth: { storage: st, storageKey: AUTH_KEY, persistSession: true, autoRefreshToken: false, detectSessionInUrl: false },
-    global: { fetch: createResidualTokenGuardFetch(createSharedReadOnlyFetch(srv.fetch), { anonKey: ANON }) },
+    global: { fetch: createResidualTokenGuardFetch(createSharedReadOnlyFetch(srv.fetch), { anonKey: ANON, logoutTimeoutMs: o && o.logoutTimeoutMs }) },
   });
 }
 const storedUid = (st) => { const raw = st.getItem(AUTH_KEY); return raw ? JSON.parse(raw).user.id : null; };
@@ -222,14 +225,14 @@ await test("3b. un marcador nuevo escrito durante un cierre anterior NO se borra
   st.setItem(AUTH_KEY, JSON.stringify(srv.sessionFor(UA)));
   let release; srv.gates.logout = new Promise((r) => { release = r; });
   const p = completePendingLogout({ client: tab, storage: st, timeoutMs: 2000, locks: null });
-  await sleep(20);
+  await sleep(150); // el cierre ya leyo su marcador y tiene el signOut en curso
   st.setItem(LOGOUT_PENDING_KEY, JSON.stringify({ v: 1, id: "nuevo", authUid: UB })); // beginLogout de otra cuenta
   release();
   await p;
   assert.equal(readLogoutPending(st).id, "nuevo", "el marcador nuevo sobrevive");
 });
 
-await test("3c. marcador sin dueño conocido: se cierra la sesion almacenada (dentro de la seccion critica); coach: el dueño sale de entrenadorId", async (st) => {
+await test("3c. entrenador: el dueño del marcador sale de entrenadorId y una sesion de otra cuenta no se revoca", async (st) => {
   const srv = makeServer(); const tab = makeTab(st, srv);
   st.setItem("it_session", JSON.stringify({ role: "entrenador", name: "C", entrenadorId: UC }));
   beginLogout({ storage: st });
@@ -238,6 +241,32 @@ await test("3c. marcador sin dueño conocido: se cierra la sesion almacenada (de
   assert.equal((await completePendingLogout({ client: tab, storage: st, timeoutMs: 500, locks: null })).reason, "session_replaced");
   assert.equal(storedUid(st), UB);
   assert.equal(srv.logoutCalls().length, 0);
+});
+
+await test("3d. marcador SIN authUid y sesion de OTRO usuario: nunca se revoca, el acceso sigue invalidado y un login nuevo lo recupera", async (st) => {
+  const srv = makeServer(); const tab = makeTab(st, srv);
+  st.setItem(LOGOUT_PENDING_KEY, JSON.stringify({ v: 1, id: "huerfano", ts: Date.now(), role: null, authUid: null }));
+  st.setItem(AUTH_KEY, JSON.stringify(srv.sessionFor(UB)));
+  const r = await completePendingLogout({ client: tab, storage: st, timeoutMs: 500, locks: null });
+  assert.deepEqual([r.status, r.reason], ["pending", "owner_unknown"]);
+  assert.equal(srv.logoutCalls().length, 0, "sin dueño conocido no hay ni una solicitud de logout");
+  assert.equal(storedUid(st), UB, "la sesion de B no se toca");
+  assert.ok(isLogoutPending(st), "el marcador sigue: acceso local invalidado");
+  // el acceso sigue invalidado: ni restauracion ni REST con esa sesion
+  assert.equal((await restoreStudentSession(tab, { role: "alumno", alumnoId: AB }, st)).reason, "logout_pending");
+  const probe = await tab.from("progreso").select("*");
+  assert.ok(probe.error);
+  assert.equal(srv.rest().length, 0);
+  // recuperacion segura: un login valido sustituye la sesion y borra el marcador
+  const ok = await loginStudent(tab, "b@t.com", "pw");
+  assert.equal(ok.ok, true);
+  assert.equal(isLogoutPending(st), false);
+  assert.equal(srv.logoutCalls().length, 0, "la recuperacion no revoco a nadie");
+  // sin sesion: el marcador sin dueño simplemente se cumple
+  const st2 = makeStorage(); globalThis.localStorage = st2;
+  st2.setItem(LOGOUT_PENDING_KEY, JSON.stringify({ v: 1, id: "h2", authUid: null }));
+  assert.equal((await completePendingLogout({ client: makeTab(st2, srv), storage: st2, timeoutMs: 500, locks: null })).reason, "session_absent");
+  assert.equal(isLogoutPending(st2), false);
 });
 
 // ── 4. Dos pestanas ─────────────────────────────────────────────────────────────────────────────────────
@@ -289,17 +318,146 @@ await test("4b. dos pestanas, orden inverso: el login (lento) toma el lock prime
   assert.equal(storedUid(st), UB);
 });
 
-await test("4c. el login no queda colgado si otra pestana retiene el lock demasiado tiempo (waitMs agotado): continua", async (st) => {
+await test("4c. Web Lock ocupado mas alla del plazo: el login NO se inicia (auth_busy, estado recuperable), nada se toca y al liberarse el reintento entra", async (st) => {
   const srv = makeServer(); const locks = makeFakeLocks();
   const tab = makeTab(st, srv);
+  const queue = [item(AA, "a1", 10), item(null, "u1", 5)];
+  await aLoggedOutOffline(st, srv, tab, { locks, queue });
+  const ps = createPendingSets({ storage: st, locks: null });
+  const keysBefore = Array.from(st.m.keys()).filter((k) => k.indexOf("it_pending_sync") === 0).sort();
+  const marker = st.getItem(LOGOUT_PENDING_KEY);
   let free; const hold = new Promise((r) => { free = r; });
-  const holder = runAuthTransition(() => hold, { locks, waitMs: 5000 });
+  const holder = runAuthTransition(() => hold, { locks, waitMs: 5000, storage: st }); // otra operacion Auth retiene el lock
   await sleep(10);
+  const tokensBefore = srv.log.filter((x) => x.path === "/auth/v1/token").length;
   const t0 = Date.now();
-  const r = await loginStudent(tab, "b@t.com", "pw", { locks, waitMs: 80 });
-  assert.equal(r.ok, true);
-  assert.ok(Date.now() - t0 < 3000);
+  const r = await loginStudent(tab, "b@t.com", "pw", { locks, waitMs: 120, storage: st });
+  assert.deepEqual([r.ok, r.reason], [false, "auth_busy"]);
+  assert.ok(Date.now() - t0 < 1500, "falla rapido, no se cuelga");
+  assert.equal(srv.log.filter((x) => x.path === "/auth/v1/token").length, tokensBefore, "NO se inicio el login (ninguna autenticacion)");
+  assert.equal(storedUid(st), UA, "la sesion residual no se toco");
+  assert.equal(st.getItem(LOGOUT_PENDING_KEY), marker, "el marcador sigue igual");
+  assert.deepEqual(Array.from(st.m.keys()).filter((k) => k.indexOf("it_pending_sync") === 0).sort(), keysBefore, "las series pendientes siguen intactas");
+  assert.equal(ps.list(AA).length, 1);
   free(); await holder;
+  const again = await loginStudent(tab, "b@t.com", "pw", { locks, waitMs: 2000, storage: st });
+  assert.equal(again.ok, true, "el reintento tras liberar el lock entra: " + JSON.stringify(again));
+  assert.equal(storedUid(st), UB);
+  assert.equal(isLogoutPending(st), false);
+  assert.equal(ps.list(AA).length, 1, "series conservadas tras el reintento");
+});
+
+await test("4d. un logout que tarda MAS que el plazo del login (>10 s equivalente): el login espera/falla recuperable y el signOut tardio NO borra a B", async (st) => {
+  const srv = makeServer(); const locks = makeFakeLocks();
+  const tab1 = makeTab(st, srv), tab2 = makeTab(st, srv);
+  await aLoggedOutOffline(st, srv, tab1, { locks, queue: [item(AA, "a1", 10)] });
+  srv.logout = "ok";
+  const logoutsBase = srv.logoutCalls().length; // incluye el intento fallido del logout offline
+  let release; srv.gates.logout = new Promise((r) => { release = r; });
+  const p1 = completePendingLogout({ client: tab1, storage: st, timeoutMs: 60, locks, waitMs: 5000 }); // el llamador se rinde (timeout) pero el SDK sigue
+  assert.equal((await p1).reason, "timeout");
+  _resetSessionLogoutForTests();
+  const r = await loginStudent(tab2, "b@t.com", "pw", { locks, waitMs: 150, storage: st });
+  assert.deepEqual([r.ok, r.reason], [false, "auth_busy"], "el login no continua sin exclusion mientras el signOut anterior sigue vivo");
+  assert.equal(storedUid(st), UA);
+  release(); // el cierre antiguo termina
+  await sleep(120);
+  assert.equal(srv.logoutCalls().slice(logoutsBase).filter((x) => x.uid === UA).length, 1, "el cierre antiguo termino con el token de A");
+  const again = await loginStudent(tab2, "b@t.com", "pw", { locks, waitMs: 2000, storage: st });
+  assert.equal(again.ok, true);
+  await sleep(150);
+  assert.equal(storedUid(st), UB, "B conserva la sesion: ningun signOut tardio la borro");
+  assert.ok(srv.logoutCalls().every((x) => x.uid === UA));
+  assert.equal(createPendingSets({ storage: st, locks: null }).list(AA).length, 1);
+});
+
+await test("4e. logout COLGADO en la red: el tope de red lo corta, libera la exclusion (sin bloqueo permanente) y el login entra sin que un signOut tardio borre a B", async (st) => {
+  const srv = makeServer(); const locks = makeFakeLocks();
+  const tab1 = makeTab(st, srv, { logoutTimeoutMs: 250 }), tab2 = makeTab(st, srv, { logoutTimeoutMs: 250 });
+  await aLoggedOutOffline(st, srv, tab1, { locks });
+  srv.logout = "hang"; // el servidor no responde jamas
+  const p1 = completePendingLogout({ client: tab1, storage: st, timeoutMs: 5000, locks, waitMs: 5000 });
+  await sleep(30);
+  _resetSessionLogoutForTests();
+  const t0 = Date.now();
+  const r = await loginStudent(tab2, "b@t.com", "pw", { locks, waitMs: 5000, storage: st });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const waited = Date.now() - t0;
+  assert.ok(waited >= 150 && waited < 3000, "espero el tope de red del logout (" + waited + " ms), no indefinidamente");
+  assert.equal((await p1).status, "pending");
+  await sleep(300);
+  assert.equal(storedUid(st), UB, "el signOut abortado no borro a B");
+});
+
+await test("4f. SIN Web Locks: lease en localStorage; si otra pestana opera, el login no empieza (auth_busy) y reintenta bien al terminar", async (st) => {
+  const srv = makeServer();
+  const tab1 = makeTab(st, srv), tab2 = makeTab(st, srv);
+  await aLoggedOutOffline(st, srv, tab1, { locks: null, queue: [item(AA, "a1", 10)] });
+  srv.logout = "ok";
+  let release; srv.gates.logout = new Promise((r) => { release = r; });
+  const p1 = completePendingLogout({ client: tab1, storage: st, timeoutMs: 5000, locks: null, waitMs: 5000, leasePollMs: 30 });
+  await sleep(150); // la pestana 1 tiene el lease y el signOut en curso
+  assert.ok(st.getItem("irontrack_auth_lease"), "lease publicado");
+  _resetSessionLogoutForTests(); // pestana 2
+  const tokensBefore = srv.log.filter((x) => x.path === "/auth/v1/token").length;
+  const r = await loginStudent(tab2, "b@t.com", "pw", { locks: null, waitMs: 200, storage: st, leasePollMs: 30 });
+  assert.deepEqual([r.ok, r.reason], [false, "auth_busy"]);
+  assert.equal(srv.log.filter((x) => x.path === "/auth/v1/token").length, tokensBefore, "no se inicio el login");
+  assert.equal(storedUid(st), UA);
+  release();
+  assert.equal((await p1).status, "completed");
+  assert.equal(st.getItem("irontrack_auth_lease"), null, "lease liberado");
+  const again = await loginStudent(tab2, "b@t.com", "pw", { locks: null, waitMs: 2000, storage: st, leasePollMs: 30 });
+  assert.equal(again.ok, true);
+  await sleep(100);
+  assert.equal(storedUid(st), UB);
+  assert.ok(srv.logoutCalls().every((x) => x.uid === UA));
+  assert.equal(createPendingSets({ storage: st, locks: null }).list(AA).length, 1);
+});
+
+await test("4g. SIN Web Locks: un lease abandonado (pestana muerta) vence solo; no hay bloqueo permanente", async (st) => {
+  const srv = makeServer(); const tab = makeTab(st, srv);
+  // lease vigente de una pestana que ya no existe: bloquea mientras no venza
+  st.setItem("irontrack_auth_lease", JSON.stringify({ id: "pestana-muerta", exp: Date.now() + 400 }));
+  const r1 = await loginStudent(tab, "b@t.com", "pw", { locks: null, waitMs: 100, storage: st, leasePollMs: 30 });
+  assert.deepEqual([r1.ok, r1.reason], [false, "auth_busy"]);
+  assert.equal(storedUid(st), null);
+  await sleep(450); // vence
+  const r2 = await loginStudent(tab, "b@t.com", "pw", { locks: null, waitMs: 1000, storage: st, leasePollMs: 30 });
+  assert.equal(r2.ok, true, "tras vencer el lease el login entra");
+  // lease ya vencido: entra de inmediato
+  const st2 = makeStorage(); globalThis.localStorage = st2;
+  st2.setItem("irontrack_auth_lease", JSON.stringify({ id: "x", exp: Date.now() - 1 }));
+  const r3 = await loginStudent(makeTab(st2, srv), "b@t.com", "pw", { locks: null, waitMs: 500, storage: st2, leasePollMs: 30 });
+  assert.equal(r3.ok, true);
+});
+
+await test("4h. tres operaciones Auth concurrentes en dos pestanas (cierre antiguo x2 + login): un solo /logout con el token de A y B queda con sesion", async (st) => {
+  const srv = makeServer(); const locks = makeFakeLocks();
+  const tab1 = makeTab(st, srv), tab2 = makeTab(st, srv);
+  await aLoggedOutOffline(st, srv, tab1, { locks, queue: [item(AA, "a1", 10), item(null, "u1", 5)] });
+  srv.logout = "ok";
+  const logoutsBase = srv.logoutCalls().length;
+  let release; srv.gates.logout = new Promise((r) => { release = r; });
+  const c1 = completePendingLogout({ client: tab1, storage: st, timeoutMs: 5000, locks, waitMs: 5000 });
+  await sleep(20);
+  _resetSessionLogoutForTests(); // pestana 2: dos operaciones en paralelo
+  const login2 = loginStudent(tab2, "b@t.com", "pw", { locks, waitMs: 5000, storage: st });
+  const c2 = completePendingLogout({ client: tab2, storage: st, timeoutMs: 5000, locks, waitMs: 5000 });
+  await sleep(40);
+  release();
+  const [rc1, rl, rc2] = await Promise.all([c1, login2, c2]);
+  assert.equal(rc1.status, "completed");
+  assert.equal(rl.ok, true, JSON.stringify(rl));
+  assert.ok(["none", "completed"].includes(rc2.status));
+  await sleep(80);
+  assert.equal(storedUid(st), UB);
+  const lg = srv.logoutCalls().slice(logoutsBase);
+  assert.equal(lg.length, 1, "un solo /logout: " + JSON.stringify(lg.map((x) => x.uid)));
+  assert.equal(lg[0].uid, UA);
+  assert.equal(isLogoutPending(st), false);
+  const ps = createPendingSets({ storage: st, locks: null });
+  assert.deepEqual([ps.list(AA).length, ps.listQuarantine().length], [1, 1], "series de A conservadas");
 });
 
 // ── 5. Entrenador con marcador pendiente ────────────────────────────────────────────────────────────────

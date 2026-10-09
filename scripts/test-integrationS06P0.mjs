@@ -137,7 +137,7 @@ await test("el marcador de logout pendiente no es una clave de cola ni empieza c
 function guardedFetch(net) { return createResidualTokenGuardFetch(createSharedReadOnlyFetch(net.fetch), { anonKey: ANON }); }
 
 await test("fetch del SDK con logout pendiente: /rest, /functions y /storage responden 401 sin red; /auth/v1 pasa con su token", async (st) => {
-  st.setItem(LOGOUT_PENDING_KEY, "{\"v\":1}");
+  st.setItem(LOGOUT_PENDING_KEY, JSON.stringify({ v: 1, authUid: UA }));
   const net = makeNet("ok"); const f = guardedFetch(net);
   for (const [method, path] of [["GET", "/rest/v1/progreso"], ["POST", "/rest/v1/progreso"], ["PATCH", "/rest/v1/alumnos"], ["DELETE", "/rest/v1/sesiones"], ["POST", "/functions/v1/update-alumno-password"], ["POST", "/storage/v1/object/fotos/x"], ["GET", "/storage/v1/object/fotos/x"]]) {
     const r = await f("https://x.supabase.co" + path, { method, headers: { Authorization: "Bearer residual", apikey: ANON } });
@@ -159,7 +159,7 @@ await test("fetch del SDK sin logout pendiente: transparente (no cambia Authoriz
 });
 
 await test("enlace compartido + logout pendiente: la lectura sale como ANONIMA (nunca con el token residual); toda escritura sigue bloqueada (403)", async (st) => {
-  st.setItem(LOGOUT_PENDING_KEY, "{\"v\":1}");
+  st.setItem(LOGOUT_PENDING_KEY, JSON.stringify({ v: 1, authUid: UA }));
   asShared();
   assert.equal(isSharedReadOnlyMode(), true);
   const net = makeNet("ok"); const f = guardedFetch(net);
@@ -176,7 +176,7 @@ await test("enlace compartido + logout pendiente: la lectura sale como ANONIMA (
 
 await test("cliente supabase-js REAL con sesion residual + logout pendiente: from().select() no sale a la red; en enlace compartido sale anonimo", async (st) => {
   st.setItem(AUTH_KEY, JSON.stringify(authSession(UA, NOW() + 3600)));
-  st.setItem(LOGOUT_PENDING_KEY, "{\"v\":1}");
+  st.setItem(LOGOUT_PENDING_KEY, JSON.stringify({ v: 1, authUid: UA }));
   const net = makeNet("ok");
   net.fetch = async (url, init) => { net.calls.push({ url: String(url), method: init && init.method, auth: new Headers(init && init.headers).get("authorization") }); return new Response("[]", { status: 200, headers: { "content-type": "application/json" } }); };
   const client = createClient("https://x.supabase.co", ANON, {
@@ -213,7 +213,7 @@ await test("resolutor REST propio: con marcador y enlace compartido solo lectura
   const auth = new GoTrueClient({ url: "http://auth.test", headers: {}, storageKey: AUTH_KEY, storage: st, persistSession: true, autoRefreshToken: false, fetch: net.fetch });
   const mk = (search) => createRestAuthResolver({ client: { auth }, storage: st, anonKey: ANON, getSearch: () => search });
   assert.equal((await mk("").resolve("progreso", "POST")).token, "at-1111");
-  st.setItem(LOGOUT_PENDING_KEY, "{\"v\":1}");
+  st.setItem(LOGOUT_PENDING_KEY, JSON.stringify({ v: 1, authUid: UA }));
   assert.equal((await mk("").resolve("progreso", "GET")).ok, false);
   const shared = await mk("?r=abc").resolve("sesiones?alumno_id=eq.1", "GET");
   assert.deepEqual([shared.ok, shared.kind, shared.token], [true, "anon", ANON]);
