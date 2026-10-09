@@ -13,6 +13,7 @@ import {
 } from "../lib/sessionLogout.js";
 import { restoreStudentSession, shouldSkipEntrenadorUpsert } from "../lib/studentIdentity.js";
 import { createPendingSets } from "../lib/pendingSets.js";
+import { makeFakeLocks } from "./_testLocks.mjs";
 import { decideRestAuth, createRestAuthResolver } from "../lib/restAuth.js";
 
 const require = createRequire(import.meta.url);
@@ -269,7 +270,7 @@ await test("cambio de alumno: A cierra sesion con series, entra B; lo de A queda
 
 // ── 6. Dos pestanas ─────────────────────────────────────────────────────────────────────────────────────
 
-await test("dos pestanas: el logout de una invalida a la otra; solo una completa signOut (Web Locks); la otra queda 'busy'", () => withGlobalStorage(makeStorage(), async function () {
+await test("dos pestanas: el logout de una invalida a la otra; solo una completa signOut (Web Lock exclusivo); la otra espera y no repite", () => withGlobalStorage(makeStorage(), async function () {
   const st = globalThis.localStorage;
   seedStudent(st, UID_A, ID_A);
   // Pestana A cierra sin red
@@ -281,9 +282,8 @@ await test("dos pestanas: el logout de una invalida a la otra; solo una completa
   assert.equal(isLogoutPending(st), true);
   assert.equal((await restoreStudentSession(tabB.client, { role: "alumno", alumnoId: ID_A }, st)).reason, "logout_pending");
 
-  // Web Locks simulado: el primero obtiene el lock, el segundo (ifAvailable) recibe null
-  let held = false;
-  const locks = { request: async (name, opts, cb) => { if (held) return cb(null); held = true; try { return await cb({ name }); } finally { held = false; } } };
+  // Web Locks simulado (exclusivo, FIFO): la pestana A cierra Auth con un servidor lento; la B espera su turno
+  const locks = makeFakeLocks();
   const slowFetchNet = makeNet("ok");
   const origFetch = slowFetchNet.fetch;
   let release;
@@ -293,11 +293,13 @@ await test("dos pestanas: el logout de una invalida a la otra; solo una completa
   const pA = completePendingLogout(depsA);
   await new Promise((r) => setTimeout(r, 20));
   _resetSessionLogoutForTests(); // otra pestana = otro modulo
-  const rB = await completePendingLogout(Object.assign(logoutDeps(st, netB), { locks }));
-  assert.equal(rB.status, "busy");
-  assert.equal(netB.calls.filter((c) => c.url.indexOf("/logout") >= 0).length, 0, "la segunda pestana no repite el signOut");
+  const pB = completePendingLogout(Object.assign(logoutDeps(st, netB), { locks, timeoutMs: 2000 }));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(netB.calls.filter((c) => c.url.indexOf("/logout") >= 0).length, 0, "la segunda pestana espera el lock y no repite el signOut");
   release();
   assert.equal((await pA).status, "completed");
+  assert.equal((await pB).status, "none", "al obtener el lock el marcador ya no existe");
+  assert.equal(netB.calls.filter((c) => c.url.indexOf("/logout") >= 0).length, 0);
   assert.equal(isLogoutPending(st), false);
   // La otra pestana ve que el SDK ya no tiene sesion (mismo almacenamiento)
   assert.equal((await tabB.client.auth.getSession()).data.session, null);

@@ -33,7 +33,8 @@ function dbRows() {
 function makeClient(opts) {
   const o = opts || {};
   const rows = o.rows || dbRows();
-  const log = { queries: [], signOuts: 0, signIns: [] };
+  const log = { queries: [], signOuts: 0, signIns: [], signOutScopes: [] };
+  let currentUid; // ultima sesion creada por signInWithPassword (getSession la devuelve salvo que opts.sessionUserId lo fije)
   const client = {
     log,
     auth: {
@@ -41,15 +42,16 @@ function makeClient(opts) {
         log.signIns.push(creds.email);
         if (o.signInError) return { data: { user: null, session: null }, error: { message: "Invalid login credentials" } };
         const uid = o.signInUserId === undefined ? UID_A : o.signInUserId;
+        currentUid = uid;
         return { data: { user: uid == null ? null : { id: uid, email: "whatever@x.com" }, session: { access_token: "x" } }, error: null };
       },
       async getSession() {
         if (o.getSessionThrows) throw new Error("boom");
         if (o.sessionError) return { data: { session: null }, error: { message: "err" } };
-        const uid = o.sessionUserId === undefined ? UID_A : o.sessionUserId;
+        const uid = o.sessionUserId === undefined ? (currentUid === undefined ? UID_A : currentUid) : o.sessionUserId;
         return { data: { session: uid == null ? null : { user: { id: uid } } }, error: null };
       },
-      async signOut() { log.signOuts++; return { error: null }; },
+      async signOut(opts) { log.signOuts++; log.signOutScopes.push(opts && opts.scope ? opts.scope : "global(default)"); return { error: null }; },
     },
     from(table) {
       const q = { table, cols: null, filters: [] };
@@ -103,6 +105,7 @@ await test("C. Auth correcto + ningun alumno con ese auth_uid -> fail-closed + s
   assert.equal(r.session, undefined);
   assert.equal(r.reason, "no_alumno_for_auth_uid");
   assert.equal(c.log.signOuts, 1);
+  assert.deepEqual(c.log.signOutScopes, ["local"], "el rechazo cierra SOLO la sesion local (nunca un signOut global)");
 });
 
 await test("C2. >1 filas / error / respuesta invalida / auth_uid distinto / signIn sin user.id -> fail-closed + signOut", async () => {

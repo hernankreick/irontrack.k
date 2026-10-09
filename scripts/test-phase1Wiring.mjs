@@ -69,4 +69,14 @@ await test("cableado en App.jsx: el unico vaciado de la cola antigua es la barre
 });
 
 
+await test("cableado P0-1/P1-1: todo inicio de sesion (alumno, entrenador y su signUp) pasa por signInReplacingResidual; el rechazo de identidad nunca es global", () => {
+  const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
+  const ident = readFileSync(new URL("../lib/studentIdentity.js", import.meta.url), "utf8");
+  assert.equal((app.match(/signInReplacingResidual\(\{\}, function \(\) \{/g) || []).length, 2, "signInWithPassword y signUp del entrenador");
+  assert.ok(!/await supabase\.auth\.signInWithPassword\(/.test(app) && !/await supabase\.auth\.signUp\(/.test(app), "ninguna autenticacion directa en App.jsx");
+  assert.ok(/signInReplacingResidual\(deps, function \(\) \{ return client\.auth\.signInWithPassword/.test(ident));
+  assert.ok(!/auth\.signOut\(\)/.test(ident), "ningun signOut sin scope (global) en studentIdentity.js");
+  assert.ok(/signOutIfCurrentUser\(client, String\(userId\)\)/.test(ident));
+});
+
 console.log("\n" + count + " tests ok");

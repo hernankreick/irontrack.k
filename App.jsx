@@ -17,7 +17,7 @@ import AlumnoRestTimerBar from './components/student/AlumnoRestTimerBar.jsx';
 import StudentMainView from './components/student/StudentMainView.jsx';
 import { useAlumnos } from './hooks/useAlumnos.js';
 import { loginStudent, restoreStudentSession, shouldSkipEntrenadorUpsert } from './lib/studentIdentity.js';
-import { performLogout, completePendingLogout, isLogoutPending, clearLogoutPending, enforceLogoutPending, LOGOUT_PENDING_KEY } from './lib/sessionLogout.js';
+import { performLogout, completePendingLogout, isLogoutPending, clearLogoutPending, enforceLogoutPending, signInReplacingResidual, LOGOUT_PENDING_KEY } from './lib/sessionLogout.js';
 import { createRestAuthResolver, AuthRequiredError } from './lib/restAuth.js';
 import { useAppShellUIState } from './hooks/useAppShellUIState.js';
 import { useCoachUIState } from './hooks/useCoachUIState.js';
@@ -3147,18 +3147,23 @@ function GymApp() {
                   setLoginError("No se pudo iniciar sesión con Supabase");
                   return;
                 }
-                var authLogin = await supabase.auth.signInWithPassword({
-                  email: loginEmailNorm,
-                  password: loginPass,
+                // Reemplaza una sesion residual de un logout pendiente sin quedar bloqueado por la barrera (lib/sessionLogout.js).
+                var authLogin = await signInReplacingResidual({}, function () {
+                  return supabase.auth.signInWithPassword({
+                    email: loginEmailNorm,
+                    password: loginPass,
+                  });
                 });
                 if (authLogin.error || !authLogin.data || !authLogin.data.session) {
                   console.error("[AUTH] signInWithPassword fallo; intentando migracion segura", authLogin.error || authLogin);
-                  var authSignup = await supabase.auth.signUp({
-                    email: loginEmailNorm,
-                    password: loginPass,
-                    options: {
-                      data: { nombre: "Entrenador", role: "entrenador" },
-                    },
+                  var authSignup = await signInReplacingResidual({}, function () {
+                    return supabase.auth.signUp({
+                      email: loginEmailNorm,
+                      password: loginPass,
+                      options: {
+                        data: { nombre: "Entrenador", role: "entrenador" },
+                      },
+                    });
                   });
                   if (authSignup.error) {
                     console.error("[AUTH] signUp migracion fallo", authSignup.error);
