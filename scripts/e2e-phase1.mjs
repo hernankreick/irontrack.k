@@ -55,6 +55,7 @@ function makeBackend() {
         entry.scope = url.searchParams.get("scope");
         if (st.logout === "abort") return route.abort("failed");
         if (st.logout === "500") return json(500, { msg: "internal" });
+        if (st.logout === "hang") await new Promise(() => {}); // el servidor no responde jamas (el cliente lo corta por su tope)
         if (st.logout === "slow") { await new Promise((r) => setTimeout(r, st.logoutDelayMs)); entry.doneAt = Date.now(); }
         return route.fulfill({ status: 204, headers: CORS });
       }
@@ -378,6 +379,97 @@ await test("E11 dos pestanas: una completa el logout antiguo (servidor LENTO) mi
   assert.equal(JSON.parse(await ls(p2, "it_session")).alumnoId, ID_B, "B conserva la sesion de la app");
   assert.ok(await authKey(p2), "y la sesion de Auth");
   assert.equal(await pendingMarker(p2), null);
+});
+
+// ── Carrera de autenticacion: un login nunca continua sin exclusion frente a un logout anterior ─────────────────
+
+const BUSY_MSG = "Se está cerrando la sesión anterior";
+const sessionRole = (page) => page.evaluate(() => { try { return JSON.parse(localStorage.getItem("it_session") || "null")?.role || null; } catch (e) { return null; } });
+const waitStudent = (page, timeout) => page.waitForFunction(() => { try { return JSON.parse(localStorage.getItem("it_session") || "null")?.role === "alumno"; } catch (e) { return false; } }, null, { timeout });
+const waitText = (page, text, timeout) => page.waitForFunction((t) => document.body.innerText.includes(t), text, { timeout });
+
+await test("E12 logout COLGADO (el servidor no responde): el tope de red lo corta (~7 s), el login de B espera y entra, y el signOut abortado no borra a B", async (ctx, be) => {
+  const p1 = await ctx.newPage();
+  await logoutAOffline(p1, be);
+  const aTokens = tokenOf(be, UID_A);
+  be.logout = "hang";
+  const nLogouts = be.log.filter((r) => r.path === "/auth/v1/logout").length;
+  await p1.evaluate(() => window.dispatchEvent(new Event("online"))); // la pestana 1 empieza a cerrar Auth: colgado
+  await new Promise((r) => setTimeout(r, 400));
+  const p2 = await ctx.newPage();
+  const t0 = Date.now();
+  await submitLogin(p2, "b@test.com", "pw");
+  await waitStudent(p2, 30000);
+  const elapsed = Date.now() - t0;
+  assert.equal(JSON.parse(await ls(p2, "it_session")).alumnoId, ID_B);
+  assert.ok(elapsed >= 5000, "el login espero al cierre colgado hasta su tope de red (" + elapsed + " ms)");
+  await p2.waitForTimeout(3000); // deja pasar cualquier signOut tardio
+  assert.equal(JSON.parse(await ls(p2, "it_session")).alumnoId, ID_B, "B conserva la sesion de la app");
+  assert.ok(await authKey(p2), "y la sesion de Auth");
+  assert.equal(await pendingMarker(p2), null);
+  const logouts = be.log.filter((r) => r.path === "/auth/v1/logout").slice(nLogouts);
+  assert.ok(logouts.length >= 1 && logouts.every((r) => aTokens.some((t) => r.auth.includes(t))), "todo /logout llevo el token de A");
+});
+
+await test("E13 Web Lock ocupado mas alla del plazo (12 s): el login NO se inicia, mensaje recuperable, series y marcador intactos; al liberarse el reintento entra", async (ctx, be) => {
+  const p1 = await ctx.newPage();
+  await login(p1, "a@test.com");
+  await p1.waitForTimeout(1200);
+  await seedQueue(p1, [{ exId: "a1", kg: 50, reps: 5, date: "1/10/2026", semana: 0, alumno_id: ID_A }, { exId: "u1", kg: 5, reps: 5, date: "1/10/2026", semana: 0 }]);
+  be.logout = "abort";
+  await uiLogout(p1);
+  await loginVisible(p1);
+  assert.ok(await pendingMarker(p1));
+  const before = await preserved(p1);
+  assert.deepEqual(before, { array: null, items: 1, quarantine: 1 });
+  // otra pestana retiene el Web Lock de transiciones Auth (operacion lenta o abandonada)
+  const holder = await ctx.newPage();
+  await holder.goto(BASE + "/");
+  await holder.evaluate(() => { navigator.locks.request("irontrack:auth-transition", { mode: "exclusive" }, () => new Promise((r) => { window.__releaseLock = r; })); });
+  await holder.waitForTimeout(300);
+  const p2 = await ctx.newPage();
+  const tokenReqs = () => be.log.filter((r) => r.path === "/auth/v1/token").length;
+  const tokensBefore = tokenReqs();
+  await submitLogin(p2, "b@test.com", "pw");
+  await waitText(p2, BUSY_MSG, 40000);
+  assert.equal(tokenReqs(), tokensBefore, "NO se inicio el login: ninguna autenticacion");
+  assert.equal(await sessionRole(p2), null);
+  assert.ok(await pendingMarker(p2), "el marcador sigue");
+  assert.deepEqual(await preserved(p2), before, "las series pendientes siguen intactas");
+  // se libera el lock y el usuario reintenta
+  await holder.evaluate(() => window.__releaseLock());
+  await p2.waitForTimeout(300);
+  await p2.click("text=INGRESAR");
+  await waitStudent(p2, 30000);
+  assert.equal(JSON.parse(await ls(p2, "it_session")).alumnoId, ID_B);
+  assert.equal(await pendingMarker(p2), null);
+  assert.deepEqual(await preserved(p2), before, "las series siguen intactas tras el reintento");
+});
+
+await test("E14 SIN Web Locks: lease en localStorage; un lease vivo ajeno impide iniciar (mensaje recuperable) y al vencer el reintento entra (sin bloqueo permanente)", async (ctx, be) => {
+  await ctx.addInitScript(() => { try { Object.defineProperty(navigator, "locks", { value: undefined, configurable: true }); } catch (e) {} });
+  const p1 = await ctx.newPage();
+  await logoutAOffline(p1, be);
+  const before = await preserved(p1);
+  // lease vigente de una pestana que no existe (se agota ~30 s despues)
+  await p1.evaluate(() => localStorage.setItem("irontrack_auth_lease", JSON.stringify({ id: "pestana-muerta", exp: Date.now() + 30000 })));
+  assert.equal(await p1.evaluate(() => typeof navigator.locks), "undefined", "el navegador de la prueba no tiene Web Locks");
+  const tokenReqs = () => be.log.filter((r) => r.path === "/auth/v1/token").length;
+  const tokensBefore = tokenReqs();
+  const t0 = Date.now();
+  await submitLogin(p1, "b@test.com", "pw");
+  await waitText(p1, BUSY_MSG, 40000);
+  assert.equal(tokenReqs(), tokensBefore, "NO se inicio el login mientras el lease ajeno estaba vivo");
+  assert.ok(await pendingMarker(p1));
+  assert.deepEqual(await preserved(p1), before, "series intactas");
+  // el lease vence solo; reintento
+  const remaining = 30000 - (Date.now() - t0);
+  if (remaining > 0) await p1.waitForTimeout(remaining + 500);
+  await p1.click("text=INGRESAR");
+  await waitStudent(p1, 30000);
+  assert.equal(JSON.parse(await ls(p1, "it_session")).alumnoId, ID_B);
+  assert.equal(await pendingMarker(p1), null);
+  assert.deepEqual(await preserved(p1), before);
 });
 
 await test("E6 recarga normal con sesion valida sigue restaurando al alumno (sin regresion online)", async (ctx, be) => {
