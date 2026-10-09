@@ -12,6 +12,7 @@ import {
   clearLogoutPending, enforceLogoutPending, _resetSessionLogoutForTests,
 } from "../lib/sessionLogout.js";
 import { restoreStudentSession, shouldSkipEntrenadorUpsert } from "../lib/studentIdentity.js";
+import { createPendingSets } from "../lib/pendingSets.js";
 import { decideRestAuth, createRestAuthResolver } from "../lib/restAuth.js";
 
 const require = createRequire(import.meta.url);
@@ -100,7 +101,7 @@ await test("logout ONLINE: acceso local invalidado antes de la red, signOut(loca
   const st = globalThis.localStorage;
   const net = makeNet("ok");
   seedStudent(st, UID_A, ID_A);
-  const pendingRaw = JSON.stringify([{ exId: "ex1", kg: 50, reps: 5, alumno_id: ID_A }]);
+  const pendingRaw = JSON.stringify([{ exId: "ex1", kg: 50, reps: 5, date: "1/10/2026", semana: 0, alumno_id: ID_A }]);
   st.setItem("it_pending_sync", pendingRaw);
   const order = [];
   const deps = logoutDeps(st, net, { onLocalInvalidated: () => order.push("ui:" + (st.getItem("it_session") === null ? "sin-sesion" : "CON-SESION") + "/net=" + net.calls.length) });
@@ -114,9 +115,12 @@ await test("logout ONLINE: acceso local invalidado antes de la red, signOut(loca
   const logoutCall = net.calls.find((c) => c.url.indexOf("/logout") >= 0);
   assert.ok(logoutCall && logoutCall.url.indexOf("scope=local") >= 0, "cierra SOLO este dispositivo");
   assert.ok(/Bearer at-1111/.test(logoutCall.auth || ""), "con el token del propio alumno");
-  // Todo it_* de acceso fuera; la cola de series conservada TAL CUAL (ni movida ni reescrita)
+  // Todo it_* de acceso fuera; la serie pendiente conservada por 1A: el array se traslada a la cola nueva con su dueño (A)
   ["it_session", "it_rt", "it_pg", "it_biometric_user", "it_onboard_done"].forEach((k) => assert.equal(st.getItem(k), null, k));
-  assert.equal(st.getItem("it_pending_sync"), pendingRaw);
+  assert.equal(st.getItem("it_pending_sync"), null, "el array antiguo ya no es enviable");
+  const ps = createPendingSets({ storage: st, locks: null });
+  assert.equal(ps.list(ID_A).length, 1, "la serie de A esta en la cola nueva");
+  assert.equal(ps.list(ID_A)[0].kg, 50);
 }));
 
 // ── 2. Logout offline / 3. Recarga / 4. Reconexion ──────────────────────────────────────────────────────
@@ -241,11 +245,10 @@ await test("beginLogout: si el marcador no cabe (cuota) igual invalida el acceso
 
 // ── 5. Cambio de alumno ─────────────────────────────────────────────────────────────────────────────────
 
-await test("cambio de alumno: A cierra sesion con series, B entra: la cola no se toca y nada sale bajo B (ver test-legacyFlushBarrier)", () => withGlobalStorage(makeStorage(), async function () {
+await test("cambio de alumno: A cierra sesion con series, entra B; lo de A queda en la cola nueva/cuarentena de 1A y nada sale bajo B", () => withGlobalStorage(makeStorage(), async function () {
   const st = globalThis.localStorage;
   seedStudent(st, UID_A, ID_A);
-  const queue = JSON.stringify([{ exId: "ex1", kg: 80, reps: 3, alumno_id: ID_A }, { exId: "ex0", kg: 10, reps: 3 }]);
-  st.setItem("it_pending_sync", queue);
+  st.setItem("it_pending_sync", JSON.stringify([{ exId: "ex1", kg: 80, reps: 3, date: "1/10/2026", semana: 0, alumno_id: ID_A }, { exId: "ex0", kg: 10, reps: 3, date: "1/10/2026", semana: 0 }]));
   await performLogout(logoutDeps(st, makeNet("offline")));
   // B inicia sesion (online): completion best-effort (falla), login OK, marcador reemplazado, limpieza de login
   _resetSessionLogoutForTests();
@@ -253,10 +256,15 @@ await test("cambio de alumno: A cierra sesion con series, B entra: la cola no se
   clearIronTrackStorageForNewLogin();
   clearLogoutPending(st);
   st.setItem("it_session", JSON.stringify({ role: "alumno", alumnoId: ID_B, authUid: UID_B }));
-  assert.equal(st.getItem("it_pending_sync"), queue, "login de B no toca la cola de A");
-  // Un logout posterior de B tampoco
+  const ps = createPendingSets({ storage: st, locks: null });
+  assert.equal(st.getItem("it_pending_sync"), null);
+  assert.equal(ps.list(ID_A).length, 1, "la serie con dueño A esta en la cola nueva");
+  assert.equal(ps.list(ID_B).length, 0, "B no hereda nada");
+  assert.equal(ps.listQuarantine().length, 1, "la de identidad desconocida va a cuarentena, sin atribuirse a nadie");
+  // Un logout posterior de B tampoco pierde nada
   await performLogout(logoutDeps(st, makeNet("ok")));
-  assert.equal(st.getItem("it_pending_sync"), queue);
+  assert.equal(ps.list(ID_A).length, 1);
+  assert.equal(ps.listQuarantine().length, 1);
 }));
 
 // ── 6. Dos pestanas ─────────────────────────────────────────────────────────────────────────────────────
@@ -380,7 +388,10 @@ await test("logout offline con token residual: NINGUNA operacion REST privada ni
   }
   // Enlace compartido tampoco usa nada mientras haya un logout pendiente
   const shared = createRestAuthResolver({ client: tab, storage: st, anonKey: "ANON", getSearch: () => "?r=abc" });
-  assert.deepEqual(await shared.resolve("sesiones?alumno_id=eq.1", "GET"), { ok: false, reason: "logout_pending" });
+  // Enlace compartido: el visitante es anonimo por diseno -> sus LECTURAS siguen, pero SIEMPRE con la anon key, nunca con el token residual
+  const sharedRead = await shared.resolve("sesiones?alumno_id=eq.1", "GET");
+  assert.deepEqual([sharedRead.ok, sharedRead.kind, sharedRead.token], [true, "anon", "ANON"]);
+  for (const method of ["POST", "PATCH", "DELETE"]) assert.deepEqual(await shared.resolve("progreso", method), { ok: false, reason: "logout_pending" }, method);
   assert.equal(net.calls.filter((c) => c.url.indexOf("/rest/v1") >= 0).length, 0, "no hubo ninguna llamada REST");
 }));
 

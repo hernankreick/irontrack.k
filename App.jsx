@@ -19,7 +19,6 @@ import { useAlumnos } from './hooks/useAlumnos.js';
 import { loginStudent, restoreStudentSession, shouldSkipEntrenadorUpsert } from './lib/studentIdentity.js';
 import { performLogout, completePendingLogout, isLogoutPending, clearLogoutPending, enforceLogoutPending, LOGOUT_PENDING_KEY } from './lib/sessionLogout.js';
 import { createRestAuthResolver, AuthRequiredError } from './lib/restAuth.js';
-import { flushLegacyPendingQueue } from './lib/legacyPendingFlush.js';
 import { useAppShellUIState } from './hooks/useAppShellUIState.js';
 import { useCoachUIState } from './hooks/useCoachUIState.js';
 import { useStudentUIState } from './hooks/useStudentUIState.js';
@@ -33,6 +32,7 @@ import {
   formatBibMuscleDisplay,
   isValidUuid,
 } from './lib/appHelpers.js';
+import { alumnosIdsKey } from './lib/coachAlumnosLoad.js';
 import { getYTVideoId } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
 import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVideoUrl, isValidHttpUrlString, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from './lib/exerciseResolve.js';
@@ -122,7 +122,9 @@ import CoachDesktopShellFrame from './components/layout/CoachDesktopShellFrame.j
 import OfflineSyncBanner from './components/layout/OfflineSyncBanner.jsx';
 import { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
-import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
+import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys, clearRoutineLocalKeysForAlumno } from './lib/irontrackLocalStorage.js';
+import { guardSharedWrites, isSharedReadOnlyMode, isWriteMethod } from './lib/sharedMode.js';
+import { flushLegacyPendingQueue } from './lib/legacyPendingFlush.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
 import { buildCoachGlobalSearchData } from './lib/coachGlobalSearchSelectors.js';
@@ -260,6 +262,11 @@ const getActiveSupabaseSession = restAuthResolver.getActiveSession;
 const resolveRestToken = restAuthResolver.resolve;
 
 const sbFetch = async (path, method="GET", body=null) => {
+  // Enlace compartido (?r=): solo lectura. Ningun metodo de escritura sale por este transporte (devuelve null, como un error).
+  if (isSharedReadOnlyMode() && isWriteMethod(method)) {
+    console.warn("[shared-readonly] escritura bloqueada:", method, path);
+    return null;
+  }
   var restAuth = await resolveRestToken(path, method);
   if (!restAuth.ok) {
     console.error("[AUTH] " + method + " " + String(path).split("?")[0] + " no enviada: " + restAuth.reason + " (sin fallback anonimo)");
@@ -287,8 +294,25 @@ const sbFetch = async (path, method="GET", body=null) => {
   return text ? JSON.parse(text) : null;
 };
 
+// Variante estricta: lanza ante error HTTP/red en vez de devolver null (no confundir error con "sin alumnos").
+const sbFetchStrict = async (path) => {
+  // Sin sesion Auth no hay fallback anonimo (lib/restAuth.js); esta variante lanza en vez de devolver null.
+  var restAuth = await resolveRestToken(path, "GET");
+  if (!restAuth.ok) throw new AuthRequiredError(restAuth.reason);
+  var accessToken = restAuth.token;
+  const r = await fetch(SB_URL+"/rest/v1/"+path, { method: "GET", headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json" } });
+  if(!r.ok) {
+    var errText = "";
+    try { errText = await r.text(); } catch (e) {}
+    throw new Error("[Supabase "+r.status+"] "+path+" "+(errText || r.statusText));
+  }
+  const text = await r.text();
+  return text ? JSON.parse(text) : [];
+};
+
 const sb = {
   getAlumnos: (entId) => sbFetch("alumnos?entrenador_id=eq."+entId+"&select=*"),
+  getAlumnosStrict: (entId) => sbFetchStrict("alumnos?entrenador_id=eq."+encodeURIComponent(entId)+"&select=*"),
   createAlumno: async (alumnoData) => {
     const { data, error } = await supabase.from("alumnos").insert([alumnoData]).select();
     if (error) console.error("[createAlumno]", error);
@@ -581,6 +605,10 @@ const sb = {
   },
 };
 
+// P0 Etapa 1A: en un enlace compartido (?r=) las escrituras de entrenamiento NO salen (solo lectura). Defensa en la capa de
+// datos ademas de la de la interfaz (startStudentWorkout, logSet, finalizarSesion). Ver lib/sharedMode.js.
+guardSharedWrites(sb);
+
 /**
  * ── Plan alumno: diagnóstico scroll / micro-saltos (Chrome mobile) ─────────────────
  * Se lee una vez al montar (sin setState). Para cambiar flags: localStorage + recarga.
@@ -698,7 +726,7 @@ function GymApp() {
 
   // ── useAlumnos ────────────────────────────────────────────────────────
   const {
-    alumnos, setAlumnos,
+    alumnos, setAlumnos, alumnosStatus, refrescarAlumnos, resetAlumnos,
     sesiones, setSesiones,
     alumnoActivo, setAlumnoActivo,
     alumnoSesiones, setAlumnoSesiones,
@@ -827,14 +855,8 @@ function GymApp() {
 
   const cargarSesionesGlobales = React.useCallback(async function(alumnosActuales) {
     var lista = alumnosActuales || alumnosActivosLimpios;
-    if(!lista || lista.length === 0) {
-      try {
-        var sbAlumnos = await sb.getAlumnos('entrenador_principal');
-        var clean = cleanActiveCoachAlumnos(sbAlumnos || [], ENTRENADOR_ID);
-        if(clean && clean.length > 0) { setAlumnos(clean); lista = clean; }
-        else return;
-      } catch(e) { return; }
-    }
+    // La lista de alumnos la carga solo cargarAlumnos; aca no se reconsulta (sin segundo escritor).
+    if(!lista || lista.length === 0) return;
     try {
       lista = cleanActiveCoachAlumnos(lista, ENTRENADOR_ID);
       var ids = lista.map(function(a){return a.id}).filter(function(id){return id && typeof id === 'string'});
@@ -858,21 +880,45 @@ function GymApp() {
     } catch(e) { console.error('[cargarSesionesGlobales]', e); }
   }, [alumnosActivosLimpios, ENTRENADOR_ID]);
 
+  // Refs para que el intervalo use siempre la version vigente (sin cierres obsoletos).
+  const cargarSesionesGlobalesRef = React.useRef(null);
+  cargarSesionesGlobalesRef.current = cargarSesionesGlobales;
+  const rutinasInicialesRef = React.useRef(null);
+  const alumnosActivosLimpiosRef = React.useRef(alumnosActivosLimpios);
+  alumnosActivosLimpiosRef.current = alumnosActivosLimpios;
+  const alumnosIdsClave = alumnosIdsKey(alumnosActivosLimpios);
+
+  // Cierre de sesion / cambio de usuario o rol: invalida consultas en vuelo y vuelve a vacio+idle.
+  useEffect(function() {
+    return function() { resetAlumnos(); };
+  }, [sessionData?.role, sessionData?.entrenadorId, resetAlumnos]);
+
+  // Carga inicial: solo pide rutinas y alumnos. Sesiones/rutinas por alumno se cargan abajo, con la lista vigente.
   useEffect(function() {
     if(sessionData && sessionData.role==='entrenador') {
-      var init = async function() {
-        var rutinasPromise = cargarRutinasEntrenador();
-        var sbAlumnos = cleanActiveCoachAlumnos(await sb.getAlumnos('entrenador_principal') || [], ENTRENADOR_ID);
-        setAlumnos(sbAlumnos);
-        if(sbAlumnos.length > 0) cargarSesionesGlobales(sbAlumnos);
-        await rutinasPromise;
-        if(sbAlumnos.length > 0) await cargarRutinasEntrenador(sbAlumnos);
-      };
-      init();
-      var intervalo = setInterval(function() { cargarSesionesGlobales(); }, 30000);
-      return function() { clearInterval(intervalo); };
+      rutinasInicialesRef.current = cargarRutinasEntrenador();
+      cargarAlumnos();
     }
-  }, [sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, cargarRutinasEntrenador]);
+  }, [sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, cargarRutinasEntrenador, cargarAlumnos]);
+
+  // Refresco y reintento automatico cada 30 s (refrescarAlumnos no abre otra consulta si hay una en vuelo).
+  useEffect(function() {
+    if(!sessionData || sessionData.role!=='entrenador') return;
+    var intervalo = setInterval(function() {
+      refrescarAlumnos();
+      if(cargarSesionesGlobalesRef.current) cargarSesionesGlobalesRef.current();
+    }, 30000);
+    return function() { clearInterval(intervalo); };
+  }, [sessionData?.role, sessionData?.entrenadorId, refrescarAlumnos]);
+
+  // Sesiones y rutinas con la lista vigente, cuando cambia el conjunto de alumnos (primera carga, altas, bajas,
+  // cambios hechos desde otro dispositivo). Una carga superada por otra no deja datos sin cargar.
+  useEffect(function() {
+    if(!sessionData || sessionData.role!=='entrenador' || !alumnosIdsClave) return;
+    var lista = alumnosActivosLimpiosRef.current;
+    cargarSesionesGlobales(lista);
+    Promise.resolve(rutinasInicialesRef.current).then(function() { return cargarRutinasEntrenador(lista); });
+  }, [sessionData?.role, alumnosIdsClave]);
 
   useEffect(function () {
     if (sessionData?.role !== "entrenador" || tab !== "alumnos") return;
@@ -1401,7 +1447,9 @@ function GymApp() {
 
   // ── Supabase Auth: fila mínima en `entrenadores` (id = auth.users.id) ──
   useEffect(function () {
-    if (!supabase) return;
+    // Enlace compartido (?r=): solo lectura. No se toca la tabla `entrenadores` aunque haya una sesion de Auth persistida
+    // de otra persona (por ejemplo un alumno que cerro sesion sin signOut).
+    if (!supabase || readOnly) return;
     var cancelled = false;
 
     function upsertEntrenador(user) {
@@ -1747,12 +1795,6 @@ function GymApp() {
   }, [timer?.endAt, es]);
   useEffect(() => { localStorage.setItem("it_week",String(currentWeek)); },[currentWeek]);
 
-  useEffect(() => {
-    if(!readOnly && sessionData?.role==="entrenador") {
-      cargarAlumnos();
-    }
-  }, [sessionData?.role]);
-
   // Refrescar rutinas del alumno desde Supabase siempre al cargar
   useEffect(() => {
     console.log('useEffect fired, alumnoId:', sessionData?.alumnoId);
@@ -2008,6 +2050,11 @@ function GymApp() {
   };
 
   const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe, weekOverride) => {
+    // Enlace compartido (?r=): solo lectura. No se registra ni en memoria ni en Supabase (defensa de la interfaz).
+    if (readOnly) {
+      toast2(es?'Modo solo lectura: iniciá sesión para registrar tu entrenamiento':'Read-only mode: sign in to log your workout');
+      return;
+    }
     const d = new Date().toLocaleDateString("es-AR");
     // Mismo criterio que al finalizar una sesión: si la rutina tiene una semana persistida
     // en el servidor, es la fuente de verdad por sobre el currentWeek local (que puede
@@ -2026,7 +2073,8 @@ function GymApp() {
       return {...prev,[exId]:ex};
     });
     // Guardar en Supabase — si offline, guardar en cola local
-    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
+    // El alumno sale de la sesion propia; el alumnoId de un enlace compartido ya NO se usa para escribir (solo lectura).
+    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
     if(alumnoIdSync) {
       if(!isOnline) {
         const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, alumnoIdSync);
@@ -2232,6 +2280,11 @@ function GymApp() {
     : getWeekCompletionGate({});
   // Defensa central: TODO inicio de entrenamiento del alumno pasa por aqui; con el gate activo no se ejecuta setSession.
   const startStudentWorkout = function (nextSession) {
+    // Enlace compartido (?r=): solo lectura, no se puede iniciar un entrenamiento.
+    if (readOnly) {
+      toast2(es ? "Modo solo lectura: iniciá sesión para registrar tu entrenamiento" : "Read-only mode: sign in to log your workout");
+      return false;
+    }
     if (weekGate.active) return false;
     setSession(nextSession);
     return true;
@@ -2555,27 +2608,6 @@ function GymApp() {
     } catch (e) {}
     await cargarSesionesGlobales();
     return true;
-  }
-
-  function clearRoutineLocalKeysForAlumno(alumnoId, rutinaId) {
-    try {
-      localStorage.removeItem('it_last_week_advance_date');
-      var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
-      var cd = JSON.parse(localStorage.getItem("it_cd") || "[]");
-      if (Array.isArray(cd)) {
-        localStorage.setItem("it_cd", JSON.stringify(cd.filter(function (k) {
-          var text = String(k);
-          return !((rid && text.indexOf(rid) >= 0) || text.indexOf(String(alumnoId)) >= 0);
-        })));
-      }
-      for (var i = localStorage.length - 1; i >= 0; i--) {
-        var key = localStorage.key(i);
-        if (!key || key.indexOf("it_") !== 0) continue;
-        if (key.indexOf(String(alumnoId)) >= 0 || (rid && key.indexOf(rid) >= 0)) {
-          localStorage.removeItem(key);
-        }
-      }
-    } catch (e) {}
   }
 
   async function resetAlumnoRoutineHistory(alumno, rutina) {
@@ -3401,6 +3433,7 @@ function GymApp() {
       coachDesktop1024: coachDesktop1024,
       dashboardProps: {
         alumnos: alumnosActivosLimpios,
+        alumnosStatus: alumnosStatus,
         sesionesGlobales: sesionesGlobalesLimpias,
         mensajesEntrenadorPendientes: mensajesEntrenadorPendientes,
         progresoGlobal: progresoGlobalLimpio,
@@ -3471,7 +3504,8 @@ function GymApp() {
         alumnoActivo: alumnoActivo,
         alumnoProgreso: alumnoProgreso,
         alumnoSesiones: alumnoSesiones,
-        alumnos: alumnos,
+        alumnos: alumnosActivosLimpios,
+        alumnosStatus: alumnosStatus,
         bgCard: bgCard,
         bgSub: bgSub,
         border: border,
@@ -4212,7 +4246,7 @@ function GymApp() {
           </div>
         )}
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
-        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
+        <ChatFlotante readOnly={readOnly} darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
       )}
       <AppShellModals
         welcomeProps={{

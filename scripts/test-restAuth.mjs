@@ -51,9 +51,15 @@ await test("una tabla parecida no se cuela: el nombre debe coincidir exacto", ()
   assert.equal(decideRestAuth({ ...base, path: "/config?id=eq.pagos" }).ok, true);
 });
 
-await test("logout pendiente: ni siquiera el token residual del SDK ni el acceso anonimo de arranque/compartido", () => {
-  for (const extra of [{ session: SESSION }, { path: "config?id=eq.pagos" }, { sharedLink: true }]) {
+await test("logout pendiente: ni el token residual ni el acceso anonimo de arranque; el enlace compartido solo LEE y siempre como anon", () => {
+  for (const extra of [{ session: SESSION }, { path: "config?id=eq.pagos" }]) {
     assert.deepEqual(decideRestAuth({ ...base, ...extra, logoutPending: true }), { ok: false, reason: "logout_pending" });
+  }
+  // enlace compartido + logout pendiente: lectura anonima (el token residual NO se usa: kind 'anon', nunca 'user')
+  assert.deepEqual(decideRestAuth({ ...base, session: SESSION, sharedLink: true, logoutPending: true }), { ok: true, kind: "anon" });
+  assert.deepEqual(decideRestAuth({ ...base, session: SESSION, sharedLink: true, method: "HEAD", logoutPending: true }), { ok: true, kind: "anon" });
+  for (const method of ["POST", "PATCH", "DELETE", "PUT"]) {
+    assert.deepEqual(decideRestAuth({ ...base, session: SESSION, sharedLink: true, method, logoutPending: true }), { ok: false, reason: "logout_pending" }, method);
   }
 });
 

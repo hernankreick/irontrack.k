@@ -2,7 +2,8 @@ import React from 'react';
 import { Chat } from './Chat.jsx';
 import { Ic } from './Ic.jsx';
 
-export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode, es}) {
+// readOnly (enlace compartido ?r=): el chat se puede leer pero no se escribe ni se marcan mensajes como leidos.
+export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode, es, readOnly}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bgCard = _dm?"#162234":"#FFFFFF";
   const border = _dm?"#2D4057":"#E2E8F0";
@@ -33,7 +34,7 @@ export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode
       if(!prev) {
         // ✅ Al abrir: marcar como leídos en Supabase Y limpiar badge
         setUnread(0);
-        if(sb.marcarMensajesLeidos) {
+        if(!readOnly && sb.marcarMensajesLeidos) {
           sb.marcarMensajesLeidos(alumnoId, esEntrenador);
         }
       }
@@ -55,7 +56,7 @@ export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode
             <div style={{fontSize:15,fontWeight:800,color:textMain}}><Ic name="message-circle" size={18}/> Chat con Entrenador</div>
             <button onClick={()=>setAbierto(false)} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer"}}><Ic name="x" size={16}/></button>
           </div>
-          <Chat darkMode={darkMode} _dm={_dm} alumnoId={alumnoId} alumnoNombre={alumnoNombre} esEntrenador={esEntrenador} sb={sb} es={es}/>
+          <Chat darkMode={darkMode} _dm={_dm} alumnoId={alumnoId} alumnoNombre={alumnoNombre} esEntrenador={esEntrenador} sb={sb} es={es} readOnly={readOnly}/>
         </div>
       )}
       <button type="button" onClick={toggleChat} style={{position:"fixed",bottom:fabBottom,right:16,background:"#2563EB",color:"#fff",border:"none",borderRadius:"50%",width:40,height:40,fontSize:15,cursor:"pointer",zIndex:155,boxShadow:"0 4px 12px rgba(239,68,68,0.4)",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent",boxSizing:"border-box"}}>

@@ -37,7 +37,7 @@ await test("cableado en App.jsx: ninguna llamada REST propia cae a SB_KEY como B
   // El unico lugar que puede producir el token anonimo es resolveRestToken (decideRestAuth)
   const bearerFallbacks = app.split("\n").filter((l) => /access_token\s*\?[^:]*:\s*SB_KEY/.test(l));
   assert.deepEqual(bearerFallbacks, [], "queda un fallback silencioso a SB_KEY: " + bearerFallbacks.join(" | "));
-  assert.equal((app.match(/await resolveRestToken\(/g) || []).length, 3, "sbFetch, deleteAlumno, marcarMensajesLeidos");
+  assert.equal((app.match(/await resolveRestToken\(/g) || []).length, 4, "sbFetch, sbFetchStrict (1A), deleteAlumno, marcarMensajesLeidos");
   // El token anonimo solo lo entrega el resolutor de lib/restAuth.js (decideRestAuth); la sesion Auth tambien pasa por el
   // (con un logout pendiente getActiveSession devuelve null aunque el SDK conserve el token residual)
   assert.ok(/const restAuthResolver = createRestAuthResolver\(\{/.test(app) && /anonKey: SB_KEY/.test(app));
@@ -48,7 +48,7 @@ await test("cableado en App.jsx: ninguna llamada REST propia cae a SB_KEY como B
   assert.ok(/sin fallback anonimo/.test(app) && /throw new AuthRequiredError\(restAuth\.reason\)/.test(app));
   // No hay otras llamadas fetch directas a /rest/v1 con credenciales propias
   const directRest = (app.match(/fetch\(SB_URL\s*\+\s*"\/rest\/v1\//g) || []).length;
-  assert.equal(directRest, 3, "sbFetch + deleteAlumno + marcarMensajesLeidos");
+  assert.equal(directRest, 4, "sbFetch + sbFetchStrict + deleteAlumno + marcarMensajesLeidos");
 });
 
 await test("cableado: con un logout pendiente el arranque no adopta, lee ni escribe con la sesion Auth residual", () => {

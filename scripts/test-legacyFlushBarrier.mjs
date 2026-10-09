@@ -13,6 +13,7 @@ import { buildPendingProgressItem } from "../lib/workoutSession.js";
 import { clearAllIronTrackPrefixedKeys, clearIronTrackStorageForNewLogin } from "../lib/irontrackLocalStorage.js";
 import { performLogout, completePendingLogout, clearLogoutPending, _resetSessionLogoutForTests } from "../lib/sessionLogout.js";
 import { createRestAuthResolver } from "../lib/restAuth.js";
+import { createPendingSets } from "../lib/pendingSets.js";
 
 const require = createRequire(import.meta.url);
 const { GoTrueClient } = require("@supabase/auth-js");
@@ -129,26 +130,29 @@ await test("cuota llena en logout y login: la cola queda intacta y sigue sin pod
 
 // ── A cierra sesion y entra B ───────────────────────────────────────────────────────────────────────────
 
-await test("A cierra sesion y entra B: nada de A sale bajo B; cuando A vuelve, lo suyo sale con SU id y lo desconocido sigue retenido", async (st) => {
+await test("A cierra sesion y entra B (con 1A integrada): la cola antigua se traslada con su dueño; B no envia nada de A; B envia lo suyo", async (st) => {
   const a1 = stamped(A, "bp", 60), a2 = stamped(A, "sq", 100), u1 = unknown("dl", 120);
   st.setItem(KEY, JSON.stringify([a1, u1, a2]));
   st.setItem("it_session", JSON.stringify({ role: "alumno", alumnoId: A }));
-  clearAllIronTrackPrefixedKeys(); // logout de A
+  clearAllIronTrackPrefixedKeys(); // logout de A  (1A: preserveLegacyPendingQueue)
   clearIronTrackStorageForNewLogin(); // login de B
   st.setItem("it_session", JSON.stringify({ role: "alumno", alumnoId: B }));
+  const ps = createPendingSets({ storage: st, locks: null });
+  assert.equal(st.getItem(KEY), null, "el array antiguo ya no existe: nada que el vaciado antiguo pueda enviar");
+  assert.deepEqual([ps.list(A).length, ps.list(B).length, ps.listQuarantine().length], [2, 0, 1]);
   const sent = [];
   const outB = await flushLegacyPendingQueue({ alumnoId: B, send: okSender(sent) });
   assert.equal(sent.length, 0);
-  assert.deepEqual([outB.withheldForeign, outB.withheldUnknown], [2, 1]);
-  // B registra una serie propia offline; no arrastra las de A
-  const q = queue(st); q.push(stamped(B, "ohp", 40)); st.setItem(KEY, JSON.stringify(q));
+  assert.equal(outB.reason, "empty");
+  // B registra una serie propia offline (logSet sigue usando el array antiguo hasta la Etapa 1B)
+  st.setItem(KEY, JSON.stringify([stamped(B, "ohp", 40)]));
   await flushLegacyPendingQueue({ alumnoId: B, send: okSender(sent) });
   assert.deepEqual(sent.map((p) => [p.alumno_id, p.ejercicio_id]), [[B, "ohp"]]);
-  // vuelve A
+  // vuelve A: el vaciado antiguo NO toca la cola nueva (la sincronizacion de esas series es la Etapa 1B)
   const sentA = [];
   await flushLegacyPendingQueue({ alumnoId: A, send: okSender(sentA) });
-  assert.deepEqual(sentA.map((p) => [p.alumno_id, p.ejercicio_id]).sort(), [[A, "bp"], [A, "sq"]]);
-  assert.deepEqual(queue(st), [u1], "solo queda la de identidad desconocida, intacta");
+  assert.equal(sentA.length, 0);
+  assert.equal(ps.list(A).length, 2, "las series de A siguen intactas en la cola nueva");
 });
 
 // ── Logout offline con token residual / reconexion ──────────────────────────────────────────────────────
@@ -182,6 +186,9 @@ await test("logout offline con token residual + reconexion: el envio de la cola 
 
   await performLogout({ client, storage: st, clearLocal: clearAllIronTrackPrefixedKeys, timeoutMs: 300, locks: null });
   assert.ok(st.getItem(AUTH_KEY), "token residual presente");
+  assert.equal(createPendingSets({ storage: st, locks: null }).list(A).length, 2, "1A traslado las series de A a su cola nueva");
+  // Una pestana con codigo viejo (o un estado 'kept') vuelve a dejar el array antiguo: la barrera sigue protegiendolo
+  st.setItem(KEY, raw);
   // 1. Sin it_session no hay identidad, y aunque un vaciado forzado indicara A, el resolutor deniega por el marcador
   assert.equal((await flushLegacyPendingQueue({ alumnoId: null, send })).reason, "no_identity");
   const forced = await flushLegacyPendingQueue({ alumnoId: A, send });

@@ -10,6 +10,7 @@ import GlobalCreateMenu from "./GlobalCreateMenu.jsx";
 import GlobalSearch from "./GlobalSearch.jsx";
 import CoachNotificationCenter from "./CoachNotificationCenter.jsx";
 import ProgresoView from "./ProgresoView.jsx";
+import { ALUMNOS_STATUS, alumnosEmptyKind, alumnosRefreshFailed } from "../lib/coachAlumnosLoad.js";
 import CoachActiveStudentsCard from "./coach/CoachActiveStudentsCard.jsx";
 import CoachDashboardAttentionCard from "./coach/CoachDashboardAttentionCard.jsx";
 import CoachDashboardSummaryGrid from "./coach/CoachDashboardSummaryGrid.jsx";
@@ -582,6 +583,7 @@ function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, 
 export default function CoachDashboard({
   activeNav = "dashboard",
   alumnos = [],
+  alumnosStatus,
   sesionesGlobales = [],
   mensajesEntrenadorPendientes = [],
   progresoGlobal = {},
@@ -1305,16 +1307,27 @@ export default function CoachDashboard({
             isMobile={isMobile}
           />
 
+          {alumnosRefreshFailed(alumnosStatus, alumnos.length) && (
+            <div role="status" style={{ fontSize: 12, color: dashMuted, padding: "0 4px" }}>
+              {M(lang, "No pudimos actualizar tus alumnos. Reintentamos automáticamente; mostramos los últimos datos.", "We couldn't refresh your athletes. Retrying automatically; showing the latest data.", "Não foi possível atualizar seus alunos. Tentando de novo; mostrando os últimos dados.")}
+            </div>
+          )}
           <CoachActiveStudentsCard
             title={M(lang, "Alumnos activos", "Active athletes", "Alunos ativos")}
             seeAllLabel={M(lang, "Ver todos →", "See all →", "Ver todos →")}
             onSeeAll={onRevisarAlumnos}
-            emptyText={M(
-              lang,
-              "Todavía no tenés alumnos cargados. Agregá alumnos desde Alumnos o con «Crear».",
-              "No athletes yet. Add them from Athletes or «Create».",
-              "Ainda não há alunos. Adicione em Alunos ou em «Criar»."
-            )}
+            emptyText={
+              alumnosEmptyKind(alumnosStatus || ALUMNOS_STATUS.READY, alumnos.length) === "loading"
+                ? M(lang, "Cargando alumnos…", "Loading athletes…", "Carregando alunos…")
+                : alumnosEmptyKind(alumnosStatus || ALUMNOS_STATUS.READY, alumnos.length) === "error"
+                  ? M(lang, "No pudimos cargar tus alumnos. Reintentá desde Alumnos.", "We couldn't load your athletes. Retry from Athletes.", "Não foi possível carregar seus alunos. Tente em Alunos.")
+                  : M(
+                    lang,
+                    "Todavía no tenés alumnos cargados. Agregá alumnos desde Alumnos o con «Crear».",
+                    "No athletes yet. Add them from Athletes or «Create».",
+                    "Ainda não há alunos. Adicione em Alunos ou em «Criar»."
+                  )
+            }
             isMobile={isMobile}
             mobileRows={activeStudentsMobileRows}
             desktopRows={activeStudentsDesktopRows}
