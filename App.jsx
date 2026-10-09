@@ -120,7 +120,7 @@ import OfflineSyncBanner from './components/layout/OfflineSyncBanner.jsx';
 import { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys, clearRoutineLocalKeysForAlumno } from './lib/irontrackLocalStorage.js';
-import { guardSharedWrites } from './lib/sharedMode.js';
+import { guardSharedWrites, isSharedReadOnlyMode, isWriteMethod } from './lib/sharedMode.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
 import { buildCoachGlobalSearchData } from './lib/coachGlobalSearchSelectors.js';
@@ -258,6 +258,11 @@ async function getActiveSupabaseSession() {
 }
 
 const sbFetch = async (path, method="GET", body=null) => {
+  // Enlace compartido (?r=): solo lectura. Ningun metodo de escritura sale por este transporte (devuelve null, como un error).
+  if (isSharedReadOnlyMode() && isWriteMethod(method)) {
+    console.warn("[shared-readonly] escritura bloqueada:", method, path);
+    return null;
+  }
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
   const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json", "Prefer": "return=representation" } };
@@ -1361,7 +1366,9 @@ function GymApp() {
 
   // ── Supabase Auth: fila mínima en `entrenadores` (id = auth.users.id) ──
   useEffect(function () {
-    if (!supabase) return;
+    // Enlace compartido (?r=): solo lectura. No se toca la tabla `entrenadores` aunque haya una sesion de Auth persistida
+    // de otra persona (por ejemplo un alumno que cerro sesion sin signOut).
+    if (!supabase || readOnly) return;
     var cancelled = false;
 
     function upsertEntrenador(user) {
@@ -4100,7 +4107,7 @@ function GymApp() {
           </div>
         )}
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
-        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
+        <ChatFlotante readOnly={readOnly} darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
       )}
       <AppShellModals
         welcomeProps={{

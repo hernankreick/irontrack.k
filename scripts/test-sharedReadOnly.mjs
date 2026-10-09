@@ -15,9 +15,12 @@ import {
   SHARED_BLOCKED_WRITES_REJECT,
   SHARED_BLOCKED_WRITES_RESOLVE_NULL,
   SharedReadOnlyError,
+  createSharedReadOnlyFetch,
   guardSharedWrites,
   guardedWrite,
+  isBlockedSharedRequest,
   isSharedReadOnlyMode,
+  isWriteMethod,
 } from "../lib/sharedMode.js";
 
 let count = 0;
@@ -26,7 +29,7 @@ const tests = [];
 function test(name, fn) { tests.push({ name, fn }); }
 
 const ALL_WRITES = SHARED_BLOCKED_WRITES_RESOLVE_NULL.concat(SHARED_BLOCKED_WRITES_REJECT);
-const READS = ["getProgreso", "getSesiones", "getRutinas", "getFotos", "getUltimaSesion", "getSesionesByAlumnoRutinaSemana"];
+const READS = ["getProgreso", "getSesiones", "getRutinas", "getFotos", "getUltimaSesion", "getSesionesByAlumnoRutinaSemana", "getMensajes", "getNota", "getConfig"];
 
 function fakeApi() {
   const calls = [];
@@ -136,7 +139,7 @@ function bodyAfter(text, signature, length) {
 }
 
 test("cableado: la capa de datos `sb` se protege con guardSharedWrites(sb) justo despues de definirse", () => {
-  assert.match(app, /import \{ guardSharedWrites \} from '\.\/lib\/sharedMode\.js'/);
+  assert.match(app, /import \{ guardSharedWrites, isSharedReadOnlyMode, isWriteMethod \} from '\.\/lib\/sharedMode\.js'/);
   const sbEnd = app.indexOf("\nconst sb = {");
   assert.ok(sbEnd > 0);
   const callAt = app.indexOf("guardSharedWrites(sb);");
@@ -177,6 +180,172 @@ test("cableado: finalizarSesion no escribe en modo compartido y se elimino la es
 test("cableado: las lecturas del enlace compartido (rutinas, sesiones) siguen en App.jsx", () => {
   assert.match(app, /sb\.getRutinas\(decoded\.alumnoId\)/);
   assert.match(app, /sb\.getSesiones\(decoded\.alumnoId\)/);
+});
+
+
+// ── lista COMPLETA de escrituras de sb ───────────────────────────────────────
+function sbTopLevelKeys() {
+  const start = app.indexOf("\nconst sb = {");
+  const end = app.indexOf("\n};\n", start);
+  const block = app.slice(start, end);
+  const keys = [];
+  for (const m of block.matchAll(/^  ([A-Za-z0-9_]+): /gm)) keys.push(m[1]);
+  return keys;
+}
+
+test("sb: TODA funcion de escritura (add/create/update/delete/set/save/marcar/reconcile) esta en las listas protegidas", () => {
+  const keys = sbTopLevelKeys();
+  assert.ok(keys.length > 30, "se esperaban las funciones de sb (" + keys.length + ")");
+  const writers = keys.filter((k) => /^(add|create|update|delete|set|save|marcar|reconcile)/.test(k));
+  const guarded = new Set(ALL_WRITES);
+  const missing = writers.filter((k) => !guarded.has(k));
+  assert.deepEqual(missing, [], "escrituras de sb sin proteger: " + missing.join(", "));
+});
+
+test("sb: las listas protegidas no nombran funciones que no existen (sin entradas obsoletas)", () => {
+  const keys = new Set(sbTopLevelKeys());
+  const stale = ALL_WRITES.filter((k) => !keys.has(k));
+  assert.deepEqual(stale, []);
+});
+
+test("sb: ninguna LECTURA queda en las listas de escritura", () => {
+  for (const r of ["getProgreso", "getSesiones", "getRutinas", "getFotos", "getMensajes", "getNota", "getConfig", "getAlumnos"]) {
+    assert.equal(ALL_WRITES.includes(r), false, r);
+  }
+});
+
+// ── transporte ───────────────────────────────────────────────────────────────
+test("transporte: isWriteMethod distingue lecturas de escrituras", () => {
+  for (const m of ["POST", "PATCH", "PUT", "DELETE", "post", "patch"]) assert.equal(isWriteMethod(m), true, m);
+  for (const m of ["GET", "HEAD", "OPTIONS", "get", undefined, null]) assert.equal(isWriteMethod(m), false, String(m));
+});
+
+test("transporte: isBlockedSharedRequest bloquea escrituras a datos/funciones/almacenamiento y deja pasar Auth y lecturas", () => {
+  const H = "https://abc.supabase.co";
+  for (const [m, u] of [
+    ["POST", H + "/rest/v1/progreso"], ["PATCH", H + "/rest/v1/alumnos?id=eq.1"], ["DELETE", H + "/rest/v1/fotos?id=eq.2"],
+    ["PUT", H + "/rest/v1/x"], ["POST", H + "/rest/v1/rpc/algo"], ["POST", H + "/functions/v1/update-alumno-password"],
+    ["POST", H + "/storage/v1/object/b/f"], ["DELETE", H + "/storage/v1/object/b/f"],
+  ]) assert.equal(isBlockedSharedRequest(m, u), true, m + " " + u);
+  for (const [m, u] of [
+    ["GET", H + "/rest/v1/progreso?select=*"], ["HEAD", H + "/rest/v1/progreso"], ["GET", H + "/storage/v1/object/public/b/f"],
+    ["POST", H + "/auth/v1/token?grant_type=refresh_token"], ["POST", H + "/auth/v1/logout"], ["GET", H + "/auth/v1/user"],
+    ["POST", "https://otro.example.com/api"],
+  ]) assert.equal(isBlockedSharedRequest(m, u), false, m + " " + u);
+});
+
+test("transporte: createSharedReadOnlyFetch en modo compartido NO toca la red para escrituras y responde 403", async () => {
+  const sent = [];
+  const base = async (input, init) => { sent.push([String((init && init.method) || "GET"), String(input)]); return new Response("[]", { status: 200 }); };
+  const f = createSharedReadOnlyFetch(base, { isReadOnly: () => true });
+  const H = "https://abc.supabase.co";
+  for (const [m, u] of [["POST", "/rest/v1/progreso"], ["PATCH", "/rest/v1/alumnos"], ["DELETE", "/rest/v1/fotos"], ["POST", "/functions/v1/f"], ["POST", "/storage/v1/o"]]) {
+    const r = await f(H + u, { method: m, body: "{}" });
+    assert.equal(r.status, 403, m + u);
+    assert.equal(r.headers.get("X-IronTrack-Blocked"), "shared-read-only");
+    assert.equal((await r.json()).code, "shared_read_only");
+  }
+  assert.deepEqual(sent, []);
+});
+
+test("transporte: en modo compartido las lecturas y Auth siguen pasando (se puede ver la info y refrescar el token)", async () => {
+  const sent = [];
+  const base = async (input, init) => { sent.push([String((init && init.method) || "GET"), String(input)]); return new Response("[]", { status: 200 }); };
+  const f = createSharedReadOnlyFetch(base, { isReadOnly: () => true });
+  const H = "https://abc.supabase.co";
+  await f(H + "/rest/v1/rutinas?select=*");
+  await f(H + "/rest/v1/progreso", { method: "HEAD" });
+  await f(H + "/auth/v1/token?grant_type=refresh_token", { method: "POST", body: "{}" });
+  assert.equal(sent.length, 3);
+});
+
+test("transporte: tambien bloquea cuando la solicitud llega como objeto Request", async () => {
+  const sent = [];
+  const base = async (input) => { sent.push(String(input.url || input)); return new Response("[]"); };
+  const f = createSharedReadOnlyFetch(base, { isReadOnly: () => true });
+  const r = await f(new Request("https://abc.supabase.co/rest/v1/mensajes", { method: "POST", body: "{}" }));
+  assert.equal(r.status, 403);
+  assert.deepEqual(sent, []);
+});
+
+test("transporte: fuera del modo compartido todo pasa igual (entrenador y alumnos autenticados no cambian)", async () => {
+  const sent = [];
+  const base = async (input, init) => { sent.push([String((init && init.method) || "GET"), String(input)]); return new Response("[]", { status: 201 }); };
+  const f = createSharedReadOnlyFetch(base, { isReadOnly: () => false });
+  const H = "https://abc.supabase.co";
+  for (const [m, u] of [["POST", "/rest/v1/progreso"], ["PATCH", "/rest/v1/alumnos"], ["DELETE", "/rest/v1/fotos"], ["POST", "/functions/v1/f"], ["GET", "/rest/v1/x"]]) {
+    const r = await f(H + u, { method: m });
+    assert.equal(r.status, 201);
+  }
+  assert.equal(sent.length, 5);
+});
+
+test("transporte: el modo compartido no depende de que exista una sesion de Auth (se evalua solo por la URL)", async () => {
+  // Con o sin token en la solicitud, la escritura se bloquea: la decision no mira los encabezados.
+  const f = createSharedReadOnlyFetch(async () => new Response("[]"), { isReadOnly: () => true });
+  for (const headers of [{}, { Authorization: "Bearer token-de-otro-alumno", apikey: "k" }]) {
+    const r = await f("https://abc.supabase.co/rest/v1/progreso", { method: "POST", headers, body: "{}" });
+    assert.equal(r.status, 403);
+  }
+});
+
+// ── cableado de la capa de transporte y del cliente ──────────────────────────
+const supaClient = readFileSync(new URL("../lib/supabaseClient.js", import.meta.url), "utf8");
+const chat = readFileSync(new URL("../components/Chat.jsx", import.meta.url), "utf8");
+const chatFlot = readFileSync(new URL("../components/ChatFlotante.jsx", import.meta.url), "utf8");
+const photos = readFileSync(new URL("../components/student-progress/ProgressPhotosPanel.jsx", import.meta.url), "utf8");
+
+test("cableado: sbFetch rechaza escrituras en modo compartido ANTES de hacer fetch", () => {
+  const body = bodyAfter(app, "const sbFetch = async (path, method=\"GET\", body=null) => {", 1400);
+  const guardAt = body.indexOf("isSharedReadOnlyMode() && isWriteMethod(method)");
+  const fetchAt = body.indexOf("fetch(");
+  assert.ok(guardAt >= 0 && fetchAt > guardAt, "la guardia debe preceder al fetch");
+  assert.match(body.slice(guardAt, fetchAt), /return null/);
+});
+
+test("cableado: el cliente supabase-js usa el fetch de solo lectura y NO cambia su configuracion de Auth", () => {
+  assert.match(supaClient, /import \{ createSharedReadOnlyFetch \} from '\.\/sharedMode\.js'/);
+  assert.match(supaClient, /global: \{ fetch: createSharedReadOnlyFetch\(\) \}/);
+  assert.match(supaClient, /persistSession: true,\s*autoRefreshToken: true,\s*detectSessionInUrl: true/);
+});
+
+test("cableado: el efecto de Auth NO hace upsert en `entrenadores` desde un enlace compartido", () => {
+  const i = app.indexOf("function upsertEntrenador(user)");
+  assert.ok(i > 0);
+  const effectStart = app.lastIndexOf("useEffect(function () {", i);
+  const head = app.slice(effectStart, i);
+  assert.match(head, /if \(!supabase \|\| readOnly\) return;/);
+});
+
+test("cableado: chat de solo lectura (no envia, no marca leidos, sin caja de texto) y App.jsx le pasa readOnly", () => {
+  assert.match(app, /<ChatFlotante readOnly=\{readOnly\}/);
+  assert.match(chatFlot, /readOnly\}\) \{/);
+  assert.match(chatFlot, /if\(!readOnly && sb\.marcarMensajesLeidos\)/);
+  assert.match(chatFlot, /<Chat [^>]*readOnly=\{readOnly\}\/>/);
+  assert.match(chat, /onMensajesLeidos, readOnly\}\) \{/);
+  assert.match(chat, /if \(!readOnly && sb\.marcarMensajesLeidos\)/);
+  const enviar = bodyAfter(chat, "const enviar = async () => {", 600);
+  assert.ok(enviar.indexOf("if(readOnly) return;") > 0 && enviar.indexOf("if(readOnly) return;") < enviar.indexOf("sb.addMensaje"));
+  assert.match(chat, /\{readOnly\?\(/); // reemplaza la caja de texto
+});
+
+test("cableado: fotos de progreso de solo lectura (sin input ni botones de subida) desde un enlace compartido", () => {
+  assert.match(photos, /const readOnly = !!sharedParam/);
+  const subir = bodyAfter(photos, "const subirFoto = async (e) => {", 120);
+  assert.match(subir, /if \(readOnly\) return/);
+  assert.equal((photos.match(/!esEntrenador && !readOnly/g) || []).length, 3, "input, boton principal y boton Agregar");
+  assert.equal(/!esEntrenador && \(/.test(photos), false, "no debe quedar ningun control de subida sin la guardia readOnly");
+});
+
+test("cableado: las lecturas del chat y de las fotos siguen presentes (se sigue mostrando la informacion autorizada)", () => {
+  assert.match(chat, /sb\.getMensajes\(alumnoId\)/);
+  assert.match(photos, /sb\.getFotos\(alumnoId\)/);
+});
+
+test("cableado: las escrituras de coach y alumno autenticado no se ven afectadas (Chat del entrenador sin readOnly)", () => {
+  const coachModal = readFileSync(new URL("../components/modals/CoachChatModal.jsx", import.meta.url), "utf8");
+  assert.equal(/readOnly/.test(coachModal), false);
+  assert.match(coachModal, /<Chat [^>]*esEntrenador=\{true\}/);
 });
 
 const originalWarn = console.warn;

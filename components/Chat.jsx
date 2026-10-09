@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { formatChatTime } from '../lib/timeFormat.js';
 
-export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, onMensajesLeidos}) {
+// readOnly (enlace compartido ?r=): se pueden LEER los mensajes pero no enviar ni marcar como leidos (lib/sharedMode.js).
+export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, onMensajesLeidos, readOnly}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bg = _dm?"#0F1923":"#F0F4F8";
   const bgCard = _dm?"#162234":"#FFFFFF";
@@ -20,7 +21,7 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, on
     const m = await sb.getMensajes(alumnoId);
     if (m) setMensajes(m);
 
-    if (sb.marcarMensajesLeidos) {
+    if (!readOnly && sb.marcarMensajesLeidos) {
       await sb.marcarMensajesLeidos(alumnoId, esEntrenador);
       if (esEntrenador && typeof onMensajesLeidos === "function") onMensajesLeidos(alumnoId);
 
@@ -39,6 +40,7 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, on
   useEffect(()=>{ endRef.current?.scrollIntoView({behavior:"smooth"}); },[mensajes]);
 
   const enviar = async () => {
+    if(readOnly) return;
     if(!texto.trim() || enviando) return;
     setEnviando(true);
     const msg = {alumno_id:alumnoId, texto:texto.trim(), de_entrenador:esEntrenador, nombre:esEntrenador?"Entrenador":alumnoNombre};
@@ -61,7 +63,7 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, on
   return (
     <div style={{display:"flex",flexDirection:"column",height:400}}>
       <div style={{flex:1,overflowY:"auto",padding:"8px 0",marginBottom:8}}>
-        {mensajes.length===0&&<div style={{textAlign:"center",padding:"30px 0",color:textMuted,fontSize:13}}>Sin mensajes aún. ¡Escribí el primero!</div>}
+        {mensajes.length===0&&<div style={{textAlign:"center",padding:"30px 0",color:textMuted,fontSize:13}}>{readOnly?"Sin mensajes aún.":"Sin mensajes aún. ¡Escribí el primero!"}</div>}
         {mensajes.map((m,i)=>{
           const esMio = esEntrenador ? m.de_entrenador : !m.de_entrenador;
           return (
@@ -83,12 +85,18 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, on
         })}
         <div ref={endRef}/>
       </div>
+      {readOnly?(
+        <div data-testid="chat-readonly" style={{textAlign:"center",padding:"10px 8px",color:textMuted,fontSize:12,background:bgSub,border:"1px solid "+border,borderRadius:12}}>
+          {es?"Solo lectura: iniciá sesión para escribir mensajes.":"Read-only: sign in to write messages."}
+        </div>
+      ):(
       <div style={{display:"flex",gap:8}}>
         <input style={{flex:1,background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"12px 14px",fontFamily:"'DM Sans',sans-serif",fontSize:15}} value={texto} onChange={e=>setTexto(e.target.value)} placeholder="Escribí un mensaje..." onKeyDown={e=>e.key==="Enter"&&enviar()}/>
         <button style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:12,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={enviar}>
           {enviando?"...":"▶"}
         </button>
       </div>
+      )}
     </div>
   );
 }

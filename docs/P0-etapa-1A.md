@@ -48,13 +48,26 @@ pendientes sobreviven gracias a la protección de claves.
 
 ## 3. Enlaces compartidos (`?r=`): solo lectura
 
-- Interfaz: `startStudentWorkout` y `logSet` (App.jsx) y `finalizarSesion` (WorkoutScreen.jsx) rechazan con aviso.
-- El `alumnoId` del enlace ya no se usa para escribir. Se eliminó la escritura de `sesiones` desde el enlace.
-- Capa de datos: `guardSharedWrites(sb)` bloquea `addProgreso`, `addSesion`, `addFoto`, `deleteFoto`,
-  `updateRutinaSemanaActiva` y los `deleteProgreso*` / `deleteSesiones*` (`lib/sharedMode.js`).
-- Las lecturas (rutina, sesiones, progreso, fotos) no cambian.
-- Es una barrera del cliente. No sustituye a la RLS (que sigue sin modificarse).
-- **No se bloquea el chat** (`Chat.jsx` → `sb.addMensaje`): no es entrenamiento. Queda como riesgo pendiente.
+Un visitante con un enlace `?r=` no está autenticado. Puede **consultar** lo que el enlace ya mostraba (rutina, sesiones, progreso,
+fotos, chat) pero **no escribir nada**, aunque en el navegador haya una sesión de Supabase Auth de otra persona.
+
+Escrituras alcanzables desde ese modo (auditadas en el código) y su defensa:
+
+| Escritura | Dónde | Defensa |
+|---|---|---|
+| Iniciar entrenamiento | `startStudentWorkout` (`App.jsx`) | rechaza con aviso |
+| Registrar series | `logSet` (`App.jsx`) | rechaza con aviso; el `alumnoId` del enlace ya no se usa |
+| Finalizar sesión / crear `sesiones` | `finalizarSesion` (`WorkoutScreen.jsx`) | rechaza; se eliminó la escritura desde el enlace |
+| Enviar mensajes (chat) | `Chat.jsx` → `sb.addMensaje` | caja de texto reemplazada por aviso; `enviar` sale sin escribir |
+| Marcar mensajes como leídos | `ChatFlotante.jsx`, `Chat.jsx` → `sb.marcarMensajesLeidos` | no se llama en modo compartido |
+| Subir fotos | `ProgressPhotosPanel.jsx` → `sb.addFoto` | sin input ni botones; `subirFoto` sale |
+| `upsert` en `entrenadores` con la sesión de Auth persistida | efecto de Auth de `App.jsx` | el efecto no corre en modo compartido |
+| Cualquier otra escritura de `sb` | `guardSharedWrites(sb)` | lista explícita (ver `lib/sharedMode.js`); un test verifica que toda función `add*/create*/update*/delete*/set*/save*/marcar*/reconcile*` esté en la lista |
+| Cualquier escritura por `sbFetch` | `sbFetch` (`App.jsx`) | rechaza todo método distinto de GET/HEAD/OPTIONS |
+| Cualquier escritura por el cliente supabase-js | `lib/supabaseClient.js` (`global.fetch`) | responde 403 sin tocar la red para escrituras a `/rest/v1`, `/functions/v1` y `/storage/v1`; **`/auth/v1` no se toca** (login y refresco de token) |
+
+El chat sigue siendo **legible** desde el enlace (como antes). Si eso es deseable es una decisión de producto aparte.
+Es una barrera del **cliente**: no sustituye a la RLS, que no se modificó.
 
 ## 4. Web Locks (`lib/pendingSets.js`)
 

@@ -3,6 +3,8 @@ import { Camera, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function ProgressPhotosPanel({ sharedParam, sb, es, esEntrenador }) {
+  // Enlace compartido (?r=): solo lectura. Se ven las fotos pero no se pueden subir (lib/sharedMode.js).
+  const readOnly = !!sharedParam
   const [fotos, setFotos] = React.useState([])
   const [loading, setLoading] = React.useState(true)
   const [uploading, setUploading] = React.useState(false)
@@ -28,6 +30,7 @@ export function ProgressPhotosPanel({ sharedParam, sb, es, esEntrenador }) {
   }, [alumnoId, sb])
 
   const subirFoto = async (e) => {
+    if (readOnly) return
     const file = e.target.files?.[0]
     if (!file || !alumnoId) return
     setUploading(true)
@@ -54,7 +57,7 @@ export function ProgressPhotosPanel({ sharedParam, sb, es, esEntrenador }) {
 
   return (
     <div>
-      {!esEntrenador && (
+      {!esEntrenador && !readOnly && (
         <input
           ref={fileRef}
           type="file"
@@ -76,7 +79,7 @@ export function ProgressPhotosPanel({ sharedParam, sb, es, esEntrenador }) {
               ? 'Subí tu primera foto para empezar a trackear tu cambio físico.'
               : 'Upload your first photo to start tracking your physical progress.'}
           </p>
-          {!esEntrenador && (
+          {!esEntrenador && !readOnly && (
             <Button
               variant="outline"
               className="min-h-[44px] border-[#1e3050]"
@@ -105,7 +108,7 @@ export function ProgressPhotosPanel({ sharedParam, sb, es, esEntrenador }) {
               <div className="absolute bottom-0 left-0 right-0 p-2 text-xs font-bold text-white">{f.fecha}</div>
             </div>
           ))}
-          {!esEntrenador && (
+          {!esEntrenador && !readOnly && (
             <button
               type="button"
               className="flex aspect-square min-h-[44px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[#1e3050] bg-[#131b2e] text-[#7c8db0] transition-colors hover:border-[#2563eb]/50 hover:bg-[#162038]"
