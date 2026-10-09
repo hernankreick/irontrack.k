@@ -131,6 +131,19 @@ function fakeServer() {
   return server;
 }
 
+
+// Instancia con Web Locks simulado COMPARTIDO por almacenamiento (dos "pestanas" sobre el mismo storage se excluyen).
+// Un test que pase `locks` (incluido null) conserva exactamente lo que pidio.
+const locksByStorage = new WeakMap();
+function makePS(options) {
+  const o = options || {};
+  if (!("locks" in o) && o.storage) {
+    if (!locksByStorage.has(o.storage)) locksByStorage.set(o.storage, fakeLocks());
+    return createPendingSets({ ...o, locks: locksByStorage.get(o.storage) });
+  }
+  return createPendingSets(o);
+}
+
 const okRes = (p) => ({ status: 201, body: [{ id: p.id }] });
 
 let count = 0;
@@ -143,7 +156,7 @@ const set = (alumnoId, extra) => Object.assign({ alumnoId, exId: "bp", kg: 60, r
 // ══ ALTA ═══════════════════════════════════════════════════════════════════
 test("alta: item con UUID, alumno_id y estado; vive en UNA clave propia (no hay array compartido)", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const item = ps.enqueue(set(A, { kg: "62.5", reps: "8", note: "buena" }));
   assert.ok(isValidSetId(item.id));
   assert.equal(item.alumno_id, A);
@@ -158,7 +171,7 @@ test("alta: item con UUID, alumno_id y estado; vive en UNA clave propia (no hay 
 
 test("alta: enqueue hace exactamente UNA escritura y ninguna lectura-modificacion-escritura compartida", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   ps.enqueue(set(A));
   const before = storage.writes;
   ps.enqueue(set(A));
@@ -166,7 +179,7 @@ test("alta: enqueue hace exactamente UNA escritura y ninguna lectura-modificacio
 });
 
 test("alta: payload usa el UUID de la serie y los mismos campos que progreso", () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const item = ps.enqueue(set(A, { exId: "sq", kg: 100, reps: 5, note: "n", date: "9/10/2026", semana: 2 }));
   assert.deepEqual(buildPendingPayload(item), {
     id: item.id, alumno_id: A, ejercicio_id: "sq", kg: 100, reps: 5, nota: "n", fecha: "9/10/2026", semana: 2,
@@ -175,7 +188,7 @@ test("alta: payload usa el UUID de la serie y los mismos campos que progreso", (
 
 test("alta: sin alumnoId / ejercicio / fecha lanza y no escribe nada", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   assert.throws(() => ps.enqueue(set("")), TypeError);
   assert.throws(() => ps.enqueue(set(null)), TypeError);
   assert.throws(() => ps.enqueue(set(A, { exId: "" })), TypeError);
@@ -187,7 +200,7 @@ test("alta: sin alumnoId / ejercicio / fecha lanza y no escribe nada", () => {
 test("alta: si el almacenamiento falla, lanza y no queda nada a medias", () => {
   const storage = memoryStorage();
   storage.failAt = 1;
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   assert.throws(() => ps.enqueue(set(A)), /boom/);
   assert.equal(storage._map.size, 0);
   storage.failAt = 0;
@@ -196,7 +209,7 @@ test("alta: si el almacenamiento falla, lanza y no queda nada a medias", () => {
 
 test("alta: con un id ya encolado es idempotente (no duplica ni pisa)", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const id = generateSetId();
   const first = ps.enqueue(set(A, { id }));
   const again = ps.enqueue(set(A, { id, kg: 999 }));
@@ -207,8 +220,8 @@ test("alta: con un id ya encolado es idempotente (no duplica ni pisa)", () => {
 
 test("alta intercalada entre pestanas: cada enqueue es una clave unica, no se pisan", () => {
   const storage = memoryStorage();
-  const tab1 = createPendingSets({ storage });
-  const tab2 = createPendingSets({ storage });
+  const tab1 = makePS({ storage });
+  const tab2 = makePS({ storage });
   const fromTab2 = [];
   let n = 0;
   storage.hooks.before = (op, key) => {
@@ -252,16 +265,16 @@ test("uuid: sin fuente segura lanza NO_SECURE_RANDOM y NUNCA recurre a Math.rand
 
 test("uuid: enqueue sin fuente aleatoria segura lanza y no escribe nada", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage, uuid: () => generateSetId({}) });
+  const ps = makePS({ storage, uuid: () => generateSetId({}) });
   assert.throws(() => ps.enqueue(set(A)), (e) => e.code === "NO_SECURE_RANDOM");
   assert.equal(storage.writes, 0);
 });
 
 test("uuid: un generador que devuelve un UUID invalido, o un id explicito invalido, no se acepta", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage, uuid: () => "id-1" });
+  const ps = makePS({ storage, uuid: () => "id-1" });
   assert.throws(() => ps.enqueue(set(A)), (e) => e.code === "INVALID_UUID");
-  const ps2 = createPendingSets({ storage });
+  const ps2 = makePS({ storage });
   for (const bad of ["", "abc", "11111111-1111-1111-8111-111111111111" /* version 1 */, "11111111-1111-4111-1111-111111111111" /* variante */, 42]) {
     assert.throws(() => ps2.enqueue(set(A, { id: bad })), (e) => e.code === "INVALID_UUID", String(bad));
   }
@@ -276,37 +289,37 @@ test("uuid: el codigo del modulo no contiene Math.random", () => {
 // ══ RECUPERACION ═══════════════════════════════════════════════════════════
 test("recuperacion: una instancia nueva (recarga) ve los pendientes y conserva los ids", () => {
   const storage = memoryStorage();
-  const before = createPendingSets({ storage, now: clock(10) });
+  const before = makePS({ storage, now: clock(10) });
   const i1 = before.enqueue(set(A));
   const i2 = before.enqueue(set(A, { exId: "sq" }));
-  const after = createPendingSets({ storage });
+  const after = makePS({ storage });
   assert.deepEqual(after.list(A).map((i) => i.id).sort(), [i1.id, i2.id].sort());
   assert.equal(after.listRetryable(A).length, 2);
 });
 
 test("recuperacion: el estado (intentos, error) tambien sobrevive a la recarga", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const it = ps.enqueue(set(A));
   ps.markAttempt(it.id, { status: PENDING_STATUS.PENDING, error: "http_500" });
   ps.markAttempt(it.id, { status: PENDING_STATUS.PENDING, error: "timeout" });
-  const again = createPendingSets({ storage }).list(A)[0];
+  const again = makePS({ storage }).list(A)[0];
   assert.equal(again.attempts, 2);
   assert.equal(again.lastError, "timeout");
 });
 
 test("recuperacion: borrar otras claves de la app no afecta la cola", () => {
   const storage = memoryStorage({ it_pg: "{}", it_session: "{}" });
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   ps.enqueue(set(A));
   storage.removeItem("it_pg");
   storage.removeItem("it_session");
-  assert.equal(createPendingSets({ storage }).count(A), 1);
+  assert.equal(makePS({ storage }).count(A), 1);
 });
 
 test("recuperacion: un registro ilegible se conserva intacto y no afecta al resto", () => {
   const storage = memoryStorage({ [ITEM + A]: "{no-es-json" });
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const good = ps.enqueue(set(A));
   assert.deepEqual(ps.list(A).map((i) => i.id), [good.id]);
   assert.deepEqual(ps.listCorrupt(), [ITEM + A]);
@@ -315,7 +328,7 @@ test("recuperacion: un registro ilegible se conserva intacto y no afecta al rest
 
 test("recuperacion: un 'meta' ilegible se trata como estado por defecto sin perder la serie", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const it = ps.enqueue(set(A));
   storage.setItem(META + it.id, "}{");
   const got = ps.list(A)[0];
@@ -325,7 +338,7 @@ test("recuperacion: un 'meta' ilegible se trata como estado por defecto sin perd
 
 test("isPendingSetsKey cubre todas las claves del modulo (para excluirlas de las limpiezas de la app)", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   ps.enqueue(set(A));
   assert.ok([...storage._map.keys()].every(isPendingSetsKey));
   assert.ok(isPendingSetsKey(PENDING_LEGACY_KEY) && isPendingSetsKey(JOURNAL) && isPendingSetsKey(QUAR + "x"));
@@ -340,7 +353,7 @@ const legacyArray = (arr) => JSON.stringify(arr);
 
 test("cuarentena: registros ANTIGUOS IDENTICOS se conservan uno por uno (no se fusionan)", async () => {
   const storage = memoryStorage({ [PENDING_LEGACY_KEY]: legacyArray([LEGACY_1, LEGACY_1, LEGACY_2, LEGACY_1]) });
-  const ps = createPendingSets({ storage, now: clock(777) });
+  const ps = makePS({ storage, now: clock(777) });
   const r = await ps.migrate();
   assert.equal(r.quarantined, 4);
   assert.equal(r.kept, 0);
@@ -356,7 +369,7 @@ test("cuarentena: registros ANTIGUOS IDENTICOS se conservan uno por uno (no se f
 
 test("cuarentena: nunca se listan ni se envian solos", async () => {
   const storage = memoryStorage({ [PENDING_LEGACY_KEY]: legacyArray([LEGACY_1, LEGACY_2]) });
-  const ps = createPendingSets({ storage, locks: null });
+  const ps = makePS({ storage, locks: null, advisoryFallback: true });
   await ps.migrate();
   assert.equal(ps.count(A), 0);
   const sent = [];
@@ -370,7 +383,7 @@ test("cuarentena: con alumno_id se conservan como series (ids nuevos); sin datos
   const withId = { alumno_id: B, exId: "dl", kg: 120, reps: 3, note: "", date: "3/10/2026", semana: 1, id: "viejo" };
   const noEx = { alumno_id: A, kg: 1, reps: 1, date: "3/10/2026" };
   const storage = memoryStorage({ [PENDING_LEGACY_KEY]: legacyArray([LEGACY_1, withId, noEx, null, "x", 5]) });
-  const ps = createPendingSets({ storage, now: clock(10) });
+  const ps = makePS({ storage, now: clock(10) });
   const r = await ps.migrate();
   assert.deepEqual([r.kept, r.quarantined], [1, 5]);
   const items = ps.list(B);
@@ -383,7 +396,7 @@ test("cuarentena: con alumno_id se conservan como series (ids nuevos); sin datos
 
 test("cuarentena: migrate es idempotente (segunda ejecucion no cambia nada)", async () => {
   const storage = memoryStorage({ [PENDING_LEGACY_KEY]: legacyArray([LEGACY_1, LEGACY_1, { ...LEGACY_2, alumno_id: A }]) });
-  const ps = createPendingSets({ storage, now: clock(1) });
+  const ps = makePS({ storage, now: clock(1) });
   await ps.migrate();
   const snapshot = JSON.stringify([...storage._map.entries()]);
   const again = await ps.migrate();
@@ -395,7 +408,7 @@ test("cuarentena: migrate es idempotente (segunda ejecucion no cambia nada)", as
 test("cuarentena: array viejo ilegible o con otra forma se respalda, no se interpreta como vacio", async () => {
   for (const raw of ["][", JSON.stringify({ a: 1 })]) {
     const storage = memoryStorage({ [PENDING_LEGACY_KEY]: raw });
-    const ps = createPendingSets({ storage, now: clock(9) });
+    const ps = makePS({ storage, now: clock(9) });
     const r = await ps.migrate();
     assert.equal(r.corrupt, true);
     const backups = keysOf(storage, PENDING_LEGACY_KEY + "_corrupt_");
@@ -407,7 +420,7 @@ test("cuarentena: array viejo ilegible o con otra forma se respalda, no se inter
 
 test("cuarentena: diario ilegible se respalda y la migracion parte de cero desde el array viejo", async () => {
   const storage = memoryStorage({ [JOURNAL]: "{{", [PENDING_LEGACY_KEY]: legacyArray([LEGACY_1]) });
-  const ps = createPendingSets({ storage, now: clock(4) });
+  const ps = makePS({ storage, now: clock(4) });
   const r = await ps.migrate();
   assert.equal(r.quarantined, 1);
   assert.equal(keysOf(storage, JOURNAL + "_corrupt_").length, 1);
@@ -421,7 +434,7 @@ test("cuarentena: CORTE en cada escritura de la migracion -> reanudar no pierde 
   let completedAt = 0;
   for (let k = 1; k <= 60; k++) {
     const storage = memoryStorage({ [PENDING_LEGACY_KEY]: raw });
-    const ps = createPendingSets({ storage, uuid: seqUuid(), now: clock(5) });
+    const ps = makePS({ storage, uuid: seqUuid(), now: clock(5) });
     storage.failAt = k;
     let crashed = false;
     try { await ps.migrate(); } catch (e) { crashed = true; }
@@ -452,7 +465,7 @@ test("cuarentena: CORTE en cada escritura de la migracion -> reanudar no pierde 
 test("cuarentena: una pestana con codigo viejo AGREGA al array durante la migracion -> no se pierde", async () => {
   const storage = memoryStorage({ [PENDING_LEGACY_KEY]: legacyArray([LEGACY_1, LEGACY_2]) });
   let tick = 0;
-  const ps = createPendingSets({ storage, now: () => ++tick });
+  const ps = makePS({ storage, now: () => ++tick });
   const late = { exId: "dl", kg: 100, reps: 3, note: "", date: "5/10/2026", semana: 0 };
   let gets = 0;
   storage.hooks.before = (op, key) => {
@@ -471,7 +484,7 @@ test("cuarentena: una pestana con codigo viejo AGREGA al array durante la migrac
 
 test("cuarentena: si el codigo viejo REESCRIBE el array de forma incompatible, no se toca y se avisa", async () => {
   const storage = memoryStorage({ [PENDING_LEGACY_KEY]: legacyArray([LEGACY_1]) });
-  const ps = createPendingSets({ storage, now: clock(1) });
+  const ps = makePS({ storage, now: clock(1) });
   const rewritten = legacyArray([LEGACY_2]);
   let gets = 0;
   storage.hooks.before = (op, key) => {
@@ -489,8 +502,8 @@ test("cuarentena: si el codigo viejo REESCRIBE el array de forma incompatible, n
 test("cuarentena: si otra pestana creo su diario justo despues, esta no escribe nada (busy) y la otra completa sin duplicar", async () => {
   const raw = legacyArray([LEGACY_1, LEGACY_1]);
   const storage = memoryStorage({ [PENDING_LEGACY_KEY]: raw });
-  const tab1 = createPendingSets({ storage, locks: null, now: clock(1) });
-  const tab2 = createPendingSets({ storage, locks: null, now: clock(1) });
+  const tab1 = makePS({ storage, locks: null, now: clock(1) });
+  const tab2 = makePS({ storage, locks: null, now: clock(1) });
   const otherJournal = {
     v: 1, id: generateSetId(), raw, ids: [generateSetId(), generateSetId()], startedAt: 1,
   };
@@ -510,8 +523,8 @@ test("cuarentena: si otra pestana creo su diario justo despues, esta no escribe 
 test("cuarentena: con Web Locks, dos migrate simultaneos -> uno trabaja y el otro queda busy", async () => {
   const storage = memoryStorage({ [PENDING_LEGACY_KEY]: legacyArray([LEGACY_1]) });
   const locks = fakeLocks();
-  const tab1 = createPendingSets({ storage, locks, now: clock(1) });
-  const tab2 = createPendingSets({ storage, locks, now: clock(1) });
+  const tab1 = makePS({ storage, locks, now: clock(1) });
+  const tab2 = makePS({ storage, locks, now: clock(1) });
   let second = null;
   storage.hooks.before = (op, key) => { if (op === "set" && key === JOURNAL && !second) second = tab2.migrate(); };
   const r1 = await tab1.migrate();
@@ -524,8 +537,8 @@ test("cuarentena: con Web Locks, dos migrate simultaneos -> uno trabaja y el otr
 
 test("cuarentena: sin Web Locks el lease consultivo tambien evita el solapamiento normal", async () => {
   const storage = memoryStorage({ [PENDING_LEGACY_KEY]: legacyArray([LEGACY_1]) });
-  const tab1 = createPendingSets({ storage, locks: null, now: clock(1) });
-  const tab2 = createPendingSets({ storage, locks: null, now: clock(1) });
+  const tab1 = makePS({ storage, locks: null, now: clock(1) });
+  const tab2 = makePS({ storage, locks: null, now: clock(1) });
   let second = null;
   storage.hooks.before = (op, key) => { if (op === "set" && key === JOURNAL && !second) second = tab2.migrate(); };
   await tab1.migrate();
@@ -537,7 +550,7 @@ test("cuarentena: sin Web Locks el lease consultivo tambien evita el solapamient
 // ══ CAMBIO DE USUARIO ══════════════════════════════════════════════════════
 test("cambio de usuario: flush de B envia solo series de B; las de A quedan intactas", async () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const a1 = ps.enqueue(set(A, { exId: "a-ex" }));
   const b1 = ps.enqueue(set(B, { exId: "b-ex" }));
   const a2 = ps.enqueue(set(A, { exId: "a-ex2" }));
@@ -550,7 +563,7 @@ test("cambio de usuario: flush de B envia solo series de B; las de A quedan inta
 });
 
 test("cambio de usuario: vuelve A y envia lo suyo bajo A", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const a1 = ps.enqueue(set(A));
   ps.enqueue(set(B));
   const sent = [];
@@ -561,7 +574,7 @@ test("cambio de usuario: vuelve A y envia lo suyo bajo A", async () => {
 });
 
 test("cambio de usuario: sin alumnoId no se envia nada ni se listan items", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   ps.enqueue(set(A));
   let called = 0;
   const out = await ps.flush({ alumnoId: "", send: async () => { called++; return {}; } });
@@ -573,7 +586,7 @@ test("cambio de usuario: sin alumnoId no se envia nada ni se listan items", asyn
 });
 
 test("cambio de usuario: los ids de alumno se comparan como texto exacto (12 no es 120)", () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   ps.enqueue(set(12));
   ps.enqueue(set(120));
   assert.equal(ps.count("12"), 1);
@@ -582,7 +595,7 @@ test("cambio de usuario: los ids de alumno se comparan como texto exacto (12 no 
 
 test("cambio de usuario: un registro con alumno_id distinto al del flush no se envia aunque aparezca en la lista", async () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const a1 = ps.enqueue(set(A));
   const sent = [];
   // otra pestana "cambia de usuario": mientras se envia, se encola una serie de B
@@ -598,7 +611,7 @@ test("cambio de usuario: un registro con alumno_id distinto al del flush no se e
 // ══ SERIES IDENTICAS ═══════════════════════════════════════════════════════
 test("series identicas: tres items con UUID distinto y se confirman por separado", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const s1 = ps.enqueue(set(A));
   const s2 = ps.enqueue(set(A));
   const s3 = ps.enqueue(set(A));
@@ -611,7 +624,7 @@ test("series identicas: tres items con UUID distinto y se confirman por separado
 });
 
 test("series identicas: un flush parcial confirma solo las que el servidor confirmo", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const s1 = ps.enqueue(set(A));
   const s2 = ps.enqueue(set(A));
   const order = ps.list(A).map((i) => i.id);
@@ -650,7 +663,7 @@ test("respuesta ambigua: classifySendResult solo confirma 2xx con la fila de ese
 
 test("respuesta ambigua: el servidor guarda y se pierde la respuesta -> el reintento (mismo id) da 409, se verifica y queda UNA fila", async () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const server = fakeServer();
   const item = ps.enqueue(set(A));
   server.mode = "lost";
@@ -667,7 +680,7 @@ test("respuesta ambigua: el servidor guarda y se pierde la respuesta -> el reint
 });
 
 test("respuesta ambigua: timeout / excepcion / null se conservan para reintento", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const item = ps.enqueue(set(A));
   let out = await ps.flush({ alumnoId: A, send: async () => null });
   assert.deepEqual(out.retry, [item.id]);
@@ -679,7 +692,7 @@ test("respuesta ambigua: timeout / excepcion / null se conservan para reintento"
 });
 
 test("respuesta ambigua: 2xx con fila de otro id no confirma", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const item = ps.enqueue(set(A));
   const out = await ps.flush({ alumnoId: A, send: async () => ({ status: 201, body: [{ id: generateSetId() }] }) });
   assert.deepEqual(out.confirmed, []);
@@ -688,7 +701,7 @@ test("respuesta ambigua: 2xx con fila de otro id no confirma", async () => {
 });
 
 test("409: sin fetchRow, con error, con fila ausente o con respuesta rara NO confirma (reintenta)", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const item = ps.enqueue(set(A));
   const dup = async () => ({ status: 409 });
   for (const fetchRow of [undefined, async () => { throw new Error("net"); }, async () => null, async () => [], async () => ({ error: "x" }), async () => [{ id: generateSetId() }]]) {
@@ -705,7 +718,7 @@ test("409: sin fetchRow, con error, con fila ausente o con respuesta rara NO con
 });
 
 test("409: confirma SOLO si coinciden id, alumno_id, ejercicio_id, kg, reps, fecha y semana", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const item = ps.enqueue(set(A, { exId: "bp", kg: 60, reps: 10, date: "9/10/2026", semana: 0 }));
   const payload = buildPendingPayload(item);
   const dup = async () => ({ status: 409 });
@@ -718,7 +731,7 @@ test("409: confirma SOLO si coinciden id, alumno_id, ejercicio_id, kg, reps, fec
     { ...payload, extra: "ignorado" },
   ];
   for (const row of matching) {
-    const ps2 = createPendingSets({ storage: memoryStorage() });
+    const ps2 = makePS({ storage: memoryStorage() });
     const it = ps2.enqueue(set(A, { exId: "bp", kg: 60, reps: 10, date: "9/10/2026", semana: 0 }));
     const out = await ps2.flush({ alumnoId: A, send: dup, fetchRow: async () => [{ ...row, id: it.id }] });
     assert.deepEqual(out.confirmed, [it.id], JSON.stringify(row));
@@ -740,7 +753,7 @@ test("409: si UNO de los campos difiere, la serie NO se confirma, queda en CONFL
     "semana vacia": { semana: null },
   };
   for (const [name, change] of Object.entries(mutations)) {
-    const ps = createPendingSets({ storage: memoryStorage() });
+    const ps = makePS({ storage: memoryStorage() });
     const it = ps.enqueue(set(A, base));
     const row = { ...buildPendingPayload(it), ...change };
     let sends = 0;
@@ -757,12 +770,12 @@ test("409: si UNO de los campos difiere, la serie NO se confirma, queda en CONFL
 });
 
 test("409: dos filas con el mismo id, o una fila sin id, no confirman", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const it = ps.enqueue(set(A));
   const p = buildPendingPayload(it);
   let out = await ps.flush({ alumnoId: A, send: async () => ({ status: 409 }), fetchRow: async () => [{ ...p }, { ...p }] });
   assert.deepEqual(out.conflicts, [it.id]);
-  const ps2 = createPendingSets({ storage: memoryStorage() });
+  const ps2 = makePS({ storage: memoryStorage() });
   const it2 = ps2.enqueue(set(A));
   const { id, ...noId } = buildPendingPayload(it2);
   out = await ps2.flush({ alumnoId: A, send: async () => ({ status: 409 }), fetchRow: async () => [noId] });
@@ -787,7 +800,7 @@ test("rowMatchesPayload: comparacion campo a campo", () => {
 });
 
 test("errores HTTP: 401/403 conserva y corta; 400/422 rechaza sin reintento; 5xx reintenta", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const s1 = ps.enqueue(set(A, { exId: "e1" }));
   const s2 = ps.enqueue(set(A, { exId: "e2" }));
   const [first, second] = ps.list(A).map((i) => i.id);
@@ -826,8 +839,8 @@ test("errores HTTP: 401/403 conserva y corta; 400/422 rechaza sin reintento; 5xx
 test("web locks: dos flush simultaneos (dos pestanas) -> uno envia, el otro queda 'locked'", async () => {
   const storage = memoryStorage();
   const locks = fakeLocks();
-  const tab1 = createPendingSets({ storage, locks });
-  const tab2 = createPendingSets({ storage, locks });
+  const tab1 = makePS({ storage, locks });
+  const tab2 = makePS({ storage, locks });
   const item = tab1.enqueue(set(A));
   const gate = deferred();
   const sent = [];
@@ -845,7 +858,7 @@ test("web locks: dos flush simultaneos (dos pestanas) -> uno envia, el otro qued
 
 test("web locks: se libera aunque send lance, y la serie queda para reintento", async () => {
   const locks = fakeLocks();
-  const ps = createPendingSets({ storage: memoryStorage(), locks });
+  const ps = makePS({ storage: memoryStorage(), locks });
   ps.enqueue(set(A));
   await ps.flush({ alumnoId: A, send: async () => { throw new Error("boom"); } });
   assert.equal(locks.held.size, 0);
@@ -854,7 +867,7 @@ test("web locks: se libera aunque send lance, y la serie queda para reintento", 
 
 test("web locks: el lock es por alumno (A y B pueden sincronizar a la vez)", async () => {
   const locks = fakeLocks();
-  const ps = createPendingSets({ storage: memoryStorage(), locks });
+  const ps = makePS({ storage: memoryStorage(), locks });
   ps.enqueue(set(A));
   ps.enqueue(set(B));
   const gate = deferred();
@@ -866,43 +879,146 @@ test("web locks: el lock es por alumno (A y B pueden sincronizar a la vez)", asy
   assert.equal((await fa).confirmed.length, 1);
 });
 
-test("web locks: si request falla ANTES de empezar, se cae al lease consultivo y sincroniza igual", async () => {
-  const locks = { request: async () => { throw new Error("SecurityError"); } };
-  const ps = createPendingSets({ storage: memoryStorage(), locks });
+test("web locks: si request RECHAZA antes de empezar, NO se degrada: no se envia nada y la serie queda intacta", async () => {
+  const storage = memoryStorage();
+  const locks = { request: async () => { throw new Error("SecurityError: lock denegado"); } };
+  const ps = createPendingSets({ storage, locks, advisoryFallback: true }); // aun permitiendo el modo consultivo
   const item = ps.enqueue(set(A));
-  const out = await ps.flush({ alumnoId: A, send: async (p) => okRes(p) });
-  assert.equal(out.coordination, COORDINATION.ADVISORY_LEASE);
-  assert.deepEqual(out.confirmed, [item.id]);
+  const snapshot = JSON.stringify([...storage._map.entries()]);
+  let sends = 0;
+  const out = await ps.flush({ alumnoId: A, send: async (p) => { sends++; return okRes(p); } });
+  assert.equal(sends, 0);
+  assert.equal(out.stopped, FLUSH_STOP.LOCK_ERROR);
+  assert.match(out.lockError, /SecurityError/);
+  assert.equal(out.coordination, COORDINATION.WEB_LOCKS);
+  assert.equal(out.locked, false);
+  assert.deepEqual(out.confirmed.concat(out.retry, out.rejected, out.authError), []);
+  assert.equal(JSON.stringify([...storage._map.entries()]), snapshot); // ni lease ni meta ni nada escrito
+  assert.equal(keysOf(storage, "it_pending_sync:lease:").length, 0);
+  assert.deepEqual(ps.list(A).map((i) => [i.id, i.status, i.attempts]), [[item.id, PENDING_STATUS.PENDING, 0]]);
 });
 
-test("web locks: un error DENTRO del flush no se confunde con indisponibilidad de locks", async () => {
+test("web locks: request que LANZA de forma sincrona o rechaza sin mensaje tambien detiene y conserva", async () => {
+  for (const request of [
+    () => { throw new Error("sync boom"); },
+    () => Promise.reject({ name: "InvalidStateError" }),
+    () => Promise.reject("texto"),
+  ]) {
+    const ps = createPendingSets({ storage: memoryStorage(), locks: { request } });
+    ps.enqueue(set(A));
+    let sends = 0;
+    const out = await ps.flush({ alumnoId: A, send: async (p) => { sends++; return okRes(p); } });
+    assert.equal(sends, 0);
+    assert.equal(out.stopped, FLUSH_STOP.LOCK_ERROR);
+    assert.equal(typeof out.lockError, "string");
+    assert.equal(ps.count(A), 1);
+  }
+});
+
+test("web locks: tras un fallo de lock, cuando Web Locks vuelve a funcionar las series se envian normalmente", async () => {
+  const storage = memoryStorage();
+  let broken = true;
+  const good = fakeLocks();
+  const locks = { request: (n, o, cb) => (broken ? Promise.reject(new Error("transitorio")) : good.request(n, o, cb)) };
+  const ps = createPendingSets({ storage, locks });
+  const item = ps.enqueue(set(A));
+  assert.equal((await ps.flush({ alumnoId: A, send: async (p) => okRes(p) })).stopped, FLUSH_STOP.LOCK_ERROR);
+  broken = false;
+  const out = await ps.flush({ alumnoId: A, send: async (p) => okRes(p) });
+  assert.deepEqual(out.confirmed, [item.id]);
+  assert.equal(out.stopped, FLUSH_STOP.NONE);
+});
+
+test("web locks: un error DENTRO del flush no se confunde con un fallo del lock", async () => {
   const locks = fakeLocks();
   const ps = createPendingSets({ storage: memoryStorage(), locks });
   ps.enqueue(set(A));
   const out = await ps.flush({ alumnoId: A, send: async () => { throw new Error("x"); } });
   assert.equal(out.coordination, COORDINATION.WEB_LOCKS);
+  assert.equal(out.stopped, FLUSH_STOP.NONE);
+  assert.equal(out.lockError, null);
   assert.equal(out.retry.length, 1);
 });
 
-test("web locks: se detecta navigator.locks automaticamente; locks:null lo desactiva", async () => {
+test("web locks: migrate con un lock que falla no migra nada y deja el array viejo intacto", async () => {
+  const raw = JSON.stringify([LEGACY_1, LEGACY_2]);
+  const storage = memoryStorage({ [PENDING_LEGACY_KEY]: raw });
+  const ps = createPendingSets({ storage, locks: { request: async () => { throw new Error("denegado"); } } });
+  const r = await ps.migrate();
+  assert.equal(r.skipped, true);
+  assert.match(r.lockError, /denegado/);
+  assert.equal(r.coordination, COORDINATION.WEB_LOCKS);
+  assert.equal(storage.getItem(PENDING_LEGACY_KEY), raw);
+  assert.equal(ps.listQuarantine().length, 0);
+});
+
+test("sin web locks: por defecto flush NO envia nada y lo informa (coordination = unavailable)", async () => {
+  const storage = memoryStorage();
+  const ps = createPendingSets({ storage, locks: null });
+  const item = ps.enqueue(set(A));
+  const snapshot = JSON.stringify([...storage._map.entries()]);
+  let sends = 0;
+  const out = await ps.flush({ alumnoId: A, send: async (p) => { sends++; return okRes(p); } });
+  assert.equal(sends, 0);
+  assert.equal(out.stopped, FLUSH_STOP.NO_WEB_LOCKS);
+  assert.equal(out.coordination, COORDINATION.UNAVAILABLE);
+  assert.equal(out.locked, false);
+  assert.equal(JSON.stringify([...storage._map.entries()]), snapshot);
+  assert.equal(ps.coordinationMode(), COORDINATION.UNAVAILABLE);
+  assert.deepEqual(ps.list(A).map((i) => i.id), [item.id]);
+});
+
+test("sin web locks: con advisoryFallback explicito si envia y declara el modo 'advisory-lease'", async () => {
+  const ps = createPendingSets({ storage: memoryStorage(), locks: null, advisoryFallback: true });
+  const item = ps.enqueue(set(A));
+  assert.equal(ps.coordinationMode(), COORDINATION.ADVISORY_LEASE);
+  const out = await ps.flush({ alumnoId: A, send: async (p) => okRes(p) });
+  assert.equal(out.coordination, COORDINATION.ADVISORY_LEASE);
+  assert.deepEqual(out.confirmed, [item.id]);
+});
+
+test("sin web locks: migrate (solo almacenamiento local) funciona y declara el modo usado", async () => {
+  const storage = memoryStorage({ [PENDING_LEGACY_KEY]: JSON.stringify([LEGACY_1]) });
+  const ps = createPendingSets({ storage, locks: null });
+  const r = await ps.migrate();
+  assert.equal(r.quarantined, 1);
+  assert.equal(r.coordination, COORDINATION.ADVISORY_LEASE);
+});
+
+test("web locks: se detecta navigator.locks automaticamente; sin el, el modo es 'unavailable' salvo advisoryFallback", async () => {
   const desc = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   const locks = fakeLocks();
   Object.defineProperty(globalThis, "navigator", { value: { locks }, configurable: true, writable: true });
   try {
     assert.equal(createPendingSets({ storage: memoryStorage() }).coordinationMode(), COORDINATION.WEB_LOCKS);
-    assert.equal(createPendingSets({ storage: memoryStorage(), locks: null }).coordinationMode(), COORDINATION.ADVISORY_LEASE);
+    assert.equal(createPendingSets({ storage: memoryStorage(), locks: null }).coordinationMode(), COORDINATION.UNAVAILABLE);
+    assert.equal(createPendingSets({ storage: memoryStorage(), locks: null, advisoryFallback: true }).coordinationMode(), COORDINATION.ADVISORY_LEASE);
     Object.defineProperty(globalThis, "navigator", { value: {}, configurable: true, writable: true });
-    assert.equal(createPendingSets({ storage: memoryStorage() }).coordinationMode(), COORDINATION.ADVISORY_LEASE);
+    assert.equal(createPendingSets({ storage: memoryStorage() }).coordinationMode(), COORDINATION.UNAVAILABLE);
+    assert.equal(createPendingSets({ storage: memoryStorage(), advisoryFallback: true }).coordinationMode(), COORDINATION.ADVISORY_LEASE);
   } finally {
     if (desc) Object.defineProperty(globalThis, "navigator", desc);
     else delete globalThis.navigator;
   }
 });
 
+test("migrateSync: variante sincrona sin lock, equivalente e idempotente", () => {
+  const storage = memoryStorage({ [PENDING_LEGACY_KEY]: JSON.stringify([LEGACY_1, LEGACY_1]) });
+  const ps = createPendingSets({ storage });
+  const r = ps.migrateSync();
+  assert.equal(r.quarantined, 2);
+  assert.equal(r.coordination, "none");
+  assert.equal(storage.getItem(PENDING_LEGACY_KEY), null);
+  assert.equal(ps.listQuarantine().length, 2);
+  const snap = JSON.stringify([...storage._map.entries()]);
+  assert.equal(ps.migrateSync().quarantined, 0);
+  assert.equal(JSON.stringify([...storage._map.entries()]), snap);
+});
+
 test("sin web locks: lease consultivo evita el solapamiento normal (no promete exclusion mutua)", async () => {
   const storage = memoryStorage();
-  const tab1 = createPendingSets({ storage, locks: null });
-  const tab2 = createPendingSets({ storage, locks: null });
+  const tab1 = makePS({ storage, locks: null, advisoryFallback: true });
+  const tab2 = makePS({ storage, locks: null, advisoryFallback: true });
   const item = tab1.enqueue(set(A));
   const gate = deferred();
   const sent = [];
@@ -919,8 +1035,8 @@ test("sin web locks: lease consultivo evita el solapamiento normal (no promete e
 test("sin web locks: aun si DOS pestanas enviaran a la vez (lease burlado), el servidor no duplica y ambas convergen", async () => {
   // Se simula la ventana que el lease consultivo no puede cerrar: la pestana 2 ve su propio lease concedido.
   const storage = memoryStorage();
-  const tab1 = createPendingSets({ storage, locks: null });
-  const tab2 = createPendingSets({ storage, locks: null });
+  const tab1 = makePS({ storage, locks: null, advisoryFallback: true });
+  const tab2 = makePS({ storage, locks: null, advisoryFallback: true });
   const server = fakeServer();
   const item = tab1.enqueue(set(A));
   const gate = deferred();
@@ -940,7 +1056,7 @@ test("sin web locks: aun si DOS pestanas enviaran a la vez (lease burlado), el s
 test("sin web locks: un lease vencido se puede tomar; el viejo dueno no puede renovar ni liberar", () => {
   const storage = memoryStorage();
   const t = clock();
-  const ps = createPendingSets({ storage, locks: null, now: t, leaseMs: 1000 });
+  const ps = makePS({ storage, locks: null, advisoryFallback: true, now: t, leaseMs: 1000 });
   const name = flushLease(A);
   assert.equal(ps.acquireLease(name, "dueno-viejo"), true);
   assert.equal(ps.acquireLease(name, "otro"), false);
@@ -956,7 +1072,7 @@ test("sin web locks: un lease vencido se puede tomar; el viejo dueno no puede re
 test("sin web locks: si se pierde el lease durante el envio no se escribe el resultado (la serie sigue intacta)", async () => {
   const storage = memoryStorage();
   const t = clock();
-  const ps = createPendingSets({ storage, locks: null, now: t, leaseMs: 1000 });
+  const ps = makePS({ storage, locks: null, advisoryFallback: true, now: t, leaseMs: 1000 });
   const item = ps.enqueue(set(A));
   const out = await ps.flush({
     alumnoId: A,
@@ -974,7 +1090,7 @@ test("sin web locks: si se pierde el lease durante el envio no se escribe el res
 });
 
 test("escrituras: una serie encolada DURANTE un flush no se pierde", async () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const s1 = ps.enqueue(set(A, { exId: "e1" }));
   const gate = deferred();
   const f = ps.flush({ alumnoId: A, send: async (p) => { await gate.promise; return okRes(p); } });
@@ -990,7 +1106,7 @@ test("escrituras: una serie encolada DURANTE un flush no se pierde", async () =>
 
 test("escrituras: confirm / markAttempt sobre una serie ya quitada son no-op y no la resucitan", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const item = ps.enqueue(set(A));
   assert.equal(ps.confirm([item.id]), 1);
   assert.equal(ps.confirm([item.id]), 0);
@@ -1001,8 +1117,8 @@ test("escrituras: confirm / markAttempt sobre una serie ya quitada son no-op y n
 
 test("escrituras intercaladas: otra pestana confirma la serie ENTRE la lectura y la escritura de markAttempt", () => {
   const storage = memoryStorage();
-  const tab1 = createPendingSets({ storage });
-  const tab2 = createPendingSets({ storage });
+  const tab1 = makePS({ storage });
+  const tab2 = makePS({ storage });
   const item = tab1.enqueue(set(A));
   let fired = false;
   storage.hooks.before = (op, key) => {
@@ -1017,8 +1133,8 @@ test("escrituras intercaladas: otra pestana confirma la serie ENTRE la lectura y
 
 test("escrituras intercaladas: enqueue de otra pestana en medio de un confirm no se pierde", () => {
   const storage = memoryStorage();
-  const tab1 = createPendingSets({ storage });
-  const tab2 = createPendingSets({ storage });
+  const tab1 = makePS({ storage });
+  const tab2 = makePS({ storage });
   const a = tab1.enqueue(set(A, { exId: "a" }));
   const b = tab1.enqueue(set(A, { exId: "b" }));
   let created = null;
@@ -1032,8 +1148,8 @@ test("escrituras intercaladas: enqueue de otra pestana en medio de un confirm no
 
 test("escrituras intercaladas: dos markAttempt desde pestanas distintas no tocan el registro de la serie", () => {
   const storage = memoryStorage();
-  const tab1 = createPendingSets({ storage });
-  const tab2 = createPendingSets({ storage });
+  const tab1 = makePS({ storage });
+  const tab2 = makePS({ storage });
   const item = tab1.enqueue(set(A, { kg: 77 }));
   const recordBefore = storage.getItem(ITEM + item.id);
   let fired = false;
@@ -1050,7 +1166,7 @@ test("escrituras intercaladas: dos markAttempt desde pestanas distintas no tocan
 });
 
 test("escrituras: confirm solo borra por UUID; ids vacios / invalidos / desconocidos no tocan nada", () => {
-  const ps = createPendingSets({ storage: memoryStorage() });
+  const ps = makePS({ storage: memoryStorage() });
   const a = ps.enqueue(set(A));
   const b = ps.enqueue(set(B));
   assert.equal(ps.confirm([]), 0);
@@ -1065,7 +1181,7 @@ test("escrituras: confirm solo borra por UUID; ids vacios / invalidos / desconoc
 
 test("escrituras: sweepOrphans borra 'meta' sin serie y respeta el de series vivas", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const live = ps.enqueue(set(A));
   ps.markAttempt(live.id, { status: PENDING_STATUS.PENDING, error: "x" });
   const orphan = generateSetId();
@@ -1077,7 +1193,7 @@ test("escrituras: sweepOrphans borra 'meta' sin serie y respeta el de series viv
 
 test("fallo parcial: confirm con un removeItem que falla -> lanza, procesa el resto y la serie fallida sigue en cola", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const a = ps.enqueue(set(A, { exId: "a" }));
   const b = ps.enqueue(set(A, { exId: "b" }));
   storage.hooks.before = (op, key) => { if (op === "remove" && key === ITEM + a.id) throw new Error("boom"); };
@@ -1088,7 +1204,7 @@ test("fallo parcial: confirm con un removeItem que falla -> lanza, procesa el re
 
 test("fallo parcial: markAttempt cuyo setItem falla lanza y deja la serie intacta", () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const item = ps.enqueue(set(A));
   storage.hooks.before = (op, key) => { if (op === "set" && key === META + item.id) throw new Error("quota"); };
   assert.throws(() => ps.markAttempt(item.id, { error: "x" }), /quota/);
@@ -1099,7 +1215,7 @@ test("fallo parcial: markAttempt cuyo setItem falla lanza y deja la serie intact
 
 test("fallo parcial: si no se puede registrar el resultado, flush se detiene (storage_error) sin perder la serie", async () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const item = ps.enqueue(set(A));
   storage.hooks.before = (op, key) => { if (op === "set" && key === META + item.id) throw new Error("quota"); };
   const out = await ps.flush({ alumnoId: A, send: async () => ({ status: 500 }) });
@@ -1112,7 +1228,7 @@ test("fallo parcial: si no se puede registrar el resultado, flush se detiene (st
 
 test("fallo parcial: el servidor guardo, el POST se confirmo pero no se pudo quitar de la cola -> el siguiente flush converge sin duplicar", async () => {
   const storage = memoryStorage();
-  const ps = createPendingSets({ storage });
+  const ps = makePS({ storage });
   const server = fakeServer();
   const item = ps.enqueue(set(A));
   storage.hooks.before = (op, key) => { if (op === "remove" && key === ITEM + item.id) throw new Error("boom"); };
@@ -1129,8 +1245,8 @@ test("fallo parcial: el servidor guardo, el POST se confirmo pero no se pudo qui
 
 test("otra pestana confirma la serie mientras esta enviaba otra -> no se reenvia ni se pisa", async () => {
   const storage = memoryStorage();
-  const tab1 = createPendingSets({ storage });
-  const tab2 = createPendingSets({ storage });
+  const tab1 = makePS({ storage });
+  const tab2 = makePS({ storage });
   tab1.enqueue(set(A, { exId: "e1" }));
   tab1.enqueue(set(A, { exId: "e2" }));
   const [first, second] = tab1.list(A).map((i) => i.id);
