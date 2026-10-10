@@ -57,6 +57,17 @@ UNION ALL SELECT 'auth.users', (SELECT count(*) FROM backup_rls_p0.auth_users_mi
 --      acl directo tablas     = ACL propio de PUBLIC/anon/authenticated sobre las tablas del snapshot (lo que R2 restaura)
 --      acl columnas           = privilegios por columna de PUBLIC/anon/authenticated (lo que R2 restaura)
 --    Un privilegio heredado puede ocultar un ACL directo distinto en "efectivos"; por eso se comparan también los dos ACL.
+WITH tablas AS (SELECT tbl FROM backup_rls_p0.rls_flags WHERE to_regclass('public.' || tbl) IS NOT NULL),
+acl_snap AS (
+  SELECT g.tbl, g.grantee, g.privilege_type, g.is_grantable
+    FROM backup_rls_p0.grants g
+   WHERE g.kind = 'r' AND g.grantee IN ('PUBLIC', 'anon', 'authenticated') AND g.tbl IN (SELECT tbl FROM tablas)),
+acl_cur AS (
+  SELECT c.relname AS tbl, CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS grantee, a.privilege_type, a.is_grantable
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace,
+         aclexplode(coalesce(c.relacl, acldefault('r'::"char", c.relowner))) a
+   WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname IN (SELECT tbl FROM tablas)
+     AND (a.grantee = 0 OR a.grantee IN ('anon'::regrole, 'authenticated'::regrole)))
 SELECT 'efectivos ' || e.role AS verificacion,
        count(*) FILTER (WHERE e.granted IS DISTINCT FROM has_table_privilege(e.role, to_regclass('public.' || e.tbl), e.priv)) AS cambiaron,
        count(*) AS comparados
@@ -65,18 +76,11 @@ SELECT 'efectivos ' || e.role AS verificacion,
  GROUP BY e.role
 UNION ALL
 SELECT 'acl directo tablas', count(*), NULL FROM (
-  (SELECT tbl, grantee, privilege_type, is_grantable FROM backup_rls_p0.grants WHERE kind = 'r' AND grantee IN ('PUBLIC','anon','authenticated') AND to_regclass('public.' || tbl) IS NOT NULL
-   EXCEPT
-   SELECT c.relname, CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END, a.privilege_type, a.is_grantable
-     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace, aclexplode(coalesce(c.relacl, acldefault('r'::"char", c.relowner))) a
-    WHERE n.nspname = 'public' AND c.relkind = 'r')
+  -- Ambos lados usan EXACTAMENTE el mismo conjunto: grantee IN (PUBLIC, anon, authenticated) y las tablas del snapshot que aún existen.
+  -- Los ACL de cualquier otro rol (p. ej. un cuarto rol con GRANT propio) quedan fuera de los dos lados: no producen diferencias.
+  (SELECT * FROM acl_snap EXCEPT SELECT * FROM acl_cur)
   UNION ALL
-  (SELECT c.relname, CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END, a.privilege_type, a.is_grantable
-     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace, aclexplode(coalesce(c.relacl, acldefault('r'::"char", c.relowner))) a
-    WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname IN (SELECT tbl FROM backup_rls_p0.rls_flags)
-      AND (a.grantee = 0 OR a.grantee IN ('anon'::regrole, 'authenticated'::regrole))
-   EXCEPT
-   SELECT tbl, grantee, privilege_type, is_grantable FROM backup_rls_p0.grants WHERE kind = 'r' AND grantee IN ('PUBLIC','anon','authenticated'))) d
+  (SELECT * FROM acl_cur EXCEPT SELECT * FROM acl_snap)) d
 UNION ALL
 SELECT 'acl columnas', count(*), NULL FROM (
   (SELECT tbl, col, grantee, privilege_type, is_grantable FROM backup_rls_p0.column_grants WHERE grantee IN ('PUBLIC','anon','authenticated')

@@ -12,7 +12,7 @@ trap 'RUN "$PGBIN/pg_ctl -D $WORK/data -m immediate stop >/dev/null" || true' EX
 P="$PGBIN/psql -X -q -h $WORK -p $PORT -U postgres"
 M1=supabase/migrations/20261010110000_rls_p0_coach_principal.sql; M2=supabase/migrations/20261010120000_rls_p0_lockdown.sql
 RB=supabase/rollback/20261010120000_rls_p0_rollback.sql; BF=sql/rls_p0_backfill_entrenador_principal.sql
-BC=sql/rls_p0_backup_create.sql; BV=sql/rls_p0_backup_verify.sql; BR=sql/rls_p0_backup_restore.sql
+BC=sql/rls_p0_backup_create.sql; BV=${BV_OVERRIDE:-sql/rls_p0_backup_verify.sql}; BR=sql/rls_p0_backup_restore.sql
 PUID=00000000-0000-0000-0000-0000000000c1
 FAIL=0; ok() { echo "PASS  $1"; }; bad() { echo "FAIL  $1"; FAIL=1; }
 sql() { RUN "$P -v ON_ERROR_STOP=1 -d $1 -f $2" 2>&1; }
@@ -28,7 +28,7 @@ q $DB "ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated; CREA
 q $DB "ALTER DEFAULT PRIVILEGES REVOKE ALL ON TABLES FROM anon, authenticated; CREATE TABLE public.zz_implicito(i int); ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated" >/dev/null
 [ "$(q $DB "SELECT relacl IS NULL FROM pg_class WHERE relname='zz_implicito'")" = "t" ] && ok "precondición: zz_implicito tiene ACL implícito (relacl NULL)" || bad "precondición ACL implícito"
 # Privilegios HEREDADOS y por COLUMNA (casos que el ACL de tabla no refleja): anon hereda SELECT sobre alumnos de otro rol; authenticated solo tiene SELECT(contenido) en notas
-q $DB "CREATE ROLE inh_role NOLOGIN; GRANT SELECT ON public.alumnos TO inh_role; GRANT inh_role TO anon; REVOKE ALL ON public.notas FROM authenticated; GRANT SELECT (contenido) ON public.notas TO authenticated" >/dev/null
+q $DB "CREATE ROLE cuarto_rol NOLOGIN; GRANT SELECT ON public.alumnos TO cuarto_rol; CREATE ROLE inh_role NOLOGIN; GRANT SELECT ON public.alumnos TO inh_role; GRANT inh_role TO anon; REVOKE ALL ON public.notas FROM authenticated; GRANT SELECT (contenido) ON public.notas TO authenticated" >/dev/null
 [ "$(q $DB "SELECT (SELECT count(*) FROM pg_auth_members m JOIN pg_roles r ON r.oid=m.roleid WHERE r.rolname='inh_role')||'/'||has_column_privilege('authenticated','public.notas','contenido','SELECT')||'/'||has_table_privilege('authenticated','public.notas','SELECT')")" = "1/true/false" ] && ok "precondición: herencia (anon<-inh_role) y privilegio SOLO por columna (authenticated en notas)" || bad "precondición herencia/columna"
 # tabla SIN clave única (no se debe asumir ninguna)
 q $DB "ALTER TABLE mensajes DROP CONSTRAINT mensajes_pkey" >/dev/null
@@ -64,6 +64,26 @@ sed -n '/^-- A)/,/^ *ORDER BY m.tbl;/p' $BV | grep -v '^--' > $WORK/blkA.sql; ch
 RUN "$P -d $DB -At -F '|' -f $WORK/blkA.sql" > $WORK/a.out 2>&1
 lines=$(wc -l < $WORK/a.out); bad_rows=$(grep -vc '|t|t$' $WORK/a.out)
 [ "$lines" = "14" ] && [ "$bad_rows" = "0" ] && ok "bloque A: 14 tablas, copia y origen idénticos (huella md5)" || { bad "bloque A ($lines filas, $bad_rows distintas)"; head -3 $WORK/a.out; }
+
+echo "### 2b. D no da falsos positivos por otros roles y sí detecta cambios reales del ACL directo"
+sed -n '/^-- D)/,/^-- E)/p' $BV | grep -v '^--' > $WORK/blkD.sql; chmod a+r $WORK/blkD.sql
+dacl() { RUN "$P -d $DB -At -F '|' -f $WORK/blkD.sql" 2>&1 | awk -F'|' '$1=="acl directo tablas"{print $2}'; }
+[ "$(dacl)" = "0" ] && ok "D: ACL directo = 0 recién copiado" || bad "D inicial: $(dacl)"
+q $DB "GRANT UPDATE, DELETE ON public.alumnos TO cuarto_rol; GRANT SELECT ON public.config TO cuarto_rol; REVOKE SELECT ON public.alumnos FROM cuarto_rol" >/dev/null
+[ "$(dacl)" = "0" ] && ok "D: GRANT/REVOKE de un CUARTO ROL (alumnos y config) NO produce falso positivo (ACL directo = 0)" || bad "falso positivo por cuarto rol: $(dacl)"
+q $DB "REVOKE SELECT ON public.alumnos FROM anon" >/dev/null
+[ "$(dacl)" -ge 1 ] 2>/dev/null && ok "D: REVOKE real de anon sobre alumnos SÍ se detecta (ACL directo > 0)" || bad "no detecta REVOKE real de anon"
+q $DB "GRANT SELECT ON public.alumnos TO anon" >/dev/null
+[ "$(dacl)" = "0" ] && ok "D: restablecido el GRANT de anon, vuelve a 0 (los grants del cuarto rol siguen sin influir)" || bad "no vuelve a 0: $(dacl)"
+q $DB "REVOKE INSERT ON public.config FROM authenticated" >/dev/null
+[ "$(dacl)" -ge 1 ] 2>/dev/null && ok "D: un REVOKE real a authenticated sobre config se detecta (falta en el lado actual)" || bad "no detecta REVOKE de authenticated"
+q $DB "GRANT INSERT ON public.config TO authenticated" >/dev/null
+[ "$(dacl)" = "0" ] && ok "D: vuelve a 0 tras restablecerlo" || bad "no vuelve a 0 (2): $(dacl)"
+q $DB "GRANT TRUNCATE ON public.config TO PUBLIC" >/dev/null
+[ "$(dacl)" -ge 1 ] 2>/dev/null && ok "D: un GRANT nuevo a PUBLIC (extra en el lado actual) se detecta" || bad "no detecta GRANT a PUBLIC"
+q $DB "REVOKE TRUNCATE ON public.config FROM PUBLIC" >/dev/null
+[ "$(dacl)" = "0" ] && ok "D: vuelve a 0 tras revertir el GRANT a PUBLIC" || bad "no vuelve a 0 (3): $(dacl)"
+q $DB "REVOKE ALL ON public.alumnos FROM cuarto_rol; REVOKE ALL ON public.config FROM cuarto_rol" >/dev/null
 
 echo "### 3. Backfill + migración 2 + datos nuevos y daños simulados"
 RUN "$P -v ON_ERROR_STOP=1 -d $DB -v principal_uid=$PUID -v expected_alumnos=2 -f $BF" >/dev/null 2>&1 && sql $DB $M2 >/dev/null && ok "backfill y migración 2 aplicados" || bad "backfill/M2"
