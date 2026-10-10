@@ -48,6 +48,37 @@ RUNBF bf $PUID 2 >/dev/null && ok "backfill con datos válidos" || bad "backfill
 RUN "$P -d bf -At -c \"SELECT 'principal='||(SELECT uid FROM coach_principal)||' legacy_restantes='||(SELECT count(*) FROM alumnos WHERE entrenador_id='entrenador_principal')\""
 sql bf $M2 >/dev/null && ok "migración 2 tras backfill" || bad "migración 2 tras backfill"
 
+echo "### 3b. Backfill reversible (solo filas que eran legacy) y respaldo de políticas"
+RV=sql/rls_p0_backfill_revert.sql; SE=sql/rls_p0_backfill_sql_editor.sql; SNAP=sql/rls_p0_snapshot_policies.sql
+mkdb rv; sql rv $M1 >/dev/null
+RUN "$P -d rv -c \"UPDATE alumnos SET entrenador_id='entrenador_principal'; UPDATE rutinas SET entrenador_id='entrenador_principal' WHERE nombre='RutB'; UPDATE video_overrides SET entrenador_id='entrenador_principal' WHERE entrenador_id LIKE '%c1'\""
+RUNBF rv $PUID 2 >/dev/null && ok "backfill registra filas legacy" || bad "backfill rv"
+n=$(RUN "$P -d rv -At -c \"SELECT count(*) FROM rls_p0_backfill_log\""); [ "$n" = "4" ] && ok "log = 2 alumnos + 1 rutina + 1 video_override ($n)" || bad "log=$n (esperado 4)"
+out=$(RUN "$P -d rv -At -c \"SET ROLE anon; SELECT count(*) FROM rls_p0_backfill_log\"" 2>&1); echo "$out" | grep -q "permission denied" && ok "rls_p0_backfill_log no es accesible por anon" || bad "log expuesto"
+out=$(RUN "$P -d rv -At -c \"SET ROLE authenticated; SELECT count(*) FROM rls_p0_backfill_log\"" 2>&1); echo "$out" | grep -q "permission denied" && ok "rls_p0_backfill_log no es accesible por authenticated" || bad "log expuesto (auth)"
+sql rv $M2 >/dev/null
+out=$(sql rv $RV); echo "$out" | grep -q "migracion RLS esta aplicada" && ok "revert aborta con la migración RLS aplicada" || bad "revert sin abortar"
+sql rv $RB >/dev/null
+sql rv $RV >/dev/null && ok "revert ejecuta" || bad "revert"
+r=$(RUN "$P -d rv -At -c \"SELECT (SELECT count(*) FROM alumnos WHERE entrenador_id='entrenador_principal')||'/'||(SELECT count(*) FROM rutinas WHERE entrenador_id='entrenador_principal')||'/'||(SELECT count(*) FROM rutinas WHERE nombre='RutA' AND entrenador_id='$PUID')||'/'||(SELECT count(*) FROM coach_principal)||'/'||(SELECT count(*) FROM rls_p0_backfill_log)\"")
+[ "$r" = "2/1/1/0/0" ] && ok "revert restaura solo lo legacy (rutina que ya tenía UUID no se toca): $r" || bad "estado tras revert: $r (esperado 2/1/1/0/0)"
+# variante SQL Editor
+mkdb se; sql se $M1 >/dev/null; RUN "$P -d se -c \"UPDATE alumnos SET entrenador_id='entrenador_principal'\""
+sed "s/e2447231-c0ba-4f90-946f-63bf364570af/$PUID/; s/expected_legacy int := 9/expected_legacy int := 2/" $SE > "$WORK/se.sql"; chmod a+r "$WORK/se.sql"
+sql se "$WORK/se.sql" >/dev/null && ok "backfill variante SQL Editor" || bad "backfill SQL Editor"
+sed "s/expected_legacy int := 9/expected_legacy int := 7/; s/e2447231-c0ba-4f90-946f-63bf364570af/$PUID/" $SE > "$WORK/se2.sql"; chmod a+r "$WORK/se2.sql"
+mkdb se2; sql se2 $M1 >/dev/null; RUN "$P -d se2 -c \"UPDATE alumnos SET entrenador_id='entrenador_principal'\""
+out=$(sql se2 "$WORK/se2.sql"); echo "$out" | grep -q "alumnos legacy = 2 (esperado 7)" && ok "SQL Editor: cantidad distinta aborta sin cambios" || bad "SQL Editor cantidad"
+n=$(RUN "$P -d se2 -At -c \"SELECT count(*) FROM alumnos WHERE entrenador_id='entrenador_principal'\""); [ "$n" = "2" ] && ok "SQL Editor: nada modificado tras abortar" || bad "SQL Editor modificó"
+# respaldo de políticas reproducible
+mkdb sn; RUN "$P -d sn -At -f $SNAP" > "$WORK/snap.txt" 2>&1; grep -c "^CREATE POLICY" "$WORK/snap.txt" | xargs -I{} echo "INFO políticas respaldadas: {}"
+before=$(RUN "$P -d sn -At -c \"SELECT count(*) FROM pg_policies WHERE schemaname='public'\"")
+RUN "$P -d sn -c \"DO \\\$\\\$ DECLARE p record; BEGIN FOR p IN SELECT policyname, tablename FROM pg_policies WHERE schemaname='public' LOOP EXECUTE format('DROP POLICY %I ON %I', p.policyname, p.tablename); END LOOP; END \\\$\\\$\"" >/dev/null 2>&1
+grep "^CREATE POLICY" "$WORK/snap.txt" > "$WORK/snap_restore.sql"; chmod a+r "$WORK/snap_restore.sql"
+sql sn "$WORK/snap_restore.sql" >/dev/null 2>&1
+after=$(RUN "$P -d sn -At -c \"SELECT count(*) FROM pg_policies WHERE schemaname='public'\"")
+[ "$before" = "$after" ] && [ "$before" -gt 0 ] && ok "el respaldo de políticas regenera las $before políticas" || bad "respaldo de políticas ($before vs $after)"
+
 echo "### 4. Migración + pruebas generales (02)"
 mkdb main; sql main $M1 >/dev/null; sql main tests/rls/01b_principal.sql >/dev/null; sql main $M2 >/dev/null || bad "migración 2"
 sql main $M2 >/dev/null && ok "idempotente (2ª ejecución)" || bad "idempotencia"

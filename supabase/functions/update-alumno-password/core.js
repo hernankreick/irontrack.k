@@ -8,12 +8,14 @@
 //  - Si el alumno ya esta vinculado, se actualiza la cuenta por auth_uid (no se busca por email).
 
 const json = (status, body) => ({ status, body });
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function handleUpdateAlumnoPassword({ callerToken, body, admin }) {
   if (!callerToken) return json(401, { error: 'missing authorization' });
   const alumnoId = body && body.alumnoId != null ? String(body.alumnoId) : '';
   const newPassword = body && body.newPassword ? String(body.newPassword) : '';
   if (!alumnoId || !newPassword) return json(400, { error: 'alumnoId and newPassword required' });
+  if (!UUID_RE.test(alumnoId)) return json(400, { error: 'alumnoId invalido' });
 
   const { data: callerData, error: callerError } = await admin.auth.getUser(callerToken);
   const caller = callerData && callerData.user;
@@ -30,6 +32,12 @@ export async function handleUpdateAlumnoPassword({ callerToken, body, admin }) {
 
   // Ya vinculado: actualizar por auth_uid (y alinear el email de la cuenta con el del alumno).
   if (alumno.auth_uid) {
+    // Nunca se modifica la cuenta del propio solicitante ni la del entrenador principal (un vinculo erroneo no debe permitirlo).
+    if (String(alumno.auth_uid) === String(caller.id)) return json(403, { error: 'cuenta protegida' });
+    const { data: principal, error: principalError } = await admin
+      .from('coach_principal').select('uid').eq('uid', String(alumno.auth_uid)).maybeSingle();
+    if (principalError) return json(500, { error: 'no se pudo verificar la cuenta' }); // falla cerrado
+    if (principal) return json(403, { error: 'cuenta protegida' });
     const { error } = await admin.auth.admin.updateUserById(String(alumno.auth_uid), { password: newPassword, email, email_confirm: true });
     if (error) return json(400, { error: error.message });
     return json(200, { ok: true });
@@ -51,7 +59,11 @@ export async function handleUpdateAlumnoPassword({ callerToken, body, admin }) {
   const { data: linked, error: linkError } = await admin
     .from('alumnos').update({ auth_uid: newUser.id }).eq('id', alumno.id).is('auth_uid', null).select('id');
   if (linkError || !linked || linked.length !== 1) {
-    await admin.auth.admin.deleteUser(newUser.id);
+    const { error: deleteError } = await admin.auth.admin.deleteUser(newUser.id);
+    if (deleteError) {
+      // Reversion fallida: no se afirma que se revirtio; se informa el id para limpiarlo manualmente.
+      return json(500, { error: 'no se pudo vincular la cuenta y tampoco revertir su creacion; eliminar manualmente la cuenta de Auth ' + newUser.id });
+    }
     return json(500, { error: 'no se pudo vincular la cuenta al alumno; se revirtio la creacion' });
   }
   return json(200, { ok: true, linked: true });

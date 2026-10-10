@@ -17,8 +17,7 @@
 -- Aborta SIN modificar nada si: el UID no existe en auth.users/entrenadores, figura como alumnos.auth_uid,
 -- coach_principal ya tiene OTRO uid, o la cantidad de alumnos legacy != expected_alumnos.
 -- Antes: SELECT entrenador_id, count(*) FROM alumnos GROUP BY 1;  (guardar para reversión)
--- Reversión: UPDATE ... SET entrenador_id='entrenador_principal' WHERE entrenador_id='<uuid>' (solo las filas legacy
---   que se hayan respaldado); DELETE FROM coach_principal.
+-- Reversión: sql/rls_p0_backfill_revert.sql (usa rls_p0_backfill_log; revierte SOLO las filas que eran legacy).
 -- =============================================================================
 \set ON_ERROR_STOP on
 SELECT
@@ -34,6 +33,17 @@ SELECT
   \quit 1
 \endif
 BEGIN;
+CREATE TABLE IF NOT EXISTS public.rls_p0_backfill_log (
+  tbl text NOT NULL, row_key text NOT NULL, logged_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (tbl, row_key)
+);
+ALTER TABLE public.rls_p0_backfill_log ENABLE ROW LEVEL SECURITY;  -- sin políticas ni grants: solo postgres/service_role
+REVOKE ALL ON TABLE public.rls_p0_backfill_log FROM PUBLIC, anon, authenticated;
+-- Registro de las filas legacy (solo ids) para poder revertir con sql/rls_p0_backfill_revert.sql
+INSERT INTO public.rls_p0_backfill_log(tbl,row_key) SELECT 'alumnos', id::text FROM public.alumnos WHERE entrenador_id::text = 'entrenador_principal' ON CONFLICT DO NOTHING;
+INSERT INTO public.rls_p0_backfill_log(tbl,row_key) SELECT 'rutinas', id::text FROM public.rutinas WHERE entrenador_id::text = 'entrenador_principal' ON CONFLICT DO NOTHING;
+INSERT INTO public.rls_p0_backfill_log(tbl,row_key) SELECT 'video_overrides', ejercicio_id::text FROM public.video_overrides WHERE entrenador_id::text = 'entrenador_principal' ON CONFLICT DO NOTHING;
+INSERT INTO public.rls_p0_backfill_log(tbl,row_key) SELECT 'ejercicio_overrides', ejercicio_id::text FROM public.ejercicio_overrides WHERE entrenador_id::text = 'entrenador_principal' ON CONFLICT DO NOTHING;
+INSERT INTO public.rls_p0_backfill_log(tbl,row_key) SELECT 'ejercicios_custom', id::text FROM public.ejercicios_custom WHERE entrenador_id::text = 'entrenador_principal' ON CONFLICT DO NOTHING;
 INSERT INTO public.coach_principal(uid) VALUES (:'principal_uid'::uuid) ON CONFLICT (singleton) DO NOTHING;
 UPDATE public.alumnos             SET entrenador_id = :'principal_uid' WHERE entrenador_id::text = 'entrenador_principal';
 UPDATE public.rutinas             SET entrenador_id = :'principal_uid' WHERE entrenador_id::text = 'entrenador_principal';
