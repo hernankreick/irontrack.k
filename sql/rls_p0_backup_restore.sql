@@ -29,7 +29,11 @@ END $$;
 
 -- ───────── R2 · Restaurar políticas, RLS y grants EXACTOS (después de revertir la migración 2) ─────────
 -- Cuándo: la migración 2 dejó la app inutilizable y se necesita volver al estado previo exacto (incluye ejercicios_custom, ejercicios_custom_backup_pre_fase1 y entrenadores).
--- Los grants se restauran desde el ACL EFECTIVO del snapshot (incl. predeterminados). Comprobar después con el bloque D de verify (cambiaron = 0).
+-- QUÉ RESTAURA EXACTAMENTE: el ACL DIRECTO de PUBLIC, anon y authenticated sobre las tablas gestionadas (a nivel de tabla y de columna; tabla `grants`
+-- del snapshot, que usa acldefault() cuando la tabla tenía ACL implícito), más políticas y banderas RLS/FORCE.
+-- QUÉ NO TOCA: grants de otros roles, pertenencia a roles (herencia), propietarios, default privileges y permisos de funciones. Las migraciones
+-- tampoco los modifican, así que los privilegios EFECTIVOS (que incluyen lo heredado) vuelven a su valor original; el bloque D del verify lo comprueba
+-- (efectivos + ACL directo + columnas). Si alguien cambió esas otras cosas entre la copia y la restauración, D lo mostrará y R2 NO lo corrige.
 -- Borra las políticas actuales de las tablas gestionadas y recrea las del snapshot; restaura RLS/FORCE y los grants de PUBLIC/anon/authenticated.
 -- Reabre la exposición anterior (acceso_total): usar solo como emergencia y corregir hacia adelante cuanto antes.
 DO $$
@@ -58,6 +62,10 @@ BEGIN
   END LOOP;
   FOR r IN SELECT * FROM backup_rls_p0.grants WHERE tbl = ANY(managed) AND kind = 'r' AND grantee IN ('PUBLIC', 'anon', 'authenticated') AND to_regclass('public.' || tbl) IS NOT NULL LOOP
     EXECUTE format('GRANT %s ON TABLE public.%I TO %s%s', r.privilege_type, r.tbl, r.grantee, CASE WHEN r.is_grantable THEN ' WITH GRANT OPTION' ELSE '' END);
+  END LOOP;
+  -- privilegios por columna (el REVOKE ALL de tabla también los eliminó)
+  FOR r IN SELECT * FROM backup_rls_p0.column_grants WHERE tbl = ANY(managed) AND grantee IN ('PUBLIC', 'anon', 'authenticated') AND to_regclass('public.' || tbl) IS NOT NULL LOOP
+    EXECUTE format('GRANT %s (%I) ON TABLE public.%I TO %s%s', r.privilege_type, r.col, r.tbl, r.grantee, CASE WHEN r.is_grantable THEN ' WITH GRANT OPTION' ELSE '' END);
   END LOOP;
 END $$;
 

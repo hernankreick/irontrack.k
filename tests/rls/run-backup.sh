@@ -27,6 +27,9 @@ q $DB "ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated; CREA
 # tabla con ACL implícito (relacl NULL): sin default privileges para anon/authenticated
 q $DB "ALTER DEFAULT PRIVILEGES REVOKE ALL ON TABLES FROM anon, authenticated; CREATE TABLE public.zz_implicito(i int); ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated" >/dev/null
 [ "$(q $DB "SELECT relacl IS NULL FROM pg_class WHERE relname='zz_implicito'")" = "t" ] && ok "precondición: zz_implicito tiene ACL implícito (relacl NULL)" || bad "precondición ACL implícito"
+# Privilegios HEREDADOS y por COLUMNA (casos que el ACL de tabla no refleja): anon hereda SELECT sobre alumnos de otro rol; authenticated solo tiene SELECT(contenido) en notas
+q $DB "CREATE ROLE inh_role NOLOGIN; GRANT SELECT ON public.alumnos TO inh_role; GRANT inh_role TO anon; REVOKE ALL ON public.notas FROM authenticated; GRANT SELECT (contenido) ON public.notas TO authenticated" >/dev/null
+[ "$(q $DB "SELECT (SELECT count(*) FROM pg_auth_members m JOIN pg_roles r ON r.oid=m.roleid WHERE r.rolname='inh_role')||'/'||has_column_privilege('authenticated','public.notas','contenido','SELECT')||'/'||has_table_privilege('authenticated','public.notas','SELECT')")" = "1/true/false" ] && ok "precondición: herencia (anon<-inh_role) y privilegio SOLO por columna (authenticated en notas)" || bad "precondición herencia/columna"
 # tabla SIN clave única (no se debe asumir ninguna)
 q $DB "ALTER TABLE mensajes DROP CONSTRAINT mensajes_pkey" >/dev/null
 SNAP="SELECT md5(string_agg(format('%s|%s|%s|%s|%s|%s|%s',tablename,policyname,permissive,roles,cmd,qual,with_check), E'\n' ORDER BY tablename,policyname)) FROM pg_policies WHERE schemaname='public' AND tablename NOT IN ('coach_principal','rls_p0_backfill_log')"
@@ -64,8 +67,13 @@ lines=$(wc -l < $WORK/a.out); bad_rows=$(grep -vc '|t|t$' $WORK/a.out)
 
 echo "### 3. Backfill + migración 2 + datos nuevos y daños simulados"
 RUN "$P -v ON_ERROR_STOP=1 -d $DB -v principal_uid=$PUID -v expected_alumnos=2 -f $BF" >/dev/null 2>&1 && sql $DB $M2 >/dev/null && ok "backfill y migración 2 aplicados" || bad "backfill/M2"
-sed -n '/^-- D)/,/^-- E)/p' $BV | grep -v '^--' > $WORK/blkD0.sql; chmod a+r $WORK/blkD0.sql
-RUN "$P -d $DB -At -F '|' -f $WORK/blkD0.sql" 2>&1 | grep -qE '^anon\|[1-9][0-9]*\|' && ok "bloque D tras la migración 2: detecta que los privilegios efectivos de anon CAMBIARON (esperado)" || bad "bloque D no detecta cambios tras M2"
+sed -n '/^-- D)/,/^-- E)/p' $BV | grep -v '^--' > $WORK/blkD.sql; chmod a+r $WORK/blkD.sql
+RUN "$P -d $DB -At -F '|' -f $WORK/blkD.sql" > $WORK/d1.out 2>&1
+[ "$(wc -l < $WORK/d1.out)" = "5" ] && ok "bloque D devuelve 5 verificaciones (efectivos x3, ACL directo tablas, ACL columnas)" || { bad "bloque D formato"; cat $WORK/d1.out; }
+awk -F'|' '$1=="acl directo tablas" && $2>0 {f=1} END{exit !f}' $WORK/d1.out && ok "tras la migración 2: D detecta que el ACL directo de tablas CAMBIÓ (esperado)" || bad "D no detecta ACL directo tras M2"
+awk -F'|' '$1=="efectivos anon" && $2>0 {f=1} END{exit !f}' $WORK/d1.out && ok "tras la migración 2: D detecta cambio de privilegios efectivos de anon" || bad "D no detecta efectivos tras M2"
+awk -F'|' '$1=="acl columnas" && $2>0 {f=1} END{exit !f}' $WORK/d1.out && ok "tras la migración 2: D detecta que el privilegio por columna de authenticated cambió (REVOKE de tabla lo elimina)" || { bad "D no detecta columnas tras M2"; cat $WORK/d1.out; }
+[ "$(q $DB "SELECT has_table_privilege('anon','public.alumnos','SELECT')")" = "t" ] && ok "la herencia mantiene SELECT efectivo de anon sobre alumnos aunque M2 revocó su ACL directo (por eso D compara también el ACL directo)" || bad "herencia no enmascara"
 q $DB "INSERT INTO progreso(alumno_id,ejercicio_id,sets,reps,kg,fecha,semana) VALUES ('11111111-1111-1111-1111-111111111111','nuevo',1,1,77,'2026-02-01',2); UPDATE progreso SET kg=999 WHERE ejercicio_id='sq' AND kg=120; DELETE FROM progreso WHERE kg=100" >/dev/null
 sed -n '/^WITH keys/,/^ *ORDER BY k.tbl;/p' $BV > $WORK/blkB.sql; chmod a+r $WORK/blkB.sql
 RUN "$P -d $DB -At -F '|' -f $WORK/blkB.sql" > $WORK/b.out 2>&1
@@ -94,8 +102,10 @@ q $DB "SELECT 1" >/dev/null
 [ "$(q $DB "$SNAP")" = "$POL0" ] && ok "R2: las políticas vuelven EXACTAS al snapshot (md5 de las políticas originales)" || bad "R2 políticas distintas"
 [ "$(q $DB "$GR")" = "$GR0" ] && ok "R2: los grants de PUBLIC/anon/authenticated vuelven exactos" || bad "R2 grants distintos"
 [ "$(q $DB "SELECT string_agg(relname||relrowsecurity::text, ',' ORDER BY relname) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE nspname='public' AND relkind='r' AND relname NOT IN ('coach_principal','rls_p0_backfill_log')")" = "$RLS0" ] && ok "R2: banderas RLS idénticas (incl. ejercicio_overrides sin RLS)" || bad "R2 flags RLS"
-sed -n '/^-- D)/,/^-- E)/p' $BV | grep -v '^--' > $WORK/blkD.sql; chmod a+r $WORK/blkD.sql
-d=$(RUN "$P -d $DB -At -F '|' -f $WORK/blkD.sql" 2>&1 | tr '\n' ' '); [ "$d" = "anon|0|*" ] || echo "$d" | grep -qE "^anon\|0\|[0-9]+ authenticated\|0\|[0-9]+ service_role\|0\|[0-9]+" && ok "bloque D tras R2: privilegios efectivos idénticos al snapshot (cambiaron = 0 para anon, authenticated, service_role)" || bad "bloque D tras R2: $d"
+RUN "$P -d $DB -At -F '|' -f $WORK/blkD.sql" > $WORK/d2.out 2>&1
+[ "$(wc -l < $WORK/d2.out)" = "5" ] && [ "$(awk -F'|' '$2!="0"' $WORK/d2.out | wc -l)" = "0" ] && ok "bloque D tras R2: las 5 verificaciones en 0 (efectivos anon/authenticated/service_role, ACL directo, ACL columnas)" || { bad "bloque D tras R2"; cat $WORK/d2.out; }
+[ "$(q $DB "SELECT has_column_privilege('authenticated','public.notas','contenido','SELECT')||'/'||has_table_privilege('authenticated','public.notas','SELECT')")" = "true/false" ] && ok "R2 restauró el privilegio SOLO por columna (sin privilegio de tabla)" || bad "columna no restaurada"
+[ "$(q $DB "SELECT has_table_privilege('anon','public.alumnos','SELECT')")" = "t" ] && ok "tras R2 la herencia de anon sobre alumnos sigue intacta (R2 no toca otros roles)" || bad "herencia alterada"
 echo "### 6. Verificar (C) objetos"
 sed -n '/^-- C)/,$p' $BV | grep -v '^--' > $WORK/blkC.sql; chmod a+r $WORK/blkC.sql
 RUN "$P -d $DB -At -F '|' -f $WORK/blkC.sql" | head -6

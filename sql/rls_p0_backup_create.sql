@@ -82,9 +82,10 @@ CREATE TABLE backup_rls_p0.effective_privs AS
          CROSS JOIN (SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')) r
          CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')) p(priv)
    WHERE n.nspname = 'public' AND c.relkind = 'r';
-CREATE TABLE backup_rls_p0.column_grants AS   -- privilegios a nivel de columna (poco comunes)
-  SELECT c.relname AS tbl, a.attname AS col, a.attacl::text AS acl
-    FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+CREATE TABLE backup_rls_p0.column_grants AS   -- privilegios a nivel de columna (ACL por columna, estructurado para poder restaurarlos)
+  SELECT c.relname AS tbl, a.attname AS col,
+         CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END AS grantee, x.privilege_type, x.is_grantable
+    FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace, aclexplode(a.attacl) x
    WHERE n.nspname = 'public' AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped AND a.attacl IS NOT NULL;
 CREATE TABLE backup_rls_p0.default_acls AS     -- default privileges: explican los permisos "implícitos" de objetos futuros
   SELECT d.defaclrole::regrole::text AS owner_role, coalesce(n.nspname, '(global)') AS schema_name, d.defaclobjtype::text AS objtype, d.defaclacl::text AS acl

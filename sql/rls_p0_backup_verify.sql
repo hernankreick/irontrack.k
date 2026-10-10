@@ -51,12 +51,47 @@ UNION ALL SELECT 'funciones', (SELECT count(*) FROM backup_rls_p0.functions), (S
 UNION ALL SELECT 'constraints', (SELECT count(*) FROM backup_rls_p0.constraints), (SELECT count(*) FROM pg_constraint WHERE connamespace='public'::regnamespace)
 UNION ALL SELECT 'auth.users', (SELECT count(*) FROM backup_rls_p0.auth_users_min), (SELECT count(*) FROM auth.users);
 
--- D) Privilegios EFECTIVOS (tabla x rol x privilegio) hoy vs snapshot. Antes de migrar: cambiaron = 0. Tras la migración 2 cambian (esperado).
---    Tras restaurar con R2: debe volver a 0.
-SELECT e.role, count(*) FILTER (WHERE e.granted IS DISTINCT FROM has_table_privilege(e.role, to_regclass('public.' || e.tbl), e.priv)) AS cambiaron, count(*) AS comparados
+-- D) Privilegios hoy vs snapshot (3 niveles). Antes de migrar: cambiaron = 0 en todas las filas. Tras la migración 2 cambian (esperado).
+--    Tras restaurar con R2: TODAS las filas deben volver a 0.
+--      efectivos *            = has_table_privilege por rol (incluye herencia por pertenencia a roles, PUBLIC y predeterminados)
+--      acl directo tablas     = ACL propio de PUBLIC/anon/authenticated sobre las tablas del snapshot (lo que R2 restaura)
+--      acl columnas           = privilegios por columna de PUBLIC/anon/authenticated (lo que R2 restaura)
+--    Un privilegio heredado puede ocultar un ACL directo distinto en "efectivos"; por eso se comparan también los dos ACL.
+SELECT 'efectivos ' || e.role AS verificacion,
+       count(*) FILTER (WHERE e.granted IS DISTINCT FROM has_table_privilege(e.role, to_regclass('public.' || e.tbl), e.priv)) AS cambiaron,
+       count(*) AS comparados
   FROM backup_rls_p0.effective_privs e
  WHERE to_regclass('public.' || e.tbl) IS NOT NULL
- GROUP BY e.role ORDER BY e.role;
+ GROUP BY e.role
+UNION ALL
+SELECT 'acl directo tablas', count(*), NULL FROM (
+  (SELECT tbl, grantee, privilege_type, is_grantable FROM backup_rls_p0.grants WHERE kind = 'r' AND grantee IN ('PUBLIC','anon','authenticated') AND to_regclass('public.' || tbl) IS NOT NULL
+   EXCEPT
+   SELECT c.relname, CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END, a.privilege_type, a.is_grantable
+     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace, aclexplode(coalesce(c.relacl, acldefault('r'::"char", c.relowner))) a
+    WHERE n.nspname = 'public' AND c.relkind = 'r')
+  UNION ALL
+  (SELECT c.relname, CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END, a.privilege_type, a.is_grantable
+     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace, aclexplode(coalesce(c.relacl, acldefault('r'::"char", c.relowner))) a
+    WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname IN (SELECT tbl FROM backup_rls_p0.rls_flags)
+      AND (a.grantee = 0 OR a.grantee IN ('anon'::regrole, 'authenticated'::regrole))
+   EXCEPT
+   SELECT tbl, grantee, privilege_type, is_grantable FROM backup_rls_p0.grants WHERE kind = 'r' AND grantee IN ('PUBLIC','anon','authenticated'))) d
+UNION ALL
+SELECT 'acl columnas', count(*), NULL FROM (
+  (SELECT tbl, col, grantee, privilege_type, is_grantable FROM backup_rls_p0.column_grants WHERE grantee IN ('PUBLIC','anon','authenticated')
+   EXCEPT
+   SELECT c.relname, a.attname, CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, x.privilege_type, x.is_grantable
+     FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace, aclexplode(a.attacl) x
+    WHERE n.nspname = 'public' AND c.relkind = 'r' AND a.attacl IS NOT NULL AND NOT a.attisdropped)
+  UNION ALL
+  (SELECT c.relname, a.attname, CASE WHEN x.grantee = 0 THEN 'PUBLIC' ELSE x.grantee::regrole::text END, x.privilege_type, x.is_grantable
+     FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace, aclexplode(a.attacl) x
+    WHERE n.nspname = 'public' AND c.relkind = 'r' AND a.attacl IS NOT NULL AND NOT a.attisdropped AND c.relname IN (SELECT tbl FROM backup_rls_p0.rls_flags)
+      AND (x.grantee = 0 OR x.grantee IN ('anon'::regrole, 'authenticated'::regrole))
+   EXCEPT
+   SELECT tbl, col, grantee, privilege_type, is_grantable FROM backup_rls_p0.column_grants WHERE grantee IN ('PUBLIC','anon','authenticated'))) d
+ORDER BY 1;
 
 -- E) El esquema de respaldo NO es accesible por API: usage_esquema debe ser false y privilegios_tablas = 0 para anon y authenticated.
 SELECT ro.rolname AS rol, has_schema_privilege(ro.rolname, 'backup_rls_p0', 'USAGE') AS usage_esquema,
