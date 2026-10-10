@@ -21,6 +21,7 @@ Prueba local (Postgres efímero, datos ficticios, nunca producción): `tests/rls
 4. Backfill/seed manual (rol postgres), **solo tras revisión**:
    `psql "$DB" -v principal_uid=e2447231-c0ba-4f90-946f-63bf364570af -v expected_alumnos=9 -f sql/rls_p0_backfill_entrenador_principal.sql`
    (aborta sin modificar nada si el UID no existe, figura como alumno, hay otro principal, o los alumnos legacy != 9).
+4b. Si se usa el SQL Editor de Supabase (sin psql), usar `sql/rls_p0_backfill_sql_editor.sql` (mismos controles, valores fijos).
 5. Deploy del frontend. 6. Migración `20261010120000_rls_p0_lockdown.sql` (aborta sin coach_principal o con legacy restante).
 
 ## Verificaciones posteriores

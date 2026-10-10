@@ -167,7 +167,7 @@ DECLARE t text; p record;
 BEGIN
   FOREACH t IN ARRAY ARRAY['alumnos','progreso','rutinas','sesiones','fotos','mensajes','config','notas',
                            'video_overrides','ejercicio_overrides','ejercicios_custom','entrenadores',
-                           'coach_calendar_assignments','coach_notification_reads']
+                           'coach_calendar_assignments','coach_notification_reads','ejercicios_custom_backup_pre_fase1']
   LOOP
     IF to_regclass('public.'||t) IS NULL THEN
       RAISE NOTICE 'tabla public.% no existe, se omite', t; CONTINUE;
@@ -186,8 +186,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.alumnos, public.rutinas, public.m
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.progreso, public.sesiones TO authenticated; -- DELETE solo lo habilita RLS al coach
 GRANT SELECT, UPDATE ON public.config TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.entrenadores TO authenticated;
-GRANT SELECT, INSERT, DELETE ON public.coach_calendar_assignments TO authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.coach_notification_reads TO authenticated;
+-- ejercicios_custom_backup_pre_fase1: queda con RLS activo, sin políticas y sin grants (solo service_role/postgres).
 
 -- 5) Políticas ---------------------------------------------------------------
 -- entrenadores: solo la propia fila.
@@ -278,13 +277,21 @@ CREATE POLICY ejercicios_custom_owner ON public.ejercicios_custom FOR ALL TO aut
   WITH CHECK (entrenador_id::text = auth.uid()::text AND public.it_is_entrenador());
 CREATE POLICY ejercicios_custom_alumno_select ON public.ejercicios_custom FOR SELECT TO authenticated USING (public.it_is_my_coach(entrenador_id::text));
 
--- coach_* (ya versionadas en sql/): mismas reglas, ahora TO authenticated.
-CREATE POLICY coach_calendar_select ON public.coach_calendar_assignments FOR SELECT TO authenticated USING (auth.uid() = entrenador_id);
-CREATE POLICY coach_calendar_insert ON public.coach_calendar_assignments FOR INSERT TO authenticated WITH CHECK (auth.uid() = entrenador_id);
-CREATE POLICY coach_calendar_delete ON public.coach_calendar_assignments FOR DELETE TO authenticated USING (auth.uid() = entrenador_id);
-CREATE POLICY coach_reads_select ON public.coach_notification_reads FOR SELECT TO authenticated USING (auth.uid() = entrenador_id);
-CREATE POLICY coach_reads_insert ON public.coach_notification_reads FOR INSERT TO authenticated WITH CHECK (auth.uid() = entrenador_id);
-CREATE POLICY coach_reads_update ON public.coach_notification_reads FOR UPDATE TO authenticated
-  USING (auth.uid() = entrenador_id) WITH CHECK (auth.uid() = entrenador_id);
+-- coach_* (versionadas en sql/): mismas reglas, ahora TO authenticated. Tablas opcionales: en producción
+-- coach_notification_reads puede no existir (sql/coach_notification_reads.sql no aplicado).
+DO $$ BEGIN
+  IF to_regclass('public.coach_calendar_assignments') IS NOT NULL THEN
+    EXECUTE 'GRANT SELECT, INSERT, DELETE ON public.coach_calendar_assignments TO authenticated';
+    EXECUTE 'CREATE POLICY coach_calendar_select ON public.coach_calendar_assignments FOR SELECT TO authenticated USING (auth.uid() = entrenador_id)';
+    EXECUTE 'CREATE POLICY coach_calendar_insert ON public.coach_calendar_assignments FOR INSERT TO authenticated WITH CHECK (auth.uid() = entrenador_id)';
+    EXECUTE 'CREATE POLICY coach_calendar_delete ON public.coach_calendar_assignments FOR DELETE TO authenticated USING (auth.uid() = entrenador_id)';
+  END IF;
+  IF to_regclass('public.coach_notification_reads') IS NOT NULL THEN
+    EXECUTE 'GRANT SELECT, INSERT, UPDATE ON public.coach_notification_reads TO authenticated';
+    EXECUTE 'CREATE POLICY coach_reads_select ON public.coach_notification_reads FOR SELECT TO authenticated USING (auth.uid() = entrenador_id)';
+    EXECUTE 'CREATE POLICY coach_reads_insert ON public.coach_notification_reads FOR INSERT TO authenticated WITH CHECK (auth.uid() = entrenador_id)';
+    EXECUTE 'CREATE POLICY coach_reads_update ON public.coach_notification_reads FOR UPDATE TO authenticated USING (auth.uid() = entrenador_id) WITH CHECK (auth.uid() = entrenador_id)';
+  END IF;
+END $$;
 
 COMMIT;
