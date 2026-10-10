@@ -1770,7 +1770,7 @@ function GymApp() {
       if(res && res[0]) setAliasData(res[0]);
     }).catch(()=>{});
     // Cargar video overrides
-    sb.getVideoOverrides().then(function(res){
+    sb.getVideoOverrides(supabaseSessionUserId || sessionData?.entrenadorId || null).then(function(res){
       if(res && Array.isArray(res)) {
         var map = {};
         res.forEach(function(r){ map[r.ejercicio_id] = r.youtube_url; });
