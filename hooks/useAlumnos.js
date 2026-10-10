@@ -1,10 +1,8 @@
 // ── hooks/useAlumnos.js ──────────────────────────────────────────────────
 import { useState, useCallback, useRef } from 'react';
 import { cleanActiveCoachAlumnos } from '../lib/appHelpers.js';
+import { supabase } from '../lib/supabaseClient.js';
 import { ALUMNOS_STATUS, createAlumnosController } from '../lib/coachAlumnosLoad.js';
-
-const ONESIGNAL_APP_ID = '8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7';
-const ONESIGNAL_KEY = 'os_v2_app_rrpcxujkzbexve7l7ud6lttu24fxxofjnc3eke5wljs2bkhvuto27d46nxt5r7pvgtnpsrxphnbgr35vfdsiesntivkncl75aq4gyuy';
 
 export function useAlumnos({ sb }) {
 
@@ -47,19 +45,11 @@ export function useAlumnos({ sb }) {
     try {
       const alumno = alumnos.find(a => a.id === alumnoId);
       if (!alumno?.onesignal_id) return;
-      await fetch('https://onesignal.com/api/v1/notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Basic ' + ONESIGNAL_KEY,
-        },
-        body: JSON.stringify({
-          app_id:            ONESIGNAL_APP_ID,
-          include_player_ids: [alumno.onesignal_id],
-          headings:  { en: 'IRON TRACK 💪', es: 'IRON TRACK 💪' },
-          contents:  { en: mensaje, es: mensaje },
-        }),
+      // El envio lo hace la Edge Function notify-alumno (clave privada solo en el servidor).
+      const { error } = await supabase.functions.invoke('notify-alumno', {
+        body: { alumnoId, mensaje },
       });
+      if (error) console.log('Push error:', error);
     } catch (e) {
       console.log('Push error:', e);
     }
