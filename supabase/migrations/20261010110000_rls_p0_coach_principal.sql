@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS public.coach_principal (
 ALTER TABLE public.coach_principal ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.coach_principal FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.coach_principal TO authenticated;
+-- service_role (Edge Functions) bypasea RLS pero necesita el privilegio de tabla; no depender de los default privileges del proyecto.
+GRANT SELECT ON TABLE public.coach_principal TO service_role;
 DROP POLICY IF EXISTS coach_principal_select_self ON public.coach_principal;
 CREATE POLICY coach_principal_select_self ON public.coach_principal FOR SELECT TO authenticated
   USING (uid::text = auth.uid()::text);
