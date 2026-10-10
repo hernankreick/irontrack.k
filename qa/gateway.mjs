@@ -9,6 +9,8 @@ import { handleUpdateAlumnoPassword } from "../supabase/functions/update-alumno-
 const PORT = Number(process.env.QA_GATEWAY_PORT || 54321);
 const PUBLIC_URL = assertLocalSupabaseUrl(`http://127.0.0.1:${PORT}`);
 const TARGETS = { "/auth/v1": { host: "127.0.0.1", port: 9999 }, "/rest/v1": { host: "127.0.0.1", port: 3000 } };
+// Si QA_FUNCTION_URL esta definida (p. ej. el index.ts real corriendo en Deno), la funcion se reenvia alli en vez de ejecutarse en Node.
+const FUNCTION_URL = process.env.QA_FUNCTION_URL ? assertLocalSupabaseUrl(process.env.QA_FUNCTION_URL, "QA_FUNCTION_URL") : null;
 const admin = createClient(PUBLIC_URL, serviceKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 
 const cors = {
@@ -21,6 +23,14 @@ const cors = {
 http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(); }
   const url = req.url || "/";
+  if (url.startsWith("/functions/v1/update-alumno-password") && FUNCTION_URL) {
+    const f = new URL(FUNCTION_URL);
+    const up = http.request({ host: f.hostname, port: f.port, method: req.method, path: "/", headers: { ...req.headers, host: f.host } }, (r) => {
+      const h = { ...r.headers }; delete h["access-control-allow-origin"]; res.writeHead(r.statusCode || 502, { ...h, ...cors }); r.pipe(res);
+    });
+    up.on("error", (e) => { res.writeHead(502, cors); res.end(String(e)); });
+    return req.pipe(up);
+  }
   if (url.startsWith("/functions/v1/update-alumno-password")) {
     const chunks = []; for await (const c of req) chunks.push(c);
     let body = null; try { body = JSON.parse(Buffer.concat(chunks).toString() || "null"); } catch (e) {}

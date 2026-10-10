@@ -16,6 +16,8 @@ Prueba local (Postgres efímero, datos ficticios, nunca producción): `tests/rls
    `select entrenador_id, count(*) from alumnos group by 1`.
 6. Validar con un dump real (QA): los tipos de columnas se castean a `::text`, pero el esquema de pruebas es reconstruido.
 
+> Orden vigente y decisión operativa: **docs/despliegue-rls-p0.md** (incluye el preflight de solo lectura `sql/rls_p0_preflight_readonly.sql` como paso 0).
+
 ## Orden exacto (ventana de mantenimiento corta, un solo entrenador)
 Regla: frontend y Edge Function nuevos dependen del backfill (consultan por UUID); la migración RLS depende de ambos.
 La contraseña de Auth del entrenador se rota DESPUÉS de publicar el frontend nuevo (el login viejo exige `irontrack2024`) y ANTES de la migración RLS.

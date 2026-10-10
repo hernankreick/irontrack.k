@@ -21,8 +21,10 @@
 ```bash
 qa/stack.sh up          # descarga PostgREST, compila Auth (≈1 min la primera vez), crea la base irontrack_qa en 127.0.0.1:54322 y levanta todo en 127.0.0.1:54321
 node qa/test-guard.mjs  # controles anti-producción (sin red)
+node qa/test-preflight.mjs   # prueba el preflight de SOLO LECTURA (sql/rls_p0_preflight_readonly.sql)
 node qa/e2e-api.mjs     # secuencia real: estado inseguro → M1 → backfill → M2 + permisos con JWT reales + función
 node qa/e2e-ui.mjs      # Vite + Chromium (Playwright): login coach/alumno y pantallas
+qa/functions-deno.sh up # opcional: el index.ts REAL de la función en Deno (requiere `deno`); repetir node qa/e2e-api.mjs
 qa/stack.sh down
 ```
 Cada ejecución de los e2e **recrea el esquema `public` de la base local** con datos ficticios (9 alumnos `entrenador_principal`, entrenador `entrenador@irontrack.app` local, alumnos A/B, ajeno). Las contraseñas son aleatorias, solo en memoria.
@@ -44,7 +46,7 @@ node qa/e2e-api.mjs && node qa/e2e-ui.mjs   # no usar el gateway Node: Kong del 
 
 ## 4. Límites (no confundir con validación sobre producción)
 - El esquema `public` es **reconstruido** (columnas inferidas del código y de los metadatos), no un `pg_dump` real: falta validar defaults, índices, FKs `ON DELETE` y tipos exactos.
-- Camino A ejecuta la función en Node (no Deno) y no incluye Realtime, Storage ni OneSignal.
+- Por defecto la función corre en Node; con `qa/functions-deno.sh up` corre el `index.ts` real en Deno 2.9 (verificado 22/22), con el import de esm.sh resuelto como `npm:`. No se probó el runtime de Edge de Supabase (verify_jwt de plataforma, límites) ni Realtime, Storage u OneSignal.
 - Por UI no se cubren aún: alta de alumno, registro de series, cambio de contraseña desde el modal (sí por API).
 - Linux x86-64 únicamente para el camino A.
 

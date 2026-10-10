@@ -59,7 +59,7 @@ q(`INSERT INTO video_overrides(entrenador_id,ejercicio_id,youtube_url) VALUES ('
 q(`NOTIFY pgrst, 'reload schema'`);
 await new Promise((r) => setTimeout(r, 1500));
 
-if (beforeMigrations) await beforeMigrations();
+if (beforeMigrations) await beforeMigrations({ coach, ua, ub, ux });
 
 // ───────── Secuencia de despliegue: M1 -> backfill (variante SQL Editor) -> M2 ─────────
 sqlFile("supabase/migrations/20261010110000_rls_p0_coach_principal.sql");
