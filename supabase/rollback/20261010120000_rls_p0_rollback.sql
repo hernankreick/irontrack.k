@@ -26,7 +26,9 @@ BEGIN
   EXECUTE 'CREATE POLICY entrenadores_self ON public.entrenadores FOR ALL TO public USING (auth.uid() = id) WITH CHECK (auth.uid() = id)';
 END $$;
 DROP FUNCTION IF EXISTS public.it_guard_alumnos_update(), public.it_guard_rutinas_update(), public.it_guard_mensajes_update(),
-  public.it_is_coach_of(text), public.it_is_alumno(text), public.it_is_my_coach(text);
+  public.it_is_coach_of(text), public.it_is_alumno(text), public.it_is_my_coach(text),
+  public.it_is_entrenador(), public.it_is_principal();
 COMMIT;
+-- coach_principal (migracion 20261010110000) se conserva: es inocua y no se usa tras el rollback.
 -- Nota: ejercicios_custom queda con RLS activo y SIN políticas tras el rollback si no existía política previa;
 -- restaurar su política original desde el respaldo (pg_policies guardado antes del despliegue).

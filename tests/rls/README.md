@@ -4,18 +4,24 @@ Prueba local (Postgres efímero, datos ficticios, nunca producción): `tests/rls
 (el esquema base `00_baseline.sql` está RECONSTRUIDO desde el código y los hallazgos; no es un dump de producción).
 
 ## Dependencias previas (bloqueantes)
-1. **Backfill de `entrenador_principal`**: `server/edge update-alumno-password` y "Nuevo alumno" usan el string legacy
-   `entrenador_principal`. La migración **aborta** si algún `alumnos.entrenador_id` no es un `entrenadores.id` real.
-   El dueño debe indicar el UUID del entrenador (`entrenadores.id`): `psql "$DB" -v principal_uid=<uuid> -f sql/rls_p0_backfill_entrenador_principal.sql`.
-2. **Cada entrenador debe tener fila en `entrenadores`** (la app la crea en login; sin ella no puede insertar alumnos/overrides).
-3. **Alumnos con `auth_uid` NULL** no podrán entrar como alumno (la migración avisa con WARNING). Verificar: `select count(*) from alumnos where auth_uid is null` (prod informó 0).
-4. Frontend de este commit (`getVideoOverrides` con el id real del entrenador) desplegado **antes o junto** con la migración.
-5. Guardar antes: `pg_dump --schema-only`, `select * from pg_policies where schemaname='public'` y `\dp public.*` (para reversión exacta).
-6. Verificar tipos reales de columnas (las políticas castean a `::text`, por lo que son tolerantes a uuid/text).
+1. **Entrenador principal verificado por el propietario** (SQL de solo lectura en producción): `entrenador@irontrack.app`
+   = `e2447231-c0ba-4f90-946f-63bf364570af` (auth.users.id = entrenadores.id); los 9 alumnos son suyos.
+2. **Contraseña de Auth del entrenador**: el frontend ya no contiene ni muestra `irontrack2024`, pero si la contraseña real
+   de Auth sigue siendo esa, el valor queda en el historial de git y en bundles ya servidos. **Rotarla en Supabase Auth
+   antes de aplicar la migración** (acción del propietario; no se hizo aquí).
+3. Alumnos con `auth_uid` NULL no podrán entrar como alumno (WARNING; producción informó 0).
+4. Frontend de este commit desplegado **antes o junto** con la migración (login sin contraseña por defecto y sin signUp
+   de migración, `getVideoOverrides` con el id real).
+5. Guardar antes: `pg_dump --schema-only`, `select * from pg_policies where schemaname='public'`, `\dp public.*` y
+   `select entrenador_id, count(*) from alumnos group by 1`.
+6. Validar con un dump real (QA): los tipos de columnas se castean a `::text`, pero el esquema de pruebas es reconstruido.
 
-## Orden
-1. Backup + respaldo de políticas/grants. 2. Backfill (paso 1 arriba). 3. Deploy frontend. 4. Aplicar
-   `supabase/migrations/20261010120000_rls_p0_lockdown.sql` (transaccional; todo o nada).
+## Orden exacto
+1. Backup (punto 5). 2. Rotar contraseña (punto 2). 3. Migración `20261010110000_rls_p0_coach_principal.sql` (inocua).
+4. Backfill/seed manual (rol postgres), **solo tras revisión**:
+   `psql "$DB" -v principal_uid=e2447231-c0ba-4f90-946f-63bf364570af -v expected_alumnos=9 -f sql/rls_p0_backfill_entrenador_principal.sql`
+   (aborta sin modificar nada si el UID no existe, figura como alumno, hay otro principal, o los alumnos legacy != 9).
+5. Deploy del frontend. 6. Migración `20261010120000_rls_p0_lockdown.sql` (aborta sin coach_principal o con legacy restante).
 
 ## Verificaciones posteriores
 - `select * from pg_policies where schemaname='public' and (qual='true' or with_check='true')` → 0 filas.
@@ -28,9 +34,15 @@ Prueba local (Postgres efímero, datos ficticios, nunca producción): `tests/rls
 Reversión exacta de políticas de `ejercicios_custom`/`entrenadores`: reaplicar desde el respaldo del paso 5.
 
 ## Riesgos residuales
-- `config` es una fila global (`id='pagos'`): cualquier entrenador registrado puede editarla y todo usuario vinculado la lee. Requiere `entrenador_id` en `config` (fuera de alcance).
-- Registro de entrenador abierto: cualquier usuario Auth que no sea alumno puede crear su fila en `entrenadores` (flujo actual de alta); solo accede a sus propios datos.
-- El alumno puede reescribir `rutinas.datos` de su rutina (necesario para avanzar `semana_activa`); no puede cambiar nada más.
-- El entrenador puede editar `alumnos.auth_uid` de sus alumnos (lo necesita la gestión de cuentas); no otorga acceso a datos de terceros.
-- No validado contra el esquema real de producción ni contra la rama de sync V2 desplegada (solo contra sus llamadas: `sesiones` INSERT y `rutinas.datos` UPDATE del alumno).
-- Storage (bucket de fotos), Edge Functions con service_role y Realtime no fueron revisados.
+- `coach_principal` (singleton) no es escribible desde la API; solo el rol postgres/SQL Editor. `config` solo la edita el principal.
+- Privilegio de entrenador = fila en `entrenadores` y no estar vinculado como alumno. Las filas que el upsert del cliente creó para
+  alumnos no otorgan nada (la migración avisa cuántas hay; conviene borrarlas a mano). El alta de entrenadores sigue abierta a
+  usuarios Auth que no sean alumnos: solo acceden a sus propios datos (multi-tenant aislado).
+- El alumno solo puede cambiar `rutinas.datos.semana_activa` (entero 1..4, sin retroceder), `alumnos.onesignal_id` y `mensajes.leido`.
+- El entrenador puede editar `alumnos.auth_uid` de sus alumnos; un entrenador no principal podría degradar a otro entrenador
+  no principal vinculándolo como alumno (el principal no es afectable). Aceptado: hoy hay un solo entrenador.
+- Login: la identidad del entrenador la decide Supabase Auth; el email `entrenador@irontrack.app` en App.jsx solo elige la rama de UI.
+  No hay contraseñas fijas ni creación de cuentas desde el cliente. Las cuentas de alumno siguen dependiendo de la contraseña que asigna el coach.
+- Storage (bucket de fotos), Edge Functions con service_role y Realtime no fueron revisados. `service_role` conserva acceso total (EXECUTE
+  concedido a las funciones auxiliares).
+- No validado contra el esquema real de producción ni contra sync V2/OneSignal (fuera de alcance).

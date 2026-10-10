@@ -7,8 +7,12 @@
 --   alumno     : auth.uid() = alumnos.auth_uid  (NO alumnos.id, NO email)
 -- No se usa user_metadata, email del cliente ni 'entrenador_principal'.
 --
--- PRE-REQUISITO: todas las filas de alumnos deben tener entrenador_id = id real
--- de un entrenador. Si no, esta migración ABORTA (ver sql/rls_p0_backfill_entrenador_principal.sql).
+-- PRE-REQUISITOS (la migración ABORTA si no se cumplen):
+--   1. aplicada 20261010110000_rls_p0_coach_principal.sql y cargada la fila de coach_principal
+--      (sql/rls_p0_backfill_entrenador_principal.sql);
+--   2. todas las filas de alumnos tienen entrenador_id = id real de un entrenador.
+-- Privilegio de entrenador = fila en entrenadores Y NO estar vinculado como alumno (auth_uid).
+-- config solo la escribe el entrenador principal (coach_principal), que no es modificable desde la API.
 -- Sin SECURITY DEFINER. Idempotente (se puede re-ejecutar).
 -- =============================================================================
 BEGIN;
@@ -17,6 +21,21 @@ BEGIN;
 DO $$
 DECLARE n int;
 BEGIN
+  IF to_regclass('public.coach_principal') IS NULL THEN
+    RAISE EXCEPTION 'RLS P0 abortada: falta public.coach_principal (aplicar 20261010110000_rls_p0_coach_principal.sql)';
+  END IF;
+  SELECT count(*) INTO n FROM public.coach_principal cp JOIN public.entrenadores e ON e.id = cp.uid;
+  IF n <> 1 THEN
+    RAISE EXCEPTION 'RLS P0 abortada: coach_principal vacio o su uid no existe en entrenadores (ejecutar el backfill/seed)';
+  END IF;
+  SELECT count(*) INTO n FROM public.coach_principal cp JOIN public.alumnos a ON a.auth_uid::text = cp.uid::text;
+  IF n > 0 THEN
+    RAISE EXCEPTION 'RLS P0 abortada: el entrenador principal figura como alumnos.auth_uid';
+  END IF;
+  SELECT count(*) INTO n FROM public.entrenadores e JOIN public.alumnos a ON a.auth_uid::text = e.id::text;
+  IF n > 0 THEN
+    RAISE WARNING '% filas de entrenadores pertenecen a alumnos (creadas por el upsert del cliente): NO otorgan privilegios de entrenador; se recomienda borrarlas manualmente', n;
+  END IF;
   SELECT count(*) INTO n FROM public.alumnos a
    WHERE NOT EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = a.entrenador_id::text);
   IF n > 0 THEN
@@ -51,16 +70,26 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
                     AND a.auth_uid::text = auth.uid()::text)
 $$;
 
--- ¿el usuario autenticado tiene fila en entrenadores? (las filas de alumnos vinculados no pueden crearla: ver entrenadores_insert_self)
+-- Entrenador = fila en entrenadores Y no vinculado como alumno. Las filas que el upsert del cliente
+-- creó para alumnos NO otorgan privilegios.
 CREATE OR REPLACE FUNCTION public.it_is_entrenador()
 RETURNS boolean LANGUAGE sql STABLE AS $$
   SELECT EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = auth.uid()::text)
+     AND NOT EXISTS (SELECT 1 FROM public.alumnos a WHERE a.auth_uid::text = auth.uid()::text)
 $$;
 
-REVOKE ALL ON FUNCTION public.it_is_entrenador() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.it_is_entrenador() TO authenticated;
+-- Entrenador principal: fila protegida de coach_principal (sin escritura desde la API) con fila en entrenadores.
+-- No depende de alumnos.auth_uid para que otro entrenador no pueda degradarlo vinculándolo como alumno.
+CREATE OR REPLACE FUNCTION public.it_is_principal()
+RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (SELECT 1 FROM public.coach_principal cp WHERE cp.uid::text = auth.uid()::text)
+     AND EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = auth.uid()::text)
+$$;
+
+REVOKE ALL ON FUNCTION public.it_is_entrenador(), public.it_is_principal() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.it_is_entrenador(), public.it_is_principal() TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.it_is_coach_of(text), public.it_is_alumno(text), public.it_is_my_coach(text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.it_is_coach_of(text), public.it_is_alumno(text), public.it_is_my_coach(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.it_is_coach_of(text), public.it_is_alumno(text), public.it_is_my_coach(text) TO authenticated, service_role;
 
 -- 2) Triggers de guarda: lo que un alumno puede cambiar en un UPDATE.
 --    (auth.uid() NULL = service_role/postgres: no se restringe.)
@@ -75,14 +104,33 @@ BEGIN
   RETURN NEW;
 END $$;
 
+-- Alumno: solo datos.semana_activa (entero 1..4), nunca hacia atrás; ni otras columnas ni otras claves de datos.
 CREATE OR REPLACE FUNCTION public.it_guard_rutinas_update() RETURNS trigger
 LANGUAGE plpgsql AS $$
+DECLARE
+  o jsonb; n jsonb; nv jsonb; ov jsonb;
 BEGIN
-  IF auth.uid() IS NOT NULL
-     AND NOT public.it_is_coach_of(OLD.alumno_id::text)
+  IF auth.uid() IS NULL THEN RETURN NEW; END IF; -- service_role / postgres
+  IF NOT public.it_is_coach_of(OLD.alumno_id::text)
      AND OLD.entrenador_id::text IS DISTINCT FROM auth.uid()::text THEN
     IF (to_jsonb(NEW) - 'datos') IS DISTINCT FROM (to_jsonb(OLD) - 'datos') THEN
-      RAISE EXCEPTION 'alumno solo puede modificar datos de la rutina' USING ERRCODE = '42501';
+      RAISE EXCEPTION 'alumno solo puede modificar datos.semana_activa' USING ERRCODE = '42501';
+    END IF;
+    o := to_jsonb(OLD)->'datos'; n := to_jsonb(NEW)->'datos';
+    IF n IS NOT DISTINCT FROM o THEN RETURN NEW; END IF;
+    IF jsonb_typeof(o) IS DISTINCT FROM 'object' OR jsonb_typeof(n) IS DISTINCT FROM 'object' THEN
+      RAISE EXCEPTION 'datos invalido' USING ERRCODE = '42501';
+    END IF;
+    IF (n - 'semana_activa') IS DISTINCT FROM (o - 'semana_activa') THEN
+      RAISE EXCEPTION 'alumno solo puede modificar datos.semana_activa' USING ERRCODE = '42501';
+    END IF;
+    nv := n->'semana_activa'; ov := o->'semana_activa';
+    IF nv IS NULL OR jsonb_typeof(nv) <> 'number' OR (nv #>> '{}') !~ '^[1-4]$' THEN
+      RAISE EXCEPTION 'semana_activa debe ser un entero 1..4' USING ERRCODE = '42501';
+    END IF;
+    IF ov IS NOT NULL AND jsonb_typeof(ov) = 'number' AND (ov #>> '{}') ~ '^[1-4]$'
+       AND (nv #>> '{}')::int < (ov #>> '{}')::int THEN
+      RAISE EXCEPTION 'semana_activa no puede retroceder' USING ERRCODE = '42501';
     END IF;
   END IF;
   RETURN NEW;
@@ -91,7 +139,8 @@ END $$;
 CREATE OR REPLACE FUNCTION public.it_guard_mensajes_update() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-  IF auth.uid() IS NOT NULL AND NOT public.it_is_coach_of(OLD.alumno_id::text) THEN
+  IF auth.uid() IS NULL THEN RETURN NEW; END IF; -- service_role / postgres
+  IF NOT public.it_is_coach_of(OLD.alumno_id::text) THEN
     IF (to_jsonb(NEW) - 'leido') IS DISTINCT FROM (to_jsonb(OLD) - 'leido') THEN
       RAISE EXCEPTION 'alumno solo puede marcar mensajes como leidos' USING ERRCODE = '42501';
     END IF;
@@ -208,12 +257,12 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- config (fila global 'pagos'): lectura para usuarios identificados (entrenador o alumno vinculado); escritura solo entrenadores.
+-- config (fila global 'pagos'): lectura para usuarios identificados (entrenador o alumno vinculado); escritura SOLO el entrenador principal.
 CREATE POLICY config_read_known_users ON public.config FOR SELECT TO authenticated
   USING (public.it_is_entrenador()
       OR EXISTS (SELECT 1 FROM public.alumnos a WHERE a.auth_uid::text = auth.uid()::text));
 CREATE POLICY config_coach_update ON public.config FOR UPDATE TO authenticated
-  USING (public.it_is_entrenador()) WITH CHECK (public.it_is_entrenador());
+  USING (public.it_is_principal()) WITH CHECK (public.it_is_principal());
 
 -- video_overrides / ejercicio_overrides / ejercicios_custom: dueño = entrenador_id = uid; el alumno lee los de su entrenador.
 CREATE POLICY video_overrides_owner ON public.video_overrides FOR ALL TO authenticated

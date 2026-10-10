@@ -3010,11 +3010,10 @@ function GymApp() {
             setLoginError(msg("La conexión está tardando demasiado. Revisá tu internet e intentá de nuevo.", "The connection is taking too long. Check your internet and try again."));
           }, 15000);
           try {
-            const sp = typeof window!=="undefined"?(localStorage.getItem("it_tpass")||"irontrack2024"):"irontrack2024";
             const loginEmailNorm = loginEmail.trim().toLowerCase();
             const isEntrenador = loginEmailNorm==="entrenador@irontrack.app";
             if(isEntrenador){
-              if(loginEmailNorm==="entrenador@irontrack.app"&&loginPass===sp){
+              if(loginPass){
                 if (!supabase) {
                   console.error("[AUTH] Supabase client no inicializado");
                   setLoginError("No se pudo iniciar sesión con Supabase");
@@ -3025,30 +3024,10 @@ function GymApp() {
                   password: loginPass,
                 });
                 if (authLogin.error || !authLogin.data || !authLogin.data.session) {
-                  console.error("[AUTH] signInWithPassword fallo; intentando migracion segura", authLogin.error || authLogin);
-                  var authSignup = await supabase.auth.signUp({
-                    email: loginEmailNorm,
-                    password: loginPass,
-                    options: {
-                      data: { nombre: "Entrenador", role: "entrenador" },
-                    },
-                  });
-                  if (authSignup.error) {
-                    console.error("[AUTH] signUp migracion fallo", authSignup.error);
-                    setLoginError("No se pudo crear tu usuario en Supabase Auth. Revisá la consola para ver el error real.");
-                    return;
-                  }
-                  if (authSignup.data && authSignup.data.session) {
-                    authLogin = authSignup;
-                  } else if (authSignup.data && authSignup.data.user && !authSignup.data.session) {
-                    console.error("[AUTH] Usuario creado sin sesión activa; Supabase requiere confirmar email", authSignup.data.user);
-                    setLoginError("El usuario fue creado, pero Supabase requiere confirmar email. Desactivá Confirm email en Supabase Auth o confirmá el usuario manualmente.");
-                    return;
-                  } else {
-                    console.error("[AUTH] signUp no devolvio usuario ni sesion", authSignup);
-                    setLoginError("No se pudo crear una sesión de Supabase Auth. Revisá la consola para ver el error real.");
-                    return;
-                  }
+                  // Sin creacion de cuentas desde el cliente ni contrasenas por defecto: la unica credencial valida es la de Supabase Auth.
+                  console.error("[AUTH] signInWithPassword entrenador fallo", authLogin.error || authLogin);
+                  setLoginError("Email o contraseña incorrectos");
+                  return;
                 }
                 if (!authLogin.data || !authLogin.data.session || !authLogin.data.session.access_token || !authLogin.data.user || !authLogin.data.user.id) {
                   console.error("[AUTH] No hay sesión activa", authLogin.error || authLogin);
@@ -3185,7 +3164,6 @@ function GymApp() {
             <span>{msg("Ingresar con huella / Face ID", "Sign in with biometrics")}</span>
           </button>
         )}
-        {loginEmail.trim().toLowerCase()==="entrenador@irontrack.app"&&<div style={{fontSize:11,color:textMuted,textAlign:"center",marginTop:12}}>Contraseña por defecto: irontrack2024</div>}
         {loginEmail.trim().toLowerCase()!=="entrenador@irontrack.app"&&<div style={{fontSize:11,color:textMuted,textAlign:"center",marginTop:12}}>Usa el email y contrasena que te dio tu entrenador</div>}
       </div>
     </div>

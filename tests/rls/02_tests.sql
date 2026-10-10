@@ -1,36 +1,5 @@
 \set ON_ERROR_STOP on
-CREATE SCHEMA IF NOT EXISTS tests;
-DROP TABLE IF EXISTS tests.results; CREATE TABLE tests.results(name text, ok boolean, got text, want text);
-CREATE OR REPLACE FUNCTION tests.x(uid text, rl text, q text) RETURNS text LANGUAGE plpgsql AS $$
-DECLARE n bigint;
-BEGIN
-  PERFORM set_config('request.jwt.claim.sub', coalesce(uid,''), true);
-  EXECUTE 'SET LOCAL ROLE '||rl;
-  BEGIN
-    EXECUTE q; GET DIAGNOSTICS n = ROW_COUNT; RESET ROLE; RETURN 'ok:'||n;
-  EXCEPTION WHEN OTHERS THEN RESET ROLE; RETURN 'err:'||SQLSTATE;
-  END;
-END $$;
-CREATE OR REPLACE FUNCTION tests.t(name text, uid text, rl text, q text, want text) RETURNS void LANGUAGE plpgsql AS $$
-DECLARE g text := tests.x(uid, rl, q);
-BEGIN INSERT INTO tests.results VALUES (name, g = want, g, want); END $$;
-CREATE OR REPLACE FUNCTION tests.state(name text, q text, want text) RETURNS void LANGUAGE plpgsql AS $$
-DECLARE g text;
-BEGIN EXECUTE q INTO g; INSERT INTO tests.results VALUES (name, g = want, g, want); END $$;
-
-\set C1 '''00000000-0000-0000-0000-0000000000c1'''
-\set C2 '''00000000-0000-0000-0000-0000000000c2'''
-\set UA '''00000000-0000-0000-0000-0000000000a1'''
-\set UB '''00000000-0000-0000-0000-0000000000b1'''
-\set D1 '''00000000-0000-0000-0000-0000000000d1'''
-\set QC1 ''''''''00000000-0000-0000-0000-0000000000c1''''''''
-\set QC2 ''''''''00000000-0000-0000-0000-0000000000c2''''''''
-\set QUA ''''''''00000000-0000-0000-0000-0000000000a1''''''''
-\set QUB ''''''''00000000-0000-0000-0000-0000000000b1''''''''
-\set QD1 ''''''''00000000-0000-0000-0000-0000000000d1''''''''
-\set IDA '11111111-1111-1111-1111-111111111111'
-\set IDB '22222222-2222-2222-2222-222222222222'
-
+\ir lib.sql
 \o /dev/null
 -- ============ ANÓNIMO ============
 SELECT tests.t('anon SELECT '||t, NULL, 'anon', 'SELECT * FROM public.'||t, 'err:42501')
@@ -182,8 +151,8 @@ SELECT tests.state('ninguna politica para rol public/anon',
   $$SELECT count(*)::text FROM pg_policies WHERE schemaname='public' AND (roles::text ~ 'public|anon')$$,'0');
 SELECT tests.state('anon sin privilegios de tabla en public',
   $$SELECT count(*)::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace, aclexplode(c.relacl) a WHERE n.nspname='public' AND c.relkind='r' AND (a.grantee=0 OR a.grantee='anon'::regrole)$$,'0');
-SELECT tests.state('RLS activo en las 14 tablas',
-  $$SELECT count(*)::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity$$,'14');
+SELECT tests.state('RLS activo en las 15 tablas',
+  $$SELECT count(*)::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity$$,'15');
 SELECT tests.state('sin SECURITY DEFINER en public',
   $$SELECT count(*)::text FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.prosecdef$$,'0');
 SELECT tests.state('anon sin EXECUTE sobre funciones it_*',

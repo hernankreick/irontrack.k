@@ -1,42 +1,68 @@
 #!/usr/bin/env bash
-# Ejecuta la batería RLS contra un PostgreSQL LOCAL efímero (nunca producción).
+# Ejecuta la batería RLS contra un PostgreSQL LOCAL efímero (nunca producción). Datos 100% ficticios.
 # Uso: tests/rls/run.sh   (requiere binarios de postgres 14+ y, si es root, el usuario 'postgres')
-set -euo pipefail
+set -uo pipefail
 cd "$(dirname "$0")/../.."
 PGBIN=${PGBIN:-$(dirname "$(ls /usr/lib/postgresql/*/bin/initdb | tail -1)")}
 WORK=${RLS_TMP:-$(mktemp -d)}; PORT=${RLS_PORT:-54329}
 RUN() { if [ "$(id -u)" = 0 ]; then su postgres -s /bin/bash -c "$*"; else bash -c "$*"; fi; }
 [ "$(id -u)" = 0 ] && chown postgres "$WORK" && chmod 755 "$WORK" && chmod -R a+rX tests supabase sql
-RUN "$PGBIN/initdb -D $WORK/data -A trust -U postgres >/dev/null"
-RUN "$PGBIN/pg_ctl -D $WORK/data -o '-p $PORT -k $WORK -c listen_addresses=' -l $WORK/log -w start >/dev/null"
+RUN "$PGBIN/initdb -D $WORK/data -A trust -U postgres >/dev/null" || exit 1
+RUN "$PGBIN/pg_ctl -D $WORK/data -o '-p $PORT -k $WORK -c listen_addresses=' -l $WORK/log -w start >/dev/null" || exit 1
 trap 'RUN "$PGBIN/pg_ctl -D $WORK/data -m immediate stop >/dev/null" || true' EXIT
-P="$PGBIN/psql -X -q -h $WORK -p $PORT -U postgres -v ON_ERROR_STOP=1"
-MIG=supabase/migrations/20261010120000_rls_p0_lockdown.sql
+P="$PGBIN/psql -X -q -h $WORK -p $PORT -U postgres"
+M1=supabase/migrations/20261010110000_rls_p0_coach_principal.sql
+M2=${M2_OVERRIDE:-supabase/migrations/20261010120000_rls_p0_lockdown.sql}
 RB=supabase/rollback/20261010120000_rls_p0_rollback.sql
-mkdb() { RUN "$P -d postgres -c 'CREATE DATABASE $1' && $P -d $1 -f tests/rls/00_baseline.sql" ; }
-echo "### 1. ANTES de la migración (demuestra la vulnerabilidad)"
-mkdb pre; RUN "$P -d pre -f tests/rls/01_seed.sql"
-RUN "$P -d pre -At -c \"SET ROLE anon; SELECT 'anon lee alumnos: '||count(*) FROM alumnos; DELETE FROM progreso; SELECT 'anon borro progreso OK'\"" || true
-echo "### 2. Preflight: debe ABORTAR con 'entrenador_principal'"
-mkdb legacy; RUN "$P -d legacy -f tests/rls/01_seed.sql"
-RUN "$P -d legacy -c \"UPDATE alumnos SET entrenador_id='entrenador_principal' WHERE nombre='A'\""
-OUT=$(RUN "$P -d legacy -f $MIG" 2>&1 || true); echo "$OUT" | head -3
-if echo "$OUT" | grep -q "RLS P0 abortada"; then echo "PASS preflight aborta"; else echo "FAIL preflight no abortó"; exit 1; fi
-echo "### 3. Backfill + migración sobre datos legacy"
-RUN "$P -d legacy -v principal_uid=00000000-0000-0000-0000-0000000000c1 -f sql/rls_p0_backfill_entrenador_principal.sql"
-RUN "$P -d legacy -f $MIG" && echo "PASS migración tras backfill"
-echo "### 4. Backfill con UID inexistente debe fallar"
-mkdb legacy2; RUN "$P -d legacy2 -f tests/rls/01_seed.sql"
-OUT=$(RUN "$P -d legacy2 -v principal_uid=00000000-0000-0000-0000-0000000000ff -f sql/rls_p0_backfill_entrenador_principal.sql" 2>&1 || true)
-if echo "$OUT" | grep -q "no existe en entrenadores"; then echo "PASS backfill valida UID"; else echo "FAIL"; exit 1; fi
-echo "### 5. Migración + batería de pruebas"
-mkdb main; RUN "$P -d main -f tests/rls/01_seed.sql"
-RUN "$P -d main -f $MIG"
-echo "### 6. Idempotencia (segunda ejecución)"
-RUN "$P -d main -f $MIG" && echo "PASS idempotente"
-RUN "$P -d main -f tests/rls/02_tests.sql" | tee "$WORK/out.txt"
-echo "### 7. Rollback restaura estado previo"
-RUN "$P -d main -f $RB" && RUN "$P -d main -At -c \"SET ROLE anon; SELECT 'tras rollback anon lee alumnos: '||count(*) FROM alumnos\""
-grep -qE '^ *0 *\| *0|\| +0 +\|' "$WORK/out.txt" || true
-FAILS=$(grep -E '^ *[0-9]+ *\| *[0-9]+ *\| *[0-9]+ *$' "$WORK/out.txt" | awk -F'|' '{gsub(/ /,"",$2); print $2}')
-[ "$FAILS" = "0" ] && echo "RESULTADO: TODAS LAS PRUEBAS PASARON" || { echo "RESULTADO: HAY FALLOS ($FAILS)"; exit 1; }
+BF=sql/rls_p0_backfill_entrenador_principal.sql
+PUID=00000000-0000-0000-0000-0000000000c1
+FAIL=0
+ok()  { echo "PASS  $1"; }
+bad() { echo "FAIL  $1"; FAIL=1; }
+mkdb() { RUN "$P -v ON_ERROR_STOP=1 -d postgres -c 'CREATE DATABASE $1'" && RUN "$P -v ON_ERROR_STOP=1 -d $1 -f tests/rls/00_baseline.sql" && RUN "$P -v ON_ERROR_STOP=1 -d $1 -f tests/rls/01_seed.sql" >/dev/null; }
+sql() { RUN "$P -v ON_ERROR_STOP=1 -d $1 -f $2" 2>&1; }
+expect_fail() { # db file pattern desc
+  local out; out=$(sql "$1" "$2"); echo "$out" | grep -q "$3" && ok "$4" || { bad "$4"; echo "$out" | head -3; }; }
+
+echo "### 1. ANTES (vulnerabilidad): anon lee y borra"
+mkdb pre
+RUN "$P -d pre -At -c \"SET ROLE anon; SELECT 'anon lee alumnos: '||count(*) FROM alumnos; DELETE FROM progreso; SELECT 'anon borro progreso'\"" 2>&1 | tail -2
+
+echo "### 2. Pre-vuelos de la migración 2"
+mkdb legacy; sql legacy $M1 >/dev/null
+expect_fail legacy $M2 "falta public.coach_principal\|coach_principal vacio" "aborta sin coach_principal cargada"
+RUN "$P -d legacy -c \"INSERT INTO coach_principal(uid) VALUES ('$PUID')\"" ; RUN "$P -d legacy -c \"UPDATE alumnos SET entrenador_id='entrenador_principal' WHERE nombre='A'\""
+expect_fail legacy $M2 "RLS P0 abortada" "aborta con alumnos entrenador_principal"
+mkdb nodb; expect_fail nodb $M2 "falta public.coach_principal" "aborta si falta la migración 1"
+
+echo "### 3. Backfill: precondiciones"
+mkdb bf; sql bf $M1 >/dev/null; RUN "$P -d bf -c \"UPDATE alumnos SET entrenador_id='entrenador_principal'\""
+RUNBF() { RUN "$P -v ON_ERROR_STOP=1 -d $1 -v principal_uid=$2 -v expected_alumnos=$3 -f $BF" 2>&1; }
+out=$(RUNBF bf 00000000-0000-0000-0000-0000000000ff 2); echo "$out" | grep -q "precondiciones no cumplidas" && ok "backfill rechaza UID inexistente" || bad "backfill UID inexistente"
+out=$(RUNBF bf $PUID 9); echo "$out" | grep -q "precondiciones no cumplidas" && ok "backfill rechaza cantidad distinta (9 != 2)" || bad "backfill cantidad"
+RUN "$P -d bf -c \"UPDATE alumnos SET auth_uid='$PUID' WHERE nombre='A'\"" ; out=$(RUNBF bf $PUID 2); echo "$out" | grep -q "precondiciones no cumplidas" && ok "backfill rechaza principal vinculado como alumno" || bad "backfill principal-alumno"
+RUN "$P -d bf -c \"UPDATE alumnos SET auth_uid='00000000-0000-0000-0000-0000000000a1' WHERE nombre='A'\""
+RUN "$P -d bf -c \"INSERT INTO coach_principal(uid) VALUES ('00000000-0000-0000-0000-0000000000c2')\""; out=$(RUNBF bf $PUID 2); echo "$out" | grep -q "precondiciones no cumplidas" && ok "backfill rechaza otro principal ya cargado" || bad "backfill otro principal"
+RUN "$P -d bf -c \"DELETE FROM coach_principal\""
+RUNBF bf $PUID 2 >/dev/null && ok "backfill con datos válidos" || bad "backfill válido"
+RUN "$P -d bf -At -c \"SELECT 'principal='||(SELECT uid FROM coach_principal)||' legacy_restantes='||(SELECT count(*) FROM alumnos WHERE entrenador_id='entrenador_principal')\""
+sql bf $M2 >/dev/null && ok "migración 2 tras backfill" || bad "migración 2 tras backfill"
+
+echo "### 4. Migración + pruebas generales (02)"
+mkdb main; sql main $M1 >/dev/null; sql main tests/rls/01b_principal.sql >/dev/null; sql main $M2 >/dev/null || bad "migración 2"
+sql main $M2 >/dev/null && ok "idempotente (2ª ejecución)" || bad "idempotencia"
+sql main $M1 >/dev/null && ok "migración 1 idempotente" || bad "migración 1 idempotencia"
+RUN "$P -v ON_ERROR_STOP=1 -d main -f tests/rls/02_tests.sql" 2>&1 | grep -v NOTICE | tee "$WORK/out02.txt"
+
+echo "### 5. Escalada, config, rutinas.datos y acceso cruzado (03)"
+mkdb esc; sql esc $M1 >/dev/null; sql esc tests/rls/01b_principal.sql >/dev/null; sql esc $M2 >/dev/null
+RUN "$P -v ON_ERROR_STOP=1 -d esc -f tests/rls/03_escalation.sql" 2>&1 | grep -v NOTICE | tee "$WORK/out03.txt"
+
+echo "### 6. Rollback restaura estado previo"
+sql main $RB >/dev/null && RUN "$P -d main -At -c \"SET ROLE anon; SELECT 'tras rollback anon lee alumnos: '||count(*) FROM alumnos\"" || bad "rollback"
+
+for f in out02 out03; do
+  n=$(grep -E '^ *[0-9]+ *\| *[0-9]+ *\| *[0-9]+ *$' "$WORK/$f.txt" | awk -F'|' '{gsub(/ /,"",$2); print $2}')
+  [ "$n" = "0" ] || { echo "FALLOS en $f: ${n:-sin resumen}"; FAIL=1; }
+done
+[ $FAIL = 0 ] && echo "RESULTADO: TODO OK" || { echo "RESULTADO: HAY FALLOS"; exit 1; }
