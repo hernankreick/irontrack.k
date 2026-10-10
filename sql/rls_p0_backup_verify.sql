@@ -17,23 +17,31 @@ SELECT m.tbl,
   FROM backup_rls_p0.manifest m
  ORDER BY m.tbl;
 
--- B) Cambios desde la copia, por clave primaria (solo ids, sin contenido):
---    faltantes = filas de la copia que YA NO existen vivas (borradas o cambiaron de id)  → debe ser 0 salvo borrados intencionales.
---    nuevas    = filas vivas que no estaban en la copia (datos nuevos de alumnos/entrenador)  → informativo; NUNCA se pisan al restaurar.
+-- B) Cambios desde la copia (solo conteos, sin contenido). La clave de cada tabla se detecta en el catálogo (índice único/PK de UNA columna
+--    de la tabla viva); si no hay ninguna NO se asume ninguna: se compara por huella de fila completa.
+--    faltantes = filas de la copia que ya no existen vivas (borradas o cambiaron de clave)  → debe ser 0 salvo borrados intencionales.
+--    nuevas    = filas vivas que no estaban en la copia (datos nuevos)                        → informativo; NUNCA se pisan al restaurar.
 --    solo_entrenador_id = filas distintas ÚNICAMENTE en la columna entrenador_id (efecto esperado del backfill).
-WITH keys(tbl, k) AS (VALUES
-  ('alumnos','id'),('rutinas','id'),('progreso','id'),('sesiones','id'),('fotos','id'),('mensajes','id'),('notas','id'),('config','id'),
-  ('entrenadores','id'),('ejercicio_overrides','id'),('ejercicios_custom','id'),('video_overrides','ejercicio_id'),
-  ('coach_calendar_assignments','id'),('coach_notification_reads','id'))
-SELECT k.tbl, k.k AS clave,
-       CASE WHEN has.ok THEN (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM backup_rls_p0.%1$I b WHERE NOT EXISTS (SELECT 1 FROM public.%1$I s WHERE s.%2$I::text = b.%2$I::text)', k.tbl, k.k), false, true, '')))[1]::text::bigint END AS faltantes,
-       CASE WHEN has.ok THEN (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM public.%1$I s WHERE NOT EXISTS (SELECT 1 FROM backup_rls_p0.%1$I b WHERE s.%2$I::text = b.%2$I::text)', k.tbl, k.k), false, true, '')))[1]::text::bigint END AS nuevas,
-       CASE WHEN has.ok AND has_ent.ok THEN (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM public.%1$I s JOIN backup_rls_p0.%1$I b ON s.%2$I::text = b.%2$I::text WHERE to_jsonb(s) <> to_jsonb(b) AND (to_jsonb(s) - ''entrenador_id'') = (to_jsonb(b) - ''entrenador_id'')', k.tbl, k.k), false, true, '')))[1]::text::bigint END AS solo_entrenador_id,
-       CASE WHEN has.ok THEN '' ELSE 'sin clave ' || k.k || ' o sin copia: comparar solo conteos (bloque A)' END AS nota
+--    Sin clave: "faltantes" cuenta filas de la copia sin igual exacto vivo (incluye modificadas) y "nuevas" las vivas sin igual exacto en la copia.
+WITH keys AS (
+  SELECT m.tbl,
+         (SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+           WHERE i.indrelid = to_regclass('public.' || m.tbl) AND i.indisunique AND i.indisvalid AND i.indnkeyatts = 1 AND i.indpred IS NULL
+           ORDER BY i.indisprimary DESC LIMIT 1) AS k,
+         to_regclass('public.' || m.tbl) IS NOT NULL AS viva,
+         EXISTS (SELECT 1 FROM information_schema.columns c WHERE c.table_schema = 'public' AND c.table_name = m.tbl AND c.column_name = 'entrenador_id') AS tiene_ent
+    FROM backup_rls_p0.manifest m)
+SELECT k.tbl, coalesce(k.k, '(sin clave unica)') AS clave,
+       CASE WHEN NOT k.viva THEN NULL WHEN k.k IS NOT NULL
+         THEN (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM backup_rls_p0.%1$I b WHERE NOT EXISTS (SELECT 1 FROM public.%1$I s WHERE s.%2$I::text = b.%2$I::text)', k.tbl, k.k), false, true, '')))[1]::text::bigint
+         ELSE (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM (SELECT md5(to_jsonb(b)::text) FROM backup_rls_p0.%1$I b EXCEPT ALL SELECT md5(to_jsonb(s)::text) FROM public.%1$I s) d', k.tbl), false, true, '')))[1]::text::bigint END AS faltantes,
+       CASE WHEN NOT k.viva THEN NULL WHEN k.k IS NOT NULL
+         THEN (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM public.%1$I s WHERE NOT EXISTS (SELECT 1 FROM backup_rls_p0.%1$I b WHERE s.%2$I::text = b.%2$I::text)', k.tbl, k.k), false, true, '')))[1]::text::bigint
+         ELSE (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM (SELECT md5(to_jsonb(s)::text) FROM public.%1$I s EXCEPT ALL SELECT md5(to_jsonb(b)::text) FROM backup_rls_p0.%1$I b) d', k.tbl), false, true, '')))[1]::text::bigint END AS nuevas,
+       CASE WHEN k.viva AND k.k IS NOT NULL AND k.tiene_ent
+         THEN (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM public.%1$I s JOIN backup_rls_p0.%1$I b ON s.%2$I::text = b.%2$I::text WHERE to_jsonb(s) <> to_jsonb(b) AND (to_jsonb(s) - ''entrenador_id'') = (to_jsonb(b) - ''entrenador_id'')', k.tbl, k.k), false, true, '')))[1]::text::bigint END AS solo_entrenador_id,
+       CASE WHEN NOT k.viva THEN 'la tabla viva ya no existe' WHEN k.k IS NULL THEN 'sin clave unica de una columna: comparacion por huella de fila' ELSE '' END AS nota
   FROM keys k
-  CROSS JOIN LATERAL (SELECT to_regclass('backup_rls_p0.' || k.tbl) IS NOT NULL AND to_regclass('public.' || k.tbl) IS NOT NULL
-                             AND EXISTS (SELECT 1 FROM information_schema.columns c WHERE c.table_schema='public' AND c.table_name=k.tbl AND c.column_name=k.k) AS ok) has
-  CROSS JOIN LATERAL (SELECT EXISTS (SELECT 1 FROM information_schema.columns c WHERE c.table_schema='public' AND c.table_name=k.tbl AND c.column_name='entrenador_id') AS ok) has_ent
  ORDER BY k.tbl;
 
 -- C) Objetos: ¿el snapshot tiene lo esperado? (conteos del snapshot vs estado actual; difieren tras las migraciones, es normal)
@@ -42,3 +50,16 @@ UNION ALL SELECT 'triggers', (SELECT count(*) FROM backup_rls_p0.triggers), (SEL
 UNION ALL SELECT 'funciones', (SELECT count(*) FROM backup_rls_p0.functions), (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.prokind='f')
 UNION ALL SELECT 'constraints', (SELECT count(*) FROM backup_rls_p0.constraints), (SELECT count(*) FROM pg_constraint WHERE connamespace='public'::regnamespace)
 UNION ALL SELECT 'auth.users', (SELECT count(*) FROM backup_rls_p0.auth_users_min), (SELECT count(*) FROM auth.users);
+
+-- D) Privilegios EFECTIVOS (tabla x rol x privilegio) hoy vs snapshot. Antes de migrar: cambiaron = 0. Tras la migración 2 cambian (esperado).
+--    Tras restaurar con R2: debe volver a 0.
+SELECT e.role, count(*) FILTER (WHERE e.granted IS DISTINCT FROM has_table_privilege(e.role, to_regclass('public.' || e.tbl), e.priv)) AS cambiaron, count(*) AS comparados
+  FROM backup_rls_p0.effective_privs e
+ WHERE to_regclass('public.' || e.tbl) IS NOT NULL
+ GROUP BY e.role ORDER BY e.role;
+
+-- E) El esquema de respaldo NO es accesible por API: usage_esquema debe ser false y privilegios_tablas = 0 para anon y authenticated.
+SELECT ro.rolname AS rol, has_schema_privilege(ro.rolname, 'backup_rls_p0', 'USAGE') AS usage_esquema,
+       (SELECT count(*) FROM pg_class c CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')) p(priv)
+         WHERE c.relnamespace = 'backup_rls_p0'::regnamespace AND c.relkind = 'r' AND has_table_privilege(ro.rolname, c.oid, p.priv)) AS privilegios_tablas
+  FROM pg_roles ro WHERE ro.rolname IN ('anon', 'authenticated') ORDER BY 1;

@@ -3,7 +3,7 @@
 \o /dev/null
 -- ============ ANÓNIMO ============
 SELECT tests.t('anon SELECT '||t, NULL, 'anon', 'SELECT * FROM public.'||t, 'err:42501')
-  FROM unnest(ARRAY['alumnos','progreso','rutinas','sesiones','fotos','mensajes','config','notas','video_overrides','ejercicio_overrides','ejercicios_custom','entrenadores','coach_calendar_assignments','coach_notification_reads']) t;
+  FROM unnest(ARRAY['alumnos','progreso','rutinas','sesiones','fotos','mensajes','config','notas','video_overrides','ejercicio_overrides','ejercicios_custom','entrenadores','coach_calendar_assignments','ejercicios_custom_backup_pre_fase1']) t;
 SELECT tests.t('anon INSERT progreso', NULL,'anon',$$INSERT INTO progreso(alumno_id,ejercicio_id) VALUES ('$$||:'IDA'||$$','x')$$,'err:42501');
 SELECT tests.t('anon UPDATE alumnos', NULL,'anon',$$UPDATE alumnos SET nombre='hack'$$,'err:42501');
 SELECT tests.t('anon DELETE rutinas', NULL,'anon','DELETE FROM rutinas','err:42501');
@@ -135,7 +135,6 @@ SELECT tests.t('C1 crea ejercicio custom', :C1,'authenticated','INSERT INTO ejer
 SELECT tests.t('C1 solo lee sus customs', :C1,'authenticated','SELECT * FROM ejercicios_custom','ok:2');
 SELECT tests.t('C1 upsert entrenadores propio', :C1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QC1||$$,'coach@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'ok:1');
 SELECT tests.t('C1 calendario insert/select', :C1,'authenticated','INSERT INTO coach_calendar_assignments(entrenador_id,alumno_id,rutina_id,fecha) VALUES ('||:QC1||$$,'x','y',now())$$,'ok:1');
-SELECT tests.t('C1 notificaciones leidas', :C1,'authenticated','INSERT INTO coach_notification_reads(entrenador_id,notification_id) VALUES ('||:QC1||$$,'n1')$$,'ok:1');
 SELECT tests.t('C2 no ve calendario de C1', :C2,'authenticated','SELECT * FROM coach_calendar_assignments','ok:0');
 SELECT tests.t('C1 reinicia progreso de A', :C1,'authenticated',$$DELETE FROM progreso WHERE alumno_id='$$||:'IDA'||$$'$$,'ok:5');
 SELECT tests.t('C1 borra sesiones de A', :C1,'authenticated',$$DELETE FROM sesiones WHERE alumno_id='$$||:'IDA'||$$'$$,'ok:2');

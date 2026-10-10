@@ -28,6 +28,7 @@ INSERT INTO mensajes(alumno_id,texto,de_entrenador,leido) VALUES
  ('22222222-2222-2222-2222-222222222222','hola B',true,false);
 INSERT INTO notas(alumno_id,contenido) VALUES ('11111111-1111-1111-1111-111111111111','nota A'),('22222222-2222-2222-2222-222222222222','nota B');
 INSERT INTO config VALUES ('pagos','alias.coach');
-INSERT INTO video_overrides(entrenador_id,ejercicio_id,youtube_url) VALUES ('00000000-0000-0000-0000-0000000000c1','sq','http://y/1'),('00000000-0000-0000-0000-0000000000c2','sq','http://y/2');
+INSERT INTO video_overrides(entrenador_id,ejercicio_id,youtube_url) VALUES ('00000000-0000-0000-0000-0000000000c1','sq','http://y/1'),('00000000-0000-0000-0000-0000000000c2','sq2','http://y/2');
 INSERT INTO ejercicio_overrides(entrenador_id,ejercicio_id,name) VALUES ('00000000-0000-0000-0000-0000000000c1','sq','Sentadilla'),('00000000-0000-0000-0000-0000000000c2','sq','Squat2');
 INSERT INTO ejercicios_custom(entrenador_id,name) VALUES ('00000000-0000-0000-0000-0000000000c1','Custom1'),('00000000-0000-0000-0000-0000000000c2','Custom2');
+INSERT INTO ejercicios_custom_backup_pre_fase1 SELECT * FROM ejercicios_custom;

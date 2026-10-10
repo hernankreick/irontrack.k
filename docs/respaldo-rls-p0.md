@@ -7,12 +7,12 @@
 ## Archivos (todos en `sql/`, solo texto, sin datos)
 | Archivo | Qué hace | Escribe en producción |
 |---|---|---|
-| `rls_p0_backup_create.sql` | Crea el esquema `backup_rls_p0` con copia de las 14 tablas + snapshot de políticas, RLS, grants, triggers, funciones, constraints, índices, columnas, secuencias y `auth.users` mínimo (sin contraseñas ni tokens). Una transacción; no sobrescribe; aborta si no hay espacio. | Sí (crea el esquema de copia) |
-| `rls_p0_backup_verify.sql` | Tres consultas de solo lectura: A) integridad de la copia (conteo + huella md5), B) cambios desde la copia por clave primaria (solo ids), C) objetos. | No |
-| `rls_p0_backup_restore.sql` | Restauración por etapa (R1–R5), cada bloque independiente. | Solo si lo ejecutás |
+| `rls_p0_backup_create.sql` | Crea el esquema `backup_rls_p0` con copia de las **14 tablas reales** (incl. `ejercicios_custom_backup_pre_fase1`; no asume `coach_notification_reads`, que no existe) + snapshot de políticas, RLS, grants **efectivos** (ACL implícito vía `acldefault`, matriz `has_table_privilege` por rol, default privileges, columnas, funciones), triggers, funciones, constraints, índices, secuencias y `auth.users` mínimo (sin contraseñas ni tokens). Una transacción; no sobrescribe; aborta si no hay espacio; REVOKE explícito a anon/authenticated y comprobación de que no queda ningún privilegio. | Sí (crea el esquema de copia) |
+| `rls_p0_backup_verify.sql` | Consultas de solo lectura: A) integridad (conteo + huella md5), B) cambios desde la copia (la clave se detecta en el catálogo —PK o índice único de una columna—; sin clave compara por huella de fila, **no se asume ninguna**), C) objetos, D) privilegios efectivos hoy vs snapshot, E) anon/authenticated sin acceso al respaldo. | No |
+| `rls_p0_backup_restore.sql` | Restauración por etapa (R1–R5), cada bloque independiente; R1/R4 detectan la clave en el catálogo y se niegan a actuar sin clave única. | Solo si lo ejecutás |
 | `rls_p0_snapshot_policies.sql` | (ya existente) Genera el DDL exacto de políticas/RLS/grants para guardarlo **fuera** de Supabase. | No |
 
-Probado en un Postgres local con datos ficticios (`tests/rls/run-backup.sh`, 21 comprobaciones). **No se ejecutó nunca contra Supabase real.**
+Probado en un Postgres local con datos ficticios (`tests/rls/run-backup.sh`, 35 comprobaciones, con las 14 tablas reales, default privileges globales tipo Supabase, ACL implícito y una tabla sin clave única). **No se ejecutó nunca contra Supabase real.**
 
 ## 1. Antes de copiar (SQL Editor, solo lectura)
 ```sql
@@ -20,15 +20,15 @@ select pg_size_pretty(pg_database_size(current_database())) as base,
        pg_size_pretty(sum(pg_total_relation_size(c.oid))) as tablas_a_copiar
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
  where n.nspname = 'public' and c.relkind = 'r'
-   and c.relname in ('alumnos','progreso','rutinas','sesiones','fotos','mensajes','config','notas','video_overrides','ejercicio_overrides','ejercicios_custom','entrenadores','coach_calendar_assignments','coach_notification_reads');
+   and c.relname in ('alumnos','progreso','rutinas','sesiones','fotos','mensajes','config','notas','video_overrides','ejercicio_overrides','ejercicios_custom','entrenadores','coach_calendar_assignments','ejercicios_custom_backup_pre_fase1');
 ```
 El plan Free permite **500 MB** de base; al superarlos el proyecto pasa a **solo lectura** (la app dejaría de guardar series). El script aborta si `base + tablas > 400 MB`.
-La copia no duplica índices, así que ocupa menos que el origen. Con 9 alumnos el volumen esperado es de pocos MB.
+Datos reales confirmados: base ≈ 14 MB y tablas públicas ≈ 1,3 MB, así que la copia ocupa ≈ 1–2 MB (no duplica índices): el espacio no es un riesgo; la guarda queda como protección.
 
 ## 2. Orden de uso
 1. Correr `rls_p0_preflight_readonly.sql` (gate) y **luego** `rls_p0_backup_create.sql` (pegar todo el archivo y ejecutar). Resultado esperado: tabla con los conteos del manifiesto.
    - Si el editor rechaza `BEGIN … COMMIT` o cortó a mitad, borrar lo creado con `drop schema backup_rls_p0 cascade;` y repetir (no hay forma de quedar con una copia a medias sin que lo notes: el script verifica conteos).
-2. Correr el bloque **A** de `rls_p0_backup_verify.sql`: todas las filas deben tener `ok_copia = true` y `ok_origen = true`. Si no, **no avanzar**.
+2. Correr los bloques de `rls_p0_backup_verify.sql`: **A** (todas las filas `ok_copia = true` y `ok_origen = true`), **D** (`cambiaron = 0` para los tres roles) y **E** (`usage_esquema = false` y `privilegios_tablas = 0` para anon y authenticated). Si algo no coincide, **no avanzar**.
 3. Exportar fuera de Supabase (sección 4) **antes del backfill**.
 4. Hacer el backfill y las migraciones según `docs/despliegue-rls-p0.md`. Después de cada etapa, bloque **B** (faltantes = 0 en todas las tablas; alumnos y rutinas pueden mostrar cambios "solo entrenador_id" tras el backfill).
 5. Antes de la migración 2 conviene una segunda copia (renombrar la primera: `alter schema backup_rls_p0 rename to backup_rls_p0_pre_backfill;` y repetir el create), porque la primera ya no representa el estado posterior al backfill.
@@ -37,7 +37,7 @@ La copia no duplica índices, así que ocupa menos que el origen. Con 9 alumnos 
 | Situación | Bloque | Qué hace / qué NO hace |
 |---|---|---|
 | Falló algo **después del backfill** y antes de la migración 2 | **R1** (o `rls_p0_backfill_revert.sql`) | Devuelve `entrenador_id` al valor copiado solo en filas que existen en la copia y cambiaron. No toca otras columnas ni filas nuevas. Se niega a correr si la migración 2 sigue aplicada. |
-| La migración 2 dejó la app inutilizable | Primero `supabase/rollback/…_rollback.sql`, luego **R2** | R2 borra las políticas actuales de las tablas gestionadas y recrea las **exactas** del snapshot; restaura RLS/FORCE y grants de PUBLIC/anon/authenticated. Reabre la exposición anterior: solo emergencia. |
+| La migración 2 dejó la app inutilizable | Primero `supabase/rollback/…_rollback.sql`, luego **R2** | R2 borra las políticas actuales de las tablas gestionadas y recrea las **exactas** del snapshot; restaura RLS/FORCE y grants de PUBLIC/anon/authenticated desde el ACL efectivo (incluye los implícitos). Después, bloque **D** de verify: `cambiaron = 0`. Reabre la exposición anterior: solo emergencia. |
 | Quedaron funciones/triggers nuevos | **R3** (indicaciones) | Usar el rollback; los objetos preexistentes no los toca ninguna migración. |
 | Se borraron filas por error | **R4** (editar la lista de tablas) | Inserta solo filas de la copia cuya clave **no existe hoy**; no pisa filas existentes, modificadas ni nuevas. Un alumno o rutina borrados a propósito reaparecerían: revisar antes con el bloque B. Ajusta la secuencia. |
 Orden de reversión total: R2 (tras el rollback de la migración 2) → R1 → frontend/función → `drop table public.coach_principal`.

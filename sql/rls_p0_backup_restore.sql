@@ -10,26 +10,32 @@
 -- Alternativa equivalente y más precisa: sql/rls_p0_backfill_revert.sql (usa rls_p0_backfill_log).
 -- Solo actualiza la columna entrenador_id de filas presentes en la copia y distintas; no toca otras columnas ni filas nuevas.
 DO $$
+DECLARE t text; k text;
 BEGIN
   IF to_regprocedure('public.it_guard_alumnos_update()') IS NOT NULL THEN
     RAISE EXCEPTION 'La migración RLS sigue aplicada: ejecutar primero supabase/rollback/20261010120000_rls_p0_rollback.sql';
   END IF;
   IF to_regnamespace('backup_rls_p0') IS NULL THEN RAISE EXCEPTION 'No existe backup_rls_p0'; END IF;
-  UPDATE public.alumnos a             SET entrenador_id = b.entrenador_id FROM backup_rls_p0.alumnos b             WHERE a.id = b.id AND a.entrenador_id IS DISTINCT FROM b.entrenador_id;
-  UPDATE public.rutinas a             SET entrenador_id = b.entrenador_id FROM backup_rls_p0.rutinas b             WHERE a.id = b.id AND a.entrenador_id IS DISTINCT FROM b.entrenador_id;
-  UPDATE public.ejercicio_overrides a SET entrenador_id = b.entrenador_id FROM backup_rls_p0.ejercicio_overrides b WHERE a.id = b.id AND a.entrenador_id IS DISTINCT FROM b.entrenador_id;
-  UPDATE public.ejercicios_custom a   SET entrenador_id = b.entrenador_id FROM backup_rls_p0.ejercicios_custom b   WHERE a.id = b.id AND a.entrenador_id IS DISTINCT FROM b.entrenador_id;
-  UPDATE public.video_overrides a     SET entrenador_id = b.entrenador_id FROM backup_rls_p0.video_overrides b     WHERE a.ejercicio_id = b.ejercicio_id AND a.entrenador_id IS DISTINCT FROM b.entrenador_id;
+  FOREACH t IN ARRAY ARRAY['alumnos','rutinas','video_overrides','ejercicio_overrides','ejercicios_custom'] LOOP
+    IF to_regclass('public.' || t) IS NULL OR to_regclass('backup_rls_p0.' || t) IS NULL THEN CONTINUE; END IF;
+    -- clave = índice único/PK de UNA columna de la tabla viva (no se asume ningún nombre de clave)
+    SELECT a.attname INTO k FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+     WHERE i.indrelid = ('public.' || t)::regclass AND i.indisunique AND i.indisvalid AND i.indnkeyatts = 1 AND i.indpred IS NULL
+     ORDER BY i.indisprimary DESC LIMIT 1;
+    IF k IS NULL THEN RAISE EXCEPTION 'R1: % no tiene clave única de una columna; usar sql/rls_p0_backfill_revert.sql', t; END IF;
+    EXECUTE format('UPDATE public.%1$I a SET entrenador_id = b.entrenador_id FROM backup_rls_p0.%1$I b WHERE a.%2$I::text = b.%2$I::text AND a.entrenador_id IS DISTINCT FROM b.entrenador_id', t, k);
+  END LOOP;
 END $$;
 
 -- ───────── R2 · Restaurar políticas, RLS y grants EXACTOS (después de revertir la migración 2) ─────────
--- Cuándo: la migración 2 dejó la app inutilizable y se necesita volver al estado previo exacto (incluye ejercicios_custom y entrenadores).
+-- Cuándo: la migración 2 dejó la app inutilizable y se necesita volver al estado previo exacto (incluye ejercicios_custom, ejercicios_custom_backup_pre_fase1 y entrenadores).
+-- Los grants se restauran desde el ACL EFECTIVO del snapshot (incl. predeterminados). Comprobar después con el bloque D de verify (cambiaron = 0).
 -- Borra las políticas actuales de las tablas gestionadas y recrea las del snapshot; restaura RLS/FORCE y los grants de PUBLIC/anon/authenticated.
 -- Reabre la exposición anterior (acceso_total): usar solo como emergencia y corregir hacia adelante cuanto antes.
 DO $$
 DECLARE
   managed text[] := ARRAY['alumnos','progreso','rutinas','sesiones','fotos','mensajes','config','notas','video_overrides','ejercicio_overrides',
-                          'ejercicios_custom','ejercicios_custom_backup_pre_fase1','entrenadores','coach_calendar_assignments','coach_notification_reads'];
+                          'ejercicios_custom','ejercicios_custom_backup_pre_fase1','entrenadores','coach_calendar_assignments'];
   r record;
 BEGIN
   IF to_regclass('backup_rls_p0.policies') IS NULL THEN RAISE EXCEPTION 'No existe el snapshot de políticas'; END IF;
@@ -67,17 +73,19 @@ END $$;
 DO $$
 DECLARE
   tablas text[] := ARRAY[]::text[];   -- ejemplo: ARRAY['progreso']  |  ARRAY['sesiones','fotos']
-  keys jsonb := '{"alumnos":"id","rutinas":"id","progreso":"id","sesiones":"id","fotos":"id","mensajes":"id","notas":"id","config":"id","entrenadores":"id",
-                  "ejercicio_overrides":"id","ejercicios_custom":"id","video_overrides":"ejercicio_id","coach_calendar_assignments":"id","coach_notification_reads":"id"}';
   t text; k text; n bigint;
 BEGIN
   IF cardinality(tablas) = 0 THEN RAISE NOTICE 'R4: lista de tablas vacia, no se hace nada'; RETURN; END IF;
   FOREACH t IN ARRAY tablas LOOP
-    k := keys ->> t;
-    IF k IS NULL OR to_regclass('backup_rls_p0.' || t) IS NULL OR to_regclass('public.' || t) IS NULL THEN RAISE EXCEPTION 'R4: tabla % no soportada o sin copia', t; END IF;
+    IF to_regclass('backup_rls_p0.' || t) IS NULL OR to_regclass('public.' || t) IS NULL THEN RAISE EXCEPTION 'R4: % sin copia o sin tabla viva', t; END IF;
+    -- clave = índice único/PK de UNA columna de la tabla viva; si no existe, NO se restaura (no se puede garantizar que no se dupliquen filas)
+    SELECT a.attname INTO k FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+     WHERE i.indrelid = ('public.' || t)::regclass AND i.indisunique AND i.indisvalid AND i.indnkeyatts = 1 AND i.indpred IS NULL
+     ORDER BY i.indisprimary DESC LIMIT 1;
+    IF k IS NULL THEN RAISE EXCEPTION 'R4: % no tiene clave unica de una columna: recuperar a mano (ver bloque B del verify)', t; END IF;
     EXECUTE format('INSERT INTO public.%1$I SELECT b.* FROM backup_rls_p0.%1$I b WHERE NOT EXISTS (SELECT 1 FROM public.%1$I s WHERE s.%2$I::text = b.%2$I::text)', t, k);
     GET DIAGNOSTICS n = ROW_COUNT;
-    RAISE NOTICE 'R4: % filas recuperadas en %', n, t;
+    RAISE NOTICE 'R4: % filas recuperadas en % (clave %)', n, t, k;
     -- secuencia asociada (si la clave es serial): evitar colisiones futuras tras reinsertar ids explícitos
     IF pg_get_serial_sequence('public.' || t, k) IS NOT NULL THEN
       EXECUTE format('SELECT setval(%L, greatest((SELECT coalesce(max(%I), 1) FROM public.%I), (SELECT last_value FROM %s)))', pg_get_serial_sequence('public.' || t, k), k, t, pg_get_serial_sequence('public.' || t, k));

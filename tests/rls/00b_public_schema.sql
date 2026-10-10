@@ -9,11 +9,11 @@ CREATE TABLE public.fotos (id bigserial PRIMARY KEY, alumno_id text, url text, c
 CREATE TABLE public.mensajes (id bigserial PRIMARY KEY, alumno_id text, texto text, de_entrenador boolean, leido boolean DEFAULT false, created_at timestamptz DEFAULT now());
 CREATE TABLE public.notas (id bigserial PRIMARY KEY, alumno_id text, contenido text, created_at timestamptz DEFAULT now());
 CREATE TABLE public.config (id text PRIMARY KEY, alias text);
-CREATE TABLE public.video_overrides (id bigserial PRIMARY KEY, entrenador_id text, ejercicio_id text, youtube_url text);
+CREATE TABLE public.video_overrides (id bigserial PRIMARY KEY, entrenador_id text, ejercicio_id text UNIQUE, youtube_url text);
 CREATE TABLE public.ejercicio_overrides (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), entrenador_id text NOT NULL, ejercicio_id text NOT NULL, name text NOT NULL, name_en text, UNIQUE (entrenador_id, ejercicio_id));
 CREATE TABLE public.ejercicios_custom (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), entrenador_id text, name text);
+CREATE TABLE public.ejercicios_custom_backup_pre_fase1 (LIKE public.ejercicios_custom INCLUDING ALL);  -- existe en produccion (RLS activo)
 CREATE TABLE public.coach_calendar_assignments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), entrenador_id uuid NOT NULL REFERENCES auth.users(id), alumno_id text NOT NULL, rutina_id text NOT NULL, fecha date NOT NULL);
-CREATE TABLE public.coach_notification_reads (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), entrenador_id uuid NOT NULL REFERENCES auth.users(id), notification_id text NOT NULL, UNIQUE (entrenador_id, notification_id));
 
 -- Estado inseguro confirmado
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
@@ -34,5 +34,5 @@ END $$;
 -- ejercicio_overrides: RLS desactivado (como en prod). coach_*: RLS+política propia de sql/*.sql
 ALTER TABLE public.coach_calendar_assignments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "coach calendar select own" ON public.coach_calendar_assignments FOR SELECT USING (auth.uid() = entrenador_id);
-ALTER TABLE public.coach_notification_reads ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "coach reads select own" ON public.coach_notification_reads FOR SELECT USING (auth.uid() = entrenador_id);
+ALTER TABLE public.ejercicios_custom_backup_pre_fase1 ENABLE ROW LEVEL SECURITY;
+CREATE POLICY por_email_bk ON public.ejercicios_custom_backup_pre_fase1 FOR ALL TO public USING (true);

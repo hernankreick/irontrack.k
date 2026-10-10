@@ -17,7 +17,7 @@ BEGIN
     RAISE EXCEPTION 'backup_rls_p0 ya existe: no se sobrescribe. Conservarlo, o renombrarlo (ALTER SCHEMA backup_rls_p0 RENAME TO backup_rls_p0_AAAAMMDD) antes de repetir.';
   END IF;
   FOREACH t IN ARRAY ARRAY['alumnos','progreso','rutinas','sesiones','fotos','mensajes','config','notas','video_overrides',
-                           'ejercicio_overrides','ejercicios_custom','entrenadores','coach_calendar_assignments','coach_notification_reads'] LOOP
+                           'ejercicio_overrides','ejercicios_custom','entrenadores','coach_calendar_assignments','ejercicios_custom_backup_pre_fase1'] LOOP
     IF to_regclass('public.' || t) IS NOT NULL THEN v_tables := v_tables + pg_total_relation_size(('public.' || t)::regclass); END IF;
   END LOOP;
   IF v_db + v_tables > v_limit THEN
@@ -42,7 +42,7 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY['alumnos','progreso','rutinas','sesiones','fotos','mensajes','config','notas','video_overrides',
-                           'ejercicio_overrides','ejercicios_custom','entrenadores','coach_calendar_assignments','coach_notification_reads'] LOOP
+                           'ejercicio_overrides','ejercicios_custom','entrenadores','coach_calendar_assignments','ejercicios_custom_backup_pre_fase1'] LOOP
     IF to_regclass('public.' || t) IS NULL THEN CONTINUE; END IF;
     EXECUTE format('CREATE TABLE backup_rls_p0.%I AS TABLE public.%I', t, t);
     EXECUTE format('ALTER TABLE backup_rls_p0.%I ENABLE ROW LEVEL SECURITY', t);  -- sin políticas: nadie por API
@@ -67,11 +67,33 @@ CREATE TABLE backup_rls_p0.policies AS
 CREATE TABLE backup_rls_p0.rls_flags AS
   SELECT c.relname AS tbl, c.relrowsecurity, c.relforcerowsecurity
     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r';
+-- Grants EFECTIVOS por ACL: si relacl es NULL (privilegios predeterminados/implícitos) se usa acldefault() en vez de omitir la tabla.
 CREATE TABLE backup_rls_p0.grants AS
-  SELECT c.relname AS tbl, c.relkind::text AS kind, CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS grantee,
-         a.privilege_type, a.is_grantable
-    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace, aclexplode(c.relacl) a
+  SELECT c.relname AS tbl, c.relkind::text AS kind,
+         CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS grantee,
+         a.privilege_type, a.is_grantable, (c.relacl IS NULL) AS acl_implicito
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace,
+         aclexplode(coalesce(c.relacl, acldefault((CASE WHEN c.relkind = 'S' THEN 's' ELSE 'r' END)::"char", c.relowner))) a
    WHERE n.nspname = 'public' AND c.relkind IN ('r','S','v');
+-- Privilegios EFECTIVOS reales (incluye herencia, PUBLIC y predeterminados): tabla x rol x privilegio. Fuente de verdad para comparar tras restaurar.
+CREATE TABLE backup_rls_p0.effective_privs AS
+  SELECT c.relname AS tbl, r.rolname AS role, p.priv, has_table_privilege(r.rolname, c.oid, p.priv) AS granted
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         CROSS JOIN (SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated','service_role')) r
+         CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')) p(priv)
+   WHERE n.nspname = 'public' AND c.relkind = 'r';
+CREATE TABLE backup_rls_p0.column_grants AS   -- privilegios a nivel de columna (poco comunes)
+  SELECT c.relname AS tbl, a.attname AS col, a.attacl::text AS acl
+    FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public' AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped AND a.attacl IS NOT NULL;
+CREATE TABLE backup_rls_p0.default_acls AS     -- default privileges: explican los permisos "implícitos" de objetos futuros
+  SELECT d.defaclrole::regrole::text AS owner_role, coalesce(n.nspname, '(global)') AS schema_name, d.defaclobjtype::text AS objtype, d.defaclacl::text AS acl
+    FROM pg_default_acl d LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace;
+CREATE TABLE backup_rls_p0.schema_grants AS
+  SELECT nspname, nspacl::text AS acl FROM pg_namespace WHERE nspname IN ('public','auth','storage');
+CREATE TABLE backup_rls_p0.function_grants AS
+  SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args, coalesce(p.proacl, acldefault('f'::"char", p.proowner))::text AS acl
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.prokind = 'f';
 CREATE TABLE backup_rls_p0.triggers AS
   SELECT c.relname AS tbl, t.tgname, pg_get_triggerdef(t.oid) AS def
     FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -99,11 +121,24 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- Cierre: sin acceso por API a nada del esquema de respaldo
+-- Cierre: sin acceso por API a nada del esquema de respaldo. RLS activo en cada copia (segunda barrera) y REVOKE explícito, porque los
+-- default privileges de Supabase pueden conceder permisos a anon/authenticated sobre tablas nuevas.
 DO $$ DECLARE r record; BEGIN
   FOR r IN SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'backup_rls_p0' AND c.relkind = 'r' LOOP
     EXECUTE format('ALTER TABLE backup_rls_p0.%I ENABLE ROW LEVEL SECURITY', r.relname);
+    EXECUTE format('REVOKE ALL ON TABLE backup_rls_p0.%I FROM PUBLIC', r.relname);
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN EXECUTE format('REVOKE ALL ON TABLE backup_rls_p0.%I FROM anon', r.relname); END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN EXECUTE format('REVOKE ALL ON TABLE backup_rls_p0.%I FROM authenticated', r.relname); END IF;
   END LOOP;
+  -- comprobación final: ningún privilegio efectivo de anon/authenticated sobre el esquema ni sus tablas
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname IN ('anon','authenticated') AND has_schema_privilege(rolname, 'backup_rls_p0', 'USAGE')) THEN
+    RAISE EXCEPTION 'anon/authenticated tienen USAGE sobre backup_rls_p0: se aborta';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_class c CROSS JOIN pg_roles ro CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE'),('TRUNCATE'),('REFERENCES'),('TRIGGER')) p(priv)
+              WHERE c.relnamespace = 'backup_rls_p0'::regnamespace AND c.relkind = 'r' AND ro.rolname IN ('anon','authenticated')
+                AND has_table_privilege(ro.rolname, c.oid, p.priv)) THEN
+    RAISE EXCEPTION 'anon/authenticated conservan privilegios sobre tablas de backup_rls_p0: se aborta';
+  END IF;
 END $$;
 
 COMMIT;
