@@ -7,14 +7,14 @@ import { readFileSync } from "node:fs";
 import { cleanActiveCoachAlumnos } from "../lib/appHelpers.js";
 import { selectCoachStudentListState } from "../lib/coachStudentListSelectors.js";
 import {
-  ALUMNOS_STATUS as S, COACH_ALUMNOS_QUERY_ID, alumnosEmptyKind, alumnosIdsKey, alumnosRefreshFailed,
+  ALUMNOS_STATUS as S, alumnosEmptyKind, alumnosIdsKey, alumnosRefreshFailed,
   createAlumnosController,
 } from "../lib/coachAlumnosLoad.js";
 
 let count = 0;
 async function test(name, fn) { await fn(); count++; console.log("ok -", name); }
 
-const LEGACY = COACH_ALUMNOS_QUERY_ID;
+const LEGACY = "00000000-0000-0000-0000-0000000000c1"; // UUID del entrenador autenticado (ficticio); nombre historico de la constante
 const UUID = "11111111-2222-3333-4444-555555555555";
 const nine = Array.from({ length: 9 }, (_, i) => ({ id: "a" + i, nombre: "Alumno " + i, entrenador_id: LEGACY, auth_uid: "u" + i }));
 const deferred = () => { let res, rej; const p = new Promise((a, b) => { res = a; rej = b; }); return { p, res, rej }; };
@@ -23,7 +23,9 @@ function make(queueOrFn) {
   const calls = [];
   const queue = Array.isArray(queueOrFn) ? queueOrFn.slice() : null;
   const snaps = [];
+  const coach = { id: LEGACY };
   const ctrl = createAlumnosController({
+    getCoachId: () => coach.id,
     fetchRows: async (id) => {
       calls.push(id);
       if (queue) { const d = queue.shift(); if (!d) throw new Error("sin respuesta preparada"); return d.p; }
@@ -32,16 +34,30 @@ function make(queueOrFn) {
     clean: cleanActiveCoachAlumnos,
     onChange: (st) => snaps.push(st),
   });
-  return { ctrl, calls, snaps };
+  return { ctrl, calls, snaps, coach };
 }
 const rowsOf = (n, pre = "a") => Array.from({ length: n }, (_, i) => ({ id: pre + i, nombre: pre + i, entrenador_id: LEGACY }));
 
-await test("1. nueve alumnos legacy se cargan; la consulta usa entrenador_principal y nunca el UUID", async () => {
+await test("1. nueve alumnos se cargan; la consulta usa el UUID del entrenador autenticado y nunca entrenador_principal", async () => {
   const { ctrl, calls } = make(async () => nine);
   const r = await ctrl.load();
   assert.equal(r.length, 9);
   assert.deepEqual(calls, [LEGACY]);
+  assert.ok(!calls.includes("entrenador_principal"));
   assert.equal(ctrl.getState().status, S.READY);
+});
+
+await test("1c. sin identidad resuelta no se consulta nada ni se toca el estado; al resolverse, carga", async () => {
+  const { ctrl, calls, snaps, coach } = make(async () => nine);
+  coach.id = null;
+  assert.equal(await ctrl.load(), null);
+  assert.equal(await ctrl.refresh(), null);
+  assert.deepEqual(calls, []);
+  assert.equal(snaps.length, 0);
+  assert.equal(ctrl.getState().status, S.IDLE);
+  coach.id = LEGACY;
+  assert.equal((await ctrl.load()).length, 9);
+  assert.deepEqual(calls, [LEGACY]);
 });
 
 await test("1b. no se amplia el acceso: filas de otro entrenador se descartan", async () => {
@@ -241,7 +257,10 @@ const students = readFileSync(new URL("../components/students/StudentsSection.js
 await test("17. cableado: el hook no lee it_session; login actual intacto; un solo escritor de carga", () => {
   assert.ok(!/it_session/.test(hook));
   assert.ok(/getAlumnosStrict\(entrenadorId\)/.test(hook));
-  assert.ok(/const ENTRENADOR_ID = "entrenador_principal"/.test(app));
+  assert.ok(!/const ENTRENADOR_ID = "entrenador_principal"/.test(app), "ENTRENADOR_ID ya no es el literal legacy");
+  assert.ok(/const ENTRENADOR_ID = resolveCoachId\(/.test(app), "ENTRENADOR_ID sale de la sesion de Auth");
+  assert.ok(/useAlumnos\(\{ sb, coachId: ENTRENADOR_ID \}\)/.test(app));
+  assert.ok(/getCoachId: \(\) => coachIdRef\.current/.test(hook));
   assert.ok(/entrenador_id:ENTRENADOR_ID/.test(students));
   assert.ok(!/sb\.getAlumnos\(/.test(app) && !/sb\.getAlumnosStrict\(/.test(app), "App.jsx no consulta alumnos por su cuenta");
   assert.ok(!/setAlumnos\(clean\)|setAlumnos\(sbAlumnos\)/.test(app));

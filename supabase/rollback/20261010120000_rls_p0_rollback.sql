@@ -2,6 +2,7 @@
 -- Restaura el estado INSEGURO previo (acceso_total public). Usar solo si la app queda inutilizable
 -- y no hay forma de corregir hacia adelante. No revierte el backfill de entrenador_id (no hace falta).
 BEGIN;
+DROP TRIGGER IF EXISTS it_guard_alumnos_insert ON public.alumnos;
 DROP TRIGGER IF EXISTS it_guard_alumnos_update ON public.alumnos;
 DROP TRIGGER IF EXISTS it_guard_rutinas_update ON public.rutinas;
 DROP TRIGGER IF EXISTS it_guard_mensajes_update ON public.mensajes;
@@ -25,7 +26,7 @@ BEGIN
   END LOOP;
   EXECUTE 'CREATE POLICY entrenadores_self ON public.entrenadores FOR ALL TO public USING (auth.uid() = id) WITH CHECK (auth.uid() = id)';
 END $$;
-DROP FUNCTION IF EXISTS public.it_guard_alumnos_update(), public.it_guard_rutinas_update(), public.it_guard_mensajes_update(),
+DROP FUNCTION IF EXISTS public.it_guard_alumnos_insert(), public.it_guard_alumnos_update(), public.it_guard_rutinas_update(), public.it_guard_mensajes_update(),
   public.it_is_coach_of(text), public.it_is_alumno(text), public.it_is_my_coach(text),
   public.it_is_entrenador(), public.it_is_principal();
 COMMIT;

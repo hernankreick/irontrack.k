@@ -14,7 +14,7 @@ GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated;
 
 CREATE TABLE public.entrenadores (id uuid PRIMARY KEY REFERENCES auth.users(id), email text, nombre text, telefono text);
 CREATE TABLE public.alumnos (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text, email text, entrenador_id text,
-  auth_uid uuid, onesignal_id text, ultimo_pago_confirmado timestamptz);
+  auth_uid uuid UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL, onesignal_id text, ultimo_pago_confirmado timestamptz);
 CREATE TABLE public.rutinas (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), alumno_id text, entrenador_id text, nombre text, datos jsonb);
 CREATE TABLE public.progreso (id bigserial PRIMARY KEY, alumno_id text, ejercicio_id text, sets int, reps int, kg numeric, fecha date, semana int, created_at timestamptz DEFAULT now());
 CREATE TABLE public.sesiones (id bigserial PRIMARY KEY, alumno_id text, rutina_id text, semana int, dia_idx int, fecha date, created_at timestamptz DEFAULT now());

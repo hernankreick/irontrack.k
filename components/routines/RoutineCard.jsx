@@ -322,7 +322,6 @@ export function RoutineCard({
           alumno: primaryName,
           note: rActual.note || '',
         },
-        entrenador_id: 'entrenador_principal',
         es_plantilla: !!rActual.es_plantilla,
       };
 
@@ -368,7 +367,6 @@ export function RoutineCard({
               nombre: rActual.name,
               alumno_id: xid,
               datos: { days: daysCopy, alumno: xnm, note: rActual.note || '' },
-              entrenador_id: 'entrenador_principal',
               fecha_inicio: fechaInicio,
             }).then(function (res2) {
               return { res2: res2, aid: xid, nm: xnm };
@@ -889,7 +887,6 @@ export function RoutineCard({
                         nombre: r.name,
                         alumno_id: r.alumno_id || null,
                         datos: { days: sanitizeRoutineDaysForWrite(savedDays), alumno: r.alumno || '', note: r.note || '' },
-                        entrenador_id: 'entrenador_principal',
                       });
                     } catch (e) { console.error('[onReorderWarmup] persist error', e); }
                   }
@@ -913,7 +910,6 @@ export function RoutineCard({
                         nombre: r.name,
                         alumno_id: r.alumno_id || null,
                         datos: { days: sanitizeRoutineDaysForWrite(savedDays), alumno: r.alumno || '', note: r.note || '' },
-                        entrenador_id: 'entrenador_principal',
                       });
                     } catch (e) { console.error('[onReorderExercises] persist error', e); }
                   }

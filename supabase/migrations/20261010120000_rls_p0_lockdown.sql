@@ -93,9 +93,24 @@ GRANT EXECUTE ON FUNCTION public.it_is_coach_of(text), public.it_is_alumno(text)
 
 -- 2) Triggers de guarda: lo que un alumno puede cambiar en un UPDATE.
 --    (auth.uid() NULL = service_role/postgres: no se restringe.)
+-- auth_uid (vínculo alumno <-> cuenta de Auth) SOLO lo asigna service_role (Edge Function update-alumno-password,
+-- que crea la cuenta en la misma llamada). Ni el entrenador ni el alumno pueden fijarlo o cambiarlo desde la API:
+-- así no se puede vincular a un tercero por coincidencia, apropiarse de una cuenta ni degradar al entrenador principal.
+CREATE OR REPLACE FUNCTION public.it_guard_alumnos_insert() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL AND NEW.auth_uid IS NOT NULL THEN
+    RAISE EXCEPTION 'auth_uid solo puede asignarlo el servidor' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $$;
+
 CREATE OR REPLACE FUNCTION public.it_guard_alumnos_update() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
+  IF auth.uid() IS NOT NULL AND NEW.auth_uid IS DISTINCT FROM OLD.auth_uid THEN
+    RAISE EXCEPTION 'auth_uid solo puede asignarlo el servidor' USING ERRCODE = '42501';
+  END IF;
   IF auth.uid() IS NOT NULL AND OLD.entrenador_id::text IS DISTINCT FROM auth.uid()::text THEN
     IF (to_jsonb(NEW) - 'onesignal_id') IS DISTINCT FROM (to_jsonb(OLD) - 'onesignal_id') THEN
       RAISE EXCEPTION 'alumno solo puede modificar onesignal_id' USING ERRCODE = '42501';
@@ -148,8 +163,11 @@ BEGIN
   RETURN NEW;
 END $$;
 
-REVOKE ALL ON FUNCTION public.it_guard_alumnos_update(), public.it_guard_rutinas_update(), public.it_guard_mensajes_update() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.it_guard_alumnos_insert(), public.it_guard_alumnos_update(), public.it_guard_rutinas_update(), public.it_guard_mensajes_update() FROM PUBLIC, anon;
 
+DROP TRIGGER IF EXISTS it_guard_alumnos_insert ON public.alumnos;
+CREATE TRIGGER it_guard_alumnos_insert BEFORE INSERT ON public.alumnos
+  FOR EACH ROW EXECUTE FUNCTION public.it_guard_alumnos_insert();
 DROP TRIGGER IF EXISTS it_guard_alumnos_update ON public.alumnos;
 CREATE TRIGGER it_guard_alumnos_update BEFORE UPDATE ON public.alumnos
   FOR EACH ROW EXECUTE FUNCTION public.it_guard_alumnos_update();

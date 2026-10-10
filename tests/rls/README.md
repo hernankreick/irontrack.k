@@ -40,10 +40,15 @@ Reversión exacta de políticas de `ejercicios_custom`/`entrenadores`: reaplicar
   alumnos no otorgan nada (la migración avisa cuántas hay; conviene borrarlas a mano). El alta de entrenadores sigue abierta a
   usuarios Auth que no sean alumnos: solo acceden a sus propios datos (multi-tenant aislado).
 - El alumno solo puede cambiar `rutinas.datos.semana_activa` (entero 1..4, sin retroceder), `alumnos.onesignal_id` y `mensajes.leido`.
-- El entrenador puede editar `alumnos.auth_uid` de sus alumnos; un entrenador no principal podría degradar a otro entrenador
-  no principal vinculándolo como alumno (el principal no es afectable). Aceptado: hoy hay un solo entrenador.
+- `alumnos.auth_uid` solo lo asigna `service_role` (trigger `it_guard_alumnos_*`): la Edge Function `update-alumno-password` crea la cuenta de
+  Auth y la vincula en la misma llamada; si el email ya existe en Auth sin vínculo responde 409 (no se vincula por email). Los 9 alumnos actuales
+  ya tienen `auth_uid`. Queda pendiente (acción manual) vincular cualquier alumno nuevo cuyo email ya tenga cuenta de Auth.
 - Login: la identidad del entrenador la decide Supabase Auth; el email `entrenador@irontrack.app` en App.jsx solo elige la rama de UI.
   No hay contraseñas fijas ni creación de cuentas desde el cliente. Las cuentas de alumno siguen dependiendo de la contraseña que asigna el coach.
 - Storage (bucket de fotos), Edge Functions con service_role y Realtime no fueron revisados. `service_role` conserva acceso total (EXECUTE
   concedido a las funciones auxiliares).
 - No validado contra el esquema real de producción ni contra sync V2/OneSignal (fuera de alcance).
+
+## Frontend ↔ backfill
+Tras el backfill el entrenador lista sus alumnos con `alumnos?entrenador_id=eq.<UUID de Auth>` y crea alumnos/rutinas/custom con ese UUID.
+Sesiones de alumno guardadas antes del backfill (localStorage con `entrenadorId` legacy) no cargan overrides/config hasta un nuevo login.

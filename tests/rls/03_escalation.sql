@@ -77,11 +77,35 @@ SELECT tests.state('it_is_entrenador(C2) = true', $$SELECT tests.x('00000000-000
 SELECT tests.state('it_is_principal(C2) = false', $$SELECT tests.x('00000000-0000-0000-0000-0000000000c2','authenticated','SELECT 1 WHERE public.it_is_principal()')$$, 'ok:0');
 SELECT tests.state('it_is_principal(C1) = true', $$SELECT tests.x('00000000-0000-0000-0000-0000000000c1','authenticated','SELECT 1 WHERE public.it_is_principal()')$$, 'ok:1');
 -- Un entrenador no puede degradar al principal vinculándolo como alumno
-SELECT tests.t('C2 inserta alumno con auth_uid=principal', :C2,'authenticated','INSERT INTO alumnos(nombre,entrenador_id,auth_uid) VALUES (''v'','||:QC2||','||:QC1||')','ok:1');
+SELECT tests.t('C2 NO puede vincular al principal como alumno (auth_uid solo servidor)', :C2,'authenticated','INSERT INTO alumnos(nombre,entrenador_id,auth_uid) VALUES (''v'','||:QC2||','||:QC1||')','err:42501');
+SELECT tests.t('C2 NO puede vincular auth_uid ajeno a un alumno propio', :C2,'authenticated','INSERT INTO alumnos(nombre,entrenador_id,auth_uid) VALUES (''v2'','||:QC2||','||:QUB||')','err:42501');
 SELECT tests.state('principal sigue siendo principal', $$SELECT tests.x('00000000-0000-0000-0000-0000000000c1','authenticated','SELECT 1 WHERE public.it_is_principal()')$$, 'ok:1');
 SELECT tests.t('principal sigue pudiendo editar config', :C1,'authenticated',$$UPDATE config SET alias='p2'$$,'ok:1');
 SELECT tests.t('service_role actualiza mensajes', NULL,'service_role',$$UPDATE mensajes SET leido=true$$,'ok:2');
-SELECT tests.t('service_role actualiza alumnos (edge fn)', NULL,'service_role',$$UPDATE alumnos SET onesignal_id='srv'$$,'ok:3');
+SELECT tests.t('service_role actualiza alumnos (edge fn)', NULL,'service_role',$$UPDATE alumnos SET onesignal_id='srv'$$,'ok:2');
+-- ============ Regresión: el identificador legacy ya no sirve para leer ni escribir tras el backfill ============
+SELECT tests.t('C1 inserta alumno con entrenador_id legacy', :C1,'authenticated',$$INSERT INTO alumnos(nombre,entrenador_id) VALUES ('x','entrenador_principal')$$,'err:42501');
+SELECT tests.t('C1 inserta plantilla con entrenador_id legacy', :C1,'authenticated',$$INSERT INTO rutinas(entrenador_id,nombre) VALUES ('entrenador_principal','x')$$,'err:42501');
+SELECT tests.t('C1 inserta custom con entrenador_id legacy', :C1,'authenticated',$$INSERT INTO ejercicios_custom(entrenador_id,name) VALUES ('entrenador_principal','x')$$,'err:42501');
+SELECT tests.t('C1 inserta video_override legacy', :C1,'authenticated',$$INSERT INTO video_overrides(entrenador_id,ejercicio_id,youtube_url) VALUES ('entrenador_principal','z','x')$$,'err:42501');
+SELECT tests.t('C1 inserta ejercicio_override legacy', :C1,'authenticated',$$INSERT INTO ejercicio_overrides(entrenador_id,ejercicio_id,name) VALUES ('entrenador_principal','z','x')$$,'err:42501');
+SELECT tests.t('C1 re-asigna alumno a entrenador legacy', :C1,'authenticated',$$UPDATE alumnos SET entrenador_id='entrenador_principal' WHERE nombre='A'$$,'err:42501');
+SELECT tests.t('consulta por entrenador_principal no devuelve alumnos', :C1,'authenticated',$$SELECT * FROM alumnos WHERE entrenador_id='entrenador_principal'$$,'ok:0');
+SELECT tests.t('consulta por entrenador_principal no devuelve overrides (alumno)', :UA,'authenticated',$$SELECT * FROM video_overrides WHERE entrenador_id='entrenador_principal'$$,'ok:0');
+-- ============ Flujo del frontend corregido: UUID autenticado ============
+SELECT tests.t('C1 lista sus alumnos por UUID', :C1,'authenticated','SELECT * FROM alumnos WHERE entrenador_id='||:QC1,'ok:2');
+SELECT tests.t('C1 crea alumno con su UUID', :C1,'authenticated','INSERT INTO alumnos(nombre,email,entrenador_id) VALUES (''N'',''n@test.local'','||:QC1||')','ok:1');
+SELECT tests.t('C1 crea ejercicio custom y video override con su UUID', :C1,'authenticated','INSERT INTO ejercicios_custom(entrenador_id,name) VALUES ('||:QC1||$$,'ok')$$,'ok:1');
+SELECT tests.t('A lee overrides de su entrenador por UUID', :UA,'authenticated','SELECT * FROM video_overrides WHERE entrenador_id='||:QC1,'ok:1');
+SELECT tests.t('A lee ejercicios custom de su entrenador por UUID', :UA,'authenticated','SELECT * FROM ejercicios_custom WHERE entrenador_id='||:QC1,'ok:2');
+SELECT tests.t('A NO lee overrides consultando por su propio uid', :UA,'authenticated','SELECT * FROM video_overrides WHERE entrenador_id='||:QUA,'ok:0');
+-- ============ Vínculo auth_uid (lo hace solo service_role desde la Edge Function) ============
+SELECT tests.t('service_role vincula auth_uid a alumno sin cuenta', NULL,'service_role',$$UPDATE alumnos SET auth_uid='00000000-0000-0000-0000-0000000000d1' WHERE nombre='N' AND auth_uid IS NULL$$,'ok:1');
+SELECT tests.t('el alumno recién vinculado ya lee su fila', :D1,'authenticated','SELECT * FROM alumnos','ok:1');
+SELECT tests.t('el entrenador no puede fijar ni cambiar auth_uid', :C1,'authenticated',$$UPDATE alumnos SET auth_uid='00000000-0000-0000-0000-0000000000c2' WHERE nombre='N'$$,'err:42501');
+SELECT tests.t('el entrenador no puede desvincular auth_uid', :C1,'authenticated',$$UPDATE alumnos SET auth_uid=NULL WHERE nombre='N'$$,'err:42501');
+SELECT tests.t('service_role: UNIQUE impide vincular un uid ya usado', NULL,'service_role',$$UPDATE alumnos SET auth_uid='00000000-0000-0000-0000-0000000000a1' WHERE nombre='N'$$,'err:23505');
+SELECT tests.t('el alumno vinculado sigue pudiendo guardar onesignal_id', :D1,'authenticated',$$UPDATE alumnos SET onesignal_id='p' WHERE nombre='N'$$,'ok:1');
 \o
 \echo
 SELECT 'FAIL' AS res, name, got, want FROM tests.results WHERE NOT ok;

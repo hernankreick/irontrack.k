@@ -162,6 +162,7 @@ export default function StudentsSection(props) {
                       const errEm = !/^[^@]+@[^@]+\.[^@]+$/.test(newAlumnoData.email);
                       if(errNom||errEm){setNewAlumnoErrors({nombre:errNom,email:errEm});return;}
                       setLoadingSB(true);
+                      if(!ENTRENADOR_ID){toast2(msg("No se pudo identificar tu cuenta de entrenador. Volvé a iniciar sesión.", "Could not identify your coach account. Please sign in again."));setLoadingSB(false);return;}
                       const {data:createdRows,error:createErr} = await sb.createAlumno({nombre:newAlumnoData.nombre.trim(),email:newAlumnoData.email.trim(),entrenador_id:ENTRENADOR_ID});
                       if(createdRows&&createdRows[0]){setAlumnos(prev=>cleanActiveCoachAlumnos([...prev,createdRows[0]],ENTRENADOR_ID));toast2(msg("Alumno creado ✓", "Athlete created ✓"));setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}
                       else{const errMsg=createErr?.message||createErr?.details||"";toast2("Error al crear alumno"+(errMsg?" — "+errMsg:""));}

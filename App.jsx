@@ -139,6 +139,7 @@ import {
   selectCurrentRoutine,
 } from './lib/routineStore.js';
 import { getActiveStudentRoutinePosition } from './lib/studentWeeklyProgress.js';
+import { resolveCoachId, resolveCoachScopeId, realCoachIdOrNull } from './lib/coachIdentity.js';
 import { updateRutinaSemanaActiva as updateRutinaSemanaActivaLib } from './lib/updateRutinaSemanaActiva.js';
 import { updateRutinaPreservingOperational, withInitialSemanaActiva } from './lib/rutinaOperationalState.js';
 import { reconcileCurrentRoutineForAlumno } from './lib/reconcileCurrentRoutine.js';
@@ -166,9 +167,9 @@ const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 function getStoredEntrenadorId() {
   try {
-    return JSON.parse(localStorage.getItem("it_session") || "null")?.entrenadorId || "entrenador_principal";
+    return realCoachIdOrNull(JSON.parse(localStorage.getItem("it_session") || "null")?.entrenadorId);
   } catch (e) {
-    return "entrenador_principal";
+    return null;
   }
 }
 
@@ -308,7 +309,9 @@ const sb = {
     return data || [];
   },
   getRutinasByEntrenador: async (entId) => {
-    const { data, error } = await supabase.from("rutinas").select("*").eq("entrenador_id", String(entId || getStoredEntrenadorId()));
+    const coachId = realCoachIdOrNull(entId) || getStoredEntrenadorId();
+    if (!coachId) { console.warn("[rutinas SELECT] entrenador sin resolver: no se consulta"); return null; }
+    const { data, error } = await supabase.from("rutinas").select("*").eq("entrenador_id", coachId);
     if (error) { console.error("[rutinas SELECT ERROR]", error); return null; }
     return data || [];
   },
@@ -322,6 +325,13 @@ const sb = {
   createRutina: async (data) => {
     // Toda rutina asignada nace con semana_activa = 1 explicita (las plantillas no).
     const body = withInitialSemanaActiva(cleanRutinaWriteBody(data));
+    if (!body.entrenador_id) {
+      // El alta la hace siempre el entrenador autenticado: su UUID de Auth es el entrenador_id (nunca el literal legacy).
+      const activeSession = await getActiveSupabaseSession();
+      const coachId = realCoachIdOrNull(activeSession && activeSession.user && activeSession.user.id);
+      if (!coachId) { console.error("[rutinas INSERT] sin sesion de entrenador: no se crea la rutina"); return null; }
+      body.entrenador_id = coachId;
+    }
     const { data: created, error } = await supabase.from("rutinas").insert([body]).select();
     if (error) { console.error("[rutinas INSERT ERROR]", error); return null; }
     return created || [];
@@ -517,12 +527,14 @@ const sb = {
 },
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
-  getVideoOverrides: (entId) => sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(entId||"entrenador_principal")+"&select=ejercicio_id,youtube_url"),
+  getVideoOverrides: (entId) => { const id = realCoachIdOrNull(entId); return id ? sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(id)+"&select=ejercicio_id,youtube_url") : Promise.resolve(null); },
   getCustomEx: async (entId) => {
+    const coachId = realCoachIdOrNull(entId) || getStoredEntrenadorId();
+    if (!coachId) return [];
     const { data, error } = await supabase
       .from("ejercicios_custom")
       .select("*")
-      .eq("entrenador_id", String(entId || getStoredEntrenadorId()));
+      .eq("entrenador_id", coachId);
     if (error) throw error;
     return data || [];
   },
@@ -555,11 +567,13 @@ const sb = {
     if (!rows || rows.length === 0) throw new Error('updateCustomEx: 0 filas actualizadas — posible mismatch de entrenador_id');
     return rows;
   },
-  setVideoOverride: async (ejercicioId, url) => {
-    try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
-    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
+  setVideoOverride: async (ejercicioId, url, entId) => {
+    const coachId = realCoachIdOrNull(entId);
+    if (!coachId) throw new Error('setVideoOverride: entId no resuelto');
+    try { await sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(coachId)+"&ejercicio_id=eq."+encodeURIComponent(ejercicioId), "DELETE"); } catch(e){}
+    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:coachId}); } catch(e){ return null; }
   },
-  getNameOverrides: (entId) => sbFetch("ejercicio_overrides?entrenador_id=eq."+encodeURIComponent(entId||"entrenador_principal")+"&select=ejercicio_id,name,name_en"),
+  getNameOverrides: (entId) => { const id = realCoachIdOrNull(entId); return id ? sbFetch("ejercicio_overrides?entrenador_id=eq."+encodeURIComponent(id)+"&select=ejercicio_id,name,name_en") : Promise.resolve(null); },
   setNameOverride: async (ejercicioId, name, nameEn, entId) => {
     if (!entId) throw new Error('setNameOverride: entId no resuelto');
     const nm = String(name || "").trim();
@@ -574,13 +588,15 @@ const sb = {
     if (error) throw error;
     return data || [];
   },
-  getEntrenador: (id) => sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal")+"&select=*"),
+  getEntrenador: (id) => { const cid = realCoachIdOrNull(id); return cid ? sbFetch("entrenadores?id=eq."+encodeURIComponent(cid)+"&select=*") : Promise.resolve(null); },
   updateEntrenador: (id, data) => {
     var clean = {};
     if (data && typeof data === "object") {
       Object.keys(data).forEach(function(k){ if(data[k] !== undefined) clean[k] = data[k]; });
     }
-    return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
+    const cid = realCoachIdOrNull(id);
+    if (!cid) return Promise.resolve(null);
+    return sbFetch("entrenadores?id=eq."+encodeURIComponent(cid), "PATCH", clean);
   },
 };
 
@@ -647,7 +663,6 @@ function GymApp() {
   const [tabMain, setTabMain] = useState("entrenador"); // entrenador | alumno
       const [onboardStep, setOnboardStep] = useState(0);
   const [onboardDone, setOnboardDone] = useState(()=>{ try{return !!localStorage.getItem('it_onboard_done');}catch(e){return false;} });
-                          const ENTRENADOR_ID = "entrenador_principal";
   // Modo alumno: detectar ?r= en la URL
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const sharedParam = urlParams ? urlParams.get("r") : null;
@@ -657,6 +672,10 @@ function GymApp() {
   const [sessionData, setSessionData] = useState(()=>{ try{return JSON.parse(localStorage.getItem("it_session")||"null")}catch(e){return null} });
   const esAlumno = readOnly || sessionData?.role==="alumno";
   const [supabaseSessionUserId, setSupabaseSessionUserId] = useState(null);
+  // Identidad real del entrenador: UUID de Supabase Auth (RLS P0). Null hasta que la sesion lo resuelve; nunca el literal legacy.
+  const ENTRENADOR_ID = resolveCoachId({ role: sessionData?.role, authUid: supabaseSessionUserId, sessionEntrenadorId: sessionData?.entrenadorId });
+  // Entrenador cuyos datos compartidos se leen (overrides): el propio si es entrenador; el de su alumno si es alumno.
+  const coachScopeId = resolveCoachScopeId({ role: sessionData?.role, authUid: supabaseSessionUserId, sessionEntrenadorId: sessionData?.entrenadorId });
   const [loginScreen, setLoginScreen] = useState(()=>{ try{return !localStorage.getItem("it_session")}catch(e){return true} });
   const [loginRole, setLoginRole] = useState("entrenador");
   const [loginEmail, setLoginEmail] = useState("");
@@ -712,7 +731,7 @@ function GymApp() {
     editAlumnoPass, setEditAlumnoPass,
     cargarAlumnos,
     notifyAlumno,
-  } = useAlumnos({ sb });
+  } = useAlumnos({ sb, coachId: ENTRENADOR_ID });
   const {
     registrosSubTab, setRegistrosSubTab,
     sugsOpen, setSugsOpen,
@@ -871,7 +890,7 @@ function GymApp() {
       rutinasInicialesRef.current = cargarRutinasEntrenador();
       cargarAlumnos();
     }
-  }, [sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, cargarRutinasEntrenador, cargarAlumnos]);
+  }, [sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, ENTRENADOR_ID, cargarRutinasEntrenador, cargarAlumnos]);
 
   // Refresco y reintento automatico cada 30 s (refrescarAlumnos no abre otra consulta si hay una en vuelo).
   useEffect(function() {
@@ -1764,27 +1783,29 @@ function GymApp() {
       localStorage.setItem("it_cex", JSON.stringify(sanitized));
     } catch (e) {}
   }, [customEx]);
-  // Cargar config de pagos desde Supabase
+  // Config de pagos y overrides: requieren sesion de Supabase Auth (RLS P0) y se piden por el entrenador resuelto
+  // (el propio, o el de su alumno). Se reintentan cuando la identidad se resuelve (login sin recarga).
   useEffect(() => {
+    if (!coachScopeId && !supabaseSessionUserId) return;
     sb.getConfig().then(res => {
       if(res && res[0]) setAliasData(res[0]);
     }).catch(()=>{});
-    // Cargar video overrides
-    sb.getVideoOverrides(supabaseSessionUserId || sessionData?.entrenadorId || null).then(function(res){
+    sb.getVideoOverrides(coachScopeId).then(function(res){
       if(res && Array.isArray(res)) {
         var map = {};
         res.forEach(function(r){ map[r.ejercicio_id] = r.youtube_url; });
         setVideoOverrides(map);
       }
     }).catch(function(){});
-    // Cargar name overrides
-    sb.getNameOverrides(supabaseSessionUserId || sessionData?.entrenadorId || null).then(function(res){
+    sb.getNameOverrides(coachScopeId).then(function(res){
       if(res && Array.isArray(res)) {
         var map = {};
         res.forEach(function(r){ map[r.ejercicio_id] = { name: r.name, nameEn: r.name_en || r.name }; });
         setNameOverrides(map);
       }
     }).catch(function(){});
+  }, [coachScopeId, supabaseSessionUserId]);
+  useEffect(() => {
     try {
       var pRaw = localStorage.getItem("it_pattern_ov");
       if (pRaw) {
@@ -1797,8 +1818,8 @@ function GymApp() {
 
   useEffect(function () {
     if (readOnly || sessionData?.role !== "entrenador") return;
-    var coachId = supabaseSessionUserId || sessionData?.entrenadorId;
-    if (!coachId || coachId === "entrenador_principal") return;
+    var coachId = ENTRENADOR_ID;
+    if (!coachId) return;
     var cancelled = false;
 
     (async function () {
@@ -1859,7 +1880,7 @@ function GymApp() {
     return function () {
       cancelled = true;
     };
-  }, [readOnly, sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, msg, toast2]);
+  }, [readOnly, sessionData?.role, ENTRENADOR_ID, msg, toast2]);
 
   /** Recordatorios de entrenamiento (alumno): comprobar hora mientras la app está abierta. */
   React.useEffect(function () {
@@ -4263,9 +4284,8 @@ function GymApp() {
                   if(res===null){toast2("Error al guardar");return;}
                 }
                 if(editAlumnoPass){
-                  const alumnoEmailActual=updates.email||editAlumnoModal.email;
                   const{data:fnData,error:fnError}=await supabase.functions.invoke("update-alumno-password",{
-                    body:{alumnoEmail:alumnoEmailActual,newPassword:editAlumnoPass}
+                    body:{alumnoId:editAlumnoModal.id,newPassword:editAlumnoPass}
                   });
                   if(fnError||(fnData&&fnData.error)){
                     // fnError.message del SDK es genérico ("Edge Function returned a non-2xx
