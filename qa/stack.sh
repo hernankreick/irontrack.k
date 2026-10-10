@@ -36,6 +36,9 @@ export GOTRUE_API_HOST=127.0.0.1 GOTRUE_API_PORT=9999
 export GOTRUE_MAILER_AUTOCONFIRM=true GOTRUE_EXTERNAL_EMAIL_ENABLED=true GOTRUE_DISABLE_SIGNUP=false
 export GOTRUE_DB_MIGRATIONS_PATH="$QA_HOME/src/auth/migrations"
 
+# Lanza un proceso en segundo plano totalmente desacoplado (sin heredar stdout/stderr: no cuelga pipes como `| tail`).
+daemon() { local dir="$1" log="$2"; shift 2; ( cd "$dir" && exec setsid "$@" ) > "$log" 2>&1 < /dev/null & }
+
 up() {
   [ -x "$QA_HOME/bin/postgrest" ] || { echo "→ descargando PostgREST $POSTGREST_VERSION"
     curl -sSL -o "$QA_HOME/pgrst.tar.xz" "https://github.com/PostgREST/postgrest/releases/download/$POSTGREST_VERSION/postgrest-$POSTGREST_VERSION-linux-static-x86-64.tar.xz"
@@ -48,7 +51,7 @@ up() {
     as_pg <<EOF
 set -euo pipefail
 mkdir -p "$PGDATA"; "$PGBIN/initdb" -D "$PGDATA" -A trust -U postgres >/dev/null
-"$PGBIN/pg_ctl" -D "$PGDATA" -o '-p 54322 -c listen_addresses=127.0.0.1' -l "$PGDATA/pg.log" -w start >/dev/null
+"$PGBIN/pg_ctl" -D "$PGDATA" -o '-p 54322 -c listen_addresses=127.0.0.1' -l "$PGDATA/pg.log" -w start </dev/null >/dev/null 2>&1
 $PSQL -d postgres -c 'CREATE DATABASE irontrack_qa'
 $PSQL -d irontrack_qa <<'SQL'
 CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;
@@ -64,7 +67,7 @@ EOF
     (cd "$QA_HOME/src/auth" && "$QA_HOME/bin/gotrue" migrate >/dev/null 2>&1) && echo "→ migraciones de Auth aplicadas"
   else
     as_pg <<EOF || true
-"$PGBIN/pg_ctl" -D "$PGDATA" status >/dev/null 2>&1 || "$PGBIN/pg_ctl" -D "$PGDATA" -o '-p 54322 -c listen_addresses=127.0.0.1' -l "$PGDATA/pg.log" -w start >/dev/null
+"$PGBIN/pg_ctl" -D "$PGDATA" status >/dev/null 2>&1 || "$PGBIN/pg_ctl" -D "$PGDATA" -o '-p 54322 -c listen_addresses=127.0.0.1' -l "$PGDATA/pg.log" -w start </dev/null >/dev/null 2>&1
 EOF
   fi
   cat > "$QA_HOME/postgrest.conf" <<EOF
@@ -75,9 +78,9 @@ jwt-secret = "$JWT_SECRET"
 server-host = "127.0.0.1"
 server-port = 3000
 EOF
-  curl -s -o /dev/null http://127.0.0.1:9999/health || (cd "$QA_HOME/src/auth" && setsid nohup "$QA_HOME/bin/gotrue" serve > "$QA_HOME/gotrue.log" 2>&1 < /dev/null &)
-  curl -s -o /dev/null http://127.0.0.1:3000/ || (setsid nohup "$QA_HOME/bin/postgrest" "$QA_HOME/postgrest.conf" > "$QA_HOME/postgrest.log" 2>&1 < /dev/null &)
-  curl -s -o /dev/null http://127.0.0.1:54321/rest/v1/ || (setsid nohup node qa/gateway.mjs > "$QA_HOME/gateway.log" 2>&1 < /dev/null &)
+  curl -s -o /dev/null http://127.0.0.1:9999/health || daemon "$QA_HOME/src/auth" "$QA_HOME/gotrue.log" "$QA_HOME/bin/gotrue" serve
+  curl -s -o /dev/null http://127.0.0.1:3000/ || daemon "$PWD" "$QA_HOME/postgrest.log" "$QA_HOME/bin/postgrest" "$QA_HOME/postgrest.conf"
+  curl -s -o /dev/null http://127.0.0.1:54321/rest/v1/ || daemon "$PWD" "$QA_HOME/gateway.log" node qa/gateway.mjs
   for i in $(seq 1 40); do
     if curl -s -o /dev/null http://127.0.0.1:9999/health && curl -s -o /dev/null http://127.0.0.1:3000/ && curl -s -o /dev/null http://127.0.0.1:54321/rest/v1/; then echo "✔ stack listo: http://127.0.0.1:54321 (DB 127.0.0.1:54322/irontrack_qa)"; return 0; fi
     sleep 1

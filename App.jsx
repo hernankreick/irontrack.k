@@ -118,7 +118,7 @@ import AppTopBar from './components/layout/AppTopBar.jsx';
 import CoachDesktopShellFrame from './components/layout/CoachDesktopShellFrame.jsx';
 import OfflineSyncBanner from './components/layout/OfflineSyncBanner.jsx';
 import { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
-import { supabase } from './lib/supabaseClient.js';
+import { supabase, SUPABASE_ENV } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
@@ -162,8 +162,10 @@ import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18
 import { usePWAInstall } from './hooks/usePWAInstall.js';
 
 
-const SB_URL = import.meta.env.VITE_SUPABASE_URL;
-const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Conexion validada y sin valores de respaldo (ver lib/supabaseEnv.js): sin configuracion no se emite ninguna peticion REST.
+const SB_URL = SUPABASE_ENV.url;
+const SB_KEY = SUPABASE_ENV.key;
+const SB_CONFIGURED = SUPABASE_ENV.configured;
 
 function getStoredEntrenadorId() {
   try {
@@ -258,6 +260,7 @@ async function getActiveSupabaseSession() {
 }
 
 const sbFetch = async (path, method="GET", body=null) => {
+  if (!SB_CONFIGURED) { console.error("[Supabase] sin configuracion (" + SUPABASE_ENV.reason + "): no se emite la peticion"); return null; }
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
   const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json", "Prefer": "return=representation" } };
@@ -283,6 +286,7 @@ const sbFetch = async (path, method="GET", body=null) => {
 
 // Variante estricta: lanza ante error HTTP/red en vez de devolver null (no confundir error con "sin alumnos").
 const sbFetchStrict = async (path) => {
+  if (!SB_CONFIGURED) throw new Error("[Supabase] sin configuracion (" + SUPABASE_ENV.reason + ")");
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
   const r = await fetch(SB_URL+"/rest/v1/"+path, { method: "GET", headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json" } });
@@ -475,6 +479,7 @@ const sb = {
     return sbFetch("alumnos?id=eq."+id, "PATCH", data);
   },
   deleteAlumno: async function (id) {
+    if (!SB_CONFIGURED) throw new Error("[Supabase] sin configuracion (" + SUPABASE_ENV.reason + ")");
     var sid = encodeURIComponent(String(id));
     var activeSession = await getActiveSupabaseSession();
     var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
@@ -506,6 +511,7 @@ const sb = {
   },
   addMensaje: (data) => sbFetch("mensajes", "POST", data),
   marcarMensajesLeidos: async (alumnoId, esEntrenador) => {
+  if (!SB_CONFIGURED) return;
   const deQuien = esEntrenador ? "false" : "true";
   const url = "mensajes?alumno_id=eq."+alumnoId+"&de_entrenador=eq."+deQuien+"&leido=eq.false";
   const activeSession = await getActiveSupabaseSession();
@@ -3021,6 +3027,7 @@ function GymApp() {
             </button>
           </div>
         </div>
+        {!SB_CONFIGURED&&<div role="alert" style={{color:"#DC2626",fontSize:13,fontWeight:700,marginBottom:12,textAlign:"center"}}>{msg("Entorno sin base de datos configurada: no se puede iniciar sesión ni guardar datos.", "No database configured for this environment: sign-in and saving are disabled.")}</div>}
         {loginError&&<div style={{color:"#2563EB",fontSize:13,marginBottom:12,textAlign:"center"}}>{loginError}</div>}
         <button ref={loginSubmitRef} style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:"pointer",letterSpacing:1}} onClick={async ()=>{
           setLoginLoading(true); setLoginError("");
