@@ -24,7 +24,7 @@ No son bloqueantes del funcionamiento de mañana: Previews antiguos con la URL d
 **Fase A — antes de la ventana (solo lectura / respaldo)**
 - A1. SQL Editor: `sql/rls_p0_preflight_readonly.sql`. Esperado: 0 filas `FALLA` con `BLOQUEANTE` (incluye: 9 alumnos `entrenador_principal`, 0 sin `auth_uid`, principal en `auth.users` y `entrenadores`, columnas/tipos usados, conflictos de unicidad del backfill).
 - A2. SQL Editor: `sql/rls_p0_snapshot_policies.sql` → guardar la salida (restauración exacta de políticas, RLS y grants; imprescindible para `ejercicios_custom` y `entrenadores`).
-- A3. Respaldo de datos: en *Database → Backups* confirmar que existe uno restaurable reciente (el plan puede no incluir PITR). Si no: `pg_dump "<cadena de conexión>" --schema=public --no-owner -f irontrack_backup_YYYYMMDD.sql` en tu máquina (contiene datos de alumnos: guardarlo privado, fuera del repo).
+- A3. Respaldo (detalle y límites en **docs/respaldo-rls-p0.md**): crear y verificar la copia interna (`sql/rls_p0_backup_create.sql` + bloque A de `sql/rls_p0_backup_verify.sql`) y exportar CSV/snapshot desde el iPhone. La copia interna NO es un backup completo. Respaldo de datos completo: en *Database → Backups* confirmar que existe uno restaurable reciente (el plan puede no incluir PITR). Si no: `pg_dump "<cadena de conexión>" --schema=public --no-owner -f irontrack_backup_YYYYMMDD.sql` en tu máquina (contiene datos de alumnos: guardarlo privado, fuera del repo).
 - A4. Avisar a los alumnos de una ventana breve y que abran la app de nuevo después (los que tengan la sesión guardada antes del backfill no verán videos/nombres personalizados hasta volver a ingresar).
 
 **Fase B — ventana**
