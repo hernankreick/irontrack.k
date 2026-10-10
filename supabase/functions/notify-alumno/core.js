@@ -13,15 +13,19 @@ const json = (status, body, corsHeaders) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 
-// Cuenta de entrenador = esta en la allowlist opcional (COACH_USER_IDS), existe en `entrenadores`
-// y su email NO pertenece a un alumno. Lecturas inyectadas para poder probarla sin base de datos.
-export function makeIsCoachAccount({ allowList = [], coachExists, emailIsAlumno }) {
-  return async (user) => {
-    if (allowList.length && !allowList.includes(user.id)) return false
-    if (!(await coachExists(user.id))) return false
-    if (user.email && (await emailIsAlumno(user.email))) return false
-    return true
-  }
+// COACH_USER_IDS (obligatorio): UIDs de Supabase Auth autorizados a enviar, separados por comas.
+// Ausente o vacio => lista vacia => se rechaza todo (falla cerrado).
+export function parseIdList(raw) {
+  return String(raw ?? '').split(',').map((x) => x.trim()).filter(Boolean)
+}
+
+// Alumnos con entrenador_id = 'entrenador_principal' no tienen dueno individual demostrable.
+// Solo los puede notificar el UID principal: PRINCIPAL_COACH_UID si esta definido; si no, el unico
+// UID de COACH_USER_IDS. Con varios UIDs y sin PRINCIPAL_COACH_UID, el caso legacy se deniega.
+export function resolvePrincipalUid(coachUserIds, principalRaw) {
+  const explicit = String(principalRaw ?? '').trim()
+  if (explicit) return coachUserIds.includes(explicit) ? explicit : null
+  return coachUserIds.length === 1 ? coachUserIds[0] : null
 }
 
 export function extractBearer(req) {
@@ -33,7 +37,8 @@ export function extractBearer(req) {
 //   corsHeaders
 //   getUser(token)            -> { id, email } | null        (valida el JWT contra Supabase Auth)
 //   getAlumno(alumnoId)       -> { id, entrenador_id, email, onesignal_id } | null   (service role)
-//   isCoachAccount(user)      -> boolean   (el usuario es una cuenta de entrenador, no de alumno)
+//   coachUserIds              -> string[]  (COACH_USER_IDS, obligatorio)
+//   principalCoachUid         -> string | null  (ver resolvePrincipalUid)
 //   sendPush({ playerId, mensaje })  -> { ok: boolean, status?: number }
 export async function handleNotify(req, deps) {
   const { corsHeaders } = deps
@@ -56,10 +61,10 @@ export async function handleNotify(req, deps) {
   }
   if (mensaje.length > MAX_MENSAJE) return json(400, { error: 'mensaje too long' }, corsHeaders)
 
-  // 1) Debe ser una cuenta de entrenador (un alumno con sesion valida NO alcanza).
-  let esEntrenador = false
-  try { esEntrenador = await deps.isCoachAccount(user) } catch (_) { esEntrenador = false }
-  if (!esEntrenador) return json(403, { error: 'not authorized' }, corsHeaders)
+  // 1) El UID validado por Supabase Auth debe estar en COACH_USER_IDS. No se usa user_metadata.role
+  //    ni la tabla `entrenadores`. Lista ausente/vacia => nadie esta autorizado.
+  const allow = Array.isArray(deps.coachUserIds) ? deps.coachUserIds : []
+  if (!allow.length || !allow.includes(String(user.id))) return json(403, { error: 'not authorized' }, corsHeaders)
 
   // 2) El alumno destinatario se lee del servidor; nunca se confia en datos del cliente.
   let alumno = null
@@ -69,9 +74,10 @@ export async function handleNotify(req, deps) {
   // Misma respuesta para "no existe" y "no es tuyo": no revela que ids existen.
   if (!alumno) return json(403, { error: 'not authorized' }, corsHeaders)
 
-  // 3) Pertenencia: UUID real del entrenador, o el id legacy usado por casi todos los alumnos.
-  const ownsAlumno =
-    String(alumno.entrenador_id) === String(user.id) || alumno.entrenador_id === LEGACY_COACH_ID
+  // 3) Pertenencia: UUID propio, o legacy 'entrenador_principal' solo para el UID principal.
+  const ownsAlumno = alumno.entrenador_id === LEGACY_COACH_ID
+    ? !!deps.principalCoachUid && String(user.id) === String(deps.principalCoachUid)
+    : String(alumno.entrenador_id) === String(user.id)
   if (!ownsAlumno) return json(403, { error: 'not authorized' }, corsHeaders)
 
   // Igual que el cliente anterior: sin onesignal_id no hay nada que enviar (no es error).

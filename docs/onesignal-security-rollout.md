@@ -9,25 +9,26 @@ Estado: **preparado, NO desplegado**. Nada de esto se ejecutó contra Supabase n
 - Hallazgo: hoy `notifyAlumno` **no se invoca desde ninguna pantalla** (solo se desestructura en `App.jsx`). La clave estaba expuesta en el bundle igualmente, pero no hay un flujo de notificaciones activo que se interrumpa al rotarla.
 
 ## Autorización (orden de chequeos)
-1. Sin `Authorization: Bearer` → 401. JWT inválido/expirado o clave anon → 401.
-2. Cuenta de entrenador: existe en `entrenadores` (el login del coach hace upsert de su UUID de Auth), **no** es el email de ningún alumno y, si se define `COACH_USER_IDS`, está en esa lista → si no, 403.
-3. Alumno leído por `alumnoId` desde la base; no existe o no es suyo → 403 (misma respuesta, no revela ids).
-4. Pertenencia: `alumnos.entrenador_id` = UUID del caller **o** `'entrenador_principal'` (esquema legacy; mismo criterio que `update-alumno-password`).
-5. Sin `onesignal_id` → 200 `sent:false` (igual que el cliente anterior).
+1. Sin `Authorization: Bearer` → 401. JWT inválido/expirado o clave anon → 401 (validado con `auth.getUser`).
+2. **`COACH_USER_IDS` es obligatorio** (UIDs de Supabase Auth separados por comas). Ausente, vacío o con el UID del caller fuera de la lista → 403 para todos (falla cerrado). No se usa `user_metadata.role` ni la tabla `entrenadores`.
+3. El alumno se lee de la base por `alumnoId`; no existe o no es suyo → 403 (misma respuesta, no revela ids).
+4. Pertenencia: `alumnos.entrenador_id` = UID del caller. Para alumnos legacy (`entrenador_principal`), que no tienen dueño individual demostrable, solo el **UID principal**: `PRINCIPAL_COACH_UID` si está definido (debe estar en la lista), o el único UID de `COACH_USER_IDS` si la lista tiene uno solo. Con varios UIDs y sin `PRINCIPAL_COACH_UID`, el caso legacy se deniega.
+5. El `onesignal_id` destino sale de la base. Sin `onesignal_id` → 200 `sent:false` (igual que el cliente anterior).
 
 ## Dependencias y riesgos antes de desplegar
-1. **Identidad canónica del entrenador (principal riesgo).** Conviven el UUID de Auth y el string `entrenador_principal`, que usan casi todos los alumnos. Con el legacy, *cualquier* cuenta de entrenador puede notificar a *cualquier* alumno legacy (test 4c). Es aceptable con un solo entrenador real; deja de serlo si se agrega otro. Solución definitiva (fuera de alcance): migrar `alumnos.entrenador_id` a UUID.
-2. **Qué es "cuenta de entrenador".** La app no tiene un rol confiable: `user_metadata.role` lo puede editar el propio usuario y el login usa `signUp` con la clave anon. Por eso la función se apoya en la tabla `entrenadores`. **Verificar antes de desplegar** si las políticas RLS de `entrenadores` dejan que un alumno autenticado inserte su propia fila; la función ya lo frena si su email figura en `alumnos`, y definir `COACH_USER_IDS` con el UUID del coach lo cubre del todo. Endurecer RLS es tarea aparte (no se tocó).
-3. **Tabla `alumnos`**: se asumen las columnas `id, entrenador_id, email, onesignal_id` (las que ya usa el cliente).
-4. **JWT**: dejar activa la verificación de JWT de la plataforma (default); no desplegar con `--no-verify-jwt`. El código además valida con `auth.getUser`.
-5. **CORS** `*`, igual que `update-alumno-password`; la autorización real es el JWT.
-6. **Clientes con bundle viejo / PWA en caché** seguirán usando la clave vieja hasta rotarla; tras rotar, sus envíos fallan en silencio (están en `try/catch`). Hoy ninguna pantalla lo dispara.
-7. **La clave sigue en el historial de git.** Quitarla del código no la invalida: la rotación es obligatoria. No hace falta reescribir historial si se rota.
-8. **Verificación pendiente en CI/local**: `vite build` no pudo ejecutarse en el entorno de preparación (`node_modules` instalado para Windows: faltan binarios nativos de rollup/esbuild). Por lo mismo `test-trainingVolume` y `test-weekGateLabels` ya fallaban antes de este cambio. Correr build y suite completa antes de desplegar.
+1. **Secretos obligatorios antes del paso de despliegue del frontend**: `COACH_USER_IDS` (UID real del entrenador, obtenerlo en Supabase Auth → Users) y `ONESIGNAL_REST_API_KEY`. Sin `COACH_USER_IDS` la función rechaza todo.
+2. **Identidad canónica**: conviven el UID de Auth y `entrenador_principal` (casi todos los alumnos). Está resuelto restringiendo el legacy a un único UID principal; si se suma un segundo entrenador, definir `PRINCIPAL_COACH_UID` y migrar `entrenador_id` a UID (fuera de alcance).
+3. **Tabla `alumnos`**: se asumen las columnas `id, entrenador_id, onesignal_id` (las que ya usa el cliente).
+4. **JWT**: dejar activa la verificación de JWT de la plataforma (default); no desplegar con `--no-verify-jwt`.
+5. **CORS** `*`, igual que `update-alumno-password`; la autorización real es el JWT + lista.
+6. **Alcance real**: `notifyAlumno` no se invoca desde ninguna pantalla ni flujo (solo se define en `hooks/useAlumnos.js` y se desestructura en `App.jsx`). Revocar la clave vieja no interrumpe ninguna funcionalidad activa conocida. El registro de suscripciones push (alta del `onesignal_id` al loguear el alumno y `OneSignal.init`) usa solo el App ID público y no depende de la clave REST.
+7. **Clientes con bundle viejo / PWA en caché** conservan la clave en su bundle; tras revocarla, esos envíos (hoy inexistentes) fallarían en silencio.
+8. **La clave sigue en el historial de git**: quitarla del código no la invalida; la rotación es obligatoria. No hace falta reescribir historial si se rota.
+9. **Nota de repo**: `node_modules/` está versionado en git, con binarios de Windows; por eso `vite build` y 2 tests no corren en Linux sin reinstalar. La verificación se hizo en una copia con `npm ci` (build OK, bundle sin claves, 15/15 scripts). No se tocó `node_modules` del repo.
 
 ## Orden seguro de despliegue (requiere autorización explícita; cada paso lo ejecuta una persona)
 1. En OneSignal: **crear una clave nueva**. **No borrar la vieja todavía.**
-2. `supabase secrets set ONESIGNAL_REST_API_KEY=<clave nueva>` (opcional `COACH_USER_IDS=<uuid del coach>`). Ingresarla en terminal/panel, no en archivos.
+2. `supabase secrets set ONESIGNAL_REST_API_KEY=<clave nueva> COACH_USER_IDS=<uid del entrenador>` (opcional `PRINCIPAL_COACH_UID`). Ingresarlos en terminal/panel, no en archivos.
 3. `supabase functions deploy notify-alumno`. Probar con una cuenta de entrenador real sobre un alumno de prueba propio (envía un push real, solo en el caso legítimo) y verificar 403/401/401 con alumno, anónimo y token inválido.
 4. Desplegar el frontend (esta rama, tras revisión y merge). Desde acá el cliente no lleva clave.
 5. Dar margen para que los clientes/PWA carguen el bundle nuevo.
@@ -42,4 +43,4 @@ Interrupciones posibles: hacer el paso 6 antes de 3–4 corta los envíos hasta 
 - La función es aditiva: `supabase functions delete notify-alumno` no afecta nada más.
 
 ## Pruebas
-`node scripts/test-notifyAlumnoFunction.mjs` — 19 casos en memoria, sin red ni envíos reales: entrenador legítimo (legacy y UUID), alumno que intenta enviar, anónimo, clave anon como Bearer, alumno ajeno/inexistente, token inválido, destino enviado por el cliente ignorado, validación, fallos de infraestructura, CORS, regla real de cuenta de entrenador, y ausencia de claves `os_v2_app_…` en el repo. No ejecutada: prueba end-to-end contra un Supabase de staging.
+`node scripts/test-notifyAlumnoFunction.mjs` — 23 casos en memoria, sin red ni envíos reales: entrenador legítimo (legacy y UID propio), alumno que intenta enviar, anónimo, clave anon, alumno ajeno/inexistente, token inválido, `COACH_USER_IDS` ausente/vacío/incorrecto, UID no listado, `user_metadata.role` ignorado, reglas del UID principal legacy, destino del cliente ignorado, validación, fallos de infraestructura, CORS y ausencia de claves `os_v2_app_…` y de UIDs literales. Pendiente: prueba end-to-end contra un Supabase de staging (infraestructura externa no disponible) y ejecución de la función bajo Deno.

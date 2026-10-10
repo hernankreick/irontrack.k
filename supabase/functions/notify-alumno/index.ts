@@ -1,8 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { handleNotify, makeIsCoachAccount, PUSH_HEADINGS } from './core.js'
+import { handleNotify, parseIdList, resolvePrincipalUid, PUSH_HEADINGS } from './core.js'
 
 // Secretos (se configuran con `supabase secrets set`, nunca en el repo):
 //   ONESIGNAL_REST_API_KEY  clave privada de OneSignal (la NUEVA, ya rotada)
+//   COACH_USER_IDS          OBLIGATORIO: UIDs de Supabase Auth autorizados, separados por comas (vacio = rechaza todo)
+//   PRINCIPAL_COACH_UID     opcional: UID dueno de los alumnos legacy 'entrenador_principal'
 //   ONESIGNAL_APP_ID        opcional; si falta se usa el App ID publico de la app
 // SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY los inyecta Supabase automaticamente.
 const DEFAULT_ONESIGNAL_APP_ID = '8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7' // publico (ya va en el bundle web)
@@ -17,6 +19,8 @@ const admin = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
 )
+
+const coachUserIds = parseIdList(Deno.env.get('COACH_USER_IDS'))
 
 const deps = {
   corsHeaders,
@@ -37,21 +41,8 @@ const deps = {
     return data
   },
 
-  // Ver makeIsCoachAccount en core.js. COACH_USER_IDS (opcional, separado por comas) endurece el
-  // caso en que la tabla `entrenadores` sea escribible por cualquier usuario autenticado.
-  isCoachAccount: makeIsCoachAccount({
-    allowList: (Deno.env.get('COACH_USER_IDS') ?? '').split(',').map((x) => x.trim()).filter(Boolean),
-    coachExists: async (id: string) => {
-      const { data, error } = await admin.from('entrenadores').select('id').eq('id', id).maybeSingle()
-      if (error) throw error
-      return !!data
-    },
-    emailIsAlumno: async (email: string) => {
-      const { data, error } = await admin.from('alumnos').select('id').ilike('email', email).limit(1)
-      if (error) throw error
-      return !!(data && data.length)
-    },
-  }),
+  coachUserIds,
+  principalCoachUid: resolvePrincipalUid(coachUserIds, Deno.env.get('PRINCIPAL_COACH_UID')),
 
   sendPush: async ({ playerId, mensaje }: { playerId: string; mensaje: string }) => {
     const apiKey = Deno.env.get('ONESIGNAL_REST_API_KEY')
