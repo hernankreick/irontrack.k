@@ -80,18 +80,9 @@
     background-color 200ms var(--it-r-ease);
 }
 
-.it-routines-root--dark .it-routine-card-wrap:hover {
+.it-routine-card-wrap:hover {
   transform: translateY(-2px);
-  border-color: rgba(59, 130, 246, 0.45) !important;
   box-shadow: var(--it-r-glow);
-  background-color: rgba(30, 45, 64, 0.65) !important;
-}
-
-.it-routines-root:not(.it-routines-root--dark) .it-routine-card-wrap:hover {
-  transform: translateY(-2px);
-  border-color: rgba(59, 130, 246, 0.4) !important;
-  box-shadow: 0 10px 28px rgba(59, 130, 246, 0.12);
-  background-color: #f8fafc !important;
 }
 
 /* ── Entrada cards ── */
@@ -151,7 +142,7 @@
 
 .it-routine-add-day:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: var(--card-border-active) !important;
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(37, 99, 235, 0.18);
 }
 
@@ -179,14 +170,14 @@
 }
 
 .it-routine-add-day__title {
-  color: #fff;
+  color: var(--text);
   font-size: 14px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .it-routine-add-day__subtitle {
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.25;
