@@ -1,6 +1,54 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap");
 @import "tailwindcss";
 
+/* Tokens de cards (rutinas / editor de día). Oscuro por defecto; el claro se activa
+   con la misma clase que ya usa la vista de Rutinas (sin .it-routines-root--dark)
+   o con .it-theme-light en cualquier contenedor. */
+:root {
+  --bg: #0a0f1a;
+  --card-bg: #111a2b;
+  --card-border: rgba(255, 255, 255, 0.07);
+  --card-border-active: rgba(96, 165, 250, 0.55);
+  --surface-2: #18233a;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent: #2563eb;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --radius-card: 18px;
+  --radius-control: 12px;
+  /* Derivados (chips, bloques del editor) */
+  --success-bg: rgba(74, 222, 128, 0.14);
+  --warning-bg: rgba(251, 191, 36, 0.14);
+  --neutral-bg: rgba(148, 163, 184, 0.14);
+  --block-bg: #0f1726;
+  --block-warmup: #fb923c;
+  --block-main: #60a5fa;
+  --on-accent: #ffffff;
+}
+
+.it-routines-root:not(.it-routines-root--dark),
+.it-theme-light {
+  --bg: #f1f5f9;
+  --card-bg: #ffffff;
+  --card-border: rgba(15, 23, 42, 0.1);
+  --card-border-active: rgba(37, 99, 235, 0.55);
+  --surface-2: #f1f5f9;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --accent: #2563eb;
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #dc2626;
+  --success-bg: rgba(21, 128, 61, 0.1);
+  --warning-bg: rgba(180, 83, 9, 0.1);
+  --neutral-bg: rgba(71, 85, 105, 0.1);
+  --block-bg: #f8fafc;
+  --block-warmup: #c2410c;
+  --block-main: #1d4ed8;
+}
+
 html,
 body,
 #root {
