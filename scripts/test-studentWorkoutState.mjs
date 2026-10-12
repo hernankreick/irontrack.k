@@ -509,8 +509,8 @@ test("C2 caso 9: los campos NO llegan a Supabase (payload remoto y cola offline)
   assert.ok(!JSON.stringify(payload).includes("session_") && !JSON.stringify(pending).includes("session_"));
   // el POST de logSet usa buildProgressPayload con argumentos explicitos, no el set
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
-  assert.ok(app.includes("sb.addProgreso(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet))"));
-  assert.ok(!/addProgreso\([^)]*newSet/.test(app));
+  assert.ok(app.includes("sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId))"));
+  assert.ok(!/addProgreso(Idempotente)?\([^)]*newSet/.test(app));
   const lib = readFileSync(new URL("../lib/workoutSession.js", import.meta.url), "utf8");
   assert.ok(!lib.includes("session_dia_idx") && !lib.includes("session_rutina_id"));
 });

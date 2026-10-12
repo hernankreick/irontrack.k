@@ -158,10 +158,29 @@ import {
   hydrateProgressFromRows,
   mergeProgressEntries,
   updateExerciseKgInRoutines,
+  persistSetConfirmed,
 } from './lib/workoutSession.js';
+import { postProgressIdempotent } from './lib/progressInsert.js';
+import {
+  generateOpId,
+  enqueueItem,
+  updateQueue,
+  readQueue,
+  visiblePendingItems,
+  flushPendingForAlumno,
+  withFlushLock,
+} from './lib/pendingSyncQueue.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
 
+
+// Series pendientes del alumno de la sesion actual (cada alumno ve solo las suyas; las de otros quedan intactas en el dispositivo).
+function readVisiblePending() {
+  try {
+    var sid = JSON.parse(localStorage.getItem("it_session") || "null")?.alumnoId;
+    return sid == null ? [] : visiblePendingItems(localStorage, sid);
+  } catch (e) { return []; }
+}
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -282,6 +301,24 @@ const sbFetch = async (path, method="GET", body=null) => {
   return text ? JSON.parse(text) : null;
 };
 
+// Variante que devuelve { ok, status, data } (no colapsa los errores HTTP a null): la necesita la insercion idempotente de series para
+// distinguir un conflicto 23505 sobre el id de la serie de cualquier otro error. Lanza solo ante falla de red.
+const sbRequestStatus = async (path, method="GET", body=null) => {
+  // Sin URL o clave de Supabase no se emite ninguna peticion REST (en main: variable ausente; con el PR de seguridad SB_URL/SB_KEY quedan vacias si el entorno no es valido).
+  if (!SB_URL || !SB_KEY) { console.error("[Supabase] sin configuracion: no se emite la peticion"); return { ok: false, status: 0, data: null }; }
+  var activeSession = await getActiveSupabaseSession();
+  var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
+  const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json", "Prefer": "return=representation" } };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(SB_URL+"/rest/v1/"+path, opts);
+  var text = "";
+  try { text = await r.text(); } catch (e) {}
+  var data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+  if(!r.ok) console.error("[Supabase request error]", { path: path, method: method, status: r.status, error: text || r.statusText });
+  return { ok: r.ok, status: r.status, data: data };
+};
+
 // Variante estricta: lanza ante error HTTP/red en vez de devolver null (no confundir error con "sin alumnos").
 const sbFetchStrict = async (path) => {
   var activeSession = await getActiveSupabaseSession();
@@ -360,6 +397,11 @@ const sb = {
   },
   getProgreso: (alumnoId) => sbFetch("progreso?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc"),
   addProgreso: (data) => sbFetch("progreso", "POST", data),
+  // Insercion idempotente: data.id (UUID de la operacion) se reutiliza en los reintentos; 23505 sobre ese id se verifica leyendo la fila.
+  addProgresoIdempotente: (data) => postProgressIdempotent({
+    post: (p) => sbRequestStatus("progreso", "POST", p),
+    getById: (id) => sbRequestStatus("progreso?id=eq." + encodeURIComponent(id) + "&select=id,alumno_id,ejercicio_id,kg,reps,semana,nota", "GET", null),
+  }, data),
   deleteProgresoByAlumno: async (alumnoId) => {
     const { error } = await supabase.from("progreso").delete().eq("alumno_id", String(alumnoId));
     if (error) throw error;
@@ -1122,9 +1164,7 @@ function GymApp() {
   const [aliasData, setAliasData] = useState(null);
   const [ultimoPagoConfirmado, setUltimoPagoConfirmado] = useState(null);
   const [isOnline, setIsOnline] = useState(()=>typeof navigator!=='undefined'?navigator.onLine:true);
-  const [pendingSync, setPendingSync] = useState(()=>{
-    try{return JSON.parse(localStorage.getItem('it_pending_sync')||'[]');}catch(e){return [];}
-  });
+  const [pendingSync, setPendingSync] = useState(()=>readVisiblePending());
   const [pagosEstado, setPagosEstado] = useState(()=>{
     try{ return JSON.parse(localStorage.getItem("it_pagos_estado")||"{}"); }catch(e){ return {}; }
   });
@@ -1266,7 +1306,7 @@ function GymApp() {
     try { setCurrentWeek(parseInt(localStorage.getItem("it_week") || "0", 10) || 0); } catch (e) { setCurrentWeek(0); }
     try { setCompletedDays(JSON.parse(localStorage.getItem("it_cd") || "[]")); } catch (e) { setCompletedDays([]); }
     try { setCustomEx(JSON.parse(localStorage.getItem("it_cex") || "[]")); } catch (e) { setCustomEx([]); }
-    try { setPendingSync(JSON.parse(localStorage.getItem("it_pending_sync") || "[]")); } catch (e) { setPendingSync([]); }
+    setPendingSync(readVisiblePending());
     try { setPagosEstado(JSON.parse(localStorage.getItem("it_pagos_estado") || "{}")); } catch (e) { setPagosEstado({}); }
     try {
       if (sess && (sess.role === "entrenador" || sess.role === "alumno")) {
@@ -1503,39 +1543,25 @@ function GymApp() {
   useEffect(()=>{
     const flushPendingSync = async () => {
       setIsOnline(true);
-      // Sincronizar sets pendientes
-      let pending = [];
-      try {
-        pending = JSON.parse(localStorage.getItem('it_pending_sync')||'[]');
-      } catch(e) {
-        console.warn('[offline sync] it_pending_sync corrupto; se conserva sin sincronizar', e);
-        return;
-      }
-      if(!Array.isArray(pending)) {
-        console.warn('[offline sync] it_pending_sync no es una lista; se conserva sin sincronizar');
-        return;
-      }
-      if(pending.length === 0) return;
       const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
       if(!alumnoIdSync) return;
-      const results = await Promise.allSettled(pending.map(item => {
-        return Promise.resolve().then(function() {
-          return sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo));
-        });
-      }));
-      const failed = pending.filter(function(item, idx) {
-        var res = results[idx];
-        return !res || res.status !== 'fulfilled' || res.value == null;
-      });
-      if(failed.length > 0) {
-        try{localStorage.setItem('it_pending_sync', JSON.stringify(failed));}catch(e){}
-      } else {
-        localStorage.removeItem('it_pending_sync');
+      if(readQueue(localStorage).corrupt) {
+        console.warn('[offline sync] it_pending_sync corrupto o no es una lista; se conserva sin sincronizar');
+        return;
       }
-      setPendingSync(failed);
-      const syncedCount = pending.length - failed.length;
+      // Un solo flush a la vez (por pestaña y entre pestañas); solo los elementos DE ESTE alumno; se quitan por opId solo si el servidor confirma.
+      const r = await withFlushLock(function () {
+        return flushPendingForAlumno({
+          storage: localStorage,
+          alumnoId: alumnoIdSync,
+          send: function (item) { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo, item.opId)); },
+        });
+      });
+      setPendingSync(readVisiblePending());
+      const syncedCount = r.ran && r.value ? r.value.sent : 0;
       if(syncedCount > 0) toast2(syncedCount+' set'+(syncedCount>1?'s':'')+' sincronizados ✓');
     };
+    flushPendingRef.current = flushPendingSync;
     const goOnline = () => { flushPendingSync(); };
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online',  goOnline);
@@ -1968,6 +1994,7 @@ function GymApp() {
     setTimer({ total: secs, color, endAt: Date.now() + secs * 1000 });
   };
 
+  const flushPendingRef = React.useRef(null);
   const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe, weekOverride) => {
     const d = new Date().toLocaleDateString("es-AR");
     // Mismo criterio que al finalizar una sesión: si la rutina tiene una semana persistida
@@ -1987,16 +2014,33 @@ function GymApp() {
       const ex = updateProgressEntryWithSessionContext(prev[exId], newSet, session);
       return {...prev,[exId]:ex};
     });
-    // Guardar en Supabase — si offline, guardar en cola local
+    // Guardar en Supabase — si offline, guardar en cola local. Online: la serie se da por guardada SOLO si Supabase
+    // devuelve la fila insertada (sbFetch devuelve null en HTTP no-ok); si no, se encola y se avisa que esta pendiente.
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
+    const opId = generateOpId();   // identidad LOCAL estable de esta serie (se conserva en los reintentos; no se envia a Supabase)
+    const enqueuePendingSet = function () {
+      enqueueItem(localStorage, buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, cicloForSet, alumnoIdSync, opId));
+      setPendingSync(readVisiblePending());
+    };
+    let confirmacionRemotaEnCurso = false;
     if(alumnoIdSync) {
       if(!isOnline) {
-        const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, cicloForSet);
-        const updated = [...pendingSync, item];
-        setPendingSync(updated);
-        try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
+        enqueuePendingSet();
       } else {
-        sb.addProgreso(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet)).catch(function(e){console.error("[PROGRESO] ERR",e)});
+        confirmacionRemotaEnCurso = true;
+        persistSetConfirmed({
+          addProgreso: function () { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId)); },
+        }).then(function (res) {
+          if (res.confirmed) {
+            toast2(es?'Serie guardada ✓':'Set saved ✓');
+            return;
+          }
+          console.error("[PROGRESO] serie no confirmada por el servidor (" + res.reason + "); se encola para reintentar");
+          enqueuePendingSet();
+          toast2(es?'Guardado localmente, pendiente de sincronizar':'Saved locally, pending sync');
+          // Un reintento automatico (el cerrojo del flush evita enviar dos veces lo mismo); si falla, queda en cola.
+          setTimeout(function () { if (flushPendingRef.current) flushPendingRef.current(); }, 10000);
+        });
       }
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
@@ -2017,7 +2061,7 @@ function GymApp() {
     }
     if(!isOnline) {
       toast2(es?'Set guardado localmente':'Set saved locally');
-    } else {
+    } else if(!confirmacionRemotaEnCurso) {
       toast2(es?'Serie guardada ✓':'Set saved ✓');
     }
     // Actualizar kg en la rutina para autocompletar sets restantes
@@ -2487,18 +2531,19 @@ function GymApp() {
       try { localStorage.setItem("it_pg", JSON.stringify(next)); } catch (e) {}
       return next;
     });
-    setPendingSync(function (prev) {
-      if (!weekDates.length || !exIds.length) return prev || [];
-      var next = (prev || []).filter(function (item) {
-        if (!item) return true;
-        if (item.alumno_id != null && String(item.alumno_id) !== aid) return true;
-        var itemEx = String(item.exId || item.ejercicio_id || "");
-        var itemDate = String(item.fecha || item.date || "");
-        return !(exSet[itemEx] && dateSet[itemDate]);
+    if (weekDates.length && exIds.length) {
+      // Lee y escribe la cola guardada (no el estado de React) y filtra por contenido, nunca por posicion: no pierde lo encolado durante un flush.
+      updateQueue(localStorage, function (items) {
+        return items.filter(function (item) {
+          if (!item) return true;
+          if (item.alumno_id != null && String(item.alumno_id) !== aid) return true;
+          var itemEx = String(item.exId || item.ejercicio_id || "");
+          var itemDate = String(item.fecha || item.date || "");
+          return !(exSet[itemEx] && dateSet[itemDate]);
+        });
       });
-      try { localStorage.setItem("it_pending_sync", JSON.stringify(next)); } catch (e) {}
-      return next;
-    });
+      setPendingSync(readVisiblePending());
+    }
     setCompletedDays(function (prev) {
       return (prev || []).filter(function (k) {
         var text = String(k);
@@ -2601,16 +2646,15 @@ function GymApp() {
       try { localStorage.setItem("it_pg", JSON.stringify(next)); } catch (e) {}
       return next;
     });
-    setPendingSync(function (prev) {
-      var next = (prev || []).filter(function (item) {
+    updateQueue(localStorage, function (items) {
+      return items.filter(function (item) {
         if (!item) return true;
         if (item.alumno_id != null && String(item.alumno_id) !== aid) return true;
         if (!exIds.length) return true;
         return !exSet[String(item.exId || item.ejercicio_id)];
       });
-      try { localStorage.setItem("it_pending_sync", JSON.stringify(next)); } catch (e) {}
-      return next;
     });
+    setPendingSync(readVisiblePending());
     setSugerencias(function (prev) {
       if (!prev || typeof prev !== "object") return prev;
       var next = Object.assign({}, prev);
@@ -2776,14 +2820,13 @@ function GymApp() {
       }
     } catch (e) {}
 
-    setPendingSync(function (prev) {
-      var next = (prev || []).filter(function (item) {
+    updateQueue(localStorage, function (items) {
+      return items.filter(function (item) {
         if (!item || item.alumno_id == null) return true;
         return String(item.alumno_id) !== aid;
       });
-      try { localStorage.setItem("it_pending_sync", JSON.stringify(next)); } catch (e) {}
-      return next;
     });
+    setPendingSync(readVisiblePending());
 
     if (alumnoActivo && String(alumnoActivo.id) === aid) {
       setRegistrosSubTab(0);
