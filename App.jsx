@@ -158,6 +158,7 @@ import {
   updateExerciseKgInRoutines,
   persistSetConfirmed,
 } from './lib/workoutSession.js';
+import { postProgressIdempotent } from './lib/progressInsert.js';
 import {
   generateOpId,
   enqueueItem,
@@ -298,6 +299,22 @@ const sbFetch = async (path, method="GET", body=null) => {
   return text ? JSON.parse(text) : null;
 };
 
+// Variante que devuelve { ok, status, data } (no colapsa los errores HTTP a null): la necesita la insercion idempotente de series para
+// distinguir un conflicto 23505 sobre el id de la serie de cualquier otro error. Lanza solo ante falla de red.
+const sbRequestStatus = async (path, method="GET", body=null) => {
+  var activeSession = await getActiveSupabaseSession();
+  var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
+  const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json", "Prefer": "return=representation" } };
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(SB_URL+"/rest/v1/"+path, opts);
+  var text = "";
+  try { text = await r.text(); } catch (e) {}
+  var data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+  if(!r.ok) console.error("[Supabase request error]", { path: path, method: method, status: r.status, error: text || r.statusText });
+  return { ok: r.ok, status: r.status, data: data };
+};
+
 // Variante estricta: lanza ante error HTTP/red en vez de devolver null (no confundir error con "sin alumnos").
 const sbFetchStrict = async (path) => {
   var activeSession = await getActiveSupabaseSession();
@@ -374,6 +391,11 @@ const sb = {
   },
   getProgreso: (alumnoId) => sbFetch("progreso?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc"),
   addProgreso: (data) => sbFetch("progreso", "POST", data),
+  // Insercion idempotente: data.id (UUID de la operacion) se reutiliza en los reintentos; 23505 sobre ese id se verifica leyendo la fila.
+  addProgresoIdempotente: (data) => postProgressIdempotent({
+    post: (p) => sbRequestStatus("progreso", "POST", p),
+    getById: (id) => sbRequestStatus("progreso?id=eq." + encodeURIComponent(id) + "&select=id,alumno_id,ejercicio_id,kg,reps,semana,nota", "GET", null),
+  }, data),
   deleteProgresoByAlumno: async (alumnoId) => {
     const { error } = await supabase.from("progreso").delete().eq("alumno_id", String(alumnoId));
     if (error) throw error;
@@ -1526,7 +1548,7 @@ function GymApp() {
         return flushPendingForAlumno({
           storage: localStorage,
           alumnoId: alumnoIdSync,
-          send: function (item) { return sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana)); },
+          send: function (item) { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.opId)); },
         });
       });
       setPendingSync(readVisiblePending());
@@ -1952,7 +1974,7 @@ function GymApp() {
       } else {
         confirmacionRemotaEnCurso = true;
         persistSetConfirmed({
-          addProgreso: function () { return sb.addProgreso(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet)); },
+          addProgreso: function () { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, opId)); },
         }).then(function (res) {
           if (res.confirmed) {
             toast2(es?'Serie guardada ✓':'Set saved ✓');
