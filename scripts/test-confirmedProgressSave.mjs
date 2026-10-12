@@ -78,6 +78,7 @@ await t("ciclo + alumnoId + opId + id conviven: ciclo>1 viaja en la cola y en el
   assert.ok(!("ciclo" in buildPendingProgressItem("sq", "60", "8", "n", "12/10/2026", 2, 1, "AL-1", OP)));
   assert.equal(isSameProgressRow({ ...p, ciclo: 3 }, p), true);
   assert.equal(isSameProgressRow({ ...p, ciclo: 2 }, p), false);   // misma id, otro ciclo => no se confirma
-  assert.equal(isSameProgressRow({ ...p1, ciclo: undefined }, p1), true);
+  const sinCiclo = { ...p }; delete sinCiclo.ciclo;
+  assert.equal(isSameProgressRow(sinCiclo, p), true);   // la lectura por id no trae ciclo: no invalida la coincidencia
 });
 console.log(`${n} comprobaciones OK`);
