@@ -73,6 +73,11 @@ q v "DROP POLICY zz_fuga ON mensajes" >/dev/null
 q v "CREATE POLICY zz_fuga ON entrenadores FOR SELECT TO authenticated USING (true)" >/dev/null
 [ "$(verdict $VI)" = "VEREDICTO: FALLA" ] && ok "fuga de entrenadores detectada" || bad "no detectó fuga de entrenadores"
 q v "DROP POLICY zz_fuga ON entrenadores" >/dev/null
+# política VULNERABLE anterior (cualquier autenticado no alumno se crea su fila de entrenador): el verificador debe detectarla
+q v "DROP POLICY entrenadores_insert_restringido ON entrenadores; CREATE POLICY entrenadores_insert_self ON entrenadores FOR INSERT TO authenticated WITH CHECK (id::text = auth.uid()::text AND NOT EXISTS (SELECT 1 FROM alumnos a WHERE a.auth_uid::text = auth.uid()::text))" >/dev/null
+[ "$(verdict $VI)" = "VEREDICTO: FALLA" ] && ok "la política vulnerable anterior (autorregistro de entrenadores) es detectada" || bad "no detectó el autorregistro: $(verdict $VI)"
+q v "DROP POLICY entrenadores_insert_self ON entrenadores; CREATE POLICY entrenadores_insert_restringido ON entrenadores FOR INSERT TO authenticated WITH CHECK (public.it_is_principal() OR (id::text = auth.uid()::text AND public.it_is_entrenador()))" >/dev/null
+[ "$(verdict $VI)" = "VEREDICTO: OK" ] && ok "con la política corregida el verificador vuelve a OK" || bad "tras restaurar la política: $(verdict $VI)"
 q v "GRANT SELECT ON alumnos TO anon; CREATE POLICY zz_anon ON alumnos FOR SELECT TO anon USING (true)" >/dev/null
 has $VA "alumnos: anon LEE 2 fila(s)" && ok "lectura anónima de alumnos detectada" || bad "no detectó lectura anónima"
 q v "DROP POLICY zz_anon ON alumnos; REVOKE SELECT ON alumnos FROM anon" >/dev/null

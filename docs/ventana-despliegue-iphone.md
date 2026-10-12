@@ -1,6 +1,6 @@
 # Ventana de despliegue RLS P0 — guía paso a paso desde iPhone
 
-> **Estado del documento (revisión 2):** borrador local, rama `claude/irontrack-rls-p0-fix-r02vvv`, PR en borrador #89. Los 11 scripts SQL/migraciones de producción son **idénticos** al commit `19dd5b54bd04a06097df1d5258ae584c74c7d6d4` (ver sección 3); los archivos nuevos de esta revisión (verificaciones B8, exportación JSON, rotación de la copia, función de un solo archivo) son **solo lectura o de respaldo**, no modifican ninguna migración.
+> **Estado del documento (revisión 2):** borrador local, rama `claude/irontrack-rls-p0-fix-r02vvv`, PR en borrador #89. De los 11 scripts SQL/migraciones de producción, **10 son idénticos** al commit `19dd5b54bd04a06097df1d5258ae584c74c7d6d4` y **uno fue corregido por seguridad**: la migración 2 (`..._rls_p0_lockdown.sql`) ahora impide que un usuario autenticado sin rol se cree su propia fila de `entrenadores` (commit `7432101bf7ec9025dc6a893d78dc9e4680292a3e`; ver B7 y la sección 3). Los archivos nuevos de esta revisión (verificaciones, exportación JSON, rotación de la copia, función de un solo archivo) son **solo lectura o de respaldo**.
 > Ningún paso de esta guía fue ejecutado en producción. Todo lo marcado **[NUEVA]** se probó solo en un Postgres local con datos ficticios (y la función en Deno real).
 > Complementa `docs/despliegue-rls-p0.md` (decisión y orden general) y `docs/respaldo-rls-p0.md` (qué cubre y qué NO cubre la copia interna).
 
@@ -451,11 +451,32 @@ Ejecutar el checklist de la sección 2 completo. Es el último punto seguro para
 - **NO CONTINUAR a B7** si no podés iniciar sesión con la nueva: sin acceso del entrenador, el lockdown dejaría el panel inaccesible.
 
 ### B7. Migración 2 — lockdown RLS
-> ⚠️ **PASO RIESGOSO.** Es transaccional: si una precondición falla, aborta sin cambiar nada. Tené a mano la sección 3 (fila B7) y el snapshot de A2.
-- Archivo: `supabase/migrations/20261010120000_rls_p0_lockdown.sql` (315 líneas; Raw en la sección 5). Empieza con comentarios (`-- IronTrack — RLS P0: reemplaza las políticas acceso_total…`), luego `BEGIN;`, y termina con `COMMIT;`. Pegado completo, un solo Run.
-- **Esperado:** "Success". Pueden aparecer avisos tipo "tabla … no existe, se omite" para tablas opcionales (p. ej. `coach_notification_reads`, que no existe): es normal.
+> ⚠️ **PASO RIESGOSO.** Es transaccional: si una precondición falla, aborta sin cambiar nada. Tené a mano la sección 2 (fila B7) y el snapshot de A2.
+- **Verificación previa [NUEVA, solo lectura]:** la política anterior dejaba que *cualquier* cuenta autenticada se creara una fila en `entrenadores` (eso da privilegios de entrenador). La migración 2 cierra el alta pero **no borra filas ya creadas**. Ejecutá esta consulta (solo conteos):
+```sql
+-- =============================================================================
+-- VERIFICACIÓN PREVIA A LA MIGRACIÓN 2 — filas de `entrenadores` que otorgan privilegios. SOLO LECTURA, no requiere editar nada, solo conteos.
+-- Con la política anterior (abierta) cualquier cuenta autenticada pudo crearse una fila en `entrenadores`; esa fila da privilegios de entrenador
+-- (salvo que la cuenta sea alumno). La migración 2 cierra el alta, pero NO borra filas ya creadas.
+-- Ejecutar después del backfill (B2) y ANTES de la migración 2 (B7):
+--   principal = 1, otras_con_privilegios = 0 (o exactamente los entrenadores legítimos que conozcas).
+--   vinculadas_a_alumnos son filas de alumnos creadas por el cliente antiguo: no otorgan privilegios (se pueden borrar a mano después).
+-- Si otras_con_privilegios > 0 y no las reconocés: NO CONTINUAR a B7 (pedir asistencia para revisarlas).
+-- =============================================================================
+SELECT
+  (SELECT count(*) FROM public.entrenadores) AS filas_entrenadores,
+  (SELECT count(*) FROM public.entrenadores e WHERE EXISTS (SELECT 1 FROM public.coach_principal cp WHERE cp.uid::text = e.id::text)) AS principal,
+  (SELECT count(*) FROM public.entrenadores e WHERE EXISTS (SELECT 1 FROM public.alumnos a WHERE a.auth_uid::text = e.id::text)) AS vinculadas_a_alumnos,
+  (SELECT count(*) FROM public.entrenadores e
+    WHERE NOT EXISTS (SELECT 1 FROM public.coach_principal cp WHERE cp.uid::text = e.id::text)
+      AND NOT EXISTS (SELECT 1 FROM public.alumnos a WHERE a.auth_uid::text = e.id::text)) AS otras_con_privilegios;
+```
+  Esperado: `principal = 1` y `otras_con_privilegios = 0` (o exactamente los entrenadores legítimos que conozcas). **NO CONTINUAR a B7** si `otras_con_privilegios` es mayor y no las reconocés: pedí asistencia para revisarlas. `vinculadas_a_alumnos` son filas viejas de alumnos: no dan privilegios.
+- Archivo: `supabase/migrations/20261010120000_rls_p0_lockdown.sql` (**329 líneas**; versión corregida, Raw en la sección 3: usar ese enlace, **no** el del commit `19dd5b5`). Empieza con comentarios (`-- IronTrack — RLS P0: reemplaza las políticas acceso_total…`), luego `BEGIN;`, y termina con `COMMIT;`. Pegado completo, un solo Run.
+- **Qué cambia respecto de la versión anterior de la migración:** la política de alta de `entrenadores` pasó de `entrenadores_insert_self` a `entrenadores_insert_restringido`: solo el entrenador principal (`it_is_principal()`) puede dar de alta a otro entrenador; una cuenta que ya es entrenador sigue pudiendo re-enviar su propia fila (el upsert del login); un usuario externo sin fila y un alumno son rechazados. **Consecuencia operativa:** una cuenta de entrenador nueva ya no se crea sola al iniciar sesión; la da de alta el entrenador principal o se inserta desde el SQL Editor.
+- **Esperado:** "Success". Pueden aparecer avisos tipo "tabla … no existe, se omite" (p. ej. `coach_notification_reads`, que no existe) y, si corresponde, un aviso sobre filas de entrenadores sin vínculo con alumnos: es normal.
 - **Si falla con "RLS P0 abortada: …":** no se aplicó nada. Copiá el mensaje y **NO CONTINUAR**.
-- **Inmediatamente después:** B8. Si la app queda inutilizable y no se corrige hacia adelante en minutos: sección 3, fila B7.
+- **Inmediatamente después:** B8. Si la app queda inutilizable y no se corrige hacia adelante en minutos: sección 2, fila B7.
 
 ### B8. Pruebas posteriores al lockdown
 1. Repetir el checklist de la sección 2 completo (entrenador y alumno de prueba).
@@ -498,7 +519,7 @@ END $$;
 -- Para cada alumno vinculado simula su sesión (rol authenticated + JWT con su auth_uid) y exige:
 --   · ve exactamente 1 alumno (él) y ningún alumno ajeno;
 --   · 0 filas ajenas en rutinas, progreso, sesiones, fotos, mensajes y notas;  · 0 filas en entrenadores.
--- Entrenador principal: ve todos los alumnos.   Usuario sin datos (UUID aleatorio): no ve nada.
+-- Entrenador principal: ve todos los alumnos.   Usuario sin datos (UUID aleatorio): no ve nada y no puede crearse una fila de entrenador.
 -- Antes de la migración 2 debe dar FALLA (RLS abierta); después, OK.
 -- =============================================================================
 DO $$
@@ -569,6 +590,14 @@ BEGIN
       WHEN undefined_table THEN NULL;
     END;
   END LOOP;
+  -- el usuario sin datos tampoco puede crearse una fila de entrenador (eso le daría privilegios de entrenador)
+  BEGIN
+    INSERT INTO public.entrenadores(id, email) VALUES (stranger::uuid, 'sin-datos@invalid.local');
+    fallas := fallas + 1; r := r || E'\n  usuario sin datos: PUDO crearse una fila de entrenador';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;   -- esperado: rechazado por la política RLS
+    WHEN OTHERS THEN fallas := fallas + 1; r := r || E'\n  usuario sin datos: el alta de entrenador no fue rechazada por RLS (SQLSTATE ' || SQLSTATE || ')';
+  END;
   RESET ROLE;
 
   IF r = '' THEN r := E'\n  (ninguno)'; END IF;
@@ -714,7 +743,7 @@ COMMIT;
 ---
 
 ## 5. Verificación de los archivos contra el commit
-Los enlaces **Raw** están fijados al commit `19dd5b54bd04a06097df1d5258ae584c74c7d6d4` (el contenido no puede cambiar). Los hashes los calculé comparando cada archivo local con la versión guardada en ese commit de git (`git show 19dd5b5:<ruta>`). **Resultado: los 11 archivos son IDÉNTICOS al commit.** Este documento nuevo no modifica ninguno de ellos.
+Los enlaces **Raw** están fijados al commit `19dd5b54bd04a06097df1d5258ae584c74c7d6d4` (el contenido no puede cambiar). Los hashes los calculé comparando cada archivo local con la versión guardada en ese commit de git (`git show 19dd5b5:<ruta>`). **Resultado: 10 de los 11 archivos son IDÉNTICOS al commit; la migración 2 (`..._rls_p0_lockdown.sql`) está MODIFICADA** (corrección de seguridad del alta de entrenadores, commit `7432101bf7ec9025dc6a893d78dc9e4680292a3e`) y su enlace Raw apunta a ese commit. Esta guía no modifica ninguno de ellos.
 
 | Archivo | Líneas | SHA-256 (16 primeros) | Local vs commit | Raw (fijado al commit) |
 |---|---|---|---|---|
@@ -727,15 +756,16 @@ Los enlaces **Raw** están fijados al commit `19dd5b54bd04a06097df1d5258ae584c74
 | `sql/rls_p0_backfill_sql_editor.sql` | 46 | `5c849d0830ebd8f1` | IGUAL (byte a byte) | https://raw.githubusercontent.com/hernankreick/irontrack.k/19dd5b54bd04a06097df1d5258ae584c74c7d6d4/sql/rls_p0_backfill_sql_editor.sql |
 | `sql/rls_p0_backfill_revert.sql` | 31 | `ae32f6c75e3be2b9` | IGUAL (byte a byte) | https://raw.githubusercontent.com/hernankreick/irontrack.k/19dd5b54bd04a06097df1d5258ae584c74c7d6d4/sql/rls_p0_backfill_revert.sql |
 | `supabase/migrations/20261010110000_rls_p0_coach_principal.sql` | 22 | `d615665b45a172a9` | IGUAL (byte a byte) | https://raw.githubusercontent.com/hernankreick/irontrack.k/19dd5b54bd04a06097df1d5258ae584c74c7d6d4/supabase/migrations/20261010110000_rls_p0_coach_principal.sql |
-| `supabase/migrations/20261010120000_rls_p0_lockdown.sql` | 315 | `99b66b901adbc067` | IGUAL (byte a byte) | https://raw.githubusercontent.com/hernankreick/irontrack.k/19dd5b54bd04a06097df1d5258ae584c74c7d6d4/supabase/migrations/20261010120000_rls_p0_lockdown.sql |
+| `supabase/migrations/20261010120000_rls_p0_lockdown.sql` | 329 | `5c4648caafab5e69` | **MODIFICADO** (corrección de seguridad, commit `7432101`) | https://raw.githubusercontent.com/hernankreick/irontrack.k/7432101bf7ec9025dc6a893d78dc9e4680292a3e/supabase/migrations/20261010120000_rls_p0_lockdown.sql |
 | `supabase/rollback/20261010120000_rls_p0_rollback.sql` | 35 | `d0dcf2cbfe57b454` | IGUAL (byte a byte) | https://raw.githubusercontent.com/hernankreick/irontrack.k/19dd5b54bd04a06097df1d5258ae584c74c7d6d4/supabase/rollback/20261010120000_rls_p0_rollback.sql |
 
 **Archivos nuevos de esta revisión** (no existen en `19dd5b5`; se publican con el commit que suba esta guía, cuyo SHA te informo al subirlo). Su contenido está **embebido en esta guía** (secciones A3, B2, B4 y B8) y el contenido embebido se verificó byte a byte contra el archivo:
 
 | Archivo | Líneas | SHA-256 (16 primeros) |
 |---|---|---|
+| `sql/rls_p0_verify_entrenadores.sql` | 16 | `d45522755bbd4b5a` |
 | `sql/rls_p0_verify_anon.sql` | 26 | `8c61ce0a872c9db9` |
-| `sql/rls_p0_verify_aislamiento.sql` | 86 | `97b1de6b37f30e51` |
+| `sql/rls_p0_verify_aislamiento.sql` | 94 | `fa8e065e44ece780` |
 | `sql/rls_p0_verify_backfill.sql` | 14 | `6767abac93644dc8` |
 | `sql/rls_p0_backup_rotar.sql` | 63 | `fa606366a4a7840f` |
 | `sql/rls_p0_export_json.sql` | 38 | `0a59bf0c559abe14` |

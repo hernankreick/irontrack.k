@@ -5,7 +5,7 @@
 -- Para cada alumno vinculado simula su sesión (rol authenticated + JWT con su auth_uid) y exige:
 --   · ve exactamente 1 alumno (él) y ningún alumno ajeno;
 --   · 0 filas ajenas en rutinas, progreso, sesiones, fotos, mensajes y notas;  · 0 filas en entrenadores.
--- Entrenador principal: ve todos los alumnos.   Usuario sin datos (UUID aleatorio): no ve nada.
+-- Entrenador principal: ve todos los alumnos.   Usuario sin datos (UUID aleatorio): no ve nada y no puede crearse una fila de entrenador.
 -- Antes de la migración 2 debe dar FALLA (RLS abierta); después, OK.
 -- =============================================================================
 DO $$
@@ -76,6 +76,14 @@ BEGIN
       WHEN undefined_table THEN NULL;
     END;
   END LOOP;
+  -- el usuario sin datos tampoco puede crearse una fila de entrenador (eso le daría privilegios de entrenador)
+  BEGIN
+    INSERT INTO public.entrenadores(id, email) VALUES (stranger::uuid, 'sin-datos@invalid.local');
+    fallas := fallas + 1; r := r || E'\n  usuario sin datos: PUDO crearse una fila de entrenador';
+  EXCEPTION
+    WHEN insufficient_privilege THEN NULL;   -- esperado: rechazado por la política RLS
+    WHEN OTHERS THEN fallas := fallas + 1; r := r || E'\n  usuario sin datos: el alta de entrenador no fue rechazada por RLS (SQLSTATE ' || SQLSTATE || ')';
+  END;
   RESET ROLE;
 
   IF r = '' THEN r := E'\n  (ninguno)'; END IF;
