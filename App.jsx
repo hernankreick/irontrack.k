@@ -4593,8 +4593,6 @@ function GymApp() {
           setAddExSelectedIds([]);
         }}
       />
-      <ToastBanner toast={toast} darkMode={darkMode} border={border} textMain={textMain} />
-
       </AppMainScroll>
       </CoachDesktopShellFrame>
       {/* Modal video: fuera del scroll (display:none con sesi?n ocultaba el overlay) + portal a body */}
@@ -4647,6 +4645,9 @@ function GymApp() {
           }}
         />
       )}
+      {/* Fuera de AppMainScroll: ese contenedor queda en display:none mientras hay un entrenamiento abierto (session && activeDay) y,
+          ademas, WorkoutScreen (fixed, z-index 80) lo taparia. Aqui el z-index 250 del aviso queda por encima de WorkoutScreen y RestTimer. */}
+      <ToastBanner toast={toast} darkMode={darkMode} border={border} textMain={textMain} />
       {!resumenSesion && !hideGlobalBottomNavCoachDash && !(showCoachDesktopShell && coachDesktop1024) && (
         <GlobalBottomNav
           ref={globalBottomNavRef}
