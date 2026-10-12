@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   isConfirmedProgressInsert, persistSetConfirmed, parsePendingQueue,
-  buildPendingProgressItem, buildProgressPayload,
+  buildPendingProgressItem, buildProgressPayload, isSameProgressRow,
 } from "../lib/workoutSession.js";
 import { isValidInsertedRow } from "../lib/finalizeWorkoutSession.js";
 
@@ -57,7 +57,7 @@ await t("cola: parse tolerante (vacia, valida, corrupta, no-lista)", () => {
 await t("elemento de la cola: sin alumnoId/opId conserva el formato anterior; con ellos agrega alumno_id y opId", () => {
   const legacy = buildPendingProgressItem("sq", "60", "8", "nota", "12/10/2026", 1);
   assert.deepEqual(Object.keys(legacy).sort(), ["date", "exId", "kg", "note", "reps", "semana"]);
-  const nuevo = buildPendingProgressItem("sq", "60", "8", "nota", "12/10/2026", 1, "AL-1", "op-1");
+  const nuevo = buildPendingProgressItem("sq", "60", "8", "nota", "12/10/2026", 1, undefined, "AL-1", "op-1");
   assert.deepEqual(Object.keys(nuevo).sort(), ["alumno_id", "date", "exId", "kg", "note", "opId", "reps", "semana"]);
   assert.equal(nuevo.alumno_id, "AL-1"); assert.equal(nuevo.opId, "op-1");
 });
@@ -66,5 +66,18 @@ await t("el elemento encolado produce EXACTAMENTE el payload que se habria envia
   const direct = buildProgressPayload("AL", "sq", "60,5", "8", "n", "12/10/2026", 2);
   const fromQueue = buildProgressPayload("AL", item.exId, item.kg, item.reps, item.note, item.date, item.semana);
   assert.deepEqual(fromQueue, direct);
+});
+await t("ciclo + alumnoId + opId + id conviven: ciclo>1 viaja en la cola y en el payload; ciclo 1 no agrega campo", () => {
+  const OP = "3f2b8c1e-9a4d-4e6b-8c7f-1a2b3c4d5e6f";
+  const item = buildPendingProgressItem("sq", "60", "8", "n", "12/10/2026", 2, 3, "AL-1", OP);
+  assert.equal(item.ciclo, 3); assert.equal(item.alumno_id, "AL-1"); assert.equal(item.opId, OP);
+  const p = buildProgressPayload("AL-1", item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo, item.opId);
+  assert.equal(p.ciclo, 3); assert.equal(p.id, OP); assert.equal(p.alumno_id, "AL-1"); assert.equal(p.semana, 2);
+  const p1 = buildProgressPayload("AL-1", "sq", "60", "8", "n", "12/10/2026", 2, 1, OP);
+  assert.ok(!("ciclo" in p1)); assert.equal(p1.id, OP);
+  assert.ok(!("ciclo" in buildPendingProgressItem("sq", "60", "8", "n", "12/10/2026", 2, 1, "AL-1", OP)));
+  assert.equal(isSameProgressRow({ ...p, ciclo: 3 }, p), true);
+  assert.equal(isSameProgressRow({ ...p, ciclo: 2 }, p), false);   // misma id, otro ciclo => no se confirma
+  assert.equal(isSameProgressRow({ ...p1, ciclo: undefined }, p1), true);
 });
 console.log(`${n} comprobaciones OK`);

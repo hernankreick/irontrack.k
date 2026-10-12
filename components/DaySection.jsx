@@ -11,8 +11,8 @@ import { coachType, coachSpace, coachTypeMobile, coachSpaceMobile } from './coac
 import { irontrackMsg as M } from '../lib/irontrackMsg.js';
 
 const BLOCK_ACCENT = {
-  warmup:    '#f59e0b',
-  exercises: '#3b82f6',
+  warmup:    'var(--block-warmup)',
+  exercises: 'var(--block-main)',
 };
 
 // ── One drag-sortable block (warmup or exercises) ─────────────────────
@@ -28,6 +28,7 @@ function SortableBlock({
   onReorderBlock,
   blockKey,
   darkMode = true,
+  lang = 'es',
   addButtonClassName = '',
   textMain,
   textMuted,
@@ -35,8 +36,6 @@ function SortableBlock({
 }) {
   const T = isUnder768 ? coachTypeMobile : coachType;
   const S = isUnder768 ? coachSpaceMobile : coachSpace;
-  var blockBg = darkMode ? '#0f172a' : '#f8fafc';
-  var blockBorder = darkMode ? `1px solid ${accent}22` : `1px solid ${accent}28`;
   const [activeId, setActiveId] = useState(null);
 
   const sensors = useSensors(
@@ -47,12 +46,11 @@ function SortableBlock({
 
   return (
     <div style={{
-      background: blockBg,
-      border: blockBorder,
-      borderRadius: 12,
+      background: 'var(--block-bg)',
+      border: '1px solid var(--card-border)',
+      borderRadius: 'var(--radius-card)',
       padding: `${S.blockGap - 2}px ${S.gridGapTight}px`,
       marginBottom: S.gridTight,
-      boxShadow: darkMode ? 'none' : '0 1px 2px rgba(15,23,42,0.04)',
     }}>
       {/* Block header */}
       <div style={{
@@ -62,13 +60,14 @@ function SortableBlock({
         marginBottom: count > 0 ? S.gridTight : 6,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: S.gridTight }}>
-          <span style={{
-            width: 3, height: 14, borderRadius: 2,
+          <span aria-hidden="true" style={{
+            width: 8, height: 8, borderRadius: '50%',
             background: accent, display: 'inline-block', flexShrink: 0,
           }} />
           <span style={{
             ...T.tableHeader,
-            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            letterSpacing: '0.1em',
             color: accent,
           }}>
             {label}
@@ -76,7 +75,7 @@ function SortableBlock({
         </div>
         <span style={{
           ...T.subtitle,
-          color: darkMode ? '#475569' : '#64748b',
+          color: 'var(--text-muted)',
         }}>
           {count}
         </span>
@@ -105,9 +104,7 @@ function SortableBlock({
               exercise={ex}
               onEdit={onEditExercise}
               onDelete={onDeleteExercise}
-              darkMode={darkMode}
-              textMain={textMain}
-              textMuted={textMuted}
+              lang={lang}
               isUnder768={isUnder768}
             />
           ))}
@@ -119,9 +116,7 @@ function SortableBlock({
               exercise={activeExercise}
               onEdit={() => {}}
               onDelete={() => {}}
-              darkMode={darkMode}
-              textMain={textMain}
-              textMuted={textMuted}
+              lang={lang}
               isUnder768={isUnder768}
             />
           ) : null}
@@ -138,8 +133,8 @@ function SortableBlock({
           marginTop: count > 0 ? 4 : 0,
           padding: '8px',
           background: 'transparent',
-          border: `1px dashed ${accent}55`,
-          borderRadius: 8,
+          border: `1px dashed ${accent}`,
+          borderRadius: 'var(--radius-control)',
           color: accent,
           ...T.label,
           fontWeight: 700,
@@ -154,7 +149,7 @@ function SortableBlock({
           minHeight: 44,
         }}
       >
-        <Plus size={13} />
+        <Plus size={14} aria-hidden="true" />
         {addExerciseLabel}
       </button>
     </div>
@@ -183,8 +178,8 @@ export function DaySection({
 }) {
   const T = isUnder768 ? coachTypeMobile : coachType;
   const S = isUnder768 ? coachSpaceMobile : coachSpace;
-  var dayTitleColor = darkMode ? '#f1f5f9' : textMain;
-  var dayInputColor = darkMode ? '#f1f5f9' : textMain;
+  var dayTitleColor = 'var(--text)';
+  var dayInputColor = 'var(--text)';
   const warmup    = day.warmup    || [];
   const exercises = day.exercises || [];
 
@@ -236,10 +231,12 @@ export function DaySection({
               {nombre}
             </span>
             <button
+              type="button"
+              aria-label={M(lang, 'Renombrar día', 'Rename day', 'Renomear dia')}
               onClick={() => setEditandoNombre(true)}
               style={{
                 width: 44, height: 44, background: 'transparent', border: 'none',
-                cursor: 'pointer', color: textMuted,
+                cursor: 'pointer', color: 'var(--text-muted)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 borderRadius: 8, flexShrink: 0,
               }}
@@ -250,6 +247,8 @@ export function DaySection({
         )}
         <div style={{ display: 'flex', gap: 4 }}>
           <button
+            type="button"
+            aria-label={M(lang, 'Copiar día', 'Copy day', 'Copiar dia')}
             onClick={onCopyDay}
             style={{
               width: 44, height: 44, background: 'transparent', border: 'none',
@@ -262,6 +261,8 @@ export function DaySection({
             <Copy size={16} />
           </button>
           <button
+            type="button"
+            aria-label={M(lang, 'Eliminar día', 'Delete day', 'Eliminar dia')}
             onClick={onDeleteDay}
             style={{
               width: 44, height: 44, background: 'transparent', border: 'none',
@@ -289,6 +290,7 @@ export function DaySection({
         onDeleteExercise={onDeleteExercise}
         onReorderBlock={onReorderWarmup}
         darkMode={darkMode}
+        lang={lang}
         textMain={textMain}
         textMuted={textMuted}
         isUnder768={isUnder768}
@@ -308,6 +310,7 @@ export function DaySection({
         onDeleteExercise={onDeleteExercise}
         onReorderBlock={onReorderExercises}
         darkMode={darkMode}
+        lang={lang}
         textMain={textMain}
         textMuted={textMuted}
         isUnder768={isUnder768}

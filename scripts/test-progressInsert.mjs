@@ -7,14 +7,14 @@ import { generateOpId } from "../lib/pendingSyncQueue.js";
 let n = 0; const t = async (name, fn) => { await fn(); n++; console.log("ok -", name); };
 const AL = "11111111-1111-4111-8111-111111111111", OTRO = "22222222-2222-4222-8222-222222222222";
 const ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const payload = (over) => ({ ...buildProgressPayload(AL, "sq", "60", "8", "", "12/10/2026", 1, ID), ...(over || {}) });
+const payload = (over) => ({ ...buildProgressPayload(AL, "sq", "60", "8", "", "12/10/2026", 1, undefined, ID), ...(over || {}) });
 const row = (over) => ({ id: ID, alumno_id: AL, ejercicio_id: "sq", kg: 60, reps: 8, semana: 1, nota: "", ...(over || {}) });
 const conflict = (id = ID, over) => ({ ok: false, status: 409, data: { code: "23505", details: `Key (id)=(${id}) already exists.`, message: 'duplicate key value violates unique constraint "progreso_pkey"', ...(over || {}) } });
 const io = (post, getById) => { const calls = { post: 0, get: 0, bodies: [] }; return { calls, post: async (p) => { calls.post++; calls.bodies.push(p); return post(p); }, getById: async (id) => { calls.get++; return getById ? getById(id) : { ok: true, data: [] }; } }; };
 
 await t("payload: con UUID valido incluye id (minusculas); sin id o con id invalido es el de siempre", () => {
-  assert.equal(buildProgressPayload(AL, "sq", "60", "8", "", "d", 1, ID.toUpperCase()).id, ID);
-  for (const bad of [undefined, null, "", "op-1", "123", 5]) assert.ok(!("id" in buildProgressPayload(AL, "sq", "60", "8", "", "d", 1, bad)), String(bad));
+  assert.equal(buildProgressPayload(AL, "sq", "60", "8", "", "d", 1, undefined, ID.toUpperCase()).id, ID);
+  for (const bad of [undefined, null, "", "op-1", "123", 5]) assert.ok(!("id" in buildProgressPayload(AL, "sq", "60", "8", "", "d", 1, undefined, bad)), String(bad));
   assert.deepEqual(Object.keys(buildProgressPayload(AL, "sq", "60", "8", "", "d", 1)).sort(), ["alumno_id", "ejercicio_id", "fecha", "kg", "nota", "reps", "semana"]);
   assert.ok(isUuid(generateOpId()));
 });
@@ -94,6 +94,6 @@ await t("dos series legitimas IDENTICAS con UUID distintos: ambas se envian con 
 });
 await t("payload sin id valido que recibe 409: no se intenta verificar (nunca se confirma por un id ajeno)", async () => {
   const i = io(async () => conflict(), async () => ({ ok: true, data: [row()] }));
-  assert.equal(await postProgressIdempotent(i, buildProgressPayload(AL, "sq", "60", "8", "", "d", 1, "no-uuid")), null); assert.equal(i.calls.get, 0);
+  assert.equal(await postProgressIdempotent(i, buildProgressPayload(AL, "sq", "60", "8", "", "d", 1, undefined, "no-uuid")), null); assert.equal(i.calls.get, 0);
 });
 console.log(`${n} comprobaciones OK`);

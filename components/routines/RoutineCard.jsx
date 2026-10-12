@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Pencil, MoreVertical, ChevronDown, ClipboardList } from 'lucide-react';
+import { Pencil, MoreVertical, ChevronDown, ClipboardList, Check, User } from 'lucide-react';
 import { Ic } from '../Ic.jsx';
 import { DaySection } from '../DaySection.jsx';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
 import { coachType, coachSpace, coachTypeMobile, coachSpaceMobile } from '../coachUiScale.js';
 import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
+import { toTitleCase, initialsOf } from '../../lib/textFormat.js';
 import RoutineCardActionMenu from './RoutineCardActionMenu.jsx';
 import RoutineDeleteConfirmModals from './RoutineDeleteConfirmModals.jsx';
 import RoutineCardTitleMeta from './RoutineCardTitleMeta.jsx';
+import RoutineRestartModal from './RoutineRestartModal.jsx';
 import './routines-ui.css';
 
 function useIsUnder768() {
@@ -66,6 +68,7 @@ export function RoutineCard({
   cardIndex = 0,
   setRutinasSBEntrenador,
   rutinasSBEntrenador = [],
+  onRestartRoutine,
 }) {
   const isUnder768 = useIsUnder768();
   const T = isUnder768 ? coachTypeMobile : coachType;
@@ -83,6 +86,9 @@ export function RoutineCard({
   const [deleteRoutineTarget, setDeleteRoutineTarget] = useState(null);
   const [deleteRoutineSubmitting, setDeleteRoutineSubmitting] = useState(false);
   const [pendingDeleteDay, setPendingDeleteDay] = useState(null);
+  const [restartOpen, setRestartOpen] = useState(false);
+  const [restartSubmitting, setRestartSubmitting] = useState(false);
+  const [restartError, setRestartError] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
   const assignTriggerRef = useRef(null);
   const assignPopoverRef = useRef(null);
@@ -90,13 +96,35 @@ export function RoutineCard({
   const [selectedAlumnoIds, setSelectedAlumnoIds] = useState(function () {
     return r.alumno_id != null && r.alumno_id !== '' ? [String(r.alumno_id)] : [];
   });
+  // Último alumno guardado (para el estado "dirty" del botón Guardar).
+  const [savedAlumnoIds, setSavedAlumnoIds] = useState(function () {
+    return r.alumno_id != null && r.alumno_id !== '' ? [String(r.alumno_id)] : [];
+  });
+  const [saveError, setSaveError] = useState('');
+  // Firma del contenido (nombre/días/nota) en el último guardado, para no perder
+  // la posibilidad de guardar ediciones de días aunque el alumno no cambie.
+  const contentSig = JSON.stringify([r.name, r.days, r.note || '']);
+  const savedContentSigRef = useRef(contentSig);
 
   useEffect(
     function () {
-      setSelectedAlumnoIds(r.alumno_id != null && r.alumno_id !== '' ? [String(r.alumno_id)] : []);
+      var ids = r.alumno_id != null && r.alumno_id !== '' ? [String(r.alumno_id)] : [];
+      setSelectedAlumnoIds(ids);
+      setSavedAlumnoIds(ids);
+      savedContentSigRef.current = JSON.stringify([r.name, r.days, r.note || '']);
     },
     [r.id]
   );
+
+  var alumnoDirty =
+    selectedAlumnoIds.length !== savedAlumnoIds.length ||
+    selectedAlumnoIds.some(function (id) {
+      return savedAlumnoIds.indexOf(String(id)) === -1;
+    });
+  var contentDirty = !r.saved || contentSig !== savedContentSigRef.current;
+  var isDirty = alumnoDirty || contentDirty;
+  var hasAlumno = selectedAlumnoIds.length > 0;
+  var headerStatus = alumnoDirty ? 'dirty' : savedAlumnoIds.length > 0 ? 'assigned' : 'none';
 
   var updateMenuPopCoords = useCallback(function () {
     var el = menuRef.current;
@@ -277,7 +305,7 @@ export function RoutineCard({
       return M(lang, 'Elegir alumnos…', 'Choose athletes…', 'Escolher alunos…');
     }
     if (selectedAlumnoIds.length === 1) {
-      return alumnoNombreById(selectedAlumnoIds[0]) || r.alumno || selectedAlumnoIds[0];
+      return toTitleCase(alumnoNombreById(selectedAlumnoIds[0]) || r.alumno || selectedAlumnoIds[0]);
     }
     return (
       String(selectedAlumnoIds.length) +
@@ -304,6 +332,8 @@ export function RoutineCard({
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError('');
+    var saveFailedMsg = M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar');
     try {
       const rActual = routines.find((x) => x.id === r.id) || r;
       var ids = selectedAlumnoIds.map(String).filter(Boolean);
@@ -353,7 +383,8 @@ export function RoutineCard({
             });
           });
         } else {
-          toast2(M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar'));
+          setSaveError(saveFailedMsg);
+          toast2(saveFailedMsg);
           setSaving(false);
           return;
         }
@@ -398,6 +429,8 @@ export function RoutineCard({
       }
 
       setSelectedAlumnoIds(primary ? [String(primary)] : []);
+      setSavedAlumnoIds(primary ? [String(primary)] : []);
+      savedContentSigRef.current = JSON.stringify([rActual.name, rActual.days, rActual.note || '']);
       setAssignOpen(false);
       setLastSaved(new Date());
       toast2(
@@ -411,12 +444,11 @@ export function RoutineCard({
           : M(lang, 'Rutina guardada ✓', 'Routine saved ✓', 'Rotina salva ✓')
       );
     } catch (e) {
-      toast2(M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar'));
+      setSaveError(saveFailedMsg);
+      toast2(saveFailedMsg);
     }
     setSaving(false);
   };
-
-  const bgHeader = darkMode ? '#111C2B' : '#EEF2F7';
 
   const openEditRoutine = useCallback(
     function () {
@@ -469,6 +501,73 @@ export function RoutineCard({
       saved: onServer,
     });
   }
+
+  // "Reiniciar rutina" solo aplica a una rutina asignada a un alumno y ya guardada en el servidor.
+  var assignedAlumnoId = r.alumno_id != null && r.alumno_id !== '' ? String(r.alumno_id) : '';
+  var restartAlumno = assignedAlumnoId
+    ? (alumnos || []).find(function (a) {
+        return String(a.id) === assignedAlumnoId;
+      })
+    : null;
+  var restartAlumnoName = (restartAlumno && (restartAlumno.nombre || restartAlumno.email)) || r.alumno || '';
+  var canRestart =
+    !!assignedAlumnoId &&
+    !r.es_plantilla &&
+    typeof onRestartRoutine === 'function' &&
+    (!!r.saved ||
+      (Array.isArray(rutinasSBEntrenador) &&
+        rutinasSBEntrenador.some(function (rs) {
+          return rs && String(rs.id) === String(r.id);
+        })));
+
+  function requestRestartRoutine() {
+    setMenuOpen(false);
+    setRestartError('');
+    setRestartOpen(true);
+  }
+
+  function restartErrorText(res) {
+    var reason = res && res.reason;
+    if (reason === 'migracion_pendiente') {
+      return M(
+        lang,
+        'Falta actualizar la base de datos (migración de ciclo). Avisá al administrador.',
+        'The database needs the cycle migration first. Contact the administrator.',
+        'Falta atualizar o banco de dados (migração de ciclo). Avise o administrador.'
+      );
+    }
+    if (reason === 'sin_filas') {
+      return M(lang, 'No tenés permiso para reiniciar esta rutina.', 'You do not have permission to restart this routine.', 'Você não tem permissão para reiniciar esta rotina.');
+    }
+    if (reason === 'no_asignada' || reason === 'alumno_distinto' || reason === 'rutina_inexistente') {
+      return M(lang, 'La rutina ya no está asignada a este alumno.', 'The routine is no longer assigned to this athlete.', 'A rotina não está mais atribuída a este aluno.');
+    }
+    return M(lang, 'No se pudo reiniciar la rutina. Probá de nuevo.', 'Could not restart the routine. Please try again.', 'Não foi possível reiniciar a rotina. Tente novamente.');
+  }
+
+  const confirmRestartRoutine = async function (cargas) {
+    if (restartSubmitting || !canRestart) return;
+    setRestartSubmitting(true);
+    setRestartError('');
+    try {
+      var res = await onRestartRoutine(r.id, cargas);
+      if (res && res.ok) {
+        setRestartOpen(false);
+        toast2(M(lang, 'Rutina reiniciada ✓ Semana 1, Día 1', 'Routine restarted ✓ Week 1, Day 1', 'Rotina reiniciada ✓ Semana 1, Dia 1'));
+      } else {
+        var text = restartErrorText(res);
+        setRestartError(text);
+        toast2(text);
+      }
+    } catch (e) {
+      console.error('[restart routine]', e);
+      var text2 = restartErrorText(null);
+      setRestartError(text2);
+      toast2(text2);
+    } finally {
+      setRestartSubmitting(false);
+    }
+  };
 
   function runDeleteDay() {
     if (!pendingDeleteDay) return;
@@ -566,21 +665,42 @@ export function RoutineCard({
 
   const staggerMs = Math.min(cardIndex * 40, 80);
 
+  const saveLabel = saving
+    ? M(lang, 'Guardando', 'Saving', 'Salvando')
+    : !isDirty
+      ? M(lang, 'Guardado', 'Saved', 'Salvo')
+      : !hasAlumno && savedAlumnoIds.length === 0 && !contentDirty
+        ? M(lang, 'Asignar', 'Assign', 'Atribuir')
+        : M(lang, 'Guardar', 'Save', 'Salvar');
+  const saveDisabled = saving || !isDirty;
+  const saveActive = !saveDisabled;
+  const singleAlumnoName =
+    selectedAlumnoIds.length === 1
+      ? toTitleCase(alumnoNombreById(selectedAlumnoIds[0]) || r.alumno || '')
+      : '';
+  const avatarText =
+    selectedAlumnoIds.length === 1
+      ? initialsOf(singleAlumnoName)
+      : selectedAlumnoIds.length > 1
+        ? '+' + selectedAlumnoIds.length
+        : '';
+
   return (
     <div
       ref={cardRootRef}
       className="it-routine-card-wrap routines-card-enter"
       style={{
-        ...card,
-        padding: 0,
-        overflow: 'hidden',
-        marginBottom: S.blockGap,
+        background: 'var(--card-bg)',
+        border: '1px solid ' + (alumnoDirty ? 'var(--card-border-active)' : 'var(--card-border)'),
+        borderRadius: 'var(--radius-card)',
+        padding: 16,
+        marginBottom: 12,
+        boxSizing: 'border-box',
         ['--stagger-delay']: staggerMs + 'ms',
-        ...(isUnder768 ? { borderLeft: '3px solid #2563EB', borderRadius: 14 } : {}),
       }}
     >
-      <div style={{ background: bgHeader, padding: isUnder768 ? '14px' : `${S.gridGapTight}px ${S.cardPadding}px ${S.blockGap}px` }}>
-        <div style={{ display: 'flex', flexDirection: isUnder768 ? 'column' : 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <RoutineCardTitleMeta
             r={r}
             nombreLocal={nombreLocal}
@@ -588,94 +708,45 @@ export function RoutineCard({
             setNombreLocal={setNombreLocal}
             guardarNombreRutina={guardarNombreRutina}
             setEditandoNombre={setEditandoNombre}
-            selectedAlumnoIds={selectedAlumnoIds}
+            status={headerStatus}
             totalEx={totalEx}
-            textMain={textMain}
-            textMuted={textMuted}
-            border={border}
+            expanded={!collapsed}
+            onOpen={() => setCollapsed((c) => !c)}
             lang={lang}
-            T={T}
             M={M}
             Ic={Ic}
-            Pencil={Pencil}
           />
 
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'flex-start' }}>
-            <RoutineCardActionMenu
-              menuOpen={menuOpen}
-              menuPopCoords={menuPopCoords}
-              menuRef={menuRef}
-              menuDropdownRef={menuDropdownRef}
-              darkMode={darkMode}
-              border={border}
-              textMain={textMain}
-              textMuted={textMuted}
-              lang={lang}
-              M={M}
-              Ic={Ic}
-              MoreVertical={MoreVertical}
-              Pencil={Pencil}
-              ClipboardList={ClipboardList}
-              onToggleMenu={() => setMenuOpen((o) => !o)}
-              onEditRoutine={openEditRoutine}
-              onEditName={() => {
-                setMenuOpen(false);
-                setEditandoNombre(true);
-              }}
-              onDuplicate={duplicateRoutine}
-              onRequestDelete={requestDeleteRoutine}
-            />
-
-            <button
-              type="button"
-              className="it-routine-btn hov"
-              onClick={() => setCollapsed((c) => !c)}
-              style={{
-                background: darkMode ? '#1E2D40' : '#E2E8F0',
-                border: `1px solid ${darkMode ? 'transparent' : border}`,
-                borderRadius: 8,
-                padding: '7px 10px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                ...T.label,
-                fontWeight: 700,
-                color: textMuted,
-                letterSpacing: '.5px',
-                minHeight: 36,
-              }}
-            >
-              {collapsed ? (
-                <svg
-                  width={15}
-                  height={15}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={textMuted}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                >
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-              ) : (
-                <Ic name="chevron-up" size={15} color={textMuted} />
-              )}
-              {collapsed
-                ? M(lang, 'Ver rutina', 'View routine', 'Ver rotina')
-                : M(lang, 'Cerrar', 'Close', 'Fechar')}
-            </button>
-          </div>
+          <RoutineCardActionMenu
+            menuOpen={menuOpen}
+            menuPopCoords={menuPopCoords}
+            menuRef={menuRef}
+            menuDropdownRef={menuDropdownRef}
+            darkMode={darkMode}
+            border={border}
+            textMain={textMain}
+            textMuted={textMuted}
+            lang={lang}
+            M={M}
+            Ic={Ic}
+            MoreVertical={MoreVertical}
+            Pencil={Pencil}
+            ClipboardList={ClipboardList}
+            onToggleMenu={() => setMenuOpen((o) => !o)}
+            onEditRoutine={openEditRoutine}
+            onEditName={() => {
+              setMenuOpen(false);
+              setEditandoNombre(true);
+            }}
+            onDuplicate={duplicateRoutine}
+            canRestart={canRestart}
+            onRequestRestart={requestRestartRoutine}
+            onRequestDelete={requestDeleteRoutine}
+          />
         </div>
 
-        <div style={{ display: 'flex', gap: S.gridTight, ...(isUnder768 ? { borderTop: '1px solid ' + (darkMode ? '#1e293b' : border), paddingTop: 10, marginTop: 8, alignItems: 'center', width: '100%' } : { marginTop: S.blockGap, alignItems: 'stretch' }) }}>
-          <div
-            ref={assignTriggerRef}
-            style={{ flex: 1, minWidth: 0, ...(isUnder768 ? { overflow: 'visible' } : {}) }}
-          >
+        <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'stretch', flexWrap: 'wrap' }}>
+          <div ref={assignTriggerRef} style={{ flex: '1 1 180px', minWidth: 0 }}>
             <button
               type="button"
               className="it-routine-btn hov"
@@ -683,29 +754,57 @@ export function RoutineCard({
               aria-expanded={assignOpen}
               aria-haspopup="listbox"
               style={{
-                ...(isUnder768 ? { width: '100%' } : { width: 'max-content', maxWidth: '100%' }),
+                width: '100%',
+                height: 48,
                 textAlign: 'left',
-                background: darkMode ? '#0B1220' : '#fff',
-                color: textMain,
-                border: `1px solid ${border}`,
-                borderRadius: 10,
-                padding: '10px 38px 10px 12px',
-                ...T.control,
+                background: 'var(--surface-2)',
+                color: 'var(--text)',
+                border: '1px solid var(--card-border)',
+                borderRadius: 'var(--radius-control)',
+                padding: '0 12px',
+                fontSize: 14,
+                fontWeight: 600,
                 fontFamily: 'inherit',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 8,
+                gap: 10,
                 cursor: 'pointer',
               }}
             >
-              <span style={isUnder768 ? { whiteSpace: 'normal', overflow: 'visible', textOverflow: 'unset' } : { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: hasAlumno ? 'var(--accent)' : 'var(--neutral-bg)',
+                  color: hasAlumno ? 'var(--on-accent)' : 'var(--text-muted)',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {hasAlumno ? avatarText : <User size={14} aria-hidden="true" />}
+              </span>
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: hasAlumno ? 'var(--text)' : 'var(--text-muted)',
+                }}
+              >
                 {assigneeButtonLabel()}
               </span>
               <ChevronDown
                 size={18}
-                aria-hidden
-                style={{ color: textMuted, flexShrink: 0, transform: assignOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}
+                aria-hidden="true"
+                style={{ color: 'var(--text-muted)', flexShrink: 0, transform: assignOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }}
               />
             </button>
           </div>
@@ -714,55 +813,58 @@ export function RoutineCard({
             type="button"
             className="it-routine-btn hov"
             onClick={handleSave}
-            disabled={saving}
+            disabled={saveDisabled}
+            aria-live="polite"
             style={{
-              background: saving ? '#1d4ed8' : '#2563EB',
-              color: '#fff',
+              background: saveActive || saving ? 'var(--accent)' : 'var(--neutral-bg)',
+              color: saveActive || saving ? 'var(--on-accent)' : 'var(--text-muted)',
               border: 'none',
-              borderRadius: 10,
-              padding: '8px 16px',
-              ...T.periodTab,
+              borderRadius: 'var(--radius-control)',
+              height: 48,
+              padding: '0 18px',
+              fontSize: 14,
               fontWeight: 700,
-              cursor: saving ? 'not-allowed' : 'pointer',
+              cursor: saveDisabled ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              opacity: saving ? 0.85 : 1,
-              letterSpacing: '.5px',
-              minWidth: 110,
+              gap: 8,
+              minWidth: 120,
               justifyContent: 'center',
-              ...(isUnder768 ? { flexShrink: 0, whiteSpace: 'nowrap' } : {}),
+              whiteSpace: 'nowrap',
+              flex: '0 0 auto',
             }}
           >
             {saving ? (
-              <>
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  style={{ animation: 'spin .7s linear infinite' }}
-                >
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                </svg>
-                {M(lang, 'GUARDANDO', 'SAVING', 'SALVANDO')}
-              </>
-            ) : (
-              <>
-                <Ic name="save" size={14} color="#fff" />
-                {M(lang, 'GUARDAR', 'SAVE', 'SALVAR')}
-              </>
-            )}
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                style={{ animation: 'spin .7s linear infinite' }}
+                aria-hidden="true"
+              >
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+              </svg>
+            ) : !isDirty ? (
+              <Check size={16} aria-hidden="true" />
+            ) : null}
+            {saveLabel}
           </button>
         </div>
 
-        {lastSaved && (
-          <div style={{ ...T.meta, color: textMuted, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Ic name="check-circle" size={11} color="#22C55E" />
+        {saveError && (
+          <div role="alert" style={{ fontSize: 13, fontWeight: 600, color: 'var(--danger)', marginTop: 8 }}>
+            {saveError}
+          </div>
+        )}
+
+        {lastSaved && !saveError && (
+          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-muted)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Ic name="check-circle" size={12} color="var(--success)" />
             {M(lang, 'Guardado a las', 'Saved at', 'Salvo às')}{' '}
             {lastSaved.toLocaleTimeString(
               lang === 'en' ? 'en-US' : lang === 'pt' ? 'pt-BR' : 'es-AR',
@@ -773,7 +875,7 @@ export function RoutineCard({
       </div>
 
       {!collapsed && (
-        <div style={{ padding: `${S.gridGapTight}px ${S.cardPadding}px ${S.gridGap}px` }}>
+        <div style={{ paddingTop: 16 }}>
           {(Array.isArray(r.days) ? r.days : []).map((d, di) => {
             const enrichList = (list) =>
               (list || []).map((ex) => {
@@ -928,11 +1030,11 @@ export function RoutineCard({
             style={{
               width: '100%',
               marginTop: S.gridGapTight,
-              border: '1px solid ' + (darkMode ? 'rgba(255,255,255,0.06)' : border),
-              borderRadius: 18,
+              border: '1px solid var(--card-border)',
+              borderRadius: 'var(--radius-card)',
               padding: '16px 18px',
-              background: darkMode ? '#0D1424' : bgCard,
-              color: textMain,
+              background: 'var(--surface-2)',
+              color: 'var(--text)',
               fontFamily: 'inherit',
               cursor: 'pointer',
               display: 'flex',
@@ -974,9 +1076,9 @@ export function RoutineCard({
               maxHeight: assignPopCoords.maxHeight,
               overflowY: 'auto',
               zIndex: 80,
-              background: darkMode ? '#0f172a' : '#fff',
-              border: '1px solid ' + border,
-              borderRadius: 10,
+              background: 'var(--surface-2)',
+              border: '1px solid var(--card-border)',
+              borderRadius: 'var(--radius-control)',
               boxShadow: '0 20px 50px rgba(0,0,0,0.55)',
               padding: '6px 0',
             }}
@@ -1011,9 +1113,10 @@ export function RoutineCard({
                       alignItems: 'center',
                       gap: 10,
                       padding: '8px 12px',
+                      minHeight: 44,
                       cursor: 'pointer',
                       fontSize: 14,
-                      color: textMain,
+                      color: 'var(--text)',
                       fontFamily: 'inherit',
                     }}
                   >
@@ -1032,7 +1135,7 @@ export function RoutineCard({
                         maxWidth: '100%',
                       }}
                     >
-                      {a.nombre || a.email}
+                      {toTitleCase(a.nombre || a.email)}
                     </span>
                   </label>
                 );
@@ -1041,6 +1144,19 @@ export function RoutineCard({
           </div>,
           document.body
         )}
+
+      <RoutineRestartModal
+        open={restartOpen}
+        alumnoName={restartAlumnoName}
+        loading={restartSubmitting}
+        errorText={restartError}
+        onCancel={function () {
+          if (!restartSubmitting) setRestartOpen(false);
+        }}
+        onConfirm={confirmRestartRoutine}
+        M={M}
+        lang={lang}
+      />
 
       <RoutineDeleteConfirmModals
         deleteRoutineTarget={deleteRoutineTarget}

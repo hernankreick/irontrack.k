@@ -14,7 +14,7 @@ const store = (init) => {
     get length() { return m.size; }, key: (i) => [...m.keys()][i] ?? null, _m: m };
 };
 const q = (s) => readQueue(s).items;
-const item = (alumno, ex, op) => buildPendingProgressItem(ex, "60", "8", "", "12/10/2026", 1, alumno, op);
+const item = (alumno, ex, op) => buildPendingProgressItem(ex, "60", "8", "", "12/10/2026", 1, undefined, alumno, op);
 const deferred = () => { let res; const p = new Promise((r) => (res = r)); return { p, res }; };
 const ok = async () => [{ id: 1 }];
 
