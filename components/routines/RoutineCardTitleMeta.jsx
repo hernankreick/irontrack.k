@@ -1,15 +1,11 @@
 import React from 'react';
+import { pluralize } from '../../lib/textFormat.js';
 
-function useIsUnder768() {
-  const [v, setV] = React.useState(typeof window !== 'undefined' && window.innerWidth < 768);
-  React.useEffect(function () {
-    var mq = window.matchMedia('(max-width: 767px)');
-    function onChange() { setV(mq.matches); }
-    mq.addEventListener('change', onChange);
-    return function () { mq.removeEventListener('change', onChange); };
-  }, []);
-  return v;
-}
+const CHIP_STYLES = {
+  assigned: { color: 'var(--success)', background: 'var(--success-bg)' },
+  dirty: { color: 'var(--warning)', background: 'var(--warning-bg)' },
+  none: { color: 'var(--text-muted)', background: 'var(--neutral-bg)' },
+};
 
 export default function RoutineCardTitleMeta({
   r,
@@ -18,155 +14,135 @@ export default function RoutineCardTitleMeta({
   setNombreLocal,
   guardarNombreRutina,
   setEditandoNombre,
-  selectedAlumnoIds,
+  status,
   totalEx,
-  textMain,
-  textMuted,
-  border,
+  expanded,
+  onOpen,
   lang,
-  T,
   M,
   Ic,
-  Pencil,
 }) {
-  const isUnder768 = useIsUnder768();
-  return (
-    <div style={{ flex: 1, minWidth: 0, ...(isUnder768 ? { width: '100%' } : {}) }}>
-      {editandoNombre ? (
+  const chipLabel =
+    status === 'dirty'
+      ? M(lang, 'Cambios sin guardar', 'Unsaved changes', 'Alterações não salvas')
+      : status === 'assigned'
+        ? M(lang, 'Asignada', 'Assigned', 'Atribuída')
+        : M(lang, 'Sin alumno', 'No athlete', 'Sem aluno');
+  const chip = CHIP_STYLES[status] || CHIP_STYLES.none;
+
+  const metaRow = (
+    <span
+      style={{
+        display: 'flex',
+        gap: 8,
+        marginTop: 6,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+      }}
+    >
+      <span
+        style={{
+          ...chip,
+          borderRadius: 999,
+          padding: '3px 10px',
+          fontSize: 12,
+          fontWeight: 700,
+          lineHeight: 1.3,
+          flexShrink: 0,
+        }}
+      >
+        {chipLabel}
+      </span>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', lineHeight: 1.35 }}>
+        {pluralize(r.days.length, M(lang, 'día', 'day', 'dia'), M(lang, 'días', 'days', 'dias'))}
+        {' · '}
+        {pluralize(totalEx, M(lang, 'ejercicio', 'exercise', 'exercício'), M(lang, 'ejercicios', 'exercises', 'exercícios'))}
+      </span>
+      {r.scanned && (
+        <span
+          style={{
+            background: 'var(--neutral-bg)',
+            color: 'var(--block-main)',
+            borderRadius: 999,
+            padding: '3px 10px',
+            fontSize: 12,
+            fontWeight: 700,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            flexShrink: 0,
+          }}
+        >
+          <Ic name="image" size={12} color="currentColor" />
+          {M(lang, 'Escaneada', 'Scanned', 'Digitalizada')}
+        </span>
+      )}
+    </span>
+  );
+
+  if (editandoNombre) {
+    return (
+      <div style={{ flex: 1, minWidth: 0 }}>
         <input
           autoFocus
+          aria-label={M(lang, 'Nombre de la rutina', 'Routine name', 'Nome da rotina')}
           value={nombreLocal}
           onChange={(e) => setNombreLocal(e.target.value)}
           onBlur={guardarNombreRutina}
           onKeyDown={(e) => e.key === 'Enter' && guardarNombreRutina()}
           style={{
-            ...T.numberStat,
-            color: textMain,
+            fontSize: 18,
+            fontWeight: 800,
+            color: 'var(--text)',
             background: 'transparent',
             border: 'none',
-            borderBottom: '1px solid #3b82f6',
+            borderBottom: '1px solid var(--accent)',
             outline: 'none',
             padding: '2px 0',
             fontFamily: 'inherit',
             width: '100%',
+            minHeight: 44,
+            boxSizing: 'border-box',
           }}
         />
-      ) : (
-        <div style={isUnder768 ? {
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          width: '100%',
-        } : {
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 6,
-        }}>
-          <div style={{ ...T.numberStat, fontSize: isUnder768 ? 15 : 16, fontWeight: 700, color: textMain, lineHeight: 1.2, whiteSpace: isUnder768 ? 'normal' : 'nowrap', ...(isUnder768 ? { flex: 1 } : { overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }), minWidth: 0 }}>
-            {nombreLocal}
-          </div>
-          <button
-            type="button"
-            onClick={() => setEditandoNombre(true)}
-            className="it-routine-btn"
-            style={{
-              ...(isUnder768
-                ? { padding: '2px 4px' }
-                : { width: 44, height: 44 }),
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 8,
-              flexShrink: 0,
-            }}
-          >
-            <Pencil size={15} />
-          </button>
-        </div>
-      )}
-      <div
+        {metaRow}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-expanded={expanded}
+      className="it-routine-header-btn"
+      style={{
+        flex: 1,
+        minWidth: 0,
+        minHeight: 44,
+        textAlign: 'left',
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        color: 'var(--text)',
+        display: 'block',
+      }}
+    >
+      <span
         style={{
-          display: 'flex',
-          gap: isUnder768 ? 4 : 6,
-          marginTop: 6,
-          ...(isUnder768 ? { marginBottom: 10 } : {}),
-          flexWrap: 'wrap',
-          alignItems: 'center',
+          display: 'block',
+          fontSize: 18,
+          fontWeight: 800,
+          lineHeight: 1.25,
+          color: 'var(--text)',
+          overflowWrap: 'anywhere',
         }}
       >
-        {selectedAlumnoIds.length > 0 ? (
-          <span
-            className="it-routine-badge--assigned"
-            style={{
-              background: '#22C55E18',
-              color: isUnder768 ? '#64748b' : '#4ade80',
-              border: isUnder768 ? 'none' : '1px solid rgba(74, 222, 128, 0.35)',
-              borderRadius: 6,
-              padding: isUnder768 ? '0' : '3px 8px',
-              ...T.tableHeader,
-              fontSize: isUnder768 ? 11 : 10,
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              flexShrink: 0,
-            }}
-          >
-            {M(lang, 'Asignada', 'Assigned', 'Atribuída')}
-            {isUnder768 && ' ·'}
-          </span>
-        ) : (
-          <span
-            className="it-routine-badge--unassigned"
-            style={{
-              background: isUnder768 ? 'transparent' : 'rgba(15, 23, 42, 0.65)',
-              color: '#64748b',
-              border: isUnder768 ? 'none' : `1px solid ${border}`,
-              borderRadius: 6,
-              padding: isUnder768 ? '0' : '3px 8px',
-              ...T.tableHeader,
-              fontSize: isUnder768 ? 11 : 10,
-              fontWeight: 600,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              flexShrink: 0,
-            }}
-          >
-            {M(lang, 'Sin asignar', 'Unassigned', 'Não atribuída')}
-            {isUnder768 && ' ·'}
-          </span>
-        )}
-        <span style={{ ...T.meta, color: '#64748b', fontWeight: 600, fontSize: isUnder768 ? 11 : undefined, whiteSpace: 'normal' }}>
-          {r.days.length} {M(lang, 'días', 'days', 'dias')} · {totalEx}{' '}
-          {M(lang, 'ejercicios', 'exercises', 'exercícios')}
-        </span>
-        {r.scanned && (
-          <span
-            style={{
-              background: '#2563EB22',
-              color: '#2563EB',
-              border: '1px solid #60a5fa33',
-              borderRadius: 6,
-              padding: '2px 8px',
-              ...T.tableHeader,
-              letterSpacing: '0.04em',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              flexShrink: 0,
-            }}
-          >
-            <Ic name="image" size={11} color="#2563EB" />
-            {M(lang, 'Escaneada', 'Scanned', 'Digitalizada')}
-          </span>
-        )}
-      </div>
-    </div>
+        {nombreLocal}
+      </span>
+      {metaRow}
+    </button>
   );
 }
