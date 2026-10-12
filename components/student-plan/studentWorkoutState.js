@@ -2,6 +2,7 @@ import { normalizeFecha } from '../../lib/normalizeFecha.js';
 import { isCompletedSession, sessionMatchesRoutine, mondayStartMs, parseLocalDateMs } from '../../lib/studentWeeklyProgress.js';
 import { updateExerciseProgressRecord } from '../../lib/workoutSession.js';
 import { countExercisesWithLogToday } from './studentPlanHelpers.js';
+import { readCicloActual, rowInCiclo } from '../../lib/rutinaCiclo.js';
 
 /**
  * Estado del entrenamiento de HOY para el alumno. Una sola derivacion, para que
@@ -58,11 +59,12 @@ function relevantSessions(rutina, sesiones, alumnoId) {
   if (!rutinaId) return [];
   const rutinaNombre = rutina && (rutina.nombre || rutina.name) ? String(rutina.nombre || rutina.name) : '';
   const wantAlumno = toId(alumnoId);
+  const cicloActual = readCicloActual(rutina && rutina.datos);
   const list = Array.isArray(sesiones) ? sesiones : [];
   const out = [];
   for (let i = 0; i < list.length; i++) {
     const s = list[i];
-    if (!s || !isCompletedSession(s)) continue;
+    if (!s || !isCompletedSession(s) || !rowInCiclo(s, cicloActual)) continue;
     if (wantAlumno && toId(s.alumno_id) !== wantAlumno) continue;
     if (!sessionMatchesRoutine(s, rutinaId, rutinaNombre)) continue;
     const sem = parseWeek(s.semana);

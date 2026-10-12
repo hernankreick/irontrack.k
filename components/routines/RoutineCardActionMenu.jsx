@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { RotateCcw } from 'lucide-react';
 
 export default function RoutineCardActionMenu({
   menuOpen,
@@ -20,6 +21,8 @@ export default function RoutineCardActionMenu({
   onEditRoutine,
   onEditName,
   onDuplicate,
+  canRestart = false,
+  onRequestRestart,
   onRequestDelete,
 }) {
   const ghostBtn = () => ({
@@ -115,6 +118,17 @@ export default function RoutineCardActionMenu({
               <Ic name="copy" size={14} color={textMuted} />
               {M(lang, 'Duplicar rutina', 'Duplicate routine', 'Duplicar rotina')}
             </button>
+            {canRestart && (
+              <button
+                type="button"
+                className="it-routine-menu-item hov"
+                style={menuItemStyle}
+                onClick={onRequestRestart}
+              >
+                <RotateCcw size={14} color={textMuted} />
+                {M(lang, 'Reiniciar rutina', 'Restart routine', 'Reiniciar rotina')}
+              </button>
+            )}
             <button
               type="button"
               className="it-routine-menu-item it-routine-menu-item--danger hov"

@@ -4,6 +4,7 @@ import { ExerciseVideoPlayButton } from './ExerciseVideoPlayButton.jsx';
 import { WorkoutExerciseCompletedState } from './workout/WorkoutExerciseCompletedState.jsx';
 import { WorkoutTodaySetsList } from './workout/WorkoutTodaySetsList.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
+import { setsForLoadPrefill } from '../lib/rutinaCiclo.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
 import {
   calculateNewWeightPR,
@@ -93,6 +94,7 @@ export function WorkoutExercisePanel(props) {
     logSet,
     startTimer,
     setPrCelebration,
+    rutinaDatos,
     progress,
   } = props;
 
@@ -120,7 +122,7 @@ export function WorkoutExercisePanel(props) {
 
   React.useEffect(()=>{
     if(ex) {
-      const lastKg = setsHoy[0]?.kg || progress[ex.id]?.sets?.[0]?.kg || ex.kg || "";
+      const lastKg = setsHoy[0]?.kg || setsForLoadPrefill(progress[ex.id]?.sets, rutinaDatos)[0]?.kg || ex.kg || "";
       setKg(lastKg ? String(lastKg) : "");
       setReps(ex.reps ? String(ex.reps) : "");
       setPause(ex.pause||90);

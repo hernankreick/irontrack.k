@@ -31,6 +31,7 @@ export default function CoachRoutinesMain({
   desktopCoachStableLayout,
   rutinasSBEntrenador,
   setRutinasSBEntrenador,
+  onRestartRoutine,
 }) {
   return (
     <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col">
@@ -64,6 +65,7 @@ export default function CoachRoutinesMain({
         desktopCoachStableLayout={desktopCoachStableLayout}
         rutinasSBEntrenador={rutinasSBEntrenador}
         setRutinasSBEntrenador={setRutinasSBEntrenador}
+        onRestartRoutine={onRestartRoutine}
       />
     </div>
   );
