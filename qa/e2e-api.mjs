@@ -127,6 +127,20 @@ await t("autenticado ajeno: no ve nada ni escribe", async () => {
   assert.ok((await X.c.from("progreso").insert([{ alumno_id: "00000000-0000-0000-0000-000000000001", ejercicio_id: "x" }])).error);
 });
 
+await t("autenticado ajeno (sin rol): no puede crearse la fila de entrenador (upsert como el login del cliente) ni operar como entrenador", async () => {
+  const up = await X.c.from("entrenadores").upsert({ id: X.user.id, email: "ajeno@qa.local" }, { onConflict: "id" });
+  assert.ok(up.error, "el upsert debe ser rechazado");
+  assert.ok((await X.c.from("entrenadores").insert([{ id: X.user.id, email: "ajeno@qa.local" }])).error);
+  assert.equal((await X.c.from("entrenadores").select("id")).data.length, 0);
+  assert.ok((await X.c.from("alumnos").insert([{ nombre: "Falso", email: "falso@qa.local", entrenador_id: X.user.id }])).error);
+  assert.equal((await X.c.from("alumnos").select("id")).data.length, 0);
+});
+await t("el entrenador principal conserva el upsert de su fila (login) y su perfil", async () => {
+  const up = await co.c.from("entrenadores").upsert({ id: co.user.id, email: COACH_EMAIL }, { onConflict: "id" });
+  assert.equal(up.error, null);
+  assert.equal((await co.c.from("entrenadores").select("id")).data.length, 1);
+});
+
 // ───────── Cambio de contraseña (Edge Function) ─────────
 const fn = (c, body) => c.functions.invoke("update-alumno-password", { body });
 await t("función: sin sesión de entrenador -> rechazada (anon key / alumno / ajeno)", async () => {

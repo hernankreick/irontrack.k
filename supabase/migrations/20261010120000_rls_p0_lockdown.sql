@@ -36,6 +36,14 @@ BEGIN
   IF n > 0 THEN
     RAISE WARNING '% filas de entrenadores pertenecen a alumnos (creadas por el upsert del cliente): NO otorgan privilegios de entrenador; se recomienda borrarlas manualmente', n;
   END IF;
+  -- Filas de entrenadores que otorgan privilegios y no son el principal ni de un alumno: la política abierta anterior permitía que cualquier
+  -- cuenta autenticada se creara una. Revisar a mano (ver docs/ventana-despliegue-iphone.md) que cada una sea un entrenador legítimo.
+  SELECT count(*) INTO n FROM public.entrenadores e
+   WHERE NOT EXISTS (SELECT 1 FROM public.coach_principal cp WHERE cp.uid::text = e.id::text)
+     AND NOT EXISTS (SELECT 1 FROM public.alumnos a WHERE a.auth_uid::text = e.id::text);
+  IF n > 0 THEN
+    RAISE WARNING '% fila(s) de entrenadores distintas del principal y sin vínculo de alumno: SÍ otorgan privilegios de entrenador; verificar que sean cuentas legítimas', n;
+  END IF;
   SELECT count(*) INTO n FROM public.alumnos a
    WHERE NOT EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = a.entrenador_id::text);
   IF n > 0 THEN
@@ -203,16 +211,22 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.alumnos, public.rutinas, public.m
       public.fotos, public.video_overrides, public.ejercicio_overrides, public.ejercicios_custom TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.progreso, public.sesiones TO authenticated; -- DELETE solo lo habilita RLS al coach
 GRANT SELECT, UPDATE ON public.config TO authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.entrenadores TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.entrenadores TO authenticated; -- INSERT acotado por la política entrenadores_insert_restringido
 -- ejercicios_custom_backup_pre_fase1: queda con RLS activo, sin políticas y sin grants (solo service_role/postgres).
 
 -- 5) Políticas ---------------------------------------------------------------
 -- entrenadores: solo la propia fila.
 CREATE POLICY entrenadores_select_self ON public.entrenadores FOR SELECT TO authenticated USING (id::text = auth.uid()::text);
--- Un usuario vinculado como alumno (alumnos.auth_uid) no puede auto-registrarse como entrenador.
-CREATE POLICY entrenadores_insert_self ON public.entrenadores FOR INSERT TO authenticated
-  WITH CHECK (id::text = auth.uid()::text
-              AND NOT EXISTS (SELECT 1 FROM public.alumnos a WHERE a.auth_uid::text = auth.uid()::text));
+-- Alta de entrenadores: NADIE puede crearse a sí mismo la fila (la fila en `entrenadores` otorga privilegios de entrenador).
+--   · el entrenador principal (it_is_principal()) puede dar de alta a otro entrenador;
+--   · una fila que YA existe puede re-enviarse por el upsert del cliente (INSERT ... ON CONFLICT (id) DO UPDATE): requiere que sea la propia
+--     (id = auth.uid()) y que la cuenta ya sea entrenador (it_is_entrenador(): con fila y sin vínculo de alumno).
+--   Un usuario autenticado externo (sin fila) y un alumno quedan rechazados; una cuenta nueva de entrenador se da de alta con el principal
+--   o desde el SQL Editor / service_role. Las funciones it_* leen entrenadores/coach_principal/alumnos, cuyas políticas SELECT solo usan
+--   auth.uid(): no hay recursión entre políticas.
+CREATE POLICY entrenadores_insert_restringido ON public.entrenadores FOR INSERT TO authenticated
+  WITH CHECK (public.it_is_principal()
+              OR (id::text = auth.uid()::text AND public.it_is_entrenador()));
 CREATE POLICY entrenadores_update_self ON public.entrenadores FOR UPDATE TO authenticated
   USING (id::text = auth.uid()::text) WITH CHECK (id::text = auth.uid()::text);
 

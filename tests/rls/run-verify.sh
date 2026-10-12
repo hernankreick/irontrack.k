@@ -34,6 +34,16 @@ sed "s/e2447231-c0ba-4f90-946f-63bf364570af/$PUID/" sql/rls_p0_verify_backfill.s
 grep -qiE "^(update|insert|delete|drop|alter|create|truncate)" sql/rls_p0_verify_backfill.sql && bad "verify_backfill no es solo lectura" || ok "verify_backfill es solo SELECT"
 [ "$(q v "SELECT count(*) AS filas_coach_principal, to_regclass('public.coach_principal') IS NOT NULL AS tabla_existe FROM public.coach_principal")" = "1|t" ] && ok "consulta de B1 ejecuta (1 fila tras el backfill; 0 antes)" || bad "consulta B1"
 
+echo "## Verificación de filas de entrenadores previa a la migración 2 (solo lectura)"
+VE=sql/rls_p0_verify_entrenadores.sql
+grep -qiE "^(update|insert|delete|drop|alter|create|truncate)" $VE && bad "verify_entrenadores no es solo lectura" || ok "verify_entrenadores es solo SELECT"
+r=$(RUN "$P -d v -At -F '|' -f $VE"); echo "      estado inicial (filas|principal|de_alumnos|otras; el seed trae un 2º entrenador) -> $r"
+q v "INSERT INTO entrenadores(id,email) VALUES ('00000000-0000-0000-0000-0000000000c2','coach2@test.local') ON CONFLICT DO NOTHING" >/dev/null
+r=$(RUN "$P -d v -At -F '|' -f $VE")
+echo "$r" | grep -q "|1|0|1$" && ok "detecta 1 fila de entrenador que no es el principal ni de un alumno (otras_con_privilegios=1)" || bad "verify_entrenadores: $r"
+q v "DELETE FROM entrenadores WHERE id='00000000-0000-0000-0000-0000000000c2'" >/dev/null
+r=$(RUN "$P -d v -At -F '|' -f $VE"); echo "$r" | grep -q "|1|0|0$" && ok "con solo el principal: principal=1, otras_con_privilegios=0" || bad "verify_entrenadores limpio: $r"
+
 echo "## sin ediciones manuales"
 ! grep -qiE "PEGAR|<UID|REEMPLAZ|TU_UID" $VA $VI && ok "los scripts no piden reemplazar identificadores" || bad "los scripts contienen marcadores a editar"
 

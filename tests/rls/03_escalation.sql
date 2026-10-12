@@ -2,6 +2,10 @@
 \ir lib.sql
 -- Escenario: el cliente antiguo creó filas en entrenadores para alumnos (upsert de sesión). Se simulan como superusuario.
 INSERT INTO entrenadores(id,email) VALUES ('00000000-0000-0000-0000-0000000000a1','a@test.local');
+-- Cuenta de Auth nueva (ficticia) para probar el alta de un entrenador por el principal.
+INSERT INTO auth.users VALUES ('00000000-0000-0000-0000-0000000000e1','nuevo@test.local');
+\set E1 '''00000000-0000-0000-0000-0000000000e1'''
+\set QE1 ''''''''00000000-0000-0000-0000-0000000000e1''''''''
 \o /dev/null
 -- ============ Escalada: fila de entrenadores de un alumno NO otorga privilegios ============
 SELECT tests.t('A edita config', :UA,'authenticated',$$UPDATE config SET alias='robado'$$,'ok:0');
@@ -12,6 +16,31 @@ SELECT tests.t('A inserta plantilla propia', :UA,'authenticated','INSERT INTO ru
 SELECT tests.t('A inserta alumno propio', :UA,'authenticated','INSERT INTO alumnos(nombre,entrenador_id) VALUES (''x'','||:QUA||')','err:42501');
 SELECT tests.t('A re-inserta su fila en entrenadores (upsert del cliente)', :UA,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QUA||$$,'a@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'err:42501');
 SELECT tests.t('B (sin fila) intenta crear fila de entrenador', :UB,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QUB||$$,'b@test.local')$$,'err:42501');
+-- ============ Autorregistro como entrenador: un usuario autenticado externo (sin rol) NO puede crearse la fila ============
+SELECT tests.t('D (externo sin rol) intenta crear su fila de entrenador', :D1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QD1||$$,'intruso@test.local')$$,'err:42501');
+SELECT tests.t('D (externo) intenta el upsert de su fila de entrenador', :D1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QD1||$$,'intruso@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'err:42501');
+SELECT tests.t('D (externo) intenta crear una fila de entrenador para otra cuenta', :D1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local')$$,'err:42501');
+SELECT tests.state('estado: D no quedó registrado como entrenador', $$SELECT count(*)::text FROM entrenadores WHERE id='00000000-0000-0000-0000-0000000000d1'$$, '0');
+SELECT tests.state('estado: la cuenta E1 no quedó registrada por D', $$SELECT count(*)::text FROM entrenadores WHERE id='00000000-0000-0000-0000-0000000000e1'$$, '0');
+SELECT tests.t('D tras el intento no puede crear alumnos propios', :D1,'authenticated','INSERT INTO alumnos(nombre,entrenador_id) VALUES (''x'','||:QD1||')','err:42501');
+SELECT tests.t('D tras el intento no puede crear plantillas', :D1,'authenticated','INSERT INTO rutinas(entrenador_id,nombre) VALUES ('||:QD1||$$,'x')$$,'err:42501');
+SELECT tests.t('D tras el intento sigue sin ver alumnos', :D1,'authenticated','SELECT * FROM alumnos','ok:0');
+SELECT tests.t('B (alumno vinculado) no puede crear fila de entrenador para otra cuenta', :UB,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local')$$,'err:42501');
+SELECT tests.t('anon no inserta en entrenadores', NULL,'anon','INSERT INTO entrenadores(id,email) VALUES ('||:QD1||$$,'x')$$,'err:42501');
+-- El principal conserva lo necesario; un entrenador provisionado funciona; un entrenador que no es el principal no provisiona a nadie.
+SELECT tests.t('C1 (principal) conserva el upsert de su propia fila', :C1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QC1||$$,'coach@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'ok:1');
+SELECT tests.t('C1 (principal) conserva la edición de su perfil', :C1,'authenticated',$$UPDATE entrenadores SET nombre='Coach' WHERE id='00000000-0000-0000-0000-0000000000c1'$$,'ok:1');
+SELECT tests.t('C2 (entrenador no principal) conserva el upsert de su propia fila', :C2,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QC2||$$,'coach2@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'ok:1');
+SELECT tests.t('C2 (no principal) no puede dar de alta a otro entrenador', :C2,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local')$$,'err:42501');
+SELECT tests.t('C1 (principal) da de alta a un entrenador nuevo', :C1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local')$$,'ok:1');
+SELECT tests.t('E1 (entrenador dado de alta) crea un alumno propio', :E1,'authenticated','INSERT INTO alumnos(nombre,email,entrenador_id) VALUES (''e1al'',''e1al@test.local'','||:QE1||')','ok:1');
+SELECT tests.t('E1 borra su alumno propio (deja el estado como estaba)', :E1,'authenticated',$$DELETE FROM alumnos WHERE nombre='e1al'$$,'ok:1');
+SELECT tests.t('E1 no ve los alumnos de C1', :E1,'authenticated','SELECT * FROM alumnos WHERE entrenador_id='||:QC1,'ok:0');
+SELECT tests.t('E1 conserva el upsert de su propia fila', :E1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'ok:1');
+SELECT tests.t('E1 (no principal) no puede dar de alta a D', :E1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QD1||$$,'intruso@test.local')$$,'err:42501');
+SELECT tests.t('el principal puede dar de alta una fila para una cuenta vinculada a alumno, pero NO le da privilegios', :C1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QUB||$$,'b@test.local')$$,'ok:1');
+SELECT tests.t('B (alumno con fila de entrenador creada por el principal) sigue sin crear alumnos', :UB,'authenticated','INSERT INTO alumnos(nombre,entrenador_id) VALUES (''x'','||:QUB||')','err:42501');
+SELECT tests.t('B sigue viendo solo su fila de alumnos', :UB,'authenticated','SELECT * FROM alumnos','ok:1');
 -- ============ coach_principal: inmutable desde la API ============
 SELECT tests.t('anon lee coach_principal', NULL,'anon','SELECT * FROM coach_principal','err:42501');
 SELECT tests.t('A lee coach_principal (no ve fila)', :UA,'authenticated','SELECT * FROM coach_principal','ok:0');
