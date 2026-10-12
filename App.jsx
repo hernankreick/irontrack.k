@@ -302,6 +302,8 @@ const sbFetch = async (path, method="GET", body=null) => {
 // Variante que devuelve { ok, status, data } (no colapsa los errores HTTP a null): la necesita la insercion idempotente de series para
 // distinguir un conflicto 23505 sobre el id de la serie de cualquier otro error. Lanza solo ante falla de red.
 const sbRequestStatus = async (path, method="GET", body=null) => {
+  // Sin URL o clave de Supabase no se emite ninguna peticion REST (en main: variable ausente; con el PR de seguridad SB_URL/SB_KEY quedan vacias si el entorno no es valido).
+  if (!SB_URL || !SB_KEY) { console.error("[Supabase] sin configuracion: no se emite la peticion"); return { ok: false, status: 0, data: null }; }
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
   const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json", "Prefer": "return=representation" } };
