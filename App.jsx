@@ -157,16 +157,27 @@ import {
   mergeProgressEntries,
   updateExerciseKgInRoutines,
   persistSetConfirmed,
-  isConfirmedProgressInsert,
-  appendPendingItem,
-  mergeQueueAfterFlush,
 } from './lib/workoutSession.js';
+import {
+  generateOpId,
+  enqueueItem,
+  updateQueue,
+  readQueue,
+  visiblePendingItems,
+  flushPendingForAlumno,
+  withFlushLock,
+} from './lib/pendingSyncQueue.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
 
 
-// Cerrojo del flush de la cola offline: evita que dos flush concurrentes envien dos veces los mismos elementos (duplicados).
-let pendingSyncFlushInFlight = false;
+// Series pendientes del alumno de la sesion actual (cada alumno ve solo las suyas; las de otros quedan intactas en el dispositivo).
+function readVisiblePending() {
+  try {
+    var sid = JSON.parse(localStorage.getItem("it_session") || "null")?.alumnoId;
+    return sid == null ? [] : visiblePendingItems(localStorage, sid);
+  } catch (e) { return []; }
+}
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -1125,9 +1136,7 @@ function GymApp() {
   const [aliasData, setAliasData] = useState(null);
   const [ultimoPagoConfirmado, setUltimoPagoConfirmado] = useState(null);
   const [isOnline, setIsOnline] = useState(()=>typeof navigator!=='undefined'?navigator.onLine:true);
-  const [pendingSync, setPendingSync] = useState(()=>{
-    try{return JSON.parse(localStorage.getItem('it_pending_sync')||'[]');}catch(e){return [];}
-  });
+  const [pendingSync, setPendingSync] = useState(()=>readVisiblePending());
   const [pagosEstado, setPagosEstado] = useState(()=>{
     try{ return JSON.parse(localStorage.getItem("it_pagos_estado")||"{}"); }catch(e){ return {}; }
   });
@@ -1269,7 +1278,7 @@ function GymApp() {
     try { setCurrentWeek(parseInt(localStorage.getItem("it_week") || "0", 10) || 0); } catch (e) { setCurrentWeek(0); }
     try { setCompletedDays(JSON.parse(localStorage.getItem("it_cd") || "[]")); } catch (e) { setCompletedDays([]); }
     try { setCustomEx(JSON.parse(localStorage.getItem("it_cex") || "[]")); } catch (e) { setCustomEx([]); }
-    try { setPendingSync(JSON.parse(localStorage.getItem("it_pending_sync") || "[]")); } catch (e) { setPendingSync([]); }
+    setPendingSync(readVisiblePending());
     try { setPagosEstado(JSON.parse(localStorage.getItem("it_pagos_estado") || "{}")); } catch (e) { setPagosEstado({}); }
     try {
       if (sess && (sess.role === "entrenador" || sess.role === "alumno")) {
@@ -1506,48 +1515,22 @@ function GymApp() {
   useEffect(()=>{
     const flushPendingSync = async () => {
       setIsOnline(true);
-      // Sincronizar sets pendientes
-      let pending = [];
-      try {
-        pending = JSON.parse(localStorage.getItem('it_pending_sync')||'[]');
-      } catch(e) {
-        console.warn('[offline sync] it_pending_sync corrupto; se conserva sin sincronizar', e);
-        return;
-      }
-      if(!Array.isArray(pending)) {
-        console.warn('[offline sync] it_pending_sync no es una lista; se conserva sin sincronizar');
-        return;
-      }
-      if(pending.length === 0) return;
       const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
       if(!alumnoIdSync) return;
-      if(pendingSyncFlushInFlight) return;
-      pendingSyncFlushInFlight = true;
-      let failed = [];
-      let remaining = [];
-      try {
-        const results = await Promise.allSettled(pending.map(item => {
-          return Promise.resolve().then(function() {
-            return sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana));
-          });
-        }));
-        // Solo cuenta como sincronizado si Supabase devolvio la fila; null (HTTP no-ok) o excepcion => sigue en cola.
-        failed = pending.filter(function(item, idx) {
-          var res = results[idx];
-          return !res || res.status !== 'fulfilled' || !isConfirmedProgressInsert(res.value);
-        });
-        // Series encoladas mientras el flush estaba en curso (se agregan al final) se conservan.
-        remaining = mergeQueueAfterFlush(localStorage.getItem('it_pending_sync'), pending.length, failed);
-        if(remaining.length > 0) {
-          try{localStorage.setItem('it_pending_sync', JSON.stringify(remaining));}catch(e){}
-        } else {
-          localStorage.removeItem('it_pending_sync');
-        }
-      } finally {
-        pendingSyncFlushInFlight = false;
+      if(readQueue(localStorage).corrupt) {
+        console.warn('[offline sync] it_pending_sync corrupto o no es una lista; se conserva sin sincronizar');
+        return;
       }
-      setPendingSync(remaining);
-      const syncedCount = pending.length - failed.length;
+      // Un solo flush a la vez (por pestaña y entre pestañas); solo los elementos DE ESTE alumno; se quitan por opId solo si el servidor confirma.
+      const r = await withFlushLock(function () {
+        return flushPendingForAlumno({
+          storage: localStorage,
+          alumnoId: alumnoIdSync,
+          send: function (item) { return sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana)); },
+        });
+      });
+      setPendingSync(readVisiblePending());
+      const syncedCount = r.ran && r.value ? r.value.sent : 0;
       if(syncedCount > 0) toast2(syncedCount+' set'+(syncedCount>1?'s':'')+' sincronizados ✓');
     };
     flushPendingRef.current = flushPendingSync;
@@ -1957,15 +1940,10 @@ function GymApp() {
     // Guardar en Supabase — si offline, guardar en cola local. Online: la serie se da por guardada SOLO si Supabase
     // devuelve la fila insertada (sbFetch devuelve null en HTTP no-ok); si no, se encola y se avisa que esta pendiente.
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
+    const opId = generateOpId();   // identidad LOCAL estable de esta serie (se conserva en los reintentos; no se envia a Supabase)
     const enqueuePendingSet = function () {
-      const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet);
-      let raw = null;
-      try { raw = localStorage.getItem('it_pending_sync'); } catch (e) {}
-      const q = appendPendingItem(raw, item);
-      // Si lo guardado estaba corrupto no se pisa sin respaldarlo.
-      if (q.corrupt && raw) { try { localStorage.setItem('it_pending_sync_corrupto_' + Date.now(), raw); } catch (e) {} }
-      try { localStorage.setItem('it_pending_sync', JSON.stringify(q.items)); } catch (e) {}
-      setPendingSync(q.items);
+      enqueueItem(localStorage, buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, alumnoIdSync, opId));
+      setPendingSync(readVisiblePending());
     };
     let confirmacionRemotaEnCurso = false;
     if(alumnoIdSync) {
@@ -2476,18 +2454,19 @@ function GymApp() {
       try { localStorage.setItem("it_pg", JSON.stringify(next)); } catch (e) {}
       return next;
     });
-    setPendingSync(function (prev) {
-      if (!weekDates.length || !exIds.length) return prev || [];
-      var next = (prev || []).filter(function (item) {
-        if (!item) return true;
-        if (item.alumno_id != null && String(item.alumno_id) !== aid) return true;
-        var itemEx = String(item.exId || item.ejercicio_id || "");
-        var itemDate = String(item.fecha || item.date || "");
-        return !(exSet[itemEx] && dateSet[itemDate]);
+    if (weekDates.length && exIds.length) {
+      // Lee y escribe la cola guardada (no el estado de React) y filtra por contenido, nunca por posicion: no pierde lo encolado durante un flush.
+      updateQueue(localStorage, function (items) {
+        return items.filter(function (item) {
+          if (!item) return true;
+          if (item.alumno_id != null && String(item.alumno_id) !== aid) return true;
+          var itemEx = String(item.exId || item.ejercicio_id || "");
+          var itemDate = String(item.fecha || item.date || "");
+          return !(exSet[itemEx] && dateSet[itemDate]);
+        });
       });
-      try { localStorage.setItem("it_pending_sync", JSON.stringify(next)); } catch (e) {}
-      return next;
-    });
+      setPendingSync(readVisiblePending());
+    }
     setCompletedDays(function (prev) {
       return (prev || []).filter(function (k) {
         var text = String(k);
@@ -2590,16 +2569,15 @@ function GymApp() {
       try { localStorage.setItem("it_pg", JSON.stringify(next)); } catch (e) {}
       return next;
     });
-    setPendingSync(function (prev) {
-      var next = (prev || []).filter(function (item) {
+    updateQueue(localStorage, function (items) {
+      return items.filter(function (item) {
         if (!item) return true;
         if (item.alumno_id != null && String(item.alumno_id) !== aid) return true;
         if (!exIds.length) return true;
         return !exSet[String(item.exId || item.ejercicio_id)];
       });
-      try { localStorage.setItem("it_pending_sync", JSON.stringify(next)); } catch (e) {}
-      return next;
     });
+    setPendingSync(readVisiblePending());
     setSugerencias(function (prev) {
       if (!prev || typeof prev !== "object") return prev;
       var next = Object.assign({}, prev);
@@ -2726,14 +2704,13 @@ function GymApp() {
       }
     } catch (e) {}
 
-    setPendingSync(function (prev) {
-      var next = (prev || []).filter(function (item) {
+    updateQueue(localStorage, function (items) {
+      return items.filter(function (item) {
         if (!item || item.alumno_id == null) return true;
         return String(item.alumno_id) !== aid;
       });
-      try { localStorage.setItem("it_pending_sync", JSON.stringify(next)); } catch (e) {}
-      return next;
     });
+    setPendingSync(readVisiblePending());
 
     if (alumnoActivo && String(alumnoActivo.id) === aid) {
       setRegistrosSubTab(0);

@@ -1,7 +1,7 @@
 // Guardado CONFIRMADO de series: criterio de exito, errores, timeout y cola.   node scripts/test-confirmedProgressSave.mjs
 import assert from "node:assert/strict";
 import {
-  isConfirmedProgressInsert, persistSetConfirmed, parsePendingQueue, appendPendingItem, mergeQueueAfterFlush,
+  isConfirmedProgressInsert, persistSetConfirmed, parsePendingQueue,
   buildPendingProgressItem, buildProgressPayload,
 } from "../lib/workoutSession.js";
 import { isValidInsertedRow } from "../lib/finalizeWorkoutSession.js";
@@ -54,29 +54,17 @@ await t("cola: parse tolerante (vacia, valida, corrupta, no-lista)", () => {
   assert.deepEqual(parsePendingQueue("{oops"), { items: [], corrupt: true });
   assert.deepEqual(parsePendingQueue('{"a":1}'), { items: [], corrupt: true });
 });
-await t("encolado: agrega al final, conserva el formato existente y lee de lo guardado (no del estado)", () => {
-  const a = buildPendingProgressItem("sq", "60", "8", "nota", "12/10/2026", 1);
-  const b = buildPendingProgressItem("bp", "40", "8", "", "12/10/2026", 1);
-  assert.deepEqual(Object.keys(a).sort(), ["date", "exId", "kg", "note", "reps", "semana"]);
-  const q1 = appendPendingItem(null, a);
-  const q2 = appendPendingItem(JSON.stringify(q1.items), b);
-  assert.deepEqual(q2.items, [a, b]); assert.equal(q2.corrupt, false);
-  assert.equal(appendPendingItem("{oops", a).corrupt, true);
-  assert.deepEqual(appendPendingItem("{oops", a).items, [a]);
+await t("elemento de la cola: sin alumnoId/opId conserva el formato anterior; con ellos agrega alumno_id y opId", () => {
+  const legacy = buildPendingProgressItem("sq", "60", "8", "nota", "12/10/2026", 1);
+  assert.deepEqual(Object.keys(legacy).sort(), ["date", "exId", "kg", "note", "reps", "semana"]);
+  const nuevo = buildPendingProgressItem("sq", "60", "8", "nota", "12/10/2026", 1, "AL-1", "op-1");
+  assert.deepEqual(Object.keys(nuevo).sort(), ["alumno_id", "date", "exId", "kg", "note", "opId", "reps", "semana"]);
+  assert.equal(nuevo.alumno_id, "AL-1"); assert.equal(nuevo.opId, "op-1");
 });
 await t("el elemento encolado produce EXACTAMENTE el payload que se habria enviado (sin perder campos)", () => {
   const item = buildPendingProgressItem("sq", "60,5", "8", "n", "12/10/2026", 2);
   const direct = buildProgressPayload("AL", "sq", "60,5", "8", "n", "12/10/2026", 2);
   const fromQueue = buildProgressPayload("AL", item.exId, item.kg, item.reps, item.note, item.date, item.semana);
   assert.deepEqual(fromQueue, direct);
-});
-await t("flush: conserva lo que fallo y lo encolado DURANTE el flush; no duplica ni pierde", () => {
-  const a = { exId: "a" }, b = { exId: "b" }, c = { exId: "c" }, nuevo = { exId: "nuevo" };
-  const snapshot = [a, b, c];
-  const durante = JSON.stringify([...snapshot, nuevo]);          // se encolo 'nuevo' mientras el flush corria
-  assert.deepEqual(mergeQueueAfterFlush(durante, 3, [b]), [b, nuevo]);        // a y c sincronizados
-  assert.deepEqual(mergeQueueAfterFlush(durante, 3, []), [nuevo]);            // todo sincronizado salvo lo nuevo
-  assert.deepEqual(mergeQueueAfterFlush(JSON.stringify(snapshot), 3, snapshot), snapshot); // todo fallo
-  assert.deepEqual(mergeQueueAfterFlush(null, 3, [a]), [a]);                  // cola desaparecida: se conserva lo fallido
 });
 console.log(`${n} comprobaciones OK`);

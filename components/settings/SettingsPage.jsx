@@ -373,10 +373,11 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
   const [deletePhrase, setDeletePhrase] = useState('');
   const [showConfirm,  setShowConfirm]  = useState(false);
 
-  const doLogout = async () => {
+  // wipePending: solo el borrado permanente explicito elimina tambien las series pendientes de sincronizar (it_pending_sync*).
+  const doLogout = async (wipePending) => {
     try { if (supabase) await supabase.auth.signOut(); } catch(e) {}
     try {
-      Object.keys(localStorage).filter(k => k.startsWith('it_')).forEach(k => localStorage.removeItem(k));
+      Object.keys(localStorage).filter(k => k.startsWith('it_') && (wipePending === true || !k.startsWith('it_pending_sync'))).forEach(k => localStorage.removeItem(k));
     } catch(e) {}
     syncStateWithLocalStorage && syncStateWithLocalStorage();
     onClose && onClose();
@@ -385,7 +386,7 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
 
   const doDelete = async () => {
     if (deletePhrase !== t.deleteWord) return;
-    await doLogout();
+    await doLogout(true);
   };
 
   const dangerRow = (label, desc, btnLabel, onClick, variant = 'outline') => (
@@ -411,7 +412,7 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
   return (
     <div>
       <SectionTitle>{t.session}</SectionTitle>
-      {dangerRow(t.logOut, t.logOutDesc, t.logOut, doLogout)}
+      {dangerRow(t.logOut, t.logOutDesc, t.logOut, () => doLogout(false))}
 
       <SectionTitle>{t.data}</SectionTitle>
       {dangerRow(t.exportData, t.exportDataDesc, t.export, () => {
