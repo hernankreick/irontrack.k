@@ -156,10 +156,17 @@ import {
   hydrateProgressFromRows,
   mergeProgressEntries,
   updateExerciseKgInRoutines,
+  persistSetConfirmed,
+  isConfirmedProgressInsert,
+  appendPendingItem,
+  mergeQueueAfterFlush,
 } from './lib/workoutSession.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
 
+
+// Cerrojo del flush de la cola offline: evita que dos flush concurrentes envien dos veces los mismos elementos (duplicados).
+let pendingSyncFlushInFlight = false;
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -1514,24 +1521,36 @@ function GymApp() {
       if(pending.length === 0) return;
       const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
       if(!alumnoIdSync) return;
-      const results = await Promise.allSettled(pending.map(item => {
-        return Promise.resolve().then(function() {
-          return sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana));
+      if(pendingSyncFlushInFlight) return;
+      pendingSyncFlushInFlight = true;
+      let failed = [];
+      let remaining = [];
+      try {
+        const results = await Promise.allSettled(pending.map(item => {
+          return Promise.resolve().then(function() {
+            return sb.addProgreso(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana));
+          });
+        }));
+        // Solo cuenta como sincronizado si Supabase devolvio la fila; null (HTTP no-ok) o excepcion => sigue en cola.
+        failed = pending.filter(function(item, idx) {
+          var res = results[idx];
+          return !res || res.status !== 'fulfilled' || !isConfirmedProgressInsert(res.value);
         });
-      }));
-      const failed = pending.filter(function(item, idx) {
-        var res = results[idx];
-        return !res || res.status !== 'fulfilled' || res.value == null;
-      });
-      if(failed.length > 0) {
-        try{localStorage.setItem('it_pending_sync', JSON.stringify(failed));}catch(e){}
-      } else {
-        localStorage.removeItem('it_pending_sync');
+        // Series encoladas mientras el flush estaba en curso (se agregan al final) se conservan.
+        remaining = mergeQueueAfterFlush(localStorage.getItem('it_pending_sync'), pending.length, failed);
+        if(remaining.length > 0) {
+          try{localStorage.setItem('it_pending_sync', JSON.stringify(remaining));}catch(e){}
+        } else {
+          localStorage.removeItem('it_pending_sync');
+        }
+      } finally {
+        pendingSyncFlushInFlight = false;
       }
-      setPendingSync(failed);
+      setPendingSync(remaining);
       const syncedCount = pending.length - failed.length;
       if(syncedCount > 0) toast2(syncedCount+' set'+(syncedCount>1?'s':'')+' sincronizados ✓');
     };
+    flushPendingRef.current = flushPendingSync;
     const goOnline = () => { flushPendingSync(); };
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online',  goOnline);
@@ -1916,6 +1935,7 @@ function GymApp() {
     setTimer({ total: secs, color, endAt: Date.now() + secs * 1000 });
   };
 
+  const flushPendingRef = React.useRef(null);
   const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe, weekOverride) => {
     const d = new Date().toLocaleDateString("es-AR");
     // Mismo criterio que al finalizar una sesión: si la rutina tiene una semana persistida
@@ -1934,16 +1954,38 @@ function GymApp() {
       const ex = updateProgressEntryWithSessionContext(prev[exId], newSet, session);
       return {...prev,[exId]:ex};
     });
-    // Guardar en Supabase — si offline, guardar en cola local
+    // Guardar en Supabase — si offline, guardar en cola local. Online: la serie se da por guardada SOLO si Supabase
+    // devuelve la fila insertada (sbFetch devuelve null en HTTP no-ok); si no, se encola y se avisa que esta pendiente.
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
+    const enqueuePendingSet = function () {
+      const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet);
+      let raw = null;
+      try { raw = localStorage.getItem('it_pending_sync'); } catch (e) {}
+      const q = appendPendingItem(raw, item);
+      // Si lo guardado estaba corrupto no se pisa sin respaldarlo.
+      if (q.corrupt && raw) { try { localStorage.setItem('it_pending_sync_corrupto_' + Date.now(), raw); } catch (e) {} }
+      try { localStorage.setItem('it_pending_sync', JSON.stringify(q.items)); } catch (e) {}
+      setPendingSync(q.items);
+    };
+    let confirmacionRemotaEnCurso = false;
     if(alumnoIdSync) {
       if(!isOnline) {
-        const item = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet);
-        const updated = [...pendingSync, item];
-        setPendingSync(updated);
-        try{localStorage.setItem('it_pending_sync', JSON.stringify(updated));}catch(e){}
+        enqueuePendingSet();
       } else {
-        sb.addProgreso(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet)).catch(function(e){console.error("[PROGRESO] ERR",e)});
+        confirmacionRemotaEnCurso = true;
+        persistSetConfirmed({
+          addProgreso: function () { return sb.addProgreso(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet)); },
+        }).then(function (res) {
+          if (res.confirmed) {
+            toast2(es?'Serie guardada ✓':'Set saved ✓');
+            return;
+          }
+          console.error("[PROGRESO] serie no confirmada por el servidor (" + res.reason + "); se encola para reintentar");
+          enqueuePendingSet();
+          toast2(es?'Guardado localmente, pendiente de sincronizar':'Saved locally, pending sync');
+          // Un reintento automatico (el cerrojo del flush evita enviar dos veces lo mismo); si falla, queda en cola.
+          setTimeout(function () { if (flushPendingRef.current) flushPendingRef.current(); }, 10000);
+        });
       }
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
@@ -1964,7 +2006,7 @@ function GymApp() {
     }
     if(!isOnline) {
       toast2(es?'Set guardado localmente':'Set saved locally');
-    } else {
+    } else if(!confirmacionRemotaEnCurso) {
       toast2(es?'Serie guardada ✓':'Set saved ✓');
     }
     // Actualizar kg en la rutina para autocompletar sets restantes
