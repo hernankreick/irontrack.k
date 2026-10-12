@@ -9,6 +9,7 @@ import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
 import RoutineCardActionMenu from './RoutineCardActionMenu.jsx';
 import RoutineDeleteConfirmModals from './RoutineDeleteConfirmModals.jsx';
 import RoutineCardTitleMeta from './RoutineCardTitleMeta.jsx';
+import RoutineRestartModal from './RoutineRestartModal.jsx';
 import './routines-ui.css';
 
 function useIsUnder768() {
@@ -66,6 +67,7 @@ export function RoutineCard({
   cardIndex = 0,
   setRutinasSBEntrenador,
   rutinasSBEntrenador = [],
+  onRestartRoutine,
 }) {
   const isUnder768 = useIsUnder768();
   const T = isUnder768 ? coachTypeMobile : coachType;
@@ -83,6 +85,9 @@ export function RoutineCard({
   const [deleteRoutineTarget, setDeleteRoutineTarget] = useState(null);
   const [deleteRoutineSubmitting, setDeleteRoutineSubmitting] = useState(false);
   const [pendingDeleteDay, setPendingDeleteDay] = useState(null);
+  const [restartOpen, setRestartOpen] = useState(false);
+  const [restartSubmitting, setRestartSubmitting] = useState(false);
+  const [restartError, setRestartError] = useState('');
   const [assignOpen, setAssignOpen] = useState(false);
   const assignTriggerRef = useRef(null);
   const assignPopoverRef = useRef(null);
@@ -470,6 +475,73 @@ export function RoutineCard({
     });
   }
 
+  // "Reiniciar rutina" solo aplica a una rutina asignada a un alumno y ya guardada en el servidor.
+  var assignedAlumnoId = r.alumno_id != null && r.alumno_id !== '' ? String(r.alumno_id) : '';
+  var restartAlumno = assignedAlumnoId
+    ? (alumnos || []).find(function (a) {
+        return String(a.id) === assignedAlumnoId;
+      })
+    : null;
+  var restartAlumnoName = (restartAlumno && (restartAlumno.nombre || restartAlumno.email)) || r.alumno || '';
+  var canRestart =
+    !!assignedAlumnoId &&
+    !r.es_plantilla &&
+    typeof onRestartRoutine === 'function' &&
+    (!!r.saved ||
+      (Array.isArray(rutinasSBEntrenador) &&
+        rutinasSBEntrenador.some(function (rs) {
+          return rs && String(rs.id) === String(r.id);
+        })));
+
+  function requestRestartRoutine() {
+    setMenuOpen(false);
+    setRestartError('');
+    setRestartOpen(true);
+  }
+
+  function restartErrorText(res) {
+    var reason = res && res.reason;
+    if (reason === 'migracion_pendiente') {
+      return M(
+        lang,
+        'Falta actualizar la base de datos (migración de ciclo). Avisá al administrador.',
+        'The database needs the cycle migration first. Contact the administrator.',
+        'Falta atualizar o banco de dados (migração de ciclo). Avise o administrador.'
+      );
+    }
+    if (reason === 'sin_filas') {
+      return M(lang, 'No tenés permiso para reiniciar esta rutina.', 'You do not have permission to restart this routine.', 'Você não tem permissão para reiniciar esta rotina.');
+    }
+    if (reason === 'no_asignada' || reason === 'alumno_distinto' || reason === 'rutina_inexistente') {
+      return M(lang, 'La rutina ya no está asignada a este alumno.', 'The routine is no longer assigned to this athlete.', 'A rotina não está mais atribuída a este aluno.');
+    }
+    return M(lang, 'No se pudo reiniciar la rutina. Probá de nuevo.', 'Could not restart the routine. Please try again.', 'Não foi possível reiniciar a rotina. Tente novamente.');
+  }
+
+  const confirmRestartRoutine = async function (cargas) {
+    if (restartSubmitting || !canRestart) return;
+    setRestartSubmitting(true);
+    setRestartError('');
+    try {
+      var res = await onRestartRoutine(r.id, cargas);
+      if (res && res.ok) {
+        setRestartOpen(false);
+        toast2(M(lang, 'Rutina reiniciada ✓ Semana 1, Día 1', 'Routine restarted ✓ Week 1, Day 1', 'Rotina reiniciada ✓ Semana 1, Dia 1'));
+      } else {
+        var text = restartErrorText(res);
+        setRestartError(text);
+        toast2(text);
+      }
+    } catch (e) {
+      console.error('[restart routine]', e);
+      var text2 = restartErrorText(null);
+      setRestartError(text2);
+      toast2(text2);
+    } finally {
+      setRestartSubmitting(false);
+    }
+  };
+
   function runDeleteDay() {
     if (!pendingDeleteDay) return;
     var di = pendingDeleteDay.di;
@@ -623,6 +695,8 @@ export function RoutineCard({
                 setEditandoNombre(true);
               }}
               onDuplicate={duplicateRoutine}
+              canRestart={canRestart}
+              onRequestRestart={requestRestartRoutine}
               onRequestDelete={requestDeleteRoutine}
             />
 
@@ -1041,6 +1115,19 @@ export function RoutineCard({
           </div>,
           document.body
         )}
+
+      <RoutineRestartModal
+        open={restartOpen}
+        alumnoName={restartAlumnoName}
+        loading={restartSubmitting}
+        errorText={restartError}
+        onCancel={function () {
+          if (!restartSubmitting) setRestartOpen(false);
+        }}
+        onConfirm={confirmRestartRoutine}
+        M={M}
+        lang={lang}
+      />
 
       <RoutineDeleteConfirmModals
         deleteRoutineTarget={deleteRoutineTarget}

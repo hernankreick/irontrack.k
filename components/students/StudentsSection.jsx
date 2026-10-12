@@ -3,6 +3,7 @@ import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 import { getActiveStudentRoutinePosition } from '../../lib/studentWeeklyProgress.js';
+import { CICLO_CARGAS, readCicloActual, readCicloCargas, rowInCiclo } from '../../lib/rutinaCiclo.js';
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
 import StudentsSectionStates from './StudentsSectionStates.jsx';
@@ -246,7 +247,10 @@ export default function StudentsSection(props) {
                 };
               });
               const rutSB = isAlumnoActive ? assignedRoutineFor(a.id) : null;
-              const regsAlu = alumnoProgreso || [];
+              // "Reiniciar desde cero": las sugerencias de carga solo parten de los registros del ciclo vigente.
+              const regsAlu = rutSB && readCicloCargas(rutSB.datos) === CICLO_CARGAS.CERO && readCicloActual(rutSB.datos) > 1
+                ? (alumnoProgreso || []).filter(function (reg) { return rowInCiclo(reg, readCicloActual(rutSB.datos)); })
+                : (alumnoProgreso || []);
               const sugs = rutSB && regsAlu.length >= 2 ? generarSugerenciasAlumno(regsAlu, rutSB.datos, EX) : [];
               const suggestionsOpen = !!sugsOpen[a.id];
               return (
