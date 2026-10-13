@@ -1,6 +1,18 @@
 import React from "react";
 import { resolveExerciseTitle } from "../../lib/exerciseResolve.js";
 import { Ic } from "../Ic.jsx";
+import { MessageSquare } from "lucide-react";
+import { getWeekNote } from "./studentPlanHelpers.js";
+
+function CoachNoteLine({ text, accent, color }) {
+  if (!text) return null;
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 6, paddingLeft: 8, borderLeft: "2px solid " + accent, color: color, fontSize: 12, fontWeight: 500, minWidth: 0 }}>
+      <MessageSquare size={12} style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
+      <span style={{ opacity: 0.85, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", lineHeight: 1.35 }}>{text}</span>
+    </div>
+  );
+}
 
 function cleanKey(value) {
   return String(value || "")
@@ -91,7 +103,10 @@ export default function StudentPlanExerciseRows({
               <div key={routineId + "-d" + dayIndex + "-wu-" + (ex.id || "ex") + "-" + ei} style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 0", borderBottom: ei < (day.warmup || []).length - 1 ? "1px solid " + border : "none" }}>
                 <div style={{ width: 3, height: 20, borderRadius: 2, background: "#F59E0B44", flexShrink: 0 }} />
                 {images && <ExThumb src={imgSrc} name={nombre} />}
-                <div style={{ flex: 1, fontSize: 16, fontWeight: 700, color: textMain }}>{nombre}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: textMain }}>{nombre}</div>
+                  <CoachNoteLine text={getWeekNote(ex, currentWeekForRoutine)} accent="#F59E0B" color={textMain} />
+                </div>
                 <span style={{ fontSize: 13, color: "#A3B4CC", fontWeight: 600 }}>{ex.sets || "-"}×{ex.reps || "-"}</span>
                 {renderExerciseVideoButton(inf, ex, nombre)}
               </div>
@@ -121,6 +136,7 @@ export default function StudentPlanExerciseRows({
                 <div style={{ fontSize: 13, color: "#A3B4CC", fontWeight: 500, marginTop: 2, display: "flex", gap: 6, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 700 }}>{s}×{rp}</span>{kg2 && <span>{kg2}kg</span>}{ex.pause && fmtP && <span>⏱ {fmtP(ex.pause)}</span>}
                 </div>
+                <CoachNoteLine text={getWeekNote(ex, currentWeekForRoutine)} accent="#2563EB" color={textMain} />
               </div>
               {renderExerciseVideoButton(inf, ex, nombre)}
             </div>
