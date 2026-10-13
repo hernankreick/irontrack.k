@@ -9,7 +9,7 @@ function CoachNoteLine({ text, accent, color }) {
   return (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 6, paddingLeft: 8, borderLeft: "2px solid " + accent, color: color, fontSize: 12, fontWeight: 500, minWidth: 0 }}>
       <MessageSquare size={12} style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
-      <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", lineHeight: 1.35 }}>{text}</span>
+      <span style={{ opacity: 0.85, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", lineHeight: 1.35 }}>{text}</span>
     </div>
   );
 }
@@ -105,7 +105,7 @@ export default function StudentPlanExerciseRows({
                 {images && <ExThumb src={imgSrc} name={nombre} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: textMain }}>{nombre}</div>
-                  <CoachNoteLine text={getWeekNote(ex, currentWeekForRoutine)} accent="#F59E0B" color="#A3B4CC" />
+                  <CoachNoteLine text={getWeekNote(ex, currentWeekForRoutine)} accent="#F59E0B" color={textMain} />
                 </div>
                 <span style={{ fontSize: 13, color: "#A3B4CC", fontWeight: 600 }}>{ex.sets || "-"}×{ex.reps || "-"}</span>
                 {renderExerciseVideoButton(inf, ex, nombre)}
@@ -136,7 +136,7 @@ export default function StudentPlanExerciseRows({
                 <div style={{ fontSize: 13, color: "#A3B4CC", fontWeight: 500, marginTop: 2, display: "flex", gap: 6, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 700 }}>{s}×{rp}</span>{kg2 && <span>{kg2}kg</span>}{ex.pause && fmtP && <span>⏱ {fmtP(ex.pause)}</span>}
                 </div>
-                <CoachNoteLine text={getWeekNote(ex, currentWeekForRoutine)} accent="#2563EB" color="#A3B4CC" />
+                <CoachNoteLine text={getWeekNote(ex, currentWeekForRoutine)} accent="#2563EB" color={textMain} />
               </div>
               {renderExerciseVideoButton(inf, ex, nombre)}
             </div>
