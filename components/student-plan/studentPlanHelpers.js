@@ -5,6 +5,17 @@ import { firstNonEmptyString } from '../../lib/appPureHelpers.js';
  * No side effects; mismos datos que el resto de App (día de rutina, progress, currentWeek).
  */
 
+/**
+ * Nota del coach para un ejercicio en la semana indicada (indice base 0 de ex.weeks[]).
+ * Devuelve "" si no hay nota (el llamador no debe renderizar nada).
+ * @param {object} ex
+ * @param {number} week
+ */
+export function getWeekNote(ex, week) {
+  const w = ((ex && ex.weeks) || [])[week];
+  return w && typeof w.note === "string" ? w.note.trim() : "";
+}
+
 /** @param {string|number|undefined} pause */
 export function parsePauseSeconds(pause) {
   const n = parseInt(String(pause), 10);
