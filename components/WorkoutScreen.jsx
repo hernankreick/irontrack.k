@@ -17,6 +17,7 @@ import {
   removeUndefinedPayloadFields,
   sessionAlreadyExists,
 } from '../lib/workoutSession.js';
+import { readCicloActual } from '../lib/rutinaCiclo.js';
 import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
 
 export function WorkoutScreen(props) {
@@ -142,6 +143,7 @@ export function WorkoutScreen(props) {
     const newCompleted = mergeCompletedDay(completedDays, dayKey);
     const totalDays = r ? r.days.length : 1;
     const semanaParaGuardar = effectiveWeek + 1;
+    const cicloActual = readCicloActual(r && r.datos);
     const hoyFin = new Date().toLocaleDateString("es-AR");
     const horaFin = new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
     const buildSummary = () => buildWorkoutSummary({
@@ -176,10 +178,12 @@ export function WorkoutScreen(props) {
             date: hoyFin,
             time: horaFin,
             includeRoutineId: true,
+            ciclo: cicloActual,
           })),
           date: hoyFin,
           dayIndex: session.dIdx,
           weekToSave: semanaParaGuardar,
+          ciclo: cicloActual,
           isOnline: typeof navigator === "undefined" ? true : navigator.onLine !== false,
           effectiveWeek: effectiveWeek,
           totalDays: totalDays,
@@ -250,7 +254,7 @@ export function WorkoutScreen(props) {
         const rutData = JSON.parse(atob(sharedParam));
         if (rutData.alumnoId) {
           const existentes = await sb.getSesiones(rutData.alumnoId);
-          const yaExiste = sessionAlreadyExists(existentes, hoyFin, session.dIdx, semanaParaGuardar);
+          const yaExiste = sessionAlreadyExists(existentes, hoyFin, session.dIdx, semanaParaGuardar, cicloActual);
           if (!yaExiste) {
             // .catch: evita un rechazo no manejado (sigue siendo fire-and-forget, sin cambios de flujo).
             Promise.resolve(sb.addSesion(removeUndefinedPayloadFields(buildSessionPayload({
@@ -263,6 +267,7 @@ export function WorkoutScreen(props) {
               date: hoyFin,
               time: horaFin,
               includeRoutineId: false,
+              ciclo: cicloActual,
             })))).catch(function (e) { console.error("[addSesion shared]", e); });
           }
         }
@@ -351,6 +356,7 @@ export function WorkoutScreen(props) {
             currentWeek={currentWeek}
             logSet={logSet} startTimer={startTimer}
             setPrCelebration={setPrCelebration} progress={progress}
+            rutinaDatos={activeR && activeR.datos}
           />
         )}
 

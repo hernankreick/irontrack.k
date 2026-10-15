@@ -24,7 +24,6 @@ export default function CoachMobileKpiCard({
         padding: 14,
         minWidth: 0,
         boxSizing: "border-box",
-        borderLeft: "3px solid " + accent,
         display: "flex",
         flexDirection: "column",
       }}

@@ -14,6 +14,7 @@ import {
 } from './SettingsFormControls.jsx';
 import SettingsProfileSummaryCard from './SettingsProfileSummaryCard.jsx';
 import SettingsShell from './SettingsShell.jsx';
+import { isPendingQueueKey } from '../../lib/pendingQueueKeyed.js';
 import SettingsSubscriptionTab from './SettingsSubscriptionTab.jsx';
 
 const SUPPORTED_LANGS = ['es', 'en', 'pt'];
@@ -373,10 +374,11 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
   const [deletePhrase, setDeletePhrase] = useState('');
   const [showConfirm,  setShowConfirm]  = useState(false);
 
-  const doLogout = async () => {
+  // wipePending: solo el borrado permanente explicito elimina tambien las series pendientes de sincronizar (it_pending_sync* y el formato por clave it_pq:*, it_pqf:*, it_pqd:*).
+  const doLogout = async (wipePending) => {
     try { if (supabase) await supabase.auth.signOut(); } catch(e) {}
     try {
-      Object.keys(localStorage).filter(k => k.startsWith('it_')).forEach(k => localStorage.removeItem(k));
+      Object.keys(localStorage).filter(k => k.startsWith('it_') && (wipePending === true || !isPendingQueueKey(k))).forEach(k => localStorage.removeItem(k));
     } catch(e) {}
     syncStateWithLocalStorage && syncStateWithLocalStorage();
     onClose && onClose();
@@ -385,7 +387,7 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
 
   const doDelete = async () => {
     if (deletePhrase !== t.deleteWord) return;
-    await doLogout();
+    await doLogout(true);
   };
 
   const dangerRow = (label, desc, btnLabel, onClick, variant = 'outline') => (
@@ -411,7 +413,7 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
   return (
     <div>
       <SectionTitle>{t.session}</SectionTitle>
-      {dangerRow(t.logOut, t.logOutDesc, t.logOut, doLogout)}
+      {dangerRow(t.logOut, t.logOutDesc, t.logOut, () => doLogout(false))}
 
       <SectionTitle>{t.data}</SectionTitle>
       {dangerRow(t.exportData, t.exportDataDesc, t.export, () => {

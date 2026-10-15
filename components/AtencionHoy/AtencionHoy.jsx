@@ -34,7 +34,6 @@ function CardPrincipal({ alumno, onVerProgreso, onAccion }) {
     <div style={{
       background: "#181c22",
       border: "0.5px solid #2a2d32",
-      borderLeft: `2px solid ${prioridad.color}`,
       borderRadius: 10,
       padding: "12px 14px",
       marginBottom: 8,
