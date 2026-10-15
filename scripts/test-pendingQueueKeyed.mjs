@@ -1,7 +1,7 @@
 // Entrega 0a — cola de series por clave: lectura, adopcion del arreglo antiguo, confirmadas, intentos, cerrojo y compatibilidad.
 //   node scripts/test-pendingQueueKeyed.mjs
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import {
   LEGACY_QUEUE_KEY, PQ_ITEM_PREFIX, PQ_STATE_PREFIX, PQ_DONE_PREFIX, SEND_STALE_MS,
   isPendingQueueKey, readKeyedItems, readDoneMap, unifyPending, adoptLegacyArray, removeConfirmedKeyed, gcDoneMarks,
@@ -241,6 +241,90 @@ await t("cableado estatico: SettingsPage usa isPendingQueueKey; la escritura de 
   const q = readFileSync(new URL("../lib/pendingSyncQueue.js", import.meta.url), "utf8");
   assert.ok(!q.includes("adoptLegacyArray"), "la adopcion por clave no se ejecuta en produccion en 0a");
   assert.equal((q.match(/removeConfirmedKeyed\(/g) || []).length, 1, "solo el flush quita elementos por clave");
+});
+
+// ───────── Revision del PR #96: serie confirmada presente a la vez en el arreglo y en it_pq:, y limpieza de marcas a los 14 dias ─────────
+const DAY = 24 * 3600 * 1000;
+
+await t("REGRESION 1: una serie confirmada que sigue (o vuelve) en el arreglo NO reaparece despues de gcDoneMarks a los 14 dias", async () => {
+  const s = store(); const it = mk("op-1"); arr(s, [it]); adoptLegacyArray(s, readQueue(s).items);       // vive en el arreglo Y por clave
+  const r = await flushPendingForAlumno({ storage: s, alumnoId: "A", send: ok });                          // se confirma: se quita de los dos lados + marca
+  assert.equal(r.sent, 1); assert.deepEqual(readAllPending(s).items, []);
+  arr(s, [it]);                                                                                           // pestaña con codigo antiguo reescribe el arreglo desde una lectura vieja: "resucita" en el arreglo
+  assert.deepEqual(readAllPending(s).items, [], "hoy esta oculta por la marca");
+  const doneAt = Number(readDoneMap(s)["op-1"]);
+  gcDoneMarks(s, doneAt + 15 * DAY);                                                                      // pasan 15 dias: la marca vence
+  assert.deepEqual(readAllPending(s).items, [], "REAPARECE si la marca se borra mientras el arreglo aun contiene la serie");
+});
+
+await t("REGRESION 2: la marca de confirmada NO se borra mientras el arreglo aun contiene ese opId; se borra cuando ya no esta", () => {
+  const s = store(); arr(s, [mk("op-1")]); s.setItem(PQ_DONE_PREFIX + "op-1", JSON.stringify({ at: 0 }));
+  assert.equal(gcDoneMarks(s, 20 * DAY), 0); assert.ok("op-1" in readDoneMap(s), "se conserva");
+  arr(s, []); assert.equal(gcDoneMarks(s, 20 * DAY), 1); assert.deepEqual(readDoneMap(s), {});
+});
+
+await t("REGRESION 3: con el arreglo corrupto o ilegible no se borra ninguna marca (no se sabe que contiene)", () => {
+  const s = store({ [LEGACY_QUEUE_KEY]: "{roto" }); s.setItem(PQ_DONE_PREFIX + "op-1", JSON.stringify({ at: 0 }));
+  assert.equal(gcDoneMarks(s, 20 * DAY), 0); assert.ok("op-1" in readDoneMap(s));
+});
+
+await t("REGRESION 4: al vencer la marca se retira tambien la copia por clave ya confirmada (no queda basura ni se vuelve a mostrar)", () => {
+  const s = store(); kItem(s, mk("op-1")); s.setItem(PQ_STATE_PREFIX + "op-1", "{}"); s.setItem(PQ_DONE_PREFIX + "op-1", JSON.stringify({ at: 0 }));
+  assert.equal(gcDoneMarks(s, 20 * DAY), 1);
+  assert.deepEqual([...s._m.keys()], [], "ni elemento, ni estado, ni marca");
+  assert.deepEqual(readAllPending(s).items, []);
+});
+
+await t("REGRESION 5: la adopcion posterior a un GC no re-crea una serie confirmada que sigue en el arreglo (la marca la protege hasta que el arreglo la suelte)", () => {
+  const s = store(); const it = mk("op-1"); arr(s, [it]); adoptLegacyArray(s, [it]); removeConfirmedKeyed(s, "op-1", 0);
+  assert.equal(gcDoneMarks(s, 30 * DAY), 0, "el arreglo aun la contiene: la marca queda");
+  const r = adoptLegacyArray(s, readQueue(s).items); assert.deepEqual([r.adopted, r.skippedDone], [0, 1]);
+  assert.deepEqual(readAllPending(s).items, []);
+});
+
+await t("REGRESION 6: el flush retira del arreglo las copias ocultas por una marca (ya confirmadas), con o sin elementos pendientes, y sin tocar lo demas", async () => {
+  const s = store(); s.setItem(PQ_DONE_PREFIX + "op-1", JSON.stringify({ at: 5 }));
+  arr(s, [mk("op-1"), mk("op-2"), { exId: "sq", kg: 1, reps: 1, date: "d", semana: 1 }, mk("op-9", { alumno_id: "B" })]);
+  const seen = [];
+  const r = await flushPendingForAlumno({ storage: s, alumnoId: "A", send: async (it) => { seen.push(it.opId); return null; } });     // el envio de op-2 falla
+  assert.ok(!seen.includes("op-1"), "la copia oculta (ya confirmada) no se envia"); assert.ok(seen.includes("op-2")); assert.equal(r.sent, 0);
+  const left = readQueue(s).items.map((i) => i.opId);
+  assert.equal(left.length, 3, "quedan: op-2, op-9 (otro alumno) y el elemento antiguo que la adopcion existente ya identifico");
+  assert.ok(left.includes("op-2") && left.includes("op-9") && !left.includes("op-1"), "solo se retiro la copia ya confirmada");
+  assert.ok(left.filter((x) => x !== "op-2" && x !== "op-9").every((x) => /^[0-9a-f-]{36}$/.test(x)), "el elemento antiguo conserva su contenido con un opId asignado como antes");
+  // y tambien cuando no hay nada pendiente para este alumno
+  const s2 = store(); s2.setItem(PQ_DONE_PREFIX + "op-1", JSON.stringify({ at: 5 })); arr(s2, [mk("op-1")]);
+  await flushPendingForAlumno({ storage: s2, alumnoId: "A", send: ok });
+  assert.equal(s2.getItem(LEGACY_QUEUE_KEY), null, "queda vacio");
+});
+
+await t("REGRESION 7: con solo el arreglo (produccion hoy) el flush no hace ninguna escritura extra por la limpieza de copias ocultas", async () => {
+  const s = store(); enqueueItem(s, mk("op-1")); enqueueItem(s, mk("op-2"));
+  const writes = []; const ss = s.setItem.bind(s), rr = s.removeItem.bind(s);
+  s.setItem = (k, v) => { writes.push("set " + k); ss(k, v); }; s.removeItem = (k) => { writes.push("rm " + k); rr(k); };
+  await flushPendingForAlumno({ storage: s, alumnoId: "A", send: async () => null });                    // nada se confirma
+  assert.ok(writes.every((w) => w.endsWith(LEGACY_QUEUE_KEY)), "solo toca el arreglo: " + writes.join(", "));
+});
+
+await t("REGRESION 8 (punto 2): adoptLegacyArray NO se ejecuta desde el flujo normal de la aplicacion — ni App.jsx, ni components, ni hooks, ni lib (salvo su definicion)", () => {
+    const roots = ["App.jsx", "components", "hooks", "lib", "contexts", "utils"];
+  const hits = [];
+  const walk = (p) => {
+    let st; try { st = statSync(new URL("../" + p, import.meta.url)); } catch (e) { return; }
+    if (st.isDirectory()) { readdirSync(new URL("../" + p + "/", import.meta.url)).forEach((f) => walk(p + "/" + f)); return; }
+    if (!/\.(jsx?|mjs)$/.test(p)) return;
+    if (readFileSync(new URL("../" + p, import.meta.url), "utf8").includes("adoptLegacyArray") && p !== "lib/pendingQueueKeyed.js") hits.push(p);
+  };
+  roots.forEach(walk);
+  assert.deepEqual(hits, [], "adoptLegacyArray solo se usa en pruebas en 0a: " + hits.join(", "));
+});
+
+await t("REGRESION 9 (punto 2): las rutas de lectura y de flush con solo el arreglo no crean ninguna clave it_pq:/it_pqf:/it_pqd:", async () => {
+  const s = store(); enqueueItem(s, mk("op-1")); enqueueItem(s, mk("op-2")); enqueueItem(s, { exId: "sq", kg: 5, reps: 5, date: "d", semana: 1 });
+  visiblePendingItems(s, "A"); readAllPending(s);
+  await flushPendingForAlumno({ storage: s, alumnoId: "A", send: async (it) => (it.opId === "op-1" ? [{ id: 1 }] : null) });
+  await flushPendingForAlumno({ storage: s, alumnoId: "A", send: ok });
+  assert.deepEqual([...s._m.keys()].filter((k) => k !== LEGACY_QUEUE_KEY), [], "ninguna clave nueva");
 });
 
 console.log(`${n} comprobaciones OK`);
