@@ -118,7 +118,7 @@ import AppTopBar from './components/layout/AppTopBar.jsx';
 import CoachDesktopShellFrame from './components/layout/CoachDesktopShellFrame.jsx';
 import OfflineSyncBanner from './components/layout/OfflineSyncBanner.jsx';
 import { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
-import { supabase } from './lib/supabaseClient.js';
+import { supabase, SUPABASE_ENV } from './lib/supabaseClient.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
@@ -139,6 +139,7 @@ import {
   selectCurrentRoutine,
 } from './lib/routineStore.js';
 import { getActiveStudentRoutinePosition } from './lib/studentWeeklyProgress.js';
+import { resolveCoachId, resolveCoachScopeId, realCoachIdOrNull } from './lib/coachIdentity.js';
 import { updateRutinaSemanaActiva as updateRutinaSemanaActivaLib } from './lib/updateRutinaSemanaActiva.js';
 import { updateRutinaPreservingOperational, withInitialSemanaActiva } from './lib/rutinaOperationalState.js';
 import { reconcileCurrentRoutineForAlumno } from './lib/reconcileCurrentRoutine.js';
@@ -182,14 +183,16 @@ function readVisiblePending() {
   } catch (e) { return []; }
 }
 
-const SB_URL = import.meta.env.VITE_SUPABASE_URL;
-const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Conexion validada y sin valores de respaldo (ver lib/supabaseEnv.js): sin configuracion no se emite ninguna peticion REST.
+const SB_URL = SUPABASE_ENV.url;
+const SB_KEY = SUPABASE_ENV.key;
+const SB_CONFIGURED = SUPABASE_ENV.configured;
 
 function getStoredEntrenadorId() {
   try {
-    return JSON.parse(localStorage.getItem("it_session") || "null")?.entrenadorId || "entrenador_principal";
+    return realCoachIdOrNull(JSON.parse(localStorage.getItem("it_session") || "null")?.entrenadorId);
   } catch (e) {
-    return "entrenador_principal";
+    return null;
   }
 }
 
@@ -278,6 +281,7 @@ async function getActiveSupabaseSession() {
 }
 
 const sbFetch = async (path, method="GET", body=null) => {
+  if (!SB_CONFIGURED) { console.error("[Supabase] sin configuracion (" + SUPABASE_ENV.reason + "): no se emite la peticion"); return null; }
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
   const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json", "Prefer": "return=representation" } };
@@ -304,7 +308,7 @@ const sbFetch = async (path, method="GET", body=null) => {
 // Variante que devuelve { ok, status, data } (no colapsa los errores HTTP a null): la necesita la insercion idempotente de series para
 // distinguir un conflicto 23505 sobre el id de la serie de cualquier otro error. Lanza solo ante falla de red.
 const sbRequestStatus = async (path, method="GET", body=null) => {
-  // Sin URL o clave de Supabase no se emite ninguna peticion REST (en main: variable ausente; con el PR de seguridad SB_URL/SB_KEY quedan vacias si el entorno no es valido).
+  // Sin URL o clave de Supabase no se emite ninguna peticion REST (SB_URL/SB_KEY quedan vacias si el entorno no es valido, ver lib/supabaseEnv.js).
   if (!SB_URL || !SB_KEY) { console.error("[Supabase] sin configuracion: no se emite la peticion"); return { ok: false, status: 0, data: null }; }
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
@@ -321,6 +325,7 @@ const sbRequestStatus = async (path, method="GET", body=null) => {
 
 // Variante estricta: lanza ante error HTTP/red en vez de devolver null (no confundir error con "sin alumnos").
 const sbFetchStrict = async (path) => {
+  if (!SB_CONFIGURED) throw new Error("[Supabase] sin configuracion (" + SUPABASE_ENV.reason + ")");
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
   const r = await fetch(SB_URL+"/rest/v1/"+path, { method: "GET", headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json" } });
@@ -347,7 +352,9 @@ const sb = {
     return data || [];
   },
   getRutinasByEntrenador: async (entId) => {
-    const { data, error } = await supabase.from("rutinas").select("*").eq("entrenador_id", String(entId || getStoredEntrenadorId()));
+    const coachId = realCoachIdOrNull(entId) || getStoredEntrenadorId();
+    if (!coachId) { console.warn("[rutinas SELECT] entrenador sin resolver: no se consulta"); return null; }
+    const { data, error } = await supabase.from("rutinas").select("*").eq("entrenador_id", coachId);
     if (error) { console.error("[rutinas SELECT ERROR]", error); return null; }
     return data || [];
   },
@@ -361,6 +368,13 @@ const sb = {
   createRutina: async (data) => {
     // Toda rutina asignada nace con semana_activa = 1 explicita (las plantillas no).
     const body = withInitialSemanaActiva(cleanRutinaWriteBody(data));
+    if (!body.entrenador_id) {
+      // El alta la hace siempre el entrenador autenticado: su UUID de Auth es el entrenador_id (nunca el literal legacy).
+      const activeSession = await getActiveSupabaseSession();
+      const coachId = realCoachIdOrNull(activeSession && activeSession.user && activeSession.user.id);
+      if (!coachId) { console.error("[rutinas INSERT] sin sesion de entrenador: no se crea la rutina"); return null; }
+      body.entrenador_id = coachId;
+    }
     const { data: created, error } = await supabase.from("rutinas").insert([body]).select();
     if (error) { console.error("[rutinas INSERT ERROR]", error); return null; }
     return created || [];
@@ -511,6 +525,7 @@ const sb = {
     return sbFetch("alumnos?id=eq."+id, "PATCH", data);
   },
   deleteAlumno: async function (id) {
+    if (!SB_CONFIGURED) throw new Error("[Supabase] sin configuracion (" + SUPABASE_ENV.reason + ")");
     var sid = encodeURIComponent(String(id));
     var activeSession = await getActiveSupabaseSession();
     var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
@@ -542,6 +557,7 @@ const sb = {
   },
   addMensaje: (data) => sbFetch("mensajes", "POST", data),
   marcarMensajesLeidos: async (alumnoId, esEntrenador) => {
+  if (!SB_CONFIGURED) return;
   const deQuien = esEntrenador ? "false" : "true";
   const url = "mensajes?alumno_id=eq."+alumnoId+"&de_entrenador=eq."+deQuien+"&leido=eq.false";
   const activeSession = await getActiveSupabaseSession();
@@ -563,12 +579,14 @@ const sb = {
 },
   getNota: (alumnoId) => sbFetch("notas?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   setNota: (data) => sbFetch("notas", "POST", data),
-  getVideoOverrides: (entId) => sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(entId||"entrenador_principal")+"&select=ejercicio_id,youtube_url"),
+  getVideoOverrides: (entId) => { const id = realCoachIdOrNull(entId); return id ? sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(id)+"&select=ejercicio_id,youtube_url") : Promise.resolve(null); },
   getCustomEx: async (entId) => {
+    const coachId = realCoachIdOrNull(entId) || getStoredEntrenadorId();
+    if (!coachId) return [];
     const { data, error } = await supabase
       .from("ejercicios_custom")
       .select("*")
-      .eq("entrenador_id", String(entId || getStoredEntrenadorId()));
+      .eq("entrenador_id", coachId);
     if (error) throw error;
     return data || [];
   },
@@ -601,11 +619,13 @@ const sb = {
     if (!rows || rows.length === 0) throw new Error('updateCustomEx: 0 filas actualizadas — posible mismatch de entrenador_id');
     return rows;
   },
-  setVideoOverride: async (ejercicioId, url) => {
-    try { await sbFetch("video_overrides?ejercicio_id=eq."+ejercicioId, "DELETE"); } catch(e){}
-    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:"entrenador_principal"}); } catch(e){ return null; }
+  setVideoOverride: async (ejercicioId, url, entId) => {
+    const coachId = realCoachIdOrNull(entId);
+    if (!coachId) throw new Error('setVideoOverride: entId no resuelto');
+    try { await sbFetch("video_overrides?entrenador_id=eq."+encodeURIComponent(coachId)+"&ejercicio_id=eq."+encodeURIComponent(ejercicioId), "DELETE"); } catch(e){}
+    try { return await sbFetch("video_overrides", "POST", {ejercicio_id:ejercicioId, youtube_url:url, entrenador_id:coachId}); } catch(e){ return null; }
   },
-  getNameOverrides: (entId) => sbFetch("ejercicio_overrides?entrenador_id=eq."+encodeURIComponent(entId||"entrenador_principal")+"&select=ejercicio_id,name,name_en"),
+  getNameOverrides: (entId) => { const id = realCoachIdOrNull(entId); return id ? sbFetch("ejercicio_overrides?entrenador_id=eq."+encodeURIComponent(id)+"&select=ejercicio_id,name,name_en") : Promise.resolve(null); },
   setNameOverride: async (ejercicioId, name, nameEn, entId) => {
     if (!entId) throw new Error('setNameOverride: entId no resuelto');
     const nm = String(name || "").trim();
@@ -620,13 +640,15 @@ const sb = {
     if (error) throw error;
     return data || [];
   },
-  getEntrenador: (id) => sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal")+"&select=*"),
+  getEntrenador: (id) => { const cid = realCoachIdOrNull(id); return cid ? sbFetch("entrenadores?id=eq."+encodeURIComponent(cid)+"&select=*") : Promise.resolve(null); },
   updateEntrenador: (id, data) => {
     var clean = {};
     if (data && typeof data === "object") {
       Object.keys(data).forEach(function(k){ if(data[k] !== undefined) clean[k] = data[k]; });
     }
-    return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
+    const cid = realCoachIdOrNull(id);
+    if (!cid) return Promise.resolve(null);
+    return sbFetch("entrenadores?id=eq."+encodeURIComponent(cid), "PATCH", clean);
   },
 };
 
@@ -693,7 +715,6 @@ function GymApp() {
   const [tabMain, setTabMain] = useState("entrenador"); // entrenador | alumno
       const [onboardStep, setOnboardStep] = useState(0);
   const [onboardDone, setOnboardDone] = useState(()=>{ try{return !!localStorage.getItem('it_onboard_done');}catch(e){return false;} });
-                          const ENTRENADOR_ID = "entrenador_principal";
   // Modo alumno: detectar ?r= en la URL
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const sharedParam = urlParams ? urlParams.get("r") : null;
@@ -703,6 +724,10 @@ function GymApp() {
   const [sessionData, setSessionData] = useState(()=>{ try{return JSON.parse(localStorage.getItem("it_session")||"null")}catch(e){return null} });
   const esAlumno = readOnly || sessionData?.role==="alumno";
   const [supabaseSessionUserId, setSupabaseSessionUserId] = useState(null);
+  // Identidad real del entrenador: UUID de Supabase Auth (RLS P0). Null hasta que la sesion lo resuelve; nunca el literal legacy.
+  const ENTRENADOR_ID = resolveCoachId({ role: sessionData?.role, authUid: supabaseSessionUserId, sessionEntrenadorId: sessionData?.entrenadorId });
+  // Entrenador cuyos datos compartidos se leen (overrides): el propio si es entrenador; el de su alumno si es alumno.
+  const coachScopeId = resolveCoachScopeId({ role: sessionData?.role, authUid: supabaseSessionUserId, sessionEntrenadorId: sessionData?.entrenadorId });
   const [loginScreen, setLoginScreen] = useState(()=>{ try{return !localStorage.getItem("it_session")}catch(e){return true} });
   const [loginRole, setLoginRole] = useState("entrenador");
   const [loginEmail, setLoginEmail] = useState("");
@@ -758,7 +783,7 @@ function GymApp() {
     editAlumnoPass, setEditAlumnoPass,
     cargarAlumnos,
     notifyAlumno,
-  } = useAlumnos({ sb });
+  } = useAlumnos({ sb, coachId: ENTRENADOR_ID });
   const {
     registrosSubTab, setRegistrosSubTab,
     sugsOpen, setSugsOpen,
@@ -917,7 +942,7 @@ function GymApp() {
       rutinasInicialesRef.current = cargarRutinasEntrenador();
       cargarAlumnos();
     }
-  }, [sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, cargarRutinasEntrenador, cargarAlumnos]);
+  }, [sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, ENTRENADOR_ID, cargarRutinasEntrenador, cargarAlumnos]);
 
   // Refresco y reintento automatico cada 30 s (refrescarAlumnos no abre otra consulta si hay una en vuelo).
   useEffect(function() {
@@ -1842,27 +1867,29 @@ function GymApp() {
       localStorage.setItem("it_cex", JSON.stringify(sanitized));
     } catch (e) {}
   }, [customEx]);
-  // Cargar config de pagos desde Supabase
+  // Config de pagos y overrides: requieren sesion de Supabase Auth (RLS P0) y se piden por el entrenador resuelto
+  // (el propio, o el de su alumno). Se reintentan cuando la identidad se resuelve (login sin recarga).
   useEffect(() => {
+    if (!coachScopeId && !supabaseSessionUserId) return;
     sb.getConfig().then(res => {
       if(res && res[0]) setAliasData(res[0]);
     }).catch(()=>{});
-    // Cargar video overrides
-    sb.getVideoOverrides().then(function(res){
+    sb.getVideoOverrides(coachScopeId).then(function(res){
       if(res && Array.isArray(res)) {
         var map = {};
         res.forEach(function(r){ map[r.ejercicio_id] = r.youtube_url; });
         setVideoOverrides(map);
       }
     }).catch(function(){});
-    // Cargar name overrides
-    sb.getNameOverrides(supabaseSessionUserId || sessionData?.entrenadorId || null).then(function(res){
+    sb.getNameOverrides(coachScopeId).then(function(res){
       if(res && Array.isArray(res)) {
         var map = {};
         res.forEach(function(r){ map[r.ejercicio_id] = { name: r.name, nameEn: r.name_en || r.name }; });
         setNameOverrides(map);
       }
     }).catch(function(){});
+  }, [coachScopeId, supabaseSessionUserId]);
+  useEffect(() => {
     try {
       var pRaw = localStorage.getItem("it_pattern_ov");
       if (pRaw) {
@@ -1875,8 +1902,8 @@ function GymApp() {
 
   useEffect(function () {
     if (readOnly || sessionData?.role !== "entrenador") return;
-    var coachId = supabaseSessionUserId || sessionData?.entrenadorId;
-    if (!coachId || coachId === "entrenador_principal") return;
+    var coachId = ENTRENADOR_ID;
+    if (!coachId) return;
     var cancelled = false;
 
     (async function () {
@@ -1937,7 +1964,7 @@ function GymApp() {
     return function () {
       cancelled = true;
     };
-  }, [readOnly, sessionData?.role, sessionData?.entrenadorId, supabaseSessionUserId, msg, toast2]);
+  }, [readOnly, sessionData?.role, ENTRENADOR_ID, msg, toast2]);
 
   /** Recordatorios de entrenamiento (alumno): comprobar hora mientras la app está abierta. */
   React.useEffect(function () {
@@ -3135,6 +3162,7 @@ function GymApp() {
             </button>
           </div>
         </div>
+        {!SB_CONFIGURED&&<div role="alert" style={{color:"#DC2626",fontSize:13,fontWeight:700,marginBottom:12,textAlign:"center"}}>{msg("Entorno sin base de datos configurada: no se puede iniciar sesión ni guardar datos.", "No database configured for this environment: sign-in and saving are disabled.")}</div>}
         {loginError&&<div style={{color:"#2563EB",fontSize:13,marginBottom:12,textAlign:"center"}}>{loginError}</div>}
         <button ref={loginSubmitRef} style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:"pointer",letterSpacing:1}} onClick={async ()=>{
           setLoginLoading(true); setLoginError("");
@@ -3145,11 +3173,10 @@ function GymApp() {
             setLoginError(msg("La conexión está tardando demasiado. Revisá tu internet e intentá de nuevo.", "The connection is taking too long. Check your internet and try again."));
           }, 15000);
           try {
-            const sp = typeof window!=="undefined"?(localStorage.getItem("it_tpass")||"irontrack2024"):"irontrack2024";
             const loginEmailNorm = loginEmail.trim().toLowerCase();
             const isEntrenador = loginEmailNorm==="entrenador@irontrack.app";
             if(isEntrenador){
-              if(loginEmailNorm==="entrenador@irontrack.app"&&loginPass===sp){
+              if(loginPass){
                 if (!supabase) {
                   console.error("[AUTH] Supabase client no inicializado");
                   setLoginError("No se pudo iniciar sesión con Supabase");
@@ -3160,30 +3187,10 @@ function GymApp() {
                   password: loginPass,
                 });
                 if (authLogin.error || !authLogin.data || !authLogin.data.session) {
-                  console.error("[AUTH] signInWithPassword fallo; intentando migracion segura", authLogin.error || authLogin);
-                  var authSignup = await supabase.auth.signUp({
-                    email: loginEmailNorm,
-                    password: loginPass,
-                    options: {
-                      data: { nombre: "Entrenador", role: "entrenador" },
-                    },
-                  });
-                  if (authSignup.error) {
-                    console.error("[AUTH] signUp migracion fallo", authSignup.error);
-                    setLoginError("No se pudo crear tu usuario en Supabase Auth. Revisá la consola para ver el error real.");
-                    return;
-                  }
-                  if (authSignup.data && authSignup.data.session) {
-                    authLogin = authSignup;
-                  } else if (authSignup.data && authSignup.data.user && !authSignup.data.session) {
-                    console.error("[AUTH] Usuario creado sin sesión activa; Supabase requiere confirmar email", authSignup.data.user);
-                    setLoginError("El usuario fue creado, pero Supabase requiere confirmar email. Desactivá Confirm email en Supabase Auth o confirmá el usuario manualmente.");
-                    return;
-                  } else {
-                    console.error("[AUTH] signUp no devolvio usuario ni sesion", authSignup);
-                    setLoginError("No se pudo crear una sesión de Supabase Auth. Revisá la consola para ver el error real.");
-                    return;
-                  }
+                  // Sin creacion de cuentas desde el cliente ni contrasenas por defecto: la unica credencial valida es la de Supabase Auth.
+                  console.error("[AUTH] signInWithPassword entrenador fallo", authLogin.error || authLogin);
+                  setLoginError("Email o contraseña incorrectos");
+                  return;
                 }
                 if (!authLogin.data || !authLogin.data.session || !authLogin.data.session.access_token || !authLogin.data.user || !authLogin.data.user.id) {
                   console.error("[AUTH] No hay sesión activa", authLogin.error || authLogin);
@@ -3320,7 +3327,6 @@ function GymApp() {
             <span>{msg("Ingresar con huella / Face ID", "Sign in with biometrics")}</span>
           </button>
         )}
-        {loginEmail.trim().toLowerCase()==="entrenador@irontrack.app"&&<div style={{fontSize:11,color:textMuted,textAlign:"center",marginTop:12}}>Contraseña por defecto: irontrack2024</div>}
         {loginEmail.trim().toLowerCase()!=="entrenador@irontrack.app"&&<div style={{fontSize:11,color:textMuted,textAlign:"center",marginTop:12}}>Usa el email y contrasena que te dio tu entrenador</div>}
       </div>
     </div>
@@ -4421,9 +4427,8 @@ function GymApp() {
                   if(res===null){toast2("Error al guardar");return;}
                 }
                 if(editAlumnoPass){
-                  const alumnoEmailActual=updates.email||editAlumnoModal.email;
                   const{data:fnData,error:fnError}=await supabase.functions.invoke("update-alumno-password",{
-                    body:{alumnoEmail:alumnoEmailActual,newPassword:editAlumnoPass}
+                    body:{alumnoId:editAlumnoModal.id,newPassword:editAlumnoPass}
                   });
                   if(fnError||(fnData&&fnData.error)){
                     // fnError.message del SDK es genérico ("Edge Function returned a non-2xx

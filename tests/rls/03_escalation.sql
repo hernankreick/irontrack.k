@@ -1,0 +1,141 @@
+\set ON_ERROR_STOP on
+\ir lib.sql
+-- Escenario: el cliente antiguo creó filas en entrenadores para alumnos (upsert de sesión). Se simulan como superusuario.
+INSERT INTO entrenadores(id,email) VALUES ('00000000-0000-0000-0000-0000000000a1','a@test.local');
+-- Cuenta de Auth nueva (ficticia) para probar el alta de un entrenador por el principal.
+INSERT INTO auth.users VALUES ('00000000-0000-0000-0000-0000000000e1','nuevo@test.local');
+\set E1 '''00000000-0000-0000-0000-0000000000e1'''
+\set QE1 ''''''''00000000-0000-0000-0000-0000000000e1''''''''
+\o /dev/null
+-- ============ Escalada: fila de entrenadores de un alumno NO otorga privilegios ============
+SELECT tests.t('A edita config', :UA,'authenticated',$$UPDATE config SET alias='robado'$$,'ok:0');
+SELECT tests.t('A inserta ejercicio_override propio', :UA,'authenticated','INSERT INTO ejercicio_overrides(entrenador_id,ejercicio_id,name) VALUES ('||:QUA||$$,'z','x')$$,'err:42501');
+SELECT tests.t('A inserta video_override propio', :UA,'authenticated','INSERT INTO video_overrides(entrenador_id,ejercicio_id,youtube_url) VALUES ('||:QUA||$$,'z','x')$$,'err:42501');
+SELECT tests.t('A inserta ejercicio custom propio', :UA,'authenticated','INSERT INTO ejercicios_custom(entrenador_id,name) VALUES ('||:QUA||$$,'x')$$,'err:42501');
+SELECT tests.t('A inserta plantilla propia', :UA,'authenticated','INSERT INTO rutinas(entrenador_id,nombre) VALUES ('||:QUA||$$,'x')$$,'err:42501');
+SELECT tests.t('A inserta alumno propio', :UA,'authenticated','INSERT INTO alumnos(nombre,entrenador_id) VALUES (''x'','||:QUA||')','err:42501');
+SELECT tests.t('A re-inserta su fila en entrenadores (upsert del cliente)', :UA,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QUA||$$,'a@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'err:42501');
+SELECT tests.t('B (sin fila) intenta crear fila de entrenador', :UB,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QUB||$$,'b@test.local')$$,'err:42501');
+-- ============ Autorregistro como entrenador: un usuario autenticado externo (sin rol) NO puede crearse la fila ============
+SELECT tests.t('D (externo sin rol) intenta crear su fila de entrenador', :D1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QD1||$$,'intruso@test.local')$$,'err:42501');
+SELECT tests.t('D (externo) intenta el upsert de su fila de entrenador', :D1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QD1||$$,'intruso@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'err:42501');
+SELECT tests.t('D (externo) intenta crear una fila de entrenador para otra cuenta', :D1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local')$$,'err:42501');
+SELECT tests.state('estado: D no quedó registrado como entrenador', $$SELECT count(*)::text FROM entrenadores WHERE id='00000000-0000-0000-0000-0000000000d1'$$, '0');
+SELECT tests.state('estado: la cuenta E1 no quedó registrada por D', $$SELECT count(*)::text FROM entrenadores WHERE id='00000000-0000-0000-0000-0000000000e1'$$, '0');
+SELECT tests.t('D tras el intento no puede crear alumnos propios', :D1,'authenticated','INSERT INTO alumnos(nombre,entrenador_id) VALUES (''x'','||:QD1||')','err:42501');
+SELECT tests.t('D tras el intento no puede crear plantillas', :D1,'authenticated','INSERT INTO rutinas(entrenador_id,nombre) VALUES ('||:QD1||$$,'x')$$,'err:42501');
+SELECT tests.t('D tras el intento sigue sin ver alumnos', :D1,'authenticated','SELECT * FROM alumnos','ok:0');
+SELECT tests.t('B (alumno vinculado) no puede crear fila de entrenador para otra cuenta', :UB,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local')$$,'err:42501');
+SELECT tests.t('anon no inserta en entrenadores', NULL,'anon','INSERT INTO entrenadores(id,email) VALUES ('||:QD1||$$,'x')$$,'err:42501');
+-- El principal conserva lo necesario; un entrenador provisionado funciona; un entrenador que no es el principal no provisiona a nadie.
+SELECT tests.t('C1 (principal) conserva el upsert de su propia fila', :C1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QC1||$$,'coach@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'ok:1');
+SELECT tests.t('C1 (principal) conserva la edición de su perfil', :C1,'authenticated',$$UPDATE entrenadores SET nombre='Coach' WHERE id='00000000-0000-0000-0000-0000000000c1'$$,'ok:1');
+SELECT tests.t('C2 (entrenador no principal) conserva el upsert de su propia fila', :C2,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QC2||$$,'coach2@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'ok:1');
+SELECT tests.t('C2 (no principal) no puede dar de alta a otro entrenador', :C2,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local')$$,'err:42501');
+SELECT tests.t('C1 (principal) da de alta a un entrenador nuevo', :C1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local')$$,'ok:1');
+SELECT tests.t('E1 (entrenador dado de alta) crea un alumno propio', :E1,'authenticated','INSERT INTO alumnos(nombre,email,entrenador_id) VALUES (''e1al'',''e1al@test.local'','||:QE1||')','ok:1');
+SELECT tests.t('E1 borra su alumno propio (deja el estado como estaba)', :E1,'authenticated',$$DELETE FROM alumnos WHERE nombre='e1al'$$,'ok:1');
+SELECT tests.t('E1 no ve los alumnos de C1', :E1,'authenticated','SELECT * FROM alumnos WHERE entrenador_id='||:QC1,'ok:0');
+SELECT tests.t('E1 conserva el upsert de su propia fila', :E1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QE1||$$,'nuevo@test.local') ON CONFLICT (id) DO UPDATE SET email=EXCLUDED.email$$,'ok:1');
+SELECT tests.t('E1 (no principal) no puede dar de alta a D', :E1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QD1||$$,'intruso@test.local')$$,'err:42501');
+SELECT tests.t('el principal puede dar de alta una fila para una cuenta vinculada a alumno, pero NO le da privilegios', :C1,'authenticated','INSERT INTO entrenadores(id,email) VALUES ('||:QUB||$$,'b@test.local')$$,'ok:1');
+SELECT tests.t('B (alumno con fila de entrenador creada por el principal) sigue sin crear alumnos', :UB,'authenticated','INSERT INTO alumnos(nombre,entrenador_id) VALUES (''x'','||:QUB||')','err:42501');
+SELECT tests.t('B sigue viendo solo su fila de alumnos', :UB,'authenticated','SELECT * FROM alumnos','ok:1');
+-- ============ coach_principal: inmutable desde la API ============
+SELECT tests.t('anon lee coach_principal', NULL,'anon','SELECT * FROM coach_principal','err:42501');
+SELECT tests.t('A lee coach_principal (no ve fila)', :UA,'authenticated','SELECT * FROM coach_principal','ok:0');
+SELECT tests.t('D lee coach_principal (no ve fila)', :D1,'authenticated','SELECT * FROM coach_principal','ok:0');
+SELECT tests.t('principal lee solo su fila', :C1,'authenticated','SELECT * FROM coach_principal','ok:1');
+SELECT tests.t('A inserta coach_principal', :UA,'authenticated','INSERT INTO coach_principal(uid) VALUES ('||:QUA||')','err:42501');
+SELECT tests.t('C2 inserta coach_principal', :C2,'authenticated','INSERT INTO coach_principal(uid) VALUES ('||:QC2||')','err:42501');
+SELECT tests.t('C2 modifica coach_principal', :C2,'authenticated','UPDATE coach_principal SET uid='||:QC2,'err:42501');
+SELECT tests.t('C2 borra coach_principal', :C2,'authenticated','DELETE FROM coach_principal','err:42501');
+SELECT tests.t('el propio principal no puede modificarla', :C1,'authenticated','UPDATE coach_principal SET uid='||:QC2,'err:42501');
+SELECT tests.t('el propio principal no puede borrarla', :C1,'authenticated','DELETE FROM coach_principal','err:42501');
+SELECT tests.t('el propio principal no puede insertar otra', :C1,'authenticated','INSERT INTO coach_principal(uid) VALUES ('||:QC2||')','err:42501');
+SELECT tests.state('estado: coach_principal intacta', $$SELECT uid::text FROM coach_principal$$, '00000000-0000-0000-0000-0000000000c1');
+-- ============ config: solo el principal ============
+SELECT tests.t('C2 (entrenador no principal) edita config', :C2,'authenticated',$$UPDATE config SET alias='c2'$$,'ok:0');
+SELECT tests.t('D edita config', :D1,'authenticated',$$UPDATE config SET alias='d'$$,'ok:0');
+SELECT tests.t('anon edita config', NULL,'anon',$$UPDATE config SET alias='x'$$,'err:42501');
+SELECT tests.t('nadie inserta config (A)', :UA,'authenticated',$$INSERT INTO config VALUES ('otra','x')$$,'err:42501');
+SELECT tests.t('nadie inserta config (principal: sin grant)', :C1,'authenticated',$$INSERT INTO config VALUES ('otra','x')$$,'err:42501');
+SELECT tests.t('nadie borra config (principal: sin grant)', :C1,'authenticated','DELETE FROM config','err:42501');
+SELECT tests.t('principal edita config', :C1,'authenticated',$$UPDATE config SET alias='principal'$$,'ok:1');
+SELECT tests.t('C2 lee config (es entrenador)', :C2,'authenticated','SELECT * FROM config','ok:1');
+SELECT tests.t('A lee config (alumno vinculado)', :UA,'authenticated','SELECT * FROM config','ok:1');
+SELECT tests.t('D no lee config', :D1,'authenticated','SELECT * FROM config','ok:0');
+SELECT tests.state('estado: config solo cambió el principal', $$SELECT alias FROM config$$, 'principal');
+-- ============ rutinas.datos: solo semana_activa, sin retrocesos ============
+SELECT tests.t('A avanza 1->2', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','2') WHERE id='aaaaaaaa-0000-0000-0000-00000000000a'$$,'ok:1');
+SELECT tests.t('A repite 2->2 (idempotente)', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','2') WHERE id='aaaaaaaa-0000-0000-0000-00000000000a'$$,'ok:1');
+SELECT tests.t('A avanza 2->4 (salto permitido)', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','4')$$,'ok:1');
+SELECT tests.t('A retrocede 4->3', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','3')$$,'err:42501');
+SELECT tests.t('A retrocede a 1', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','1')$$,'err:42501');
+SELECT tests.t('A semana fuera de rango (5)', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','5')$$,'err:42501');
+SELECT tests.t('A semana 0', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','0')$$,'err:42501');
+SELECT tests.t('A semana como texto', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','"4"')$$,'err:42501');
+SELECT tests.t('A semana decimal', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','4.5')$$,'err:42501');
+SELECT tests.t('A semana null', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','null')$$,'err:42501');
+SELECT tests.t('A borra semana_activa', :UA,'authenticated',$$UPDATE rutinas SET datos=datos - 'semana_activa'$$,'err:42501');
+SELECT tests.t('A agrega otra clave a datos', :UA,'authenticated',$$UPDATE rutinas SET datos=datos || '{"days":[1]}'$$,'err:42501');
+SELECT tests.t('A semana válida + otra clave', :UA,'authenticated',$$UPDATE rutinas SET datos='{"semana_activa":4,"days":[{"x":1}]}'$$,'err:42501');
+SELECT tests.t('A reemplaza datos completo', :UA,'authenticated',$$UPDATE rutinas SET datos='{"semana_activa":4,"owned":true}'$$,'err:42501');
+SELECT tests.t('A pone semana_reiniciada', :UA,'authenticated',$$UPDATE rutinas SET datos=datos || '{"semana_reiniciada":true}'$$,'err:42501');
+SELECT tests.t('A datos = array', :UA,'authenticated',$$UPDATE rutinas SET datos='[4]'$$,'err:42501');
+SELECT tests.t('A datos = null', :UA,'authenticated',$$UPDATE rutinas SET datos=NULL$$,'err:42501');
+SELECT tests.t('A cambia nombre + semana', :UA,'authenticated',$$UPDATE rutinas SET nombre='x', datos=jsonb_set(datos,'{semana_activa}','4')$$,'err:42501');
+SELECT tests.t('A cambia alumno_id', :UA,'authenticated',$$UPDATE rutinas SET alumno_id='22222222-2222-2222-2222-222222222222'$$,'err:42501');
+SELECT tests.t('B modifica rutina de A', :UB,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','4') WHERE id='aaaaaaaa-0000-0000-0000-00000000000a'$$,'ok:0');
+SELECT tests.t('B avanza su propia rutina 1->3', :UB,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','3') WHERE id='bbbbbbbb-0000-0000-0000-00000000000b'$$,'ok:1');
+SELECT tests.t('A no toca la plantilla del coach', :UA,'authenticated',$$UPDATE rutinas SET datos='{"semana_activa":2}' WHERE alumno_id IS NULL$$,'ok:0');
+SELECT tests.state('estado: rutina A quedó en semana 4 sin otras claves', $$SELECT datos::text FROM rutinas WHERE id='aaaaaaaa-0000-0000-0000-00000000000a'$$, '{"semana_activa": 4}');
+SELECT tests.t('coach reinicia semana a 1 y edita días', :C1,'authenticated',$$UPDATE rutinas SET datos='{"semana_activa":1,"days":[{"n":1}],"semana_reiniciada":true}' WHERE id='aaaaaaaa-0000-0000-0000-00000000000a'$$,'ok:1');
+SELECT tests.t('A avanza tras reinicio 1->2', :UA,'authenticated',$$UPDATE rutinas SET datos=jsonb_set(datos,'{semana_activa}','2') WHERE id='aaaaaaaa-0000-0000-0000-00000000000a'$$,'ok:1');
+SELECT tests.state('estado: coach conserva days tras avance del alumno', $$SELECT (datos->'days')::text FROM rutinas WHERE id='aaaaaaaa-0000-0000-0000-00000000000a'$$, '[{"n": 1}]');
+SELECT tests.t('C2 no modifica rutina de A', :C2,'authenticated',$$UPDATE rutinas SET datos='{}' WHERE id='aaaaaaaa-0000-0000-0000-00000000000a'$$,'ok:0');
+SELECT tests.t('service_role puede corregir datos', NULL,'service_role',$$UPDATE rutinas SET datos='{"semana_activa":1}' WHERE id='bbbbbbbb-0000-0000-0000-00000000000b'$$,'ok:1');
+-- ============ Acceso cruzado adicional ============
+SELECT tests.t('B no lee mensajes de A', :UB,'authenticated',$$SELECT * FROM mensajes WHERE alumno_id='11111111-1111-1111-1111-111111111111'$$,'ok:0');
+SELECT tests.t('B no lee fotos de A', :UB,'authenticated',$$SELECT * FROM fotos WHERE alumno_id='11111111-1111-1111-1111-111111111111'$$,'ok:0');
+SELECT tests.t('B no lee notas de A', :UB,'authenticated',$$SELECT * FROM notas WHERE alumno_id='11111111-1111-1111-1111-111111111111'$$,'ok:0');
+SELECT tests.t('A (con fila en entrenadores) no lee alumnos de otros', :UA,'authenticated','SELECT * FROM alumnos','ok:1');
+SELECT tests.t('A (con fila en entrenadores) no ve progreso ajeno', :UA,'authenticated',$$SELECT * FROM progreso WHERE alumno_id='22222222-2222-2222-2222-222222222222'$$,'ok:0');
+SELECT tests.state('it_is_entrenador(A) = false', $$SELECT tests.x('00000000-0000-0000-0000-0000000000a1','authenticated','SELECT 1 WHERE public.it_is_entrenador()')$$, 'ok:0');
+SELECT tests.state('it_is_entrenador(C2) = true', $$SELECT tests.x('00000000-0000-0000-0000-0000000000c2','authenticated','SELECT 1 WHERE public.it_is_entrenador()')$$, 'ok:1');
+SELECT tests.state('it_is_principal(C2) = false', $$SELECT tests.x('00000000-0000-0000-0000-0000000000c2','authenticated','SELECT 1 WHERE public.it_is_principal()')$$, 'ok:0');
+SELECT tests.state('it_is_principal(C1) = true', $$SELECT tests.x('00000000-0000-0000-0000-0000000000c1','authenticated','SELECT 1 WHERE public.it_is_principal()')$$, 'ok:1');
+-- Un entrenador no puede degradar al principal vinculándolo como alumno
+SELECT tests.t('C2 NO puede vincular al principal como alumno (auth_uid solo servidor)', :C2,'authenticated','INSERT INTO alumnos(nombre,entrenador_id,auth_uid) VALUES (''v'','||:QC2||','||:QC1||')','err:42501');
+SELECT tests.t('C2 NO puede vincular auth_uid ajeno a un alumno propio', :C2,'authenticated','INSERT INTO alumnos(nombre,entrenador_id,auth_uid) VALUES (''v2'','||:QC2||','||:QUB||')','err:42501');
+SELECT tests.state('principal sigue siendo principal', $$SELECT tests.x('00000000-0000-0000-0000-0000000000c1','authenticated','SELECT 1 WHERE public.it_is_principal()')$$, 'ok:1');
+SELECT tests.t('principal sigue pudiendo editar config', :C1,'authenticated',$$UPDATE config SET alias='p2'$$,'ok:1');
+SELECT tests.t('service_role actualiza mensajes', NULL,'service_role',$$UPDATE mensajes SET leido=true$$,'ok:2');
+SELECT tests.t('service_role actualiza alumnos (edge fn)', NULL,'service_role',$$UPDATE alumnos SET onesignal_id='srv'$$,'ok:2');
+-- ============ Regresión: el identificador legacy ya no sirve para leer ni escribir tras el backfill ============
+SELECT tests.t('C1 inserta alumno con entrenador_id legacy', :C1,'authenticated',$$INSERT INTO alumnos(nombre,entrenador_id) VALUES ('x','entrenador_principal')$$,'err:42501');
+SELECT tests.t('C1 inserta plantilla con entrenador_id legacy', :C1,'authenticated',$$INSERT INTO rutinas(entrenador_id,nombre) VALUES ('entrenador_principal','x')$$,'err:42501');
+SELECT tests.t('C1 inserta custom con entrenador_id legacy', :C1,'authenticated',$$INSERT INTO ejercicios_custom(entrenador_id,name) VALUES ('entrenador_principal','x')$$,'err:42501');
+SELECT tests.t('C1 inserta video_override legacy', :C1,'authenticated',$$INSERT INTO video_overrides(entrenador_id,ejercicio_id,youtube_url) VALUES ('entrenador_principal','z','x')$$,'err:42501');
+SELECT tests.t('C1 inserta ejercicio_override legacy', :C1,'authenticated',$$INSERT INTO ejercicio_overrides(entrenador_id,ejercicio_id,name) VALUES ('entrenador_principal','z','x')$$,'err:42501');
+SELECT tests.t('C1 re-asigna alumno a entrenador legacy', :C1,'authenticated',$$UPDATE alumnos SET entrenador_id='entrenador_principal' WHERE nombre='A'$$,'err:42501');
+SELECT tests.t('consulta por entrenador_principal no devuelve alumnos', :C1,'authenticated',$$SELECT * FROM alumnos WHERE entrenador_id='entrenador_principal'$$,'ok:0');
+SELECT tests.t('consulta por entrenador_principal no devuelve overrides (alumno)', :UA,'authenticated',$$SELECT * FROM video_overrides WHERE entrenador_id='entrenador_principal'$$,'ok:0');
+-- ============ Flujo del frontend corregido: UUID autenticado ============
+SELECT tests.t('C1 lista sus alumnos por UUID', :C1,'authenticated','SELECT * FROM alumnos WHERE entrenador_id='||:QC1,'ok:2');
+SELECT tests.t('C1 crea alumno con su UUID', :C1,'authenticated','INSERT INTO alumnos(nombre,email,entrenador_id) VALUES (''N'',''n@test.local'','||:QC1||')','ok:1');
+SELECT tests.t('C1 crea ejercicio custom y video override con su UUID', :C1,'authenticated','INSERT INTO ejercicios_custom(entrenador_id,name) VALUES ('||:QC1||$$,'ok')$$,'ok:1');
+SELECT tests.t('A lee overrides de su entrenador por UUID', :UA,'authenticated','SELECT * FROM video_overrides WHERE entrenador_id='||:QC1,'ok:1');
+SELECT tests.t('A lee ejercicios custom de su entrenador por UUID', :UA,'authenticated','SELECT * FROM ejercicios_custom WHERE entrenador_id='||:QC1,'ok:2');
+SELECT tests.t('A NO lee overrides consultando por su propio uid', :UA,'authenticated','SELECT * FROM video_overrides WHERE entrenador_id='||:QUA,'ok:0');
+-- ============ Vínculo auth_uid (lo hace solo service_role desde la Edge Function) ============
+SELECT tests.t('service_role vincula auth_uid a alumno sin cuenta', NULL,'service_role',$$UPDATE alumnos SET auth_uid='00000000-0000-0000-0000-0000000000d1' WHERE nombre='N' AND auth_uid IS NULL$$,'ok:1');
+SELECT tests.t('el alumno recién vinculado ya lee su fila', :D1,'authenticated','SELECT * FROM alumnos','ok:1');
+SELECT tests.t('el entrenador no puede fijar ni cambiar auth_uid', :C1,'authenticated',$$UPDATE alumnos SET auth_uid='00000000-0000-0000-0000-0000000000c2' WHERE nombre='N'$$,'err:42501');
+SELECT tests.t('el entrenador no puede desvincular auth_uid', :C1,'authenticated',$$UPDATE alumnos SET auth_uid=NULL WHERE nombre='N'$$,'err:42501');
+SELECT tests.t('service_role: UNIQUE impide vincular un uid ya usado', NULL,'service_role',$$UPDATE alumnos SET auth_uid='00000000-0000-0000-0000-0000000000a1' WHERE nombre='N'$$,'err:23505');
+SELECT tests.t('el alumno vinculado sigue pudiendo guardar onesignal_id', :D1,'authenticated',$$UPDATE alumnos SET onesignal_id='p' WHERE nombre='N'$$,'ok:1');
+\o
+\echo
+SELECT 'FAIL' AS res, name, got, want FROM tests.results WHERE NOT ok;
+SELECT count(*) FILTER (WHERE ok) AS pass, count(*) FILTER (WHERE NOT ok) AS fail, count(*) AS total FROM tests.results;

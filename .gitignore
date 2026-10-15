@@ -1,5 +1,9 @@
 node_modules
 dist
 .vercel
-.env*.local
 .claude/
+
+# Variables de entorno: nunca versionar credenciales (solo .env.example)
+.env
+.env.*
+!.env.example
