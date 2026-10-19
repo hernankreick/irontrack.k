@@ -1,0 +1,72 @@
+name: CI
+
+# Valida cada PR hacia main y cada push a main: dependencias limpias (npm ci),
+# todas las suites de scripts/test-*.mjs y el build de produccion.
+# No usa secretos ni credenciales: el build recibe variables ficticias.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Valores ficticios: nunca se conecta a servicios reales.
+      VITE_SUPABASE_URL: https://example.invalid
+      VITE_SUPABASE_ANON_KEY: ci-dummy-anon-key
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # El repo versiona node_modules con binarios de otra plataforma:
+      # npm ci lo reemplaza por completo desde package-lock.json.
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run test suites
+        run: |
+          status=0
+          count=0
+          for f in scripts/test-*.mjs; do
+            count=$((count + 1))
+            echo "::group::$f"
+            if ! node "$f"; then
+              echo "::error file=$f::suite failed"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          echo "Suites ejecutadas: $count"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::no se encontro ninguna suite en scripts/test-*.mjs"
+            exit 1
+          fi
+          exit $status
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify build used placeholder environment
+        run: |
+          if grep -rqE "supabase\.co" dist/assets; then
+            echo "::error::el bundle contiene un host de produccion; el build debe usar variables ficticias"
+            exit 1
+          fi
+          grep -rq "example.invalid" dist/assets
