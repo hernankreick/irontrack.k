@@ -6,6 +6,7 @@ import { getActiveStudentRoutinePosition } from '../../lib/studentWeeklyProgress
 import { CICLO_CARGAS, readCicloActual, readCicloCargas, rowInCiclo } from '../../lib/rutinaCiclo.js';
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
+import StudentOrphanSession from './StudentOrphanSession.jsx';
 import StudentsSectionStates from './StudentsSectionStates.jsx';
 
 export default function StudentsSection(props) {
@@ -318,6 +319,24 @@ export default function StudentsSection(props) {
                 }}
                 onAsignarRutina={function () {}}
               >
+                {isAlumnoActive&&rutinaActiva&&!loadingSB&&(
+                  <StudentOrphanSession
+                    alumno={a}
+                    rutina={rutinaActiva}
+                    progreso={alumnoProgreso}
+                    sesiones={sesionesForAlumno(a)}
+                    allEx={allEx}
+                    sb={sb}
+                    setAlumnoSesiones={setAlumnoSesiones}
+                    toast2={toast2}
+                    es={es}
+                    msg={msg}
+                    textMain={textMain}
+                    textMuted={textMuted}
+                    coachAluSurface={coachAluSurface}
+                    coachAluBorderSoft={coachAluBorderSoft}
+                  />
+                )}
                 {isAlumnoActive&&(
                   <StudentDetailPanel
                     alumno={a}
