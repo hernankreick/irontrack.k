@@ -328,6 +328,8 @@ export default function StudentsSection(props) {
                     allEx={allEx}
                     sb={sb}
                     setAlumnoSesiones={setAlumnoSesiones}
+                    setRutinasSB={setRutinasSB}
+                    setRutinasSBEntrenador={setRutinasSBEntrenador}
                     toast2={toast2}
                     es={es}
                     msg={msg}

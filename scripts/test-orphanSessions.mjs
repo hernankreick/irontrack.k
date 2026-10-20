@@ -12,6 +12,7 @@ import {
   validateOrphanSession,
   confirmOrphanSessions,
   isCoachValidatedSession,
+  advanceWeekAfterValidation,
   ORPHAN_ORIGEN,
 } from "../lib/orphanSessions.js";
 import { removeUndefinedPayloadFields } from "../lib/workoutSession.js";
@@ -259,6 +260,22 @@ await test("confirmar: si falla la lectura lanza (no se muestran avisos sin conf
 await test("isCoachValidatedSession: solo origen validada_coach", () => {
   assert.equal(isCoachValidatedSession({ origen: "validada_coach" }), true);
   for (const s of [{}, { origen: null }, { origen: "alumno" }, null, undefined]) assert.equal(isCoachValidatedSession(s), false);
+});
+
+await test("avanzar semana tras validar: usa el chequeo compartido con la rutina vigente y devuelve su resultado", async () => {
+  const calls = [];
+  const sb = { reconcileSemanaActivaAlumno: async (...a) => { calls.push(a); return { status: "advanced", rutinaId: "r1", semanaActiva: 2 }; } };
+  const res = await advanceWeekAfterValidation({ sb, alumnoId: ALU, rutina });
+  assert.deepEqual(res, { status: "advanced", rutinaId: "r1", semanaActiva: 2 });
+  assert.deepEqual(calls, [[ALU, [rutina], "coach_validar"]]);
+});
+
+await test("avanzar semana tras validar: noop se devuelve tal cual; si falla o no existe NO lanza", async () => {
+  assert.equal((await advanceWeekAfterValidation({ sb: { reconcileSemanaActivaAlumno: async () => ({ status: "noop", reason: "semana_incompleta" }) }, alumnoId: ALU, rutina })).status, "noop");
+  assert.equal((await advanceWeekAfterValidation({ sb: { reconcileSemanaActivaAlumno: async () => { throw new Error("boom"); } }, alumnoId: ALU, rutina })).status, "failed");
+  assert.equal((await advanceWeekAfterValidation({ sb: { reconcileSemanaActivaAlumno: async () => null }, alumnoId: ALU, rutina })).status, "failed");
+  assert.equal((await advanceWeekAfterValidation({ sb: {}, alumnoId: ALU, rutina })).status, "unavailable");
+  assert.equal((await advanceWeekAfterValidation({ alumnoId: ALU, rutina })).status, "unavailable");
 });
 
 console.log("\n" + count + " tests ok");
