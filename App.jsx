@@ -374,8 +374,9 @@ const sb = {
   // Avance MONOTONO (nunca retrocede) de la semana del alumno; lo usa finalizeStudentSession.
   updateRutinaSemanaActiva: (rutinaId, nextWeek) => updateRutinaSemanaActivaLib(supabase, rutinaId, nextWeek),
   // Una pagina de sesiones de una rutina (para reconciliar la semana). Lanza ante error: la reconciliacion no escribe si falta algo.
+  // Debe traer `ciclo`: sin esa columna toda fila cuenta como ciclo 1 y en una rutina reiniciada (ciclo >= 2) la semana nunca avanza.
   getSesionesPageByRutina: async ({ rutinaId, alumnoId, from, to }) => {
-    var q = supabase.from("sesiones").select("id,alumno_id,rutina_id,semana,dia_idx,fecha,created_at").eq("rutina_id", String(rutinaId));
+    var q = supabase.from("sesiones").select("id,alumno_id,rutina_id,semana,dia_idx,fecha,ciclo,created_at").eq("rutina_id", String(rutinaId));
     if (alumnoId != null && alumnoId !== "") q = q.eq("alumno_id", String(alumnoId));
     const { data, error } = await q.order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to);
     if (error) throw error;

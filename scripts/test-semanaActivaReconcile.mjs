@@ -369,4 +369,24 @@ await test("14. el fix de updateRutina no cambia el contrato de retorno de sb.up
   assert.equal(await updateRutinaPreservingOperational(bad.client, EVI3, cleanRutinaWriteBody({ nombre: "n", alumno_id: EVI, datos: {}, entrenador_id: "e" })), null);
 });
 
+await test("15. rutina en ciclo 2: con filas que traen `ciclo` la semana avanza; sin la columna toda fila cuenta como ciclo 1 y no avanza", async () => {
+  const rows = [0, 1, 2, 3].map((d) => ses(d, 1, { ciclo: 2 }));
+  const sinCiclo = rows.map((r) => { const c = Object.assign({}, r); delete c.ciclo; return c; });
+  const a = makeClient(freshRow({ semana_activa: 1, ciclo_actual: 2 }));
+  const ok = await reconcileSemanaActiva({ client: a.client, rutinaId: EVI3, alumnoId: EVI, fetchSesionesPage: pager(rows) });
+  assert.equal(ok.status, "advanced");
+  assert.equal(a.db[EVI3].datos.semana_activa, 2);
+  const b = makeClient(freshRow({ semana_activa: 1, ciclo_actual: 2 }));
+  const bad = await reconcileSemanaActiva({ client: b.client, rutinaId: EVI3, alumnoId: EVI, fetchSesionesPage: pager(sinCiclo) });
+  assert.equal(bad.status, "noop", "documenta por que la consulta DEBE traer ciclo");
+  assert.equal(b.db[EVI3].datos.semana_activa, 1);
+});
+await test("16. auditoria de fuentes: sb.getSesionesPageByRutina pide la columna `ciclo`", () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const app = readFileSync(path.join(root, "App.jsx"), "utf8");
+  const m = app.match(/getSesionesPageByRutina:[\s\S]*?\.select\("([^"]+)"\)/);
+  assert.ok(m, "se encontro la consulta");
+  assert.ok(m[1].split(",").map((c) => c.trim()).includes("ciclo"), "columnas: " + m[1]);
+});
+
 console.log(count + " tests OK");
