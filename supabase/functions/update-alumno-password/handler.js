@@ -5,11 +5,14 @@
 //     funcion (COACH_UIDS). No se confia en datos que el cliente pueda escribir: ni alumnos.entrenador_id, ni una fila en `entrenadores`
 //     (el cliente inserta esa fila para cualquier usuario con sesion). Sin lista valida, todo se deniega.
 //  2. SOBRE QUE alumno: ademas, alumnos.entrenador_id debe ser el UID del solicitante o el valor legacy "entrenador_principal".
-//  3. SOBRE QUE cuenta de Auth: una cuenta existente se modifica SOLO si esta vinculada al alumno por un vinculo explicito:
-//       - app_metadata.alumno_id (solo lo escribe el servidor; la funcion lo pone al crear la cuenta), o
-//       - alumnos.auth_uid.
-//     Una coincidencia de email, por si sola, NUNCA basta: si hay una cuenta con ese email sin vinculo, responde 409 y no toca nada.
+//  3. SOBRE QUE cuenta de Auth: una cuenta existente se modifica SOLO si esta vinculada al alumno por app_metadata.alumno_id.
+//     Ese dato solo lo escribe el servidor (la funcion al crear la cuenta, o el propietario tras verificar la titularidad); un usuario no
+//     puede escribir su propio app_metadata. NO son vinculos confiables: una coincidencia de email, las columnas de la ficha del alumno
+//     (incluida cualquier columna con el id de una cuenta) ni user_metadata, porque el cliente puede escribirlos.
+//     Si existe una cuenta con ese email sin vinculo, responde 409 y no toca nada.
 //  4. Nunca se modifica la cuenta del solicitante ni la de ningun entrenador autorizado.
+//  5. Sobre una cuenta existente solo se cambia la contrasena: el email de login y su confirmacion no se tocan. Si el email de la cuenta
+//     vinculada difiere del de la ficha, responde 409 sin modificar nada.
 
 const json = (status, body) => ({ status, body });
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -68,34 +71,23 @@ export async function handleUpdateAlumnoPassword({ callerToken, body, admin, all
   const users = listed.users;
   const byEmail = users.find((u) => lower(u.email) === email) || null;
 
-  let linked = null;
-  if (alumno.auth_uid) {
-    linked = users.find((u) => lower(u.id) === lower(alumno.auth_uid)) || null;
-    if (!linked) {
-      return json(409, { error: 'el vinculo auth_uid del alumno no corresponde a ninguna cuenta verificable; no se modifica nada' });
-    }
-  } else {
-    const byLink = users.filter((u) => u.app_metadata && String(u.app_metadata.alumno_id) === String(alumno.id));
-    if (byLink.length > 1) return json(409, { error: 'hay mas de una cuenta vinculada a este alumno; no se modifica nada' });
-    linked = byLink[0] || null;
-  }
+  // Unico vinculo confiable: app_metadata.alumno_id (escrito solo por el servidor).
+  const byLink = users.filter((u) => u.app_metadata && String(u.app_metadata.alumno_id) === String(alumno.id));
+  if (byLink.length > 1) return json(409, { error: 'hay mas de una cuenta vinculada a este alumno; no se modifica nada' });
+  const linked = byLink[0] || null;
 
   if (linked) {
-    // Una cuenta vinculada a OTRO alumno no se toca.
-    const linkedTo = linked.app_metadata && linked.app_metadata.alumno_id;
-    if (linkedTo != null && String(linkedTo) !== String(alumno.id)) {
-      return json(409, { error: 'la cuenta esta vinculada a otro alumno; no se modifica nada' });
-    }
     // (4) Cuentas protegidas: el solicitante y cualquier entrenador autorizado.
     const linkedId = lower(linked.id);
     if (linkedId === callerId || coaches.includes(linkedId)) return json(403, { error: 'cuenta protegida' });
-    // Si el email de la fila ya pertenece a OTRA cuenta, no se pisa.
-    if (byEmail && lower(byEmail.id) !== linkedId) {
-      return json(409, { error: 'el email del alumno ya pertenece a otra cuenta de Auth; no se modifica nada' });
+    // (5) El email de la cuenta debe ser el de la ficha: no se cambia el email de login a partir de datos de la ficha.
+    if (lower(linked.email) !== email || (byEmail && lower(byEmail.id) !== linkedId)) {
+      return json(409, {
+        error: 'el email de la cuenta vinculada no coincide con el de la ficha del alumno; ' +
+          'corregirlo en Authentication > Users y reintentar. No se modifica nada',
+      });
     }
-    const attrs = { password: newPassword };
-    if (lower(linked.email) !== email) { attrs.email = email; attrs.email_confirm = true; } // mantiene el email de login alineado con la fila
-    const { error } = await admin.auth.admin.updateUserById(String(linked.id), attrs);
+    const { error } = await admin.auth.admin.updateUserById(String(linked.id), { password: newPassword });
     if (error) return json(400, { error: error.message });
     return json(200, { ok: true });
   }
@@ -104,7 +96,7 @@ export async function handleUpdateAlumnoPassword({ callerToken, body, admin, all
   if (byEmail) {
     return json(409, {
       error: 'existe una cuenta de Auth con ese email que no esta vinculada a este alumno; ' +
-        'verificar su titularidad y vincularla (alumnos.auth_uid) antes de cambiar la contrasena',
+        'verificar su titularidad y vincularla desde el servidor (app_metadata.alumno_id) antes de cambiar la contrasena',
     });
   }
   // Si el listado quedo truncado no se puede asegurar que no exista: falla cerrada.

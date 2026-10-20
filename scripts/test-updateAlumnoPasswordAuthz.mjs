@@ -214,25 +214,50 @@ await t("R2: lo mismo con distinta capitalizacion del email", async () => {
   assert.equal((await call(f)).status, 409);
   nothingChanged(f);
 });
-await t("R2: vinculo por alumnos.auth_uid valido: 200 y se actualiza esa cuenta por id", async () => {
+await t("R2: alumnos.auth_uid NO es un vinculo: cuenta con el mismo email, auth_uid apuntando a ella, sin app_metadata: 409 sin cambios", async () => {
   const f = fake({ alumnos: [al({ auth_uid: "u-al1" })], authUsers: [{ id: "u-al1", email: "a@test.local" }] });
   const r = await call(f);
-  assert.equal(r.status, 200);
-  assert.equal(f.log.updated[0].id, "u-al1");
+  assert.equal(r.status, 409);
+  nothingChanged(f);
 });
-await t("R2: auth_uid que no corresponde a ninguna cuenta: 409 sin cambios", async () => {
+await t("R2: auth_uid manipulado hacia la cuenta de OTRA persona (email distinto): esa cuenta no se modifica", async () => {
+  const f = fake({ alumnos: [al({ auth_uid: "u-victima" })], authUsers: [{ id: "u-victima", email: "victima@test.local" }] });
+  const r = await call(f);
+  assert.ok(!f.log.updated.some((u) => u.id === "u-victima"), "se modifico la cuenta ajena");
+  assert.ok(!f.log.updated.length, "no debe actualizarse ninguna cuenta");
+});
+await t("R2: auth_uid manipulado hacia la cuenta de un entrenador: no se modifica nada", async () => {
+  for (const uid of [COACH, COACH2]) {
+    const f = fake({ alumnos: [al({ auth_uid: uid })], authUsers: [{ id: uid, email: "coach@test.local" }] });
+    const r = await call(f, { allowedCoachUids: [COACH, COACH2] });
+    assert.ok(!f.log.updated.length, "uid=" + uid);
+    assert.ok(!f.log.updated.some((u) => u.id === uid), "uid=" + uid);
+  }
+});
+await t("R2: auth_uid que no corresponde a ninguna cuenta + cuenta sin vinculo con el mismo email: 409 sin cambios", async () => {
   const f = fake({ alumnos: [al({ auth_uid: "u-fantasma" })], authUsers: [{ id: "otra", email: "a@test.local" }] });
   assert.equal((await call(f)).status, 409);
   nothingChanged(f);
 });
-await t("R2: cuenta vinculada a OTRO alumno: 409 sin cambios", async () => {
-  const f = fake({ alumnos: [al({ auth_uid: "u-x" })], authUsers: [{ id: "u-x", email: "x@test.local", app_metadata: { alumno_id: AL2 } }] });
+await t("R2: auth_uid manipulado no desvia el vinculo real: se actualiza la cuenta de app_metadata, no la apuntada", async () => {
+  const f = fake({ alumnos: [al({ auth_uid: "u-victima" })], authUsers: [acct(), { id: "u-victima", email: "victima@test.local" }] });
+  const r = await call(f);
+  assert.equal(r.status, 200);
+  assert.deepEqual(f.log.updated.map((u) => u.id), ["u-al1"]);
+});
+await t("R2: cuenta vinculada a OTRO alumno (no a este): 409 sin cambios", async () => {
+  const f = fake({ alumnos: [al()], authUsers: [{ id: "u-x", email: "a@test.local", app_metadata: { alumno_id: AL2 } }] });
   assert.equal((await call(f)).status, 409);
   nothingChanged(f);
 });
-await t("R2: cuenta protegida (la del solicitante o de un entrenador autorizado): 403 sin cambios", async () => {
+await t("R2: dos cuentas vinculadas al mismo alumno: 409 sin cambios", async () => {
+  const f = fake({ alumnos: [al()], authUsers: [acct(), acct({ id: "u-dup", email: "dup@test.local" })] });
+  assert.equal((await call(f)).status, 409);
+  nothingChanged(f);
+});
+await t("R2: cuenta vinculada protegida (la del solicitante o de un entrenador autorizado): 403 sin cambios", async () => {
   for (const uid of [COACH, COACH2]) {
-    const f = fake({ alumnos: [al({ auth_uid: uid })], authUsers: [{ id: uid, email: "coach@test.local" }] });
+    const f = fake({ alumnos: [al()], authUsers: [acct({ id: uid, email: "a@test.local" })] });
     const r = await call(f, { allowedCoachUids: [COACH, COACH2] });
     assert.equal(r.status, 403, "uid=" + uid);
     nothingChanged(f);
@@ -243,11 +268,16 @@ await t("R2: cuenta vinculada pero el email de la fila ya es de OTRA cuenta: 409
   assert.equal((await call(f)).status, 409);
   nothingChanged(f);
 });
-await t("cuenta vinculada con email viejo: se actualiza la contrasena y se alinea el email de login con el de la fila", async () => {
+await t("R3: cuenta vinculada con email DISTINTO al de la ficha: 409 y no se cambia nada (ni contrasena ni email)", async () => {
   const f = fake({ alumnos: [al()], authUsers: [acct({ email: "viejo@test.local" })] });
+  const r = await call(f);
+  assert.equal(r.status, 409);
+  nothingChanged(f);
+});
+await t("R3: ante una cuenta vinculada con email igual, solo se envia la contrasena (nunca email ni email_confirm)", async () => {
+  const f = fake({ alumnos: [al()], authUsers: [acct({ email: "A@Test.LOCAL" })] });
   assert.equal((await call(f)).status, 200);
-  assert.equal(f.log.updated[0].id, "u-al1");
-  assert.equal(f.log.updated[0].attrs.email, "a@test.local");
+  assert.deepEqual(Object.keys(f.log.updated[0].attrs), ["password"]);
 });
 await t("R2: si crear la cuenta falla, no hay reintento que modifique una cuenta por email", async () => {
   const f = fake({ alumnos: [al()], authUsers: [], createFails: true });
@@ -292,6 +322,13 @@ if (!legacyFile) {
     const h = readFileSync(FN_DIR + "handler.js", "utf8");
     assert.ok(!/from\(\s*['"]entrenadores['"]/.test(h));
     assert.ok(!/ilike\(\s*['"]email['"]\s*,\s*alumnoEmail/.test(h), "el email del cliente debe escaparse antes de buscar");
+  });
+  await t("handler.js no usa alumnos.auth_uid como vinculo ni actualiza el email de Auth", async () => {
+    const code = readFileSync(FN_DIR + "handler.js", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/\/\/ .*$/gm, "");
+    assert.ok(!/auth_uid/.test(code), "auth_uid no debe usarse");
+    assert.ok(!/email_confirm\s*:\s*true[\s\S]{0,80}updateUserById|attrs\.email|attrs\s*=/.test(code), "no debe haber alineacion de email");
+    assert.equal((code.match(/updateUserById\(/g) || []).length, 1);
+    assert.ok(/updateUserById\(\s*String\(linked\.id\)\s*,\s*\{\s*password:\s*newPassword\s*\}\s*\)/.test(code), "solo { password }");
   });
 }
 
