@@ -16,12 +16,26 @@ Las cuentas creadas con versiones anteriores no tienen vínculo, por lo que camb
 
 Para cada alumno, de a uno:
 1. Verificar que la cuenta le pertenece realmente a esa persona (quién la creó, fecha de alta, confirmación directa con el alumno). `user_metadata` no sirve como prueba.
-2. Recién entonces, el propietario escribe `app_metadata.alumno_id` desde el servidor (Admin API `updateUserById` con la clave de administración, fuera del navegador y de esta función). La función no ofrece esa operación a propósito.
+2. Recién entonces, el propietario escribe `app_metadata.alumno_id` desde el servidor, fuera del navegador y de esta función (que no ofrece esa operación a propósito), con la herramienta `scripts/admin/link-alumno.mjs` (ver «Herramienta de vinculación»).
 3. Si hay dudas: no vincular. Definir la contraseña a mano en Authentication → Users, o eliminar la cuenta dudosa y dejar que la función cree una nueva (queda vinculada).
 
 Las cuentas que cree esta función ya quedan vinculadas.
 
+## Herramienta de vinculación (`scripts/admin/link-alumno.mjs`)
+La **verificación humana de titularidad es obligatoria** y la herramienta no la sustituye: el `--confirm` es solo un control contra errores de copiado. Sin confirmación del alumno por otro canal (presencial o teléfono ya conocido), no se vincula.
+
+- Vincula **una cuenta por ejecución** (no existe modo masivo) y escribe solo `app_metadata.alumno_id`; no cambia email, confirmación, contraseña ni `user_metadata`, y conserva el resto de `app_metadata`.
+- **Dry-run por defecto.** Escribir exige `--apply` y `--confirm <alumno-id>:<8 primeros caracteres del uid de la cuenta>`.
+- Requiere `npm ci` y variables de entorno (nunca en el repositorio ni en el historial de la shell): `SUPABASE_URL` (`https://<ref>.supabase.co`), la clave de administración (`read -rs` para cargarla), y `COACH_UIDS` (los mismos UIDs que el secreto de la función; todos deben ser UUID y existir en Auth). Se debe indicar `--project-ref <ref>` para confirmar a qué proyecto se apunta.
+- Rechaza: ficha inexistente o duplicada, email repetido en fichas o cuentas, cuenta inexistente, de entrenador, suspendida, con proveedor distinto de email (salvo `--allow-non-email-provider`), con email distinto del de la ficha, ya vinculada a otro alumno, o si otra cuenta ya está vinculada a ese alumno.
+- Antes de escribir vuelve a leer y compara; después de escribir vuelve a leer y verifica. Códigos de salida: `0` correcto, `1` abortó sin escribir, `2` estado incierto (revisar la cuenta en Authentication → Users).
+- **Deshacer, de a una:** el mismo comando con `--rollback` (y `--apply --confirm …` para aplicar).
+- El dry-run imprime señales de titularidad (email confirmado, fecha de creación, último login, proveedores) sin emails ni nombres. Se usan con la verificación del alumno, no en su lugar.
+- Es una herramienta administrativa local: no forma parte de la aplicación ni de su bundle, y no se ejecuta desde el navegador ni desde agentes.
+- Pruebas: `node scripts/test-linkAlumno.mjs` y `node scripts/test-linkAlumnoCli.mjs` (cliente simulado, sin red).
+
 ## Despliegue (lo hace el propietario; el orden importa)
+0. **Antes de todo, vincular** las cuentas existentes de a una (ver arriba; herramienta `scripts/admin/link-alumno.mjs`, dry-run por defecto). Vincular solo escribe `app_metadata` y no afecta a la versión que esté desplegada.
 1. Cargar el secreto **`COACH_UIDS`** con el UID del entrenador (Authentication → Users → UID). Es un identificador, no una credencial. **Antes de desplegar**: con el orden inverso el entrenador recibe 403 hasta cargarlo.
 2. Desplegar la función. `index.ts` importa `./handler.js`, por lo que hay que subir **ambos archivos** (con la CLI se incluyen solos).
 3. Probar con un **alumno de prueba**: crear alumno → «Editar alumno» → asignar contraseña (200) → iniciar sesión como ese alumno. Prueba negativa con la sesión de un alumno de prueba (no de uno real): cambiar la contraseña de otro alumno de prueba debe responder 403.
@@ -31,7 +45,7 @@ Las cuentas que cree esta función ya quedan vinculadas.
 - **El entrenador recibe 403 en todos los alumnos:** el secreto falta o el UID está mal. Corregir `COACH_UIDS`; los registros de la función lo avisan.
 - **409 en un alumno:** cuenta sin vincular (ver arriba), email de la cuenta distinto del de la ficha, o cuenta de otra persona. No se modificó nada.
 - **Salida inmediata, independiente de la función:** Authentication → Users → definir o restablecer la contraseña del alumno a mano.
-- **Rollback:** volver a desplegar la versión anterior de `index.ts` (queda en el historial de git, commit `d53db36`).
+- **Rollback:** NUNCA volver a desplegar la versión anterior (`d53db36`): no autoriza al solicitante y permite tomar cuentas de alumnos. Si la versión nueva falla, volver a desplegar `main` desde un checkout limpio. Para desactivar la función temporalmente, dejar `COACH_UIDS` vacío o inválido (deniega todo) o eliminar la función; la salida manual es Authentication → Users.
 
 ## Pruebas
 `node scripts/test-updateAlumnoPasswordAuthz.mjs` (cliente simulado, sin red). Con un argumento corre los mismos escenarios contra otra versión de `index.ts`, para comprobar que fallan con la anterior.
