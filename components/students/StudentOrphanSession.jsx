@@ -1,6 +1,7 @@
 import React from 'react';
 import BaseModal from '../modals/BaseModal.jsx';
-import { detectOrphanSessions, confirmOrphanSessions, validateOrphanSession } from '../../lib/orphanSessions.js';
+import { detectOrphanSessions, confirmOrphanSessions, validateOrphanSession, advanceWeekAfterValidation } from '../../lib/orphanSessions.js';
+import { applySemanaActivaToRutinas } from '../../lib/rutinaOperationalState.js';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 
 // "Descartar" solo oculta el aviso en la UI (en memoria, hasta recargar la app): no borra nada ni usa localStorage.
@@ -29,6 +30,8 @@ export default function StudentOrphanSession({
   allEx = [],
   sb,
   setAlumnoSesiones,
+  setRutinasSB,
+  setRutinasSBEntrenador,
   toast2,
   es,
   msg,
@@ -120,6 +123,15 @@ export default function StudentOrphanSession({
         toast2(msg("Esa sesión ya estaba registrada", "That session was already recorded"));
       }
       setOpenKey(null);
+      // Si con esta sesion la semana queda completa, se habilita la siguiente ya (el mismo chequeo que corre al abrir la ficha). No puede
+      // fallar la validacion: la sesion ya esta guardada y, si el chequeo falla, se reintenta al volver a abrir la ficha.
+      const week = await advanceWeekAfterValidation({ sb: sb, alumnoId: alumno.id, rutina: rutina });
+      if (week.status === "advanced") {
+        const apply = function (prev) { return applySemanaActivaToRutinas(prev, week.rutinaId, week.semanaActiva); };
+        if (typeof setRutinasSB === "function") setRutinasSB(apply);
+        if (typeof setRutinasSBEntrenador === "function") setRutinasSBEntrenador(apply);
+        toast2(msg("Semana completa: pasó a la semana " + week.semanaActiva, "Week complete: moved to week " + week.semanaActiva));
+      }
     } catch (e) {
       console.error("[validarSesionHuerfana]", e);
       setError(msg("No se pudo validar la sesión. Intentá de nuevo.", "Could not validate the session. Please try again."));
