@@ -5,6 +5,7 @@ import { WorkoutExerciseCompletedState } from './workout/WorkoutExerciseComplete
 import { WorkoutTodaySetsList } from './workout/WorkoutTodaySetsList.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
 import { setsForLoadPrefill } from '../lib/rutinaCiclo.js';
+import { createRepsSwipeHandlers } from '../lib/repsSwipe.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
 import {
   calculateNewWeightPR,
@@ -106,6 +107,7 @@ export function WorkoutExercisePanel(props) {
   const [swipeDelta, setSwipeDelta] = React.useState(0);
   const [swiping, setSwiping] = React.useState(false);
   const swipeStartX = React.useRef(null);
+  const repsSwipeStartX = React.useRef(null);
   const holdTimer = React.useRef(null);
   const holdInterval = React.useRef(null);
   const suppressKgClick = React.useRef(false);
@@ -119,6 +121,9 @@ export function WorkoutExercisePanel(props) {
   const pendingPR = hasSuggestedLoad ? calculateNewWeightPR({ max: pr }, kg) : null;
   const isPR = !!pendingPR;
   const canLogSet = canLogWorkoutSet(validationExercise, kg, reps);
+  // Contraste del panel en modo oscuro: los grises fijos (#475569/#374151) quedaban en 1.35-1.84:1 sobre la tarjeta.
+  const labelCol = darkMode ? textMuted : "#475569";
+  const hintCol = darkMode ? textMuted : "#374151";
 
   React.useEffect(()=>{
     if(ex) {
@@ -299,16 +304,16 @@ export function WorkoutExercisePanel(props) {
           <div style={{position:"relative",zIndex:1}}>
           <div style={{padding:"8px 16px",background:"#2D4057",borderBottom:"1px solid #24304022",
             display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <div style={{fontSize:13,fontWeight:800,color:"#2563EB",letterSpacing:0.3}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#93C5FD",letterSpacing:0.3}}>
               {es?"SET":"SET"} {setActualNum} {es?"de":"of"} {totalSets}
             </div>
             {setActualNum===1&&!swipeDelta&&(
-              <div style={{fontSize:10,color:"#4A5C72",display:"flex",alignItems:"center",gap:3}}>
-                <Ic name="arrow-left" size={10} color="#4A5C72"/> deslizá
+              <div style={{fontSize:10,color:"#CBD5E1",display:"flex",alignItems:"center",gap:3}}>
+                <Ic name="arrow-left" size={10} color="#CBD5E1"/> deslizá
               </div>
             )}
             {isPR&&(
-              <div style={{fontSize:13,fontWeight:900,color:"#60A5FA",
+              <div style={{fontSize:13,fontWeight:900,color:"#93C5FD",
                 background:"#f59e0b15",border:"1px solid #f59e0b44",
                 borderRadius:20,padding:"2px 10px"}}>
                 🏆 PR
@@ -319,7 +324,7 @@ export function WorkoutExercisePanel(props) {
           <div style={{padding:"14px"}}>
             {/* Header progreso */}
             <div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",marginBottom:8}}>
-              <div style={{fontSize:10,fontWeight:600,color:"#475569"}}>{es?"Ej":"Ex"} {activeExIdx+1}/{exercises.length}</div>
+              <div style={{fontSize:10,fontWeight:600,color:labelCol}}>{es?"Ej":"Ex"} {activeExIdx+1}/{exercises.length}</div>
             </div>
             <div style={{height:2,borderRadius:1,background:"#1a2535",marginBottom:12}}>
               <div style={{height:"100%",borderRadius:1,background:"#2563EB",width:Math.round((setsHoy.length/totalSets)*100)+"%",transition:"width .3s"}}/>
@@ -328,8 +333,8 @@ export function WorkoutExercisePanel(props) {
             {/* PESO - input editable + botón [+] */}
             <div style={{marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>PESO</span>
-                {parseFloat(kg)>0&&<span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{es?"Último":"Last"}: {kg}kg</span>}
+                <span style={{fontSize:10,fontWeight:700,color:labelCol,letterSpacing:1}}>PESO</span>
+                {parseFloat(kg)>0&&<span style={{fontSize:10,fontWeight:600,color:hintCol}}>{es?"Último":"Last"}: {kg}kg</span>}
               </div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <button type="button" className="hov"
@@ -346,11 +351,12 @@ export function WorkoutExercisePanel(props) {
                 <div style={{flex:1,position:"relative"}}>
                   <input
                     type="number" value={kg} onChange={e=>setKg(e.target.value)}
+                    aria-label={es?"Peso en kg":"Weight in kg"}
                     placeholder="0"
                     style={{width:"100%",height:48,background:darkMode?"#111827":"#F0F4F8",border:"1px solid "+(darkMode?"#1E3A5F":"#CBD5E1"),borderRadius:10,
                       textAlign:"center",fontSize:20,fontWeight:800,color:darkMode?"#fff":"#0F1923",padding:"0 40px 0 40px",
                       fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>
-                  <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:14,fontWeight:600,color:"#475569",pointerEvents:"none"}}>kg</span>
+                  <span style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",fontSize:14,fontWeight:600,color:labelCol,pointerEvents:"none"}}>kg</span>
                 </div>
                 <button type="button" className="hov"
                   style={{width:48,height:48,background:"#2563EB",border:"none",borderRadius:10,
@@ -364,14 +370,14 @@ export function WorkoutExercisePanel(props) {
                   aria-label={es?"Más 1 kg":"Increase 1 kg"}
                 >+</button>
               </div>
-              <div style={{fontSize:9,color:"#374151",marginTop:3}}>{es?"Tocá ±1 kg · mantené ±5 kg":"Tap ±1 kg · hold ±5 kg"}</div>
+              <div style={{fontSize:9,color:hintCol,marginTop:3}}>{es?"Tocá ±1 kg · mantené ±5 kg":"Tap ±1 kg · hold ±5 kg"}</div>
             </div>
 
             {/* REPS - pills dinámicas extendidas */}
             <div style={{marginBottom:12}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                <span style={{fontSize:10,fontWeight:700,color:"#475569",letterSpacing:1}}>{isTimedExercise ? (es?"DURACIÓN":"DURATION") : "REPS"}</span>
-                <span style={{fontSize:10,fontWeight:600,color:"#374151"}}>{isTimedExercise ? reps + '"' : reps + " reps"}</span>
+                <span style={{fontSize:10,fontWeight:700,color:labelCol,letterSpacing:1}}>{isTimedExercise ? (es?"DURACIÓN":"DURATION") : "REPS"}</span>
+                <span style={{fontSize:10,fontWeight:600,color:hintCol}}>{isTimedExercise ? reps + '"' : reps + " reps"}</span>
               </div>
               {(()=>{
                 var repsStr=(ex?.reps||"8").toString();
@@ -383,15 +389,18 @@ export function WorkoutExercisePanel(props) {
                 var lo=isTimedExercise?Math.max(5,rMin-(repStep*2)):Math.max(1,rMin-2);
                 var hi=isTimedExercise?rMax+(repStep*2):rMax+2;
                 var pills=[];for(var n=lo;n<=hi;n+=repStep)pills.push(n);
+                // Swipe de reps aislado del swipe de la tarjeta (que registra el set): ver lib/repsSwipe.js.
+                var repsSwipe=createRepsSwipeHandlers({
+                  startRef:repsSwipeStartX,
+                  getCur:function(){return parseInt(reps)||rMin},
+                  lo:lo,hi:hi,step:repStep,setReps:setReps,
+                  vibrate:function(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(ex){}}
+                });
                 return(
                   <div
-                    onTouchStart={function(e){this._swX=e.touches[0].clientX}}
-                    onTouchEnd={function(e){
-                      var dx=e.changedTouches[0].clientX-(this._swX||0);
-                      var cur=parseInt(reps)||rMin;
-                      if(dx<-30&&cur<hi){setReps(String(Math.min(hi,cur+repStep)));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}
-                      else if(dx>30&&cur>lo){setReps(String(Math.max(lo,cur-repStep)));try{navigator.vibrate&&navigator.vibrate(15)}catch(ex){}}
-                    }}
+                    onTouchStart={repsSwipe.onTouchStart}
+                    onTouchMove={repsSwipe.onTouchMove}
+                    onTouchEnd={repsSwipe.onTouchEnd}
                     style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
                     {pills.map(function(pn){
                       var inR=pn>=rMin&&pn<=rMax;
@@ -400,6 +409,7 @@ export function WorkoutExercisePanel(props) {
                         <button
                           key={pn}
                           type="button"
+                          aria-pressed={isT}
                           style={repPillButtonStyle(isT, inR, darkMode)}
                           onClick={function(){
                             setReps(String(pn));
@@ -413,7 +423,7 @@ export function WorkoutExercisePanel(props) {
                   </div>
                 );
               })()}
-              <div style={{fontSize:9,color:"#374151",textAlign:"center",marginTop:3}}>{es?"← deslizá para cambiar reps →":"← swipe to change reps →"}</div>
+              <div style={{fontSize:9,color:hintCol,textAlign:"center",marginTop:3}}>{es?"← deslizá para cambiar reps →":"← swipe to change reps →"}</div>
             </div>
 
             {/* BOTÓN REGISTRAR */}
@@ -437,8 +447,8 @@ export function WorkoutExercisePanel(props) {
                   </span>)
               }
             </button>
-            <button onClick={()=>setShowAdvanced(v=>!v)}
-              style={{width:"100%",background:"transparent",border:"none",color:"#475569",
+            <button onClick={()=>setShowAdvanced(v=>!v)} aria-expanded={showAdvanced}
+              style={{width:"100%",background:"transparent",border:"none",color:labelCol,
                 fontSize:11,fontWeight:700,cursor:"pointer",padding:"2px",fontFamily:"inherit"}}>
               {showAdvanced?"▲":"▼"} {es?"Pausa · Nota · RPE":"Rest · Note · RPE"}
             </button>
@@ -461,10 +471,12 @@ export function WorkoutExercisePanel(props) {
                 <input style={{width:"100%",background:bgSub,border:"1px solid "+border,
                   borderRadius:8,color:textMain,padding:"8px 10px",fontSize:13,fontFamily:"inherit",marginBottom:8}}
                   value={note} onChange={e=>setNote(e.target.value)}
+                  aria-label={es?"Nota del set":"Set note"}
                   placeholder={es?"Nota del set...":"Set note..."}/>
                 <div style={{display:"flex",gap:4}}>
                   {[6,7,8,9,10].map(v=>(
                     <button key={v} className="hov" onClick={()=>setRpe(rpe===v?null:v)}
+                      aria-label={"RPE "+v} aria-pressed={rpe===v}
                       style={{flex:1,padding:"8px 2px",border:"1px solid "+(rpe===v?"#2563EB":border),
                         borderRadius:8,background:rpe===v?"#2563EB22":"transparent",
                         color:rpe===v?"#2563EB":textMuted,fontSize:13,fontWeight:800,
