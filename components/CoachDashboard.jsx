@@ -21,6 +21,7 @@ import { coachType as T, coachSpace as S, coachFirstNameFromFullName } from "./c
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 import { getStudentRoutine, getStudentWeeklyProgress } from "../lib/studentWeeklyProgress.js";
+import { isCoachValidatedSession } from "../lib/orphanSessions.js";
 
 /** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
 export const NAV_ITEM_PAD = "10px 12px";
@@ -352,6 +353,8 @@ function buildWorkoutCompletedAlerts(alumnos, sesionesGlobales, lang, P) {
   return sesionesGlobales
     .map(function (s) {
       if (!s || s.alumno_id == null) return null;
+      // Sesion que registro el propio entrenador con "Validar": no es un aviso (no la acaba de completar el alumno).
+      if (isCoachValidatedSession(s)) return null;
       var alumnoId = String(s.alumno_id);
       var alumno = byAlumno[alumnoId];
       if (!alumno) return null;
