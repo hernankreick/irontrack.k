@@ -9,7 +9,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CHAT_PAGE_LIMIT, mensajesPath, enOrdenCronologico, appendUnique, isSavedMessage, enviarMensaje, mensajeErrorEnvio, createSendLock,
-  resolveDashboardMessageTarget,
+  resolveDashboardMessageTarget, contarNoLeidosDelEntrenador, siguienteBadge, textoBadge,
 } from "../lib/chatMessages.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -267,13 +267,136 @@ await test("cableado en Chat.jsx: texto solo se limpia con exito, candado sincro
   assert.match(c, /role="alert"/); assert.match(c, /disabled=\{enviando\}/); assert.match(c, /aria-label=\{es\?"Enviar mensaje"/);
 });
 
-await test("consumidores de getMensajes: solo Chat y ChatFlotante; el contrato (orden cronologico / null en error) se conserva", () => {
-  const chat = read("components/Chat.jsx"), flot = read("components/ChatFlotante.jsx");
+// ---- Cliente supabase-js simulado: registra la cadena y evalua los filtros sobre una tabla en memoria (sin red).
+function fakeSupabase(rows, opts) {
+  const o = opts || {};
+  return {
+    from(tabla) {
+      const calls = [{ tabla }];
+      const filtros = [];
+      const q = {
+        calls,
+        select(cols, cfg) { calls.push({ select: cols, cfg }); return q; },
+        eq(col, val) { calls.push({ eq: [col, val] }); filtros.push((r) => r[col] === val); return q; },
+        or(expr) {
+          calls.push({ or: expr });
+          assert.equal(expr, "leido.is.null,leido.eq.false");
+          filtros.push((r) => r.leido == null || r.leido === false);
+          return q;
+        },
+        then(res, rej) {
+          if (o.lanza) return Promise.reject(new TypeError("Failed to fetch")).then(res, rej);
+          if (o.error) return Promise.resolve({ count: null, error: { message: "boom" } }).then(res, rej);
+          const n = rows.filter((r) => filtros.every((f) => f(r))).length;
+          return Promise.resolve({ count: q.calls.find((c) => c.cfg && c.cfg.head) ? n : null, data: null, error: null }).then(res, rej);
+        },
+      };
+      q.lastCalls = calls;
+      return q;
+    },
+  };
+}
+// 120 mensajes del alumno A: 4 del entrenador sin leer, uno de ellos FUERA de los ultimos 50 (el mas viejo).
+function conversacionConNoLeidos() {
+  const rows = Array.from({ length: 120 }, (_, i) => mk(i + 1, { de_entrenador: false, leido: true }));
+  const marcar = (n, over) => Object.assign(rows[n - 1], { de_entrenador: true, leido: false }, over || {});
+  marcar(3);                       // fuera de los ultimos 50 (la ventana es 71-120)
+  marcar(80); marcar(100); marcar(119);
+  return rows;
+}
+
+await test("badge: antes se contaba sobre los ultimos 50 y se perdia el no leido viejo (regresion documentada)", () => {
+  const rows = conversacionConNoLeidos();
+  const ventana = getMensajesSim(rows, "A");
+  assert.equal(ventana.filter((m) => m.de_entrenador && !m.leido).length, 3);
+  assert.equal(rows.filter((m) => m.de_entrenador && !m.leido).length, 4);
+});
+
+await test("badge: 120 mensajes y 4 no leidos del entrenador (uno fuera de los ultimos 50) => cuenta EXACTA 4", async () => {
+  const c = fakeSupabase(conversacionConNoLeidos());
+  assert.equal(await contarNoLeidosDelEntrenador(c, "A"), 4);
+});
+
+await test("badge: consulta de solo conteo (HEAD, sin descargar mensajes) con los filtros correctos", async () => {
+  const c = fakeSupabase([]);
+  let ultimo;
+  const spy = { from: (t) => { ultimo = c.from(t); return ultimo; } };
+  await contarNoLeidosDelEntrenador(spy, "alumno-1");
+  assert.deepEqual(ultimo.calls.slice(0, 5), [
+    { tabla: "mensajes" },
+    { select: "id", cfg: { count: "exact", head: true } },
+    { eq: ["alumno_id", "alumno-1"] },
+    { eq: ["de_entrenador", true] },
+    { or: "leido.is.null,leido.eq.false" },
+  ]);
+});
+
+await test("badge: no cuenta mensajes propios del alumno, ya leidos, ni de otras conversaciones; leido NULL cuenta como no leido", async () => {
+  const rows = [
+    mk(1, { de_entrenador: true, leido: false }),                       // cuenta
+    mk(2, { de_entrenador: true, leido: null }),                        // NULL => no leido => cuenta
+    mk(3, { de_entrenador: true, leido: true }),                        // leido
+    mk(4, { de_entrenador: false, leido: false }),                      // mensaje propio del alumno
+    mk(5, { de_entrenador: false, leido: null }),                       // propio
+    mk(6, { de_entrenador: true, leido: false, alumno_id: "B" }),       // otra conversacion
+    mk(7, { de_entrenador: true, leido: null, alumno_id: "B" }),
+  ];
+  assert.equal(await contarNoLeidosDelEntrenador(fakeSupabase(rows), "A"), 2);
+  assert.equal(await contarNoLeidosDelEntrenador(fakeSupabase(rows), "B"), 2);
+  assert.equal(await contarNoLeidosDelEntrenador(fakeSupabase(rows), "C"), 0);
+});
+
+await test("badge: errores de Supabase, de red o respuestas invalidas => null (nunca 0)", async () => {
+  assert.equal(await contarNoLeidosDelEntrenador(fakeSupabase([], { error: true }), "A"), null);
+  assert.equal(await contarNoLeidosDelEntrenador(fakeSupabase([], { lanza: true }), "A"), null);
+  assert.equal(await contarNoLeidosDelEntrenador(null, "A"), null);
+  assert.equal(await contarNoLeidosDelEntrenador(fakeSupabase([]), ""), null);
+  assert.equal(await contarNoLeidosDelEntrenador({ from: () => ({ select: () => { throw new Error("x"); } }) }, "A"), null);
+  assert.equal(await contarNoLeidosDelEntrenador({ from: () => ({ select() { return this; }, eq() { return this; }, or() { return Promise.resolve({ count: "7", error: null }); } }) }, "A"), null);
+});
+
+await test("badge: si la consulta falla se conserva el valor anterior; un 0 valido SI apaga el badge", () => {
+  assert.equal(siguienteBadge(3, null), 3);
+  assert.equal(siguienteBadge(3, undefined), 3);
+  assert.equal(siguienteBadge(3, NaN), 3);
+  assert.equal(siguienteBadge(3, -1), 3);
+  assert.equal(siguienteBadge(3, 0), 0);
+  assert.equal(siguienteBadge(0, 12), 12);
+});
+
+await test("badge: el conteo es exacto y solo la presentacion se topa en 99+", () => {
+  assert.equal(textoBadge(1), "1"); assert.equal(textoBadge(99), "99"); assert.equal(textoBadge(100), "99+"); assert.equal(textoBadge(5000), "99+");
+});
+
+await test("badge: el conteo exacto escala sin traer filas (no depende del limite de 50 ni de 100)", async () => {
+  const muchos = Array.from({ length: 300 }, (_, i) => mk(i + 1, { de_entrenador: true, leido: false }));
+  assert.equal(await contarNoLeidosDelEntrenador(fakeSupabase(muchos), "A"), 300);
+});
+
+await test("cableado del badge: App.jsx usa el conteo exacto; ChatFlotante lo usa, conserva el valor ante fallos y no depende de getMensajes", () => {
+  const app = read("App.jsx"), flot = read("components/ChatFlotante.jsx");
+  assert.match(app, /getMensajesNoLeidosCount: \(alumnoId\) => contarNoLeidosDelEntrenador\(supabase, alumnoId\)/);
+  assert.match(flot, /sb\.getMensajesNoLeidosCount\(alumnoId\)/);
+  assert.match(flot, /setUnread\(function\(prev\)\{ return siguienteBadge\(prev, n\); \}\)/);
+  assert.match(flot, /textoBadge\(unread\)/);
+  assert.ok(!/sb\.getMensajes\(/.test(flot), "ya no descarga mensajes para contar");
+  assert.ok(!/filter\(msg => msg\.de_entrenador/.test(flot), "ya no cuenta en el cliente");
+  assert.match(flot, /\.catch\(function\(\)\{\}\)/);
+});
+
+await test("marcarMensajesLeidos NO se modifico en este PR (caracterizacion): su filtro es leido=eq.false", () => {
+  const app = read("App.jsx");
+  assert.match(app, /"&de_entrenador=eq\."\+deQuien\+"&leido=eq\.false"/);
+  // Evidencia del problema potencial: filas con leido NULL no coinciden con ese PATCH (en SQL NULL = false no es verdadero).
+  const rows = [{ leido: null }, { leido: false }, { leido: true }];
+  const coincide = rows.filter((r) => r.leido === false).length;
+  assert.equal(coincide, 1, "el PATCH solo alcanza leido=false; leido NULL queda sin marcar");
+});
+
+await test("consumidores de getMensajes: Chat.jsx (2 llamadas); el contrato (cronologico / null en error) se conserva", () => {
+  const chat = read("components/Chat.jsx");
   assert.equal((chat.match(/sb\.getMensajes\(/g) || []).length, 2);
-  assert.equal((flot.match(/sb\.getMensajes\(/g) || []).length, 1);
   assert.match(chat, /if \(m\) setMensajes\(m\)/); assert.match(chat, /if \(m2\) setMensajes\(m2\)/); // null no pisa la lista
-  assert.match(flot, /filter\(msg => msg\.de_entrenador && !msg\.leido\)/); // el conteo no depende del orden
-  assert.ok(!/enOrdenCronologico|mensajesPath/.test(flot), "ChatFlotante no cambia");
 });
 
 console.log("\n" + count + " pruebas OK");

@@ -124,7 +124,7 @@ import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMs
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
 import { buildCoachGlobalSearchData } from './lib/coachGlobalSearchSelectors.js';
 import { selectAppShellLayoutState } from './lib/appShellLayoutSelectors.js';
-import { mensajesPath, enOrdenCronologico, resolveDashboardMessageTarget } from './lib/chatMessages.js';
+import { mensajesPath, enOrdenCronologico, resolveDashboardMessageTarget, contarNoLeidosDelEntrenador } from './lib/chatMessages.js';
 import {
   buildRutinaInsertBody,
   cleanRutinaWriteBody,
@@ -536,6 +536,8 @@ const sb = {
   saveConfig: (data) => sbFetch("config?id=eq.pagos", "PATCH", data),
   // Ultimos 50 mensajes (desc en el servidor) devueltos en orden cronologico; `null` ante un error HTTP, igual que antes.
   getMensajes: (alumnoId) => sbFetch(mensajesPath(alumnoId)).then(enOrdenCronologico),
+  // Conteo exacto de no leidos del entrenador para el badge del alumno (sin descargar mensajes); `null` si falla.
+  getMensajesNoLeidosCount: (alumnoId) => contarNoLeidosDelEntrenador(supabase, alumnoId),
   getMensajesConversaciones: async (alumnoIds) => {
     var ids = Array.from(new Set((alumnoIds || []).filter(Boolean).map(String)));
     if (!ids.length) return [];
