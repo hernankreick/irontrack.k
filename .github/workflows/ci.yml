@@ -81,3 +81,30 @@ jobs:
           npm run build -- --outDir dist-preview --emptyOutDir
           node scripts/check-bundle-target.mjs dist-preview/assets --target preview
           rm -rf dist-preview
+
+      # Simula un build de Production de Vercel con configuracion VALIDA (host de ejemplo, no real): el guard exige una URL
+      # https con host real y una clave valida, y el escaner revisa el bundle.
+      - name: Env guard - Production simulado (configuracion valida)
+        env:
+          VERCEL: "1"
+          VERCEL_ENV: production
+          VITE_SUPABASE_URL: https://ci-simulado.example.com
+          VITE_SUPABASE_ANON_KEY: ci-simulada-anon-key-0123456789
+        run: |
+          npm run build -- --outDir dist-prod --emptyOutDir
+          node scripts/check-bundle-target.mjs dist-prod/assets --target production
+          rm -rf dist-prod
+
+      # El build de Production DEBE fallar si falta la configuracion: las variables vacias pisan al .env versionado.
+      - name: Env guard - Production sin configuracion debe fallar
+        env:
+          VERCEL: "1"
+          VERCEL_ENV: production
+          VITE_SUPABASE_URL: ""
+          VITE_SUPABASE_ANON_KEY: ""
+        run: |
+          if npm run build -- --outDir dist-prod-neg --emptyOutDir; then
+            echo "::error::el build de Production con variables vacias debia fallar y termino bien"
+            exit 1
+          fi
+          rm -rf dist-prod-neg
