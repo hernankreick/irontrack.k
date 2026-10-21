@@ -28,6 +28,7 @@ export default function StudentHistoryAccess({
   const [view, setView] = React.useState(initialView); // null | 'history' | 'library'
   const closeRef = React.useRef(null);
   const openerRef = React.useRef(null);
+  const dialogRef = React.useRef(null);
 
   const close = React.useCallback(() => {
     setView(null);
@@ -38,7 +39,26 @@ export default function StudentHistoryAccess({
   React.useEffect(() => {
     if (!view) return undefined;
     if (closeRef.current) closeRef.current.focus();
-    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    const onKey = (e) => {
+      if (e.defaultPrevented) return; // otra capa (p. ej. el reproductor de video) ya lo manejo
+      const root = dialogRef.current;
+      const active = document.activeElement;
+      const inside = !!root && !!active && root.contains(active);
+      if (e.key === 'Escape') {
+        // Si el foco esta en otra capa abierta encima (video), Escape es de esa capa.
+        if (inside || !active || active === document.body) close();
+        return;
+      }
+      if (e.key !== 'Tab' || !root) return;
+      // Navegacion de teclado contenida: el Tab da la vuelta dentro de la pantalla y no sale al fondo.
+      const items = [...root.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+        .filter((n) => n.offsetParent !== null || n === active);
+      if (!items.length) { e.preventDefault(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (!inside) { if (active && active !== document.body) return; e.preventDefault(); first.focus(); return; }
+      if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [view, close]);
@@ -79,6 +99,7 @@ export default function StudentHistoryAccess({
 
       {view && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={title}
@@ -96,15 +117,17 @@ export default function StudentHistoryAccess({
               ref={closeRef}
               type="button"
               onClick={close}
-              aria-label={es ? 'Cerrar' : 'Close'}
+              aria-label={es ? 'Volver al Plan' : 'Back to Plan'}
               style={{
-                width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                background: 'transparent', border: 'none', borderRadius: 12, cursor: 'pointer', color: textMain,
+                minWidth: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexShrink: 0,
+                padding: '0 10px 0 6px', background: 'transparent', border: 'none', borderRadius: 12, cursor: 'pointer', color: textMain,
+                fontFamily: 'inherit', fontSize: 15, fontWeight: 700,
               }}
             >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="15 6 9 12 15 18" />
               </svg>
+              <span aria-hidden="true">Plan</span>
             </button>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: textMain, minWidth: 0 }}>{title}</h2>
           </div>
@@ -117,7 +140,7 @@ export default function StudentHistoryAccess({
           >
             <div className="mx-auto w-full max-w-[32rem]">
               {view === 'history' && (
-                <StudentProgressSection {...progressProps} esEntrenador={false} initialSubView="sessions" onRegistrarPrimerEntrenamiento={close} />
+                <StudentProgressSection {...progressProps} esEntrenador={false} initialSubView="sessions" hideBack onRegistrarPrimerEntrenamiento={close} />
               )}
               {view === 'library' && <LibraryAlumno {...libraryProps} />}
             </div>

@@ -124,14 +124,15 @@ await test("plan: acceso cerrado = 2 botones ('Historial de entrenamientos' y 'E
   for (const h of html.matchAll(/min-height:(\d+)px/g)) assert.ok(Number(h[1]) >= 44, "boton de al menos 44px");
 });
 
-await test("historial abierto: dialogo accesible (role, aria-modal, nombre), boton Cerrar de 44px, area segura arriba y abajo", () => {
+await test("historial abierto: dialogo accesible (role, aria-modal, nombre), UNA sola opcion de retorno (Volver al Plan) de 44px, area segura arriba y abajo", () => {
   const html = access({ initialView: "history" });
   assert.match(html, /role="dialog"[^>]*aria-modal="true"[^>]*aria-label="Historial de entrenamientos"/);
-  assert.match(html, /aria-label="Cerrar"/);
-  assert.match(html, /width:44px;height:44px/);
+  assert.match(html, /aria-label="Volver al Plan"/);
+  assert.match(html, /min-width:44px;height:44px/);
+  assert.ok(!html.includes("aria-label=\"Cerrar\""));
   assert.ok(html.includes("padding-top:env(safe-area-inset-top, 0px)") || html.includes("padding-top:env(safe-area-inset-top,0px)"));
   assert.ok(/padding:0 0 env\(safe-area-inset-bottom/.test(html), "area segura inferior (el historial trae su propio margen lateral)");
-  assert.ok(html.includes("← Volver"), "abre directo en la subvista de sesiones (con boton Volver al resumen)");
+  assert.ok(!html.includes("← Volver") && !html.includes("← Back"), "sin navegacion de retorno duplicada (no pasa por el resumen de Progreso)");
   assert.ok(/class="sk /.test(html) || html.includes("Sin sesiones aún"), "muestra la lista de sesiones (esqueleto de carga con datos sinteticos)");
 });
 
@@ -145,6 +146,24 @@ await test("ejercicios abierto: dialogo con nombre 'Ejercicios y videos'; el his
 await test("el acceso solo LEE: el componente no escribe en localStorage ni llama a Supabase", () => {
   const src = readFileSync(path.join(ROOT, "components/student/StudentHistoryAccess.jsx"), "utf8");
   assert.ok(!/localStorage|sessionStorage|fetch\(|\.from\(|sbFetch|\.insert|\.update|\.delete/.test(src));
+});
+
+await test("accesibilidad de la pantalla superpuesta: foco inicial, Tab contenido, Escape y foco devuelto al boton que la abrio", () => {
+  const src = readFileSync(path.join(ROOT, "components/student/StudentHistoryAccess.jsx"), "utf8");
+  assert.match(src, /closeRef\.current\.focus\(\)/, "foco inicial dentro de la pantalla");
+  assert.match(src, /e\.key === 'Escape'/);
+  assert.match(src, /e\.key !== 'Tab'/, "intercepta Tab");
+  assert.match(src, /last\.focus\(\)/); assert.match(src, /first\.focus\(\)/);
+  assert.match(src, /openerRef\.current = e\.currentTarget/);
+  assert.match(src, /el\.focus\(\)/, "devuelve el foco al abridor");
+  assert.match(src, /e\.defaultPrevented/, "no pisa a una capa superior (video)");
+  const vm = readFileSync(path.join(ROOT, "components/ui/VideoModal.jsx"), "utf8");
+  assert.match(vm, /addEventListener\("keydown", onKey, true\)/, "el video atiende Escape en captura");
+  assert.match(vm, /e\.preventDefault\(\)/); assert.match(vm, /role="dialog"/); assert.match(vm, /aria-modal="true"/);
+  assert.match(vm, /closeRef\.current\.focus\(\)/); assert.match(vm, /opener\.focus\(\)/);
+  const sp = readFileSync(path.join(ROOT, "components/student-progress/StudentProgressSection.jsx"), "utf8");
+  assert.match(sp, /hideBack = false/); assert.match(sp, /subView !== 'main' && !hideBack/);
+  assert.match(src, /hideBack/);
 });
 
 // ---------------------------------------------------------------- 5. historial: legibilidad
