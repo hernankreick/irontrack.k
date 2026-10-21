@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { formatChatTime } from '../lib/timeFormat.js';
+import { appendUnique, enviarMensaje, mensajeErrorEnvio, createSendLock } from '../lib/chatMessages.js';
 
 export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, onMensajesLeidos}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
@@ -14,6 +15,9 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, on
   const [texto, setTexto] = useState("");
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState(null);
+  const sendLock = useRef(null);
+  if (!sendLock.current) sendLock.current = createSendLock();
   const endRef = useRef();
 
   const cargarYMarcar = async () => {
@@ -38,15 +42,27 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, on
 
   useEffect(()=>{ endRef.current?.scrollIntoView({behavior:"smooth"}); },[mensajes]);
 
-  const enviar = async () => {
-    if(!texto.trim() || enviando) return;
+  // El texto se limpia SOLO si el servidor confirma el guardado (devuelve la fila); si falla se conserva y se puede reintentar.
+  // El candado es sincrono: un doble toque no envia dos veces aunque React aun no haya re-renderizado.
+  const enviar = () => sendLock.current.run(async () => {
+    const limpio = texto.trim();
+    if(!limpio) return;
     setEnviando(true);
-    const msg = {alumno_id:alumnoId, texto:texto.trim(), de_entrenador:esEntrenador, nombre:esEntrenador?"Entrenador":alumnoNombre};
-    const res = await sb.addMensaje(msg);
-    if(res&&res[0]) setMensajes(prev=>[...prev,res[0]]);
-    setTexto("");
-    setEnviando(false);
-  };
+    setErrorEnvio(null);
+    try {
+      const msg = {alumno_id:alumnoId, texto:limpio, de_entrenador:esEntrenador, nombre:esEntrenador?"Entrenador":alumnoNombre};
+      const r = await enviarMensaje(sb.addMensaje, msg);
+      if(r.ok) {
+        setMensajes(prev=>appendUnique(prev, r.mensaje));
+        // Si el usuario siguio escribiendo mientras se enviaba, no se le borra lo nuevo.
+        setTexto(cur=>cur.trim()===limpio?"":cur);
+      } else {
+        setErrorEnvio(mensajeErrorEnvio(r.reason, es));
+      }
+    } finally {
+      setEnviando(false);
+    }
+  });
 
   if(loading) return (
     <div style={{display:"flex",flexDirection:"column",gap:8,padding:"8px 0"}}>
@@ -83,9 +99,10 @@ export function Chat({alumnoId, alumnoNombre, esEntrenador, sb, darkMode, es, on
         })}
         <div ref={endRef}/>
       </div>
+      {errorEnvio&&<div role="alert" style={{color:"#EF4444",fontSize:13,fontWeight:600,marginBottom:6}}>{errorEnvio}</div>}
       <div style={{display:"flex",gap:8}}>
-        <input style={{flex:1,background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"12px 14px",fontFamily:"'DM Sans',sans-serif",fontSize:15}} value={texto} onChange={e=>setTexto(e.target.value)} placeholder="Escribí un mensaje..." onKeyDown={e=>e.key==="Enter"&&enviar()}/>
-        <button style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:12,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={enviar}>
+        <input aria-label={es?"Escribí un mensaje":"Write a message"} style={{flex:1,background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:12,padding:"12px 14px",fontFamily:"'DM Sans',sans-serif",fontSize:15}} value={texto} onChange={e=>{setTexto(e.target.value); if(errorEnvio) setErrorEnvio(null);}} placeholder="Escribí un mensaje..." onKeyDown={e=>e.key==="Enter"&&enviar()}/>
+        <button type="button" aria-label={es?"Enviar mensaje":"Send message"} disabled={enviando} style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:12,padding:"8px 16px",fontFamily:"'DM Sans',sans-serif",fontSize:15,fontWeight:700,cursor:enviando?"default":"pointer",opacity:enviando?0.7:1}} onClick={enviar}>
           {enviando?"...":"▶"}
         </button>
       </div>
