@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const G = await import("../lib/envTargetGuard.js");
-const { evaluateEnvTarget, sha256Host, hostOf, detectTarget, parseHashList, loadHashConfig, runEnvTargetGuard } = G;
+const { evaluateEnvTarget, sha256Host, hostOf, normalizeHost, detectTarget, parseHashList, loadHashConfig, runEnvTargetGuard } = G;
 const { scanBundleDir } = await import("../lib/envBundleScan.js");
 const { envTargetGuardPlugin } = await import("../lib/envTargetGuardPlugin.js");
 
@@ -90,6 +90,39 @@ await test("Production y local NUNCA fallan (solo advierten): .env en archivo, h
   assert.equal(ev({ target: "production", url: url(PROD_HOST), urlFromProcess: true }).status, "ok");
   assert.equal(ev({ target: "production", url: url(OTHER_HOST), urlFromProcess: true }).status, "warn");
   assert.equal(ev({ target: "local", url: url(PROD_HOST), urlFromProcess: false }).status, "warn");
+});
+
+await test("normalizeHost: quita puntos finales (host. = host), conserva el puerto y es idempotente", () => {
+  assert.equal(normalizeHost("HOST.invalid."), "host.invalid");
+  assert.equal(normalizeHost(" host.invalid.. "), "host.invalid");
+  assert.equal(normalizeHost("host.invalid.:8443"), "host.invalid:8443");
+  assert.equal(normalizeHost(normalizeHost("host.invalid.")), "host.invalid");
+  assert.equal(normalizeHost("[::1]:80"), "[::1]:80");
+  assert.equal(sha256Host("prod-sintetico.invalid."), PROD[0], "el hash con punto final es el mismo");
+  assert.equal(sha256Host("prod-sintetico.invalid.."), PROD[0]);
+  assert.equal(hostOf("https://prod-sintetico.invalid./rest/v1"), PROD_HOST);
+  assert.equal(hostOf("https://prod-sintetico.invalid.:443/x"), PROD_HOST);
+});
+
+await test("Preview: host de produccion con PUNTO FINAL (FQDN) => FALLA (R2), con ruta, puerto 443 o mayusculas", () => {
+  for (const v of ["https://" + PROD_HOST + ".", "https://" + PROD_HOST + "./rest/v1", "https://" + PROD_HOST + ".:443", "HTTPS://" + PROD_HOST.toUpperCase() + ".", "https://" + PROD_HOST + ".."]) {
+    const r = ev({ target: "preview", url: v, urlFromProcess: true });
+    assert.equal(r.status, "fail", v);
+    assert.ok(r.errors.some((e) => e.startsWith("R2")), v);
+    assert.ok(!r.errors.join(" ").includes(PROD_HOST), "no imprime el host");
+  }
+  // Un host distinto con punto final sigue siendo valido (no se bloquea por error).
+  assert.equal(ev({ target: "preview", url: "https://" + STG_HOST + ".", urlFromProcess: true }).status, "ok");
+});
+
+await test("Preview: URL vacia o solo espacios (variable definida pero vacia) => OK sin backend; Production igual (no falla)", () => {
+  for (const target of ["preview", "development", "unknown", "production", "local"]) {
+    for (const u of ["", "   ", "\n"]) {
+      const r = ev({ target, url: u, urlFromProcess: true });
+      assert.notEqual(r.status, "fail", target + JSON.stringify(u));
+      assert.ok(r.info.length > 0, "informa que no hay backend");
+    }
+  }
 });
 
 // ------------------------------------------------------------------ 2. configuracion y runner
@@ -167,6 +200,45 @@ await test("CLI --hash imprime solo el sha256 del host", () => {
   assert.equal(r.stdout.trim(), PROD[0]);
 });
 
+await test("CLI Preview con el host de produccion + PUNTO FINAL en el entorno => exit 1 (R2), sin filtrar valores", () => {
+  const dir = tmpProject({}, { productionHostHashes: PROD });
+  for (const v of [url(PROD_HOST) + ".", url(PROD_HOST) + "./rest/v1", url(PROD_HOST.toUpperCase()) + "."]) {
+    const r = runCli(dir, { VERCEL: "1", VERCEL_ENV: "preview", VITE_SUPABASE_URL: v, VITE_SUPABASE_ANON_KEY: KEY });
+    assert.equal(r.code, 1, r.out); assert.ok(r.out.includes("R2")); noLeak(r.out);
+  }
+});
+
+await test("CLI Preview con URL VACIA en el entorno (pisa al .env de produccion) => exit 0, sin backend; Production tambien exit 0", () => {
+  const dir = tmpProject({ ".env": dotEnv(PROD_HOST) }, { productionHostHashes: PROD });
+  for (const env of [{ VERCEL_ENV: "preview" }, { VERCEL_ENV: "production" }]) {
+    const r = runCli(dir, { VERCEL: "1", ...env, VITE_SUPABASE_URL: "", VITE_SUPABASE_ANON_KEY: KEY });
+    assert.equal(r.code, 0, r.out);
+    assert.ok(r.out.includes("VITE_SUPABASE_URL=ausente"), r.out); noLeak(r.out);
+  }
+});
+
+await test("CLI Preview con SOLO la clave en el entorno y el .env de produccion presente => exit 1 (la URL cae al archivo: R1+R2)", () => {
+  const dir = tmpProject({ ".env": dotEnv(PROD_HOST) }, { productionHostHashes: PROD });
+  const r = runCli(dir, { VERCEL: "1", VERCEL_ENV: "preview", VITE_SUPABASE_ANON_KEY: KEY });
+  assert.equal(r.code, 1, r.out);
+  assert.ok(r.out.includes("R1") && r.out.includes("R2")); noLeak(r.out);
+});
+
+await test("CLI con SOLO la clave y sin URL en ningun lado => exit 0 en Preview y en Production (cliente null)", () => {
+  const dir = tmpProject({}, { productionHostHashes: PROD });
+  for (const env of [{ VERCEL_ENV: "preview" }, { VERCEL_ENV: "production" }]) {
+    const r = runCli(dir, { VERCEL: "1", ...env, VITE_SUPABASE_ANON_KEY: KEY });
+    assert.equal(r.code, 0, r.out);
+    assert.ok(r.out.includes("VITE_SUPABASE_URL=ausente")); noLeak(r.out);
+  }
+});
+
+await test("CLI Production con SOLO la clave y el .env presente => exit 0 (no rompe produccion)", () => {
+  const dir = tmpProject({ ".env": dotEnv(PROD_HOST) }, { productionHostHashes: PROD });
+  const r = runCli(dir, { VERCEL: "1", VERCEL_ENV: "production", VITE_SUPABASE_ANON_KEY: KEY });
+  assert.equal(r.code, 0, r.out); noLeak(r.out);
+});
+
 // ------------------------------------------------------------------ 4. plugin de Vite (vite build directo, sin npm run build)
 await test("plugin de Vite: bloquea Preview con URL de produccion y deja pasar Production", () => {
   const dir = tmpProject({}, { productionHostHashes: PROD });
@@ -181,6 +253,22 @@ await test("plugin de Vite: bloquea Preview con URL de produccion y deja pasar P
     set({ VERCEL: "1", VERCEL_ENV: "production", VITE_SUPABASE_URL: url(PROD_HOST) });
     assert.doesNotThrow(() => hook(cfg));
     set({});
+    assert.doesNotThrow(() => hook(cfg));
+  } finally { console.log = log; for (const k of Object.keys(process.env)) delete process.env[k]; Object.assign(process.env, saved); }
+});
+
+await test("plugin de Vite: Preview con host de produccion + punto final => bloquea; Production => no", () => {
+  const dir = tmpProject({}, { productionHostHashes: PROD });
+  const hook = envTargetGuardPlugin().configResolved;
+  const saved = { ...process.env }, log = console.log;
+  const fq = url(PROD_HOST) + ".";
+  try {
+    console.log = () => {};
+    const cfg = { root: dir, env: { VITE_SUPABASE_URL: fq, VITE_SUPABASE_ANON_KEY: KEY } };
+    for (const k of ["VERCEL", "VERCEL_ENV", "VITE_SUPABASE_URL", "VITE_SUPABASE_ANON_KEY"]) delete process.env[k];
+    Object.assign(process.env, { VERCEL: "1", VERCEL_ENV: "preview", VITE_SUPABASE_URL: fq });
+    assert.throws(() => hook(cfg), /env-target: build bloqueado/);
+    process.env.VERCEL_ENV = "production";
     assert.doesNotThrow(() => hook(cfg));
   } finally { console.log = log; for (const k of Object.keys(process.env)) delete process.env[k]; Object.assign(process.env, saved); }
 });
@@ -216,6 +304,13 @@ await test("escaner de bundle: *.supabase.co fuera de la allowlist de staging =>
   const stgHash = [sha256Host("stagingstagingstaging.supabase.co")];
   assert.equal(scanBundleDir(tmpBundle('x="' + SB("otroproyectootroproy") + '"'), { target: "preview", productionHashes: PROD, stagingHashes: stgHash }).ok, false);
   assert.equal(scanBundleDir(tmpBundle('x="' + SB("stagingstagingstaging") + '"'), { target: "preview", productionHashes: PROD, stagingHashes: stgHash }).ok, true);
+});
+
+await test("escaner de bundle: host de produccion con PUNTO FINAL dentro del bundle => FALLA en Preview", () => {
+  const prodHash = [sha256Host("abcdefghijklmnopqrst.supabase.co")];
+  const dir = tmpBundle('const u="' + SB("abcdefghijklmnopqrst") + './rest/v1";');
+  assert.equal(scanBundleDir(dir, { target: "preview", productionHashes: prodHash }).productionHit, true);
+  assert.equal(scanBundleDir(dir, { target: "production", productionHashes: prodHash }).ok, true);
 });
 
 // ------------------------------------------------------------------ 6. repo real
