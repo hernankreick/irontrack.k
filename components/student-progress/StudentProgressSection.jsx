@@ -78,10 +78,12 @@ export default function StudentProgressSection({
   expectedDaysPerWeek,
   onRegistrarPrimerEntrenamiento,
   esEntrenador = false,
+  initialSubView = 'main',
+  hideBack = false,
 }) {
   const [sbData, setSbData] = React.useState([])
   const [loadingSb, setLoadingSb] = React.useState(true)
-  const [subView, setSubView] = React.useState('main')
+  const [subView, setSubView] = React.useState(initialSubView)
   const [seenAch, setSeenAch] = React.useState(() => {
     try {
       if (localStorage.getItem('irontrack_sp_ach_seen')) {
@@ -258,7 +260,7 @@ export default function StudentProgressSection({
         className="relative z-0 mx-auto flex w-full max-w-[32rem] flex-col gap-9 pb-[max(11rem,calc(env(safe-area-inset-bottom, 0px) + 148px))] pt-5"
         style={{ paddingInline: 'var(--page-gutter)', boxSizing: 'border-box' }}
       >
-        {subView !== 'main' && (
+        {subView !== 'main' && !hideBack && (
           <button
             type="button"
             className="mb-1 w-fit border-0 bg-transparent text-[12px] font-semibold"

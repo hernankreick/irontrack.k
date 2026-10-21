@@ -1273,6 +1273,14 @@ function GymApp() {
     [esAlumno, tab]
   );
 
+  /** Alumno: "Ejercicios" y "Progreso" ya no estan en la navegacion (se abren desde el Plan). Si algun flujo lo dejara ahi, vuelve al Plan. */
+  useEffect(
+    function () {
+      if (esAlumno && (tab === "library" || tab === "progress")) setTab("plan");
+    },
+    [esAlumno, tab]
+  );
+
   /** Al cambiar de tab, asegurar que el bottom nav siempre sea visible. */
   useLayoutEffect(
     function () {
@@ -3742,6 +3750,7 @@ function GymApp() {
         session={session}
         activeDay={activeDay}
         darkMode={darkMode}
+        hasBottomNav={tabs2.length > 1}
         onScrollNode={function (node) {
           scrollRef.current = node;
         }}
@@ -4149,8 +4158,10 @@ function GymApp() {
                     <RoutinePdfDownloadButton msg={msg} onDownload={function(){ downloadRoutinePdf(r); }} />
                   )}
 
-                  {/* Volumen de entrenamiento: últimas 4 semanas, kg × reps (lectura propia de progreso, sin el tope de 50 sets) */}
+                  {/* Volumen de entrenamiento: últimas 4 semanas, kg × reps. El alumno NO lo ve (su pantalla es solo el Plan); el entrenador que mira el plan de un alumno sí. */}
+                {sessionData?.role==="entrenador"&&(
                 <StudentTrainingVolumeCard alumnoId={sessionData?.alumnoId} progress={progress} routines={routines} fetchPage={sbFetch} _dm={darkMode} textMuted={textMuted} msg={msg} />
+                )}
                 </div>
               );
             })}
@@ -4220,7 +4231,7 @@ function GymApp() {
           </div>
         )}
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
-        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
+        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false} hasBottomNav={tabs2.length>1} hidden={!!(session&&activeDay)}/>
       )}
       <AppShellModals
         welcomeProps={{

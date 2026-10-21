@@ -14,6 +14,7 @@ export default function AppMainScroll({
   activeDay,
   darkMode,
   onScrollNode,
+  hasBottomNav = true,
   children,
 }) {
   return (
@@ -58,9 +59,12 @@ export default function AppMainScroll({
               : "block",
         flexDirection: showCoachDesktopShell && !esAlumno && !(session && activeDay) ? "column" : undefined,
         paddingBottom: esAlumno
-          ? tab === "plan"
-            ? "calc(180px + env(safe-area-inset-bottom, 0px))"
-            : "calc(150px + env(safe-area-inset-bottom, 0px))"
+          ? !hasBottomNav
+            // Sin barra inferior: solo se reserva lugar para el boton flotante del chat (40px + 20px de margen) y el area segura.
+            ? "calc(112px + env(safe-area-inset-bottom, 0px))"
+            : tab === "plan"
+              ? "calc(180px + env(safe-area-inset-bottom, 0px))"
+              : "calc(150px + env(safe-area-inset-bottom, 0px))"
           : showCoachDesktopShell
             ? coachDesktop1024
               ? "calc(1rem + env(safe-area-inset-bottom, 0px))"
