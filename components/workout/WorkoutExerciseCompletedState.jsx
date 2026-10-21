@@ -37,7 +37,7 @@ export function WorkoutExerciseCompletedState({
             marginTop: 12,
             padding: "8px 24px",
             background: "#22C55E",
-            color: "#fff",
+            color: "#052E16",
             border: "none",
             borderRadius: 12,
             fontSize: 15,
