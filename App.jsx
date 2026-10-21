@@ -94,6 +94,7 @@ import RoutinePdfDownloadButton from './components/student-plan/RoutinePdfDownlo
 import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyProgressCard.jsx';
 import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
 import StudentTrainingVolumeCard from './components/student-plan/StudentTrainingVolumeCard.jsx';
+import StudentHistoryAccess from './components/student/StudentHistoryAccess.jsx';
 import StudentPlanExerciseRows from './components/student-plan/StudentPlanExerciseRows.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import WorkoutSessionSummary from './components/workout/WorkoutSessionSummary.jsx';
@@ -1269,6 +1270,14 @@ function GymApp() {
       if (!esAlumno || tab !== "plan") return;
       headerCollapsedRef.current = false;
       applyAlumnoHeaderLayerStyles(false);
+    },
+    [esAlumno, tab]
+  );
+
+  /** Alumno: "Ejercicios" y "Progreso" ya no estan en la navegacion (se abren desde el Plan). Si algun flujo lo dejara ahi, vuelve al Plan. */
+  useEffect(
+    function () {
+      if (esAlumno && (tab === "library" || tab === "progress")) setTab("plan");
     },
     [esAlumno, tab]
   );
@@ -3742,6 +3751,7 @@ function GymApp() {
         session={session}
         activeDay={activeDay}
         darkMode={darkMode}
+        hasBottomNav={tabs2.length > 1}
         onScrollNode={function (node) {
           scrollRef.current = node;
         }}
@@ -4154,6 +4164,13 @@ function GymApp() {
                 </div>
               );
             })}
+            {!cargandoAlumno&&(
+              <StudentHistoryAccess
+                es={es} darkMode={darkMode} textMain={textMain} textMuted={textMuted} bgCard={bgCard} border={border}
+                progressProps={{ progress, EX, allEx, sesiones, sessionData, sb, sharedParam: sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId})), es, expectedDaysPerWeek: routineDaysCount }}
+                libraryProps={{ allEx, darkMode, es, routines, videoOverrides, setVideoModal, msg }}
+              />
+            )}
           </div>
         )}
         {tab==="progress"&&!showAlumnoProgressStack&&!(sessionData?.role==="entrenador"&&!esAlumno)&&(
@@ -4220,7 +4237,7 @@ function GymApp() {
           </div>
         )}
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
-        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
+        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false} hasBottomNav={tabs2.length>1} hidden={!!(session&&activeDay)}/>
       )}
       <AppShellModals
         welcomeProps={{

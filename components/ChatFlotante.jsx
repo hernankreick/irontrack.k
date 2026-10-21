@@ -2,7 +2,7 @@ import React from 'react';
 import { Chat } from './Chat.jsx';
 import { Ic } from './Ic.jsx';
 
-export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode, es}) {
+export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode, es, hasBottomNav = true, hidden = false}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bgCard = _dm?"#162234":"#FFFFFF";
   const border = _dm?"#2D4057":"#E2E8F0";
@@ -43,8 +43,12 @@ export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode
 
   if(!alumnoId) return null;
 
-  const fabBottom = "calc(env(safe-area-inset-bottom, 0px) + 112px)";
-  const panelBottom = "calc(env(safe-area-inset-bottom, 0px) + 118px)";
+  // Oculto durante un entrenamiento abierto: el boton (z-index 155) quedaba encima de los controles de la serie.
+  if(hidden) return null;
+
+  // Con barra inferior el boton queda por encima de ella; sin barra, cerca del borde respetando el area segura.
+  const fabBottom = hasBottomNav ? "calc(env(safe-area-inset-bottom, 0px) + 112px)" : "calc(env(safe-area-inset-bottom, 0px) + 20px)";
+  const panelBottom = hasBottomNav ? "calc(env(safe-area-inset-bottom, 0px) + 118px)" : "calc(env(safe-area-inset-bottom, 0px) + 68px)";
   /** Por encima del bottom nav alumno (z-index 40) y debajo de modales (600+). */
 
   return (

@@ -79,7 +79,7 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
         <div className="mb-2 text-lg font-semibold" style={{ color: 'var(--sp-fg, #f3f4f6)' }}>
           {es ? 'Sin sesiones aún' : 'No sessions yet'}
         </div>
-        <p className="text-sm" style={{ color: 'rgba(243,244,246,0.5)' }}>
+        <p className="px-2 text-sm" style={{ color: 'rgba(243,244,246,0.75)' }}>
           {es
             ? 'Completá tu primer entrenamiento para ver el historial aquí'
             : 'Complete your first workout to see your history here'}
@@ -145,16 +145,16 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
 
             {expanded && (
               <div
-                className="flex flex-col gap-6 border-t px-2 py-4"
+                className="flex flex-col gap-4 border-t px-3 py-4"
                 style={{ borderColor: 'var(--sp-stroke, #2D4057)', background: 'rgba(15, 25, 35, 0.55)' }}
               >
                 {list.map((s, i) => (
                   <div
                     key={s.id || `sesion-${wk}-${i}`}
-                    className="rounded-[12px] border p-3"
+                    className="rounded-[12px] border p-4"
                     style={{ borderColor: 'var(--sp-stroke, #2D4057)', background: 'var(--sp-surface,#1E2D40)' }}
                   >
-                    <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="mb-3 flex items-start justify-between gap-2">
                       <div className="flex items-start gap-2">
                         <CheckCircle2
                           className="mt-0.5 h-5 w-5 shrink-0"
@@ -162,17 +162,17 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
                           style={{ color: '#3b82f6' }}
                         />
                         <div>
-                          <div className="font-bold" style={{ color: 'var(--sp-fg,#f3f4f6)' }}>
+                          <div className="break-words font-bold" style={{ color: 'var(--sp-fg,#f3f4f6)' }}>
                             {s.dia_label || (es ? 'Sesión' : 'Session')}
                           </div>
-                          <div className="mt-0.5 text-xs" style={{ color: 'rgba(243,244,246,0.5)' }}>
+                          <div className="mt-1 text-xs" style={{ color: 'rgba(243,244,246,0.75)' }}>
                             {s.fecha}
                             {s.hora ? ` · ${s.hora}` : ''}
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'rgba(243,244,246,0.45)' }}>
+                    <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'rgba(243,244,246,0.7)' }}>
                       {s.rutina_nombre || ''}
                     </div>
                     {s.ejercicios && (
@@ -182,10 +182,10 @@ export function ProgressSessionsPanel({ sharedParam, sb, EX, es, sesiones: sesio
                           return ex ? (
                             <span
                               key={`${s.id}-${exId}`}
-                              className="rounded-md px-2 py-1 text-[11px] font-semibold"
+                              className="rounded-md px-2.5 py-1.5 text-xs font-semibold"
                               style={{
                                 background: 'var(--sp-surface-high,#162234)',
-                                color: 'rgba(243,244,246,0.55)',
+                                color: 'rgba(243,244,246,0.85)',
                               }}
                             >
                               {es ? ex.name : ex.nameEn || ex.name}

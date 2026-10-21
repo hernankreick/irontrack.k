@@ -78,10 +78,11 @@ export default function StudentProgressSection({
   expectedDaysPerWeek,
   onRegistrarPrimerEntrenamiento,
   esEntrenador = false,
+  initialSubView = 'main',
 }) {
   const [sbData, setSbData] = React.useState([])
   const [loadingSb, setLoadingSb] = React.useState(true)
-  const [subView, setSubView] = React.useState('main')
+  const [subView, setSubView] = React.useState(initialSubView)
   const [seenAch, setSeenAch] = React.useState(() => {
     try {
       if (localStorage.getItem('irontrack_sp_ach_seen')) {
