@@ -124,6 +124,7 @@ import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMs
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
 import { buildCoachGlobalSearchData } from './lib/coachGlobalSearchSelectors.js';
 import { selectAppShellLayoutState } from './lib/appShellLayoutSelectors.js';
+import { mensajesPath, enOrdenCronologico, resolveDashboardMessageTarget } from './lib/chatMessages.js';
 import {
   buildRutinaInsertBody,
   cleanRutinaWriteBody,
@@ -533,7 +534,8 @@ const sb = {
   },
   getConfig: () => sbFetch("config?id=eq.pagos&select=*"),
   saveConfig: (data) => sbFetch("config?id=eq.pagos", "PATCH", data),
-  getMensajes: (alumnoId) => sbFetch("mensajes?alumno_id=eq."+alumnoId+"&select=*&order=created_at.asc&limit=50"),
+  // Ultimos 50 mensajes (desc en el servidor) devueltos en orden cronologico; `null` ante un error HTTP, igual que antes.
+  getMensajes: (alumnoId) => sbFetch(mensajesPath(alumnoId)).then(enOrdenCronologico),
   getMensajesConversaciones: async (alumnoIds) => {
     var ids = Array.from(new Set((alumnoIds || []).filter(Boolean).map(String)));
     if (!ids.length) return [];
@@ -3314,13 +3316,16 @@ function GymApp() {
     </>
   );
 
+  // CTA global (sin alumno asociado): no abre ningun chat por si solo; lleva a Alumnos filtrado para que el entrenador elija a quien escribir.
   const handleCoachDashboardEnviarMensaje = function () {
-    var first = (alumnos || [])[0];
-    if (first) {
-      setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
-    } else {
+    var target = resolveDashboardMessageTarget(coachAlumnosCounts);
+    if (target.empty) {
       toast2(msg("No hay alumnos para contactar", "No athletes to message"));
+      return;
     }
+    setCoachAlumnosSearch("");
+    setCoachAlumnosFilter(target.filter);
+    setTab(target.tab);
   };
   const handleCoachDashboardCrearRutina = function () {
     setTab("routines");
