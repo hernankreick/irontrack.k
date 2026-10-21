@@ -70,3 +70,14 @@ jobs:
             exit 1
           fi
           grep -rq "example.invalid" dist/assets
+
+      # Simula un build de Preview de Vercel: el guard de entorno (plugin de Vite) corre con VERCEL_ENV=preview y las
+      # variables ficticias del job, y el escaner revisa que el bundle no contenga el host de produccion (comparacion por hash).
+      - name: Env guard - Preview simulado
+        env:
+          VERCEL: "1"
+          VERCEL_ENV: preview
+        run: |
+          npm run build -- --outDir dist-preview --emptyOutDir
+          node scripts/check-bundle-target.mjs dist-preview/assets --target preview
+          rm -rf dist-preview

@@ -1,0 +1,7 @@
+{
+  "_comment": "Hashes sha256 (hex) del HOST de Supabase, nunca el host ni claves. productionHostHashes: hosts de produccion que una Preview/Development no puede usar. stagingHostHashes: si no esta vacio, en Preview solo se permiten estos. Se pueden sumar hashes con las variables PROD_SUPABASE_HOST_HASHES y STAGING_SUPABASE_HOST_HASHES (coma). Calcular: node scripts/check-env-target.mjs --hash <host>",
+  "productionHostHashes": [
+    "2d77f51ea0109429d3a7c8031ac3eae5cfd22fe057be57d4c1249743c46732e6"
+  ],
+  "stagingHostHashes": []
+}
