@@ -6,4 +6,26 @@ dist
 .env.*
 !.env.example
 .env*.local
-.claude/
+
+# .claude/: se versiona SOLO la configuracion compartida de agentes y guards (lista blanca).
+# Todo lo demas queda fuera: estado local, cache, ajustes personales y cualquier credencial o dato sensible.
+.claude/*
+!.claude/agents/
+!.claude/hooks/
+!.claude/ORQUESTADOR.md
+!.claude/settings.json
+# Autorizacion temporal de correcciones: la crea cada persona en su maquina y NUNCA se versiona (solo la plantilla de ejemplo).
+!.claude/authorization/
+.claude/authorization/*
+!.claude/authorization/fix.example.json
+# Defensa en profundidad dentro de las carpetas permitidas: nada de secretos, llaves ni ajustes locales.
+.claude/**/.env
+.claude/**/.env.*
+.claude/**/*.env
+.claude/**/*.key
+.claude/**/*.pem
+.claude/**/*.token
+.claude/**/*secret*
+.claude/**/*credential*
+.claude/**/*.local.*
+.claude/settings.local.json

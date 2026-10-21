@@ -1,0 +1,8 @@
+{
+  "_comment": "PLANTILLA SIN EFECTO (approved_by_user=false). Para autorizar una correccion, cada persona crea su propio .claude/authorization/fix.json (ignorado por git) con approved_by_user=true, el id, la rama exacta y la lista de archivos o carpetas (terminadas en /) que el irontrack-fixer puede editar. Borrarlo al terminar.",
+  "approved_by_user": false,
+  "id": "FIX-000",
+  "branch": "fix/ejemplo",
+  "files": ["lib/ejemplo.js", "scripts/test-ejemplo.mjs"],
+  "allow_sql_files": false
+}
