@@ -12,12 +12,13 @@ const GlobalBottomNav = React.forwardRef(function GlobalBottomNav({ darkMode, es
   }, []);
 
   return (
-    <nav ref={ref} style={{
+    <nav ref={ref} aria-label={esAlumno ? "Navegación del alumno" : "Navegación principal"} style={{
       position:"fixed",bottom:0,left:0,right:0,
       background: darkMode ? "rgba(15,25,35,0.96)" : "rgba(255,255,255,0.96)",
       backdropFilter: "blur(12px)",
       borderTop:"1px solid "+(darkMode?"#1E2D40":"#E2E8F0"),
-      display: isUnder768 ? "none" : "flex", zIndex:40,
+      // En móvil la barra se oculta solo para el entrenador (usa el drawer); el alumno no tiene otra navegación.
+      display: (isUnder768 && !esAlumno) ? "none" : "flex", zIndex:40,
       paddingBottom:"env(safe-area-inset-bottom,0px)",
       overflowX:"auto",
       WebkitOverflowScrolling:"touch",
@@ -25,10 +26,11 @@ const GlobalBottomNav = React.forwardRef(function GlobalBottomNav({ darkMode, es
     }}>
       {tabs2.map(tb=>{
         const isActive = tab===tb.k;
-        const activeCol = esAlumno ? "#3b82f6" : "#2563EB";
+        // Contraste AA (11px): claro #3b82f6 daba 3.67:1 -> #2563EB 5.16:1; oscuro entrenador #2563EB daba 3.43:1 -> #60A5FA 6.98:1.
+        const activeCol = darkMode ? (esAlumno ? "#3b82f6" : "#60A5FA") : "#2563EB";
         const inactiveCol = darkMode?"#8B9AB2":"#64748B";
         return(
-          <button key={tb.k} onClick={()=>setTab(tb.k)}
+          <button key={tb.k} onClick={()=>setTab(tb.k)} aria-current={isActive ? "page" : undefined}
             style={{flex:1,background:"none",border:"none",
               padding:"8px 0 12px",cursor:"pointer",
               display:"flex",flexDirection:"column",
