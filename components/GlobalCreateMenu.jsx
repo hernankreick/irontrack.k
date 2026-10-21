@@ -208,6 +208,7 @@ export default function GlobalCreateMenu({
       <button
         ref={btnRef}
         type="button"
+        className="coach-tap"
         id={btnId}
         aria-haspopup="menu"
         aria-expanded={open}

@@ -16,6 +16,7 @@ import CoachRoutinesMain from './CoachRoutinesMain.jsx';
 import CoachStudentsMain from './CoachStudentsMain.jsx';
 import CoachCalendar from '../CoachCalendar.jsx';
 import CoachMobileDrawer from '../layout/CoachMobileDrawer.jsx';
+import CoachMobileTopBar from '../layout/CoachMobileTopBar.jsx';
 import SettingsPage from '../settings/SettingsPage.jsx';
 import ScannerRutina from '../scanner/ScannerRutina.jsx';
 import CoachMessagesMain from './CoachMessagesMain.jsx';
@@ -38,10 +39,21 @@ export default function CoachSectionRenderer({
 }) {
   const isCoach = sessionData?.role === "entrenador" && !esAlumno;
   const isUnder768 = useIsUnder768();
-  const mobilePad = isUnder768 ? { paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", paddingLeft: 16, paddingRight: 16 } : {};
+  // En < 768 px el entrenador tiene una barra superior propia (CoachMobileTopBar) que ya absorbe el area segura de iPhone.
+  const showMobileBar = isCoach && isUnder768 && showCoachDesktopShell && !coachDesktop1024;
+  const mobilePad = isUnder768 ? { paddingTop: showMobileBar ? 16 : "calc(20px + env(safe-area-inset-top, 0px))", paddingLeft: 16, paddingRight: 16 } : {};
 
   return (
     <>
+      {showMobileBar && (
+        <CoachMobileTopBar
+          tab={tab}
+          darkMode={calendarProps?.dark}
+          msg={mobileDrawerProps?.msg || ((es) => es)}
+          menuOpen={!!mobileDrawerProps?.open}
+          onOpenMenu={mobileDrawerProps?.onOpen}
+        />
+      )}
       {/* Main coach sections */}
       {(tab === "plan" || tab === "progress") && isCoach && (
         <div style={mobilePad}>
@@ -71,7 +83,9 @@ export default function CoachSectionRenderer({
       )}
 
       {tab === "mensajes" && isCoach && (
-        <CoachMessagesMain {...messagesProps} />
+        <div style={{ "--coach-safe-top": showMobileBar ? "0px" : undefined }}>
+          <CoachMessagesMain {...messagesProps} />
+        </div>
       )}
 
       {/* Exercise library aliases */}
