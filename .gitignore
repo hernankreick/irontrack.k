@@ -1,5 +1,9 @@
 node_modules
 dist
 .vercel
+# Variables de entorno: nunca versionar valores. La plantilla es .env.example (sin valores).
+.env
+.env.*
+!.env.example
 .env*.local
 .claude/
