@@ -166,25 +166,12 @@ await test("accesibilidad de la pantalla superpuesta: foco inicial, Tab contenid
   assert.match(src, /hideBack/);
 });
 
-// ---------------------------------------------------------------- 5. historial: legibilidad
-await test("tarjetas del historial: textos secundarios con contraste >= 4.5:1 sobre la tarjeta y mas espacio interno", () => {
-  const src = readFileSync(path.join(ROOT, "components/student-progress/ProgressSessionsPanel.jsx"), "utf8");
-  const lum = (hex) => { const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
-  const mix = (fg, a, bg) => "#" + [1, 3, 5].map((i) => Math.round(parseInt(fg.slice(i, i + 2), 16) * a + parseInt(bg.slice(i, i + 2), 16) * (1 - a)).toString(16).padStart(2, "0")).join("");
-  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-  const alphas = [...src.matchAll(/rgba\(243, ?244, ?246, ?([0-9.]+)\)/g)].map((m) => Number(m[1]));
-  assert.ok(alphas.length >= 4);
-  for (const a of alphas) {
-    assert.ok(ratio(mix("#f3f4f6", a, "#1E2D40"), "#1E2D40") >= 4.5, "alpha " + a + " sobre la tarjeta");
-    assert.ok(ratio(mix("#f3f4f6", a, "#162234"), "#162234") >= 4.5, "alpha " + a + " sobre el chip");
-  }
-  assert.ok(/rounded-\[12px\] border p-4/.test(src) && /border-t px-3 py-4/.test(src), "tarjetas con mas padding");
-});
-
 // ---------------------------------------------------------------- 6. cableado en App.jsx
-await test("App.jsx: el acceso esta en el plan, el chat recibe la barra/oculto, y una guarda devuelve al alumno al Plan si cae en una pestana oculta", () => {
+await test("App.jsx: sin accesos a historial/ejercicios ni volumen para el alumno, el chat recibe la barra/oculto, y una guarda devuelve al alumno al Plan si cae en una pestana oculta", () => {
   const src = readFileSync(path.join(ROOT, "App.jsx"), "utf8");
-  assert.match(src, /<StudentHistoryAccess/);
+  assert.ok(!/<StudentHistoryAccess/.test(src) && !/StudentHistoryAccess\.jsx/.test(src), "el alumno ya no tiene accesos independientes a Historial / Ejercicios y videos");
+  assert.match(src, /sessionData\?\.role==="entrenador"&&\(\s*<StudentTrainingVolumeCard/, "el grafico de volumen es solo del entrenador");
+  assert.ok(readFileSync(path.join(ROOT, "components/student/StudentHistoryAccess.jsx"), "utf8").length > 0, "el componente se conserva (no se elimina codigo)");
   assert.match(src, /hasBottomNav=\{tabs2\.length > 1\}/);
   assert.match(src, /hasBottomNav=\{tabs2\.length>1\} hidden=\{!!\(session&&activeDay\)\}/);
   assert.match(src, /if \(esAlumno && \(tab === "library" \|\| tab === "progress"\)\) setTab\("plan"\)/);

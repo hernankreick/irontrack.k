@@ -94,7 +94,6 @@ import RoutinePdfDownloadButton from './components/student-plan/RoutinePdfDownlo
 import StudentWeeklyProgressCard from './components/student-plan/StudentWeeklyProgressCard.jsx';
 import StudentPlanMiniHeader from './components/student-plan/StudentPlanMiniHeader.jsx';
 import StudentTrainingVolumeCard from './components/student-plan/StudentTrainingVolumeCard.jsx';
-import StudentHistoryAccess from './components/student/StudentHistoryAccess.jsx';
 import StudentPlanExerciseRows from './components/student-plan/StudentPlanExerciseRows.jsx';
 import { ExerciseVideoPlayButton } from './components/ExerciseVideoPlayButton.jsx';
 import WorkoutSessionSummary from './components/workout/WorkoutSessionSummary.jsx';
@@ -4159,18 +4158,13 @@ function GymApp() {
                     <RoutinePdfDownloadButton msg={msg} onDownload={function(){ downloadRoutinePdf(r); }} />
                   )}
 
-                  {/* Volumen de entrenamiento: últimas 4 semanas, kg × reps (lectura propia de progreso, sin el tope de 50 sets) */}
+                  {/* Volumen de entrenamiento: últimas 4 semanas, kg × reps. El alumno NO lo ve (su pantalla es solo el Plan); el entrenador que mira el plan de un alumno sí. */}
+                {sessionData?.role==="entrenador"&&(
                 <StudentTrainingVolumeCard alumnoId={sessionData?.alumnoId} progress={progress} routines={routines} fetchPage={sbFetch} _dm={darkMode} textMuted={textMuted} msg={msg} />
+                )}
                 </div>
               );
             })}
-            {!cargandoAlumno&&(
-              <StudentHistoryAccess
-                es={es} darkMode={darkMode} textMain={textMain} textMuted={textMuted} bgCard={bgCard} border={border}
-                progressProps={{ progress, EX, allEx, sesiones, sessionData, sb, sharedParam: sharedParam||btoa(JSON.stringify({alumnoId:sessionData?.alumnoId})), es, expectedDaysPerWeek: routineDaysCount }}
-                libraryProps={{ allEx, darkMode, es, routines, videoOverrides, setVideoModal, msg }}
-              />
-            )}
           </div>
         )}
         {tab==="progress"&&!showAlumnoProgressStack&&!(sessionData?.role==="entrenador"&&!esAlumno)&&(

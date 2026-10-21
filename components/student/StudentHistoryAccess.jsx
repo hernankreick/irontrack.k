@@ -2,6 +2,7 @@ import React from 'react';
 import StudentProgressSection from '../student-progress/StudentProgressSection.jsx';
 import LibraryAlumno from './LibraryAlumno.jsx';
 
+// NOTA: por decision de producto el alumno usa SOLO su Plan; este componente se conserva pero NO se monta en App.jsx.
 // Acceso desde el Plan del alumno al historial de sesiones y a los ejercicios (antes eran las pestanas "Progreso" y "Ejercicios",
 // que ya no estan en la navegacion). Reutiliza las MISMAS vistas, sin duplicar logica ni datos: se abren en una pantalla
 // superpuesta con boton de cierre y respetando el area segura de iPhone.
