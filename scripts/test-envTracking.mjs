@@ -95,6 +95,7 @@ await test("el guard de entorno esta conectado: plugin en vite.config.js y modul
 await test("el workflow de CI ejecuta el guard sobre un build de Preview simulado y el escaner de bundle", () => {
   const ci = readFileSync(path.join(ROOT, ".github/workflows/ci.yml"), "utf8");
   assert.match(ci, /VERCEL_ENV: preview/);
+  assert.match(ci, /VERCEL_ENV: production/);
   assert.match(ci, /check-bundle-target\.mjs/);
 });
 
