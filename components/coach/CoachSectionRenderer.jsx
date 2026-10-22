@@ -57,7 +57,8 @@ export default function CoachSectionRenderer({
       {/* Main coach sections */}
       {(tab === "plan" || tab === "progress") && isCoach && (
         // El Dashboard ya trae su propio margen lateral (16 px en movil): sin el del contenedor no se suma a 36 px.
-        <div style={isUnder768 ? { ...mobilePad, paddingLeft: 0, paddingRight: 0 } : mobilePad}>
+        // Progreso pinta su propio fondo: con los 16 px superiores quedaba una franja del fondo de la app bajo la barra.
+        <div style={isUnder768 ? { ...mobilePad, paddingLeft: 0, paddingRight: 0, ...(tab === "progress" && showMobileBar ? { paddingTop: 0 } : {}) } : mobilePad}>
           <CoachDashboardMain
             activeNav={tab === "progress" ? "progreso" : "dashboard"}
             {...dashboardProps}
@@ -72,7 +73,8 @@ export default function CoachSectionRenderer({
       )}
 
       {tab === "routines" && !esAlumno && (
-        <div style={mobilePad}>
+        // RutinaView ya trae sus 16 px laterales: sin los del contenedor no se suman (antes 32-36 px).
+        <div style={isUnder768 ? { ...mobilePad, paddingLeft: 0, paddingRight: 0 } : mobilePad}>
           <CoachRoutinesMain {...routinesProps} />
         </div>
       )}

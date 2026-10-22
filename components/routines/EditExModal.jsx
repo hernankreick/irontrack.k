@@ -42,7 +42,9 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
       open={!!editEx}
       onClose={onClose}
       maxWidth={720}
-      closeOnOutside={true}
+      closeOnOutside={false}
+      closeOnEscape={false}
+      ariaLabel={msg("Editar ejercicio", "Edit exercise") + ": " + nombre}
       zIndex={210}
       overlayStyle={{
         background:"rgba(0,0,0,.92)",
@@ -65,7 +67,7 @@ function EditExModal({editEx, btn, inp, es, onSave, onClose, PATS, darkMode, all
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <div style={{width:36,height:36,borderRadius:8,background:color+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:color,flexShrink:0}}>{pat?.icon||"·"}</div>
           <div style={{fontSize:22,fontWeight:800,flex:1,color:textMain}}>{nombre}</div>
-          <button className="hov" style={{...btn(),fontSize:22,padding:"4px 8px"}} onClick={onClose}>x</button>
+          <button type="button" className="hov" aria-label={msg("Cerrar", "Close")} style={{...btn(),fontSize:22,padding:"4px 8px"}} onClick={onClose}>x</button>
         </div>
 
         <div style={{fontSize:13,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:8}}>CONFIGURACION BASE</div>

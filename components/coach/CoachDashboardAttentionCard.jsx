@@ -10,6 +10,7 @@ export default function CoachDashboardAttentionCard({
   dashMuted,
   colors,
   type,
+  okLabel,
 }) {
   return (
     <div
@@ -18,7 +19,7 @@ export default function CoachDashboardAttentionCard({
         background: dashCard,
         border: `1px solid ${dashBorder}`,
         borderRadius: 16,
-        padding: isMobile ? 14 : 18,
+        padding: isMobile ? 16 : 18,
         boxSizing: "border-box",
         boxShadow: colors.darkMode ? "0 14px 40px rgba(0,0,0,0.18)" : "0 12px 32px rgba(15,23,42,0.06)",
       }}
@@ -35,10 +36,13 @@ export default function CoachDashboardAttentionCard({
       >
         {items.map(function (item) {
           var Icon = item.Icon;
+          // Cuenta 0: estado "al dia" atenuado, sin boton de accion (no hay nada que hacer).
+          var isClear = Number(item.count) === 0;
           return (
             <div
               key={item.key}
               className="cd-attention-block"
+              data-state={isClear ? "clear" : "pending"}
               style={{
                 display: "grid",
                 gridTemplateColumns: "44px minmax(0, 1fr)",
@@ -63,17 +67,19 @@ export default function CoachDashboardAttentionCard({
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
+                  opacity: isClear ? 0.55 : 1,
                 }}
               >
                 <Icon size={20} color={item.color} strokeWidth={2.25} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ ...type.bodyLg, color: colors.t, fontWeight: 800 }}>
+                <div style={{ ...type.bodyLg, color: isClear ? dashMuted : colors.t, fontWeight: 800 }}>
                   {item.count} {item.title}
                 </div>
-                <div style={{ ...type.body, color: colors.t2, marginTop: 3 }}>
-                  {item.sub}
+                <div style={{ ...type.body, color: dashMuted, marginTop: 3 }}>
+                  {isClear ? okLabel : item.sub}
                 </div>
+                {!isClear && (
                 <button
                   type="button"
                   className="cd-btn"
@@ -95,6 +101,7 @@ export default function CoachDashboardAttentionCard({
                 >
                   {item.cta}
                 </button>
+                )}
               </div>
             </div>
           );

@@ -25,6 +25,7 @@ export default function WorkoutSessionSummary({
       onClose={onClose}
       maxWidth={420}
       closeOnOutside={false}
+      ariaLabel={msg("Resumen de la sesión", "Session summary")}
       zIndex={10000}
       overlayStyle={{background:"#0A0F1A",alignItems:"flex-start",paddingTop:"calc(env(safe-area-inset-top, 0px) + 10px)",paddingRight:16,paddingBottom:"calc(env(safe-area-inset-bottom, 0px) + 20px)",paddingLeft:16,boxSizing:"border-box",overflowY:"auto",WebkitOverflowScrolling:"touch"}}
       contentStyle={{background:"transparent",borderRadius:0,padding:"18px 0 0",paddingBottom:"calc(20px + env(safe-area-inset-bottom, 0px))",width:"100%",maxWidth:440,maxHeight:"none",overflowY:"visible",WebkitOverflowScrolling:"touch",border:"none",textAlign:"left",animation:"fadeIn 0.25s ease",boxShadow:"none"}}

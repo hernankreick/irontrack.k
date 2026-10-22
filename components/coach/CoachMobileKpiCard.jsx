@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, ArrowDown } from "lucide-react";
 
 export default function CoachMobileKpiCard({
   label,
@@ -54,11 +54,11 @@ export default function CoachMobileKpiCard({
             gap: 6,
             marginTop: 6,
             ...T.meta,
-            color: accent,
+            color: String(deltaText).charAt(0) === "-" ? colors.red : accent,
             fontWeight: 600,
           }}
         >
-          <ArrowUp size={13} strokeWidth={2.5} />
+          {String(deltaText).charAt(0) === "-" ? <ArrowDown size={13} strokeWidth={2.5} /> : <ArrowUp size={13} strokeWidth={2.5} />}
           {deltaText}
         </div>
       ) : (

@@ -312,7 +312,7 @@ export default function CoachCalendar({
     for (var d = 1; d <= daysInMonth; d++) cells.push(d);
 
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
+      <div className="it-cal-grid" style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
         {dows.map(function (dow) {
           return <div key={month + "-dow-" + dow} style={{ color: P.muted, fontSize: 11, fontWeight: 800, textAlign: "center" }}>{dow}</div>;
         })}
@@ -354,7 +354,7 @@ export default function CoachCalendar({
   }
 
   return (
-    <div style={{ width: "100%", maxWidth: 1120, margin: "0 auto", color: P.text, paddingTop: 20, paddingLeft: 16 }}>
+    <div className="it-cal-wrap" style={{ width: "100%", maxWidth: 1120, margin: "0 auto", color: P.text, paddingTop: 20, paddingLeft: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, color: P.primary, fontSize: 13, fontWeight: 900, letterSpacing: 1, textTransform: "uppercase" }}>
@@ -398,7 +398,7 @@ export default function CoachCalendar({
                 <span style={{ fontSize: 18, fontWeight: 900 }}>{name} {year}</span>
                 <ChevronDown size={20} color={P.muted} style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform .18s ease" }} />
               </button>
-              {open ? <div style={{ padding: "0 14px 16px" }}>{renderMonth(month)}</div> : null}
+              {open ? <div className="it-cal-body" style={{ padding: "0 14px 16px" }}>{renderMonth(month)}</div> : null}
             </section>
           );
         })}
@@ -406,13 +406,13 @@ export default function CoachCalendar({
 
       {selectedDate ? (
         <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(2,6,23,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ width: "100%", maxWidth: 560, maxHeight: "min(760px, calc(100vh - 32px))", overflowY: "auto", background: P.bg, border: "1px solid " + P.border, borderRadius: 24, boxShadow: "0 24px 80px rgba(0,0,0,.45)" }}>
+          <div style={{ width: "100%", maxWidth: 560, maxHeight: "min(760px, calc(100dvh - 32px))", overflowY: "auto", background: P.bg, border: "1px solid " + P.border, borderRadius: 24, boxShadow: "0 24px 80px rgba(0,0,0,.45)" }}>
             <div style={{ position: "sticky", top: 0, background: P.bg, zIndex: 2, padding: 18, borderBottom: "1px solid " + P.border, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <div>
                 <div style={{ color: P.muted, fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 1 }}>{selectedDate}</div>
                 <div style={{ color: P.text, fontSize: 20, fontWeight: 900 }}>{M(lang, "Asignar rutina", "Assign routine", "Atribuir rotina")}</div>
               </div>
-              <button type="button" className="hov" onClick={closeModal} style={{ width: 40, height: 40, borderRadius: 14, border: "none", background: P.card, color: P.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <button type="button" className="hov coach-tap" aria-label={M(lang, "Cerrar", "Close", "Fechar")} onClick={closeModal} style={{ width: 40, height: 40, borderRadius: 14, border: "none", background: P.card, color: P.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
                 <X size={20} />
               </button>
             </div>

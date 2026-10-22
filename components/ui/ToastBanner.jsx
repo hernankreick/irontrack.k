@@ -19,6 +19,7 @@ function ToastBanner({ toast, darkMode, border, textMain }) {
       }}>{toast}</div>
     );
   })();
+  // z 10100: por encima de los modales (BaseModal 9999/10000, centro de notificaciones 10050) para que los avisos se vean con un modal abierto.
   // Contenedor flex a todo el ancho que centra el aviso SIN transform: la animacion slideUpFade define transform
   // (translateY) y pisaria un translateX(-50%) durante la entrada. pointerEvents none: el aviso no bloquea toques.
   return(
@@ -27,7 +28,7 @@ function ToastBanner({ toast, darkMode, border, textMain }) {
       position:"fixed",bottom:"calc(88px + env(safe-area-inset-bottom, 0px))",left:0,right:0,
       display:"flex",justifyContent:"center",
       padding:"0 16px",boxSizing:"border-box",
-      zIndex:250,pointerEvents:"none"
+      zIndex:10100,pointerEvents:"none"
     }}>{bubble}</div>
   );
 }

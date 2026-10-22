@@ -31,7 +31,7 @@ export function rutinaDe(alumno) {
           name: "Dia 1",
           label: "Dia 1",
           warmup: [],
-          exercises: [{ name: "Sentadilla", sets: 3, reps: "8", weeks: {} }],
+          exercises: [{ name: "Sentadilla", sets: 3, reps: "8", weeks: [0, 1, 2, 3].map(() => ({ sets: "3", reps: "8", kg: "", note: "", pausa: "" })) }],
         },
       ],
     },
