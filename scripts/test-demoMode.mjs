@@ -141,6 +141,32 @@ await test("bootDemo: por defecto abre como entrenador (?rol=alumno abre al alum
   }
 });
 
+await test("demo del entrenador: 'Validar sesion no finalizada' funciona con el simulador (guarda en memoria y la 2a vez dice que ya existe)", async () => {
+  // bootDemo toca localStorage/location/document/fetch: se simulan con stubs minimos (sin red ni navegador).
+  const store = new Map();
+  globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k), key: (i) => [...store.keys()][i] ?? null, get length() { return store.size; } };
+  globalThis.location = { href: "http://localhost/", search: "", origin: "http://localhost" };
+  globalThis.document = { body: null, addEventListener() {} };
+  const { bootDemo } = await import("../demo/bootDemo.js");
+  bootDemo();
+  const api = globalThis.__IRONTRACK_DEMO_API__;
+  assert.equal(api.role, "entrenador");
+  const { validateOrphanSession } = await import("../lib/orphanSessions.js");
+  const rutina = COACH_RUTINAS.find((r) => r.alumno_id === "demo-alu-beto");
+  const orphan = { semanaSesion: 3, fecha: "20/10/2026", ejercicios: ["bp", "row"], sets: [], hora: "10:30" };
+  const params = { sb: api.sb, alumnoId: "demo-alu-beto", rutina: { id: rutina.id, nombre: rutina.nombre, datos: rutina.datos }, orphan, diaIdx: 0 };
+  const first = await validateOrphanSession(params);
+  assert.equal(first.status, "saved"); assert.ok(first.row.id);
+  assert.ok((await api.sb.getSesiones("demo-alu-beto")).some((x) => x.id === first.row.id), "queda en la lista de sesiones de la demo");
+  const second = await validateOrphanSession(params);
+  assert.equal(second.status, "exists", "no se duplica");
+  // Regresion: sin addSesion en el simulador (el fallo reportado en iPhone), la validacion lanzaba 'no confirmo el guardado'.
+  const sinAdd = Object.assign({}, api.sb); delete sinAdd.addSesion;
+  const roto = Object.assign({}, sinAdd, { addSesion: async () => null });
+  await assert.rejects(() => validateOrphanSession({ ...params, sb: roto, orphan: { ...orphan, fecha: "21/10/2026" }, diaIdx: 1 }), /no confirmo/);
+  delete globalThis.__IRONTRACK_DEMO_API__;
+});
+
 await test("CI: construye la demo, verifica los bundles y Production con demo debe fallar", () => {
   const ci = read(".github/workflows/ci.yml");
   assert.match(ci, /IRONTRACK_DEMO: "1"/);

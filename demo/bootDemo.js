@@ -76,6 +76,14 @@ export function bootDemo() {
       getSesiones: async (id) => byAlumno(sesiones, id),
       getProgreso: async (id) => byAlumno(progreso, id),
       getUltimaSesion: async (id) => byAlumno(sesiones, id).slice(0, 1),
+      // "Validar sesion no finalizada": lee las sesiones de esa semana y guarda la validada SOLO en memoria (no persiste ni sale del navegador).
+      getSesionesByAlumnoRutinaSemana: async (alumnoId, rutinaId, _rutinaNombre, semana) =>
+        byAlumno(sesiones, alumnoId).filter((s) => String(s.rutina_id) === String(rutinaId) && Number(s.semana) === Number(semana)),
+      addSesion: async (data) => {
+        const row = Object.assign({ id: "demo-ses-" + Date.now(), created_at: now() }, data);
+        sesiones.unshift(row);
+        return [row];
+      },
       getMensajes: async (id) => byAlumno(mensajes, id).slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))),
       getMensajesConversaciones: async (ids) => mensajes.filter((m) => (ids || []).map(String).includes(String(m.alumno_id))),
       getMensajesNoLeidosCount: async () => 0,
