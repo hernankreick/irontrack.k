@@ -18,6 +18,9 @@ export default function AppGlobalStyles({ darkMode, bgSub, textMain, border }) {
       "@keyframes bounceIn{0%{transform:scale(0) rotate(-10deg);opacity:0}50%{transform:scale(1.2) rotate(5deg)}70%{transform:scale(0.92) rotate(-2deg)}100%{transform:scale(1) rotate(0);opacity:1}}" +
       "@keyframes rippleOut{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)}100%{box-shadow:0 0 0 20px rgba(34,197,94,0)}}" +
 
+      // Movil (< 768 px): areas tactiles >= 44 px en el panel del entrenador y campos a 16 px (con menos, iOS Safari hace zoom al enfocar el campo).
+      "@media (max-width:767px){.coach-tap,.cd-btn{min-height:44px;min-width:44px}" +
+      "input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]):not([type=hidden]):not([type=button]):not([type=submit]),select,textarea{font-size:16px!important}}" +
       ".num{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}" +
       "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch}.plan-main-scroll{scroll-behavior:auto!important;overflow-anchor:none;overscroll-behavior-y:contain}" +
       ".plan-scroll-diag-no-hov .hov{transition:none!important;filter:none!important}" +

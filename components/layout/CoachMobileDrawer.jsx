@@ -1,6 +1,34 @@
 import React from "react";
 import { Ic } from "../Ic.jsx";
 
+// Fila de navegacion del drawer: boton real (teclado y lector de pantalla), area tactil >= 48 px.
+function DrawerNavItem({ active, onClick, children, color }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        width: "100%",
+        minHeight: 48,
+        padding: "8px 16px",
+        cursor: "pointer",
+        font: "inherit",
+        textAlign: "left",
+        color: color || "inherit",
+        background: active ? "rgba(37,99,235,.1)" : "transparent",
+        border: "none",
+        borderLeft: active ? "3px solid #2563EB" : "3px solid transparent",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function CoachMobileDrawer({
   open,
   activeTab,
@@ -13,6 +41,39 @@ export default function CoachMobileDrawer({
   coachInitials,
   darkMode = true,
 }) {
+  const closeRef = React.useRef(null);
+  const openerRef = React.useRef(null);
+  const wasOpen = React.useRef(false);
+
+  // Accesibilidad: al abrir el foco entra al drawer; Escape cierra; Tab no se escapa al fondo; al cerrar el foco vuelve a quien lo abrio.
+  React.useEffect(() => {
+    if (open) {
+      openerRef.current = document.activeElement;
+      wasOpen.current = true;
+      const t = setTimeout(() => { if (closeRef.current) closeRef.current.focus(); }, 0);
+      const onKey = (e) => {
+        if (e.key === "Escape") { e.preventDefault(); onClose(); return; }
+        if (e.key !== "Tab") return;
+        const root = mobileDrawerRef && mobileDrawerRef.current;
+        if (!root) return;
+        const items = [...root.querySelectorAll("button:not([disabled]),a[href],[tabindex]:not([tabindex='-1'])")].filter((n) => n.offsetParent !== null);
+        if (!items.length) return;
+        const first = items[0], last = items[items.length - 1], a = document.activeElement;
+        if (!root.contains(a)) { e.preventDefault(); first.focus(); }
+        else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+      };
+      document.addEventListener("keydown", onKey);
+      return () => { clearTimeout(t); document.removeEventListener("keydown", onKey); };
+    }
+    if (wasOpen.current) {
+      wasOpen.current = false;
+      const el = openerRef.current;
+      if (el && typeof el.focus === "function" && document.contains(el)) el.focus();
+    }
+    return undefined;
+  }, [open, onClose, mobileDrawerRef]);
+
   return (
     <>
       {/* Overlay */}
@@ -34,6 +95,11 @@ export default function CoachMobileDrawer({
       {/* Drawer */}
       <div
         ref={mobileDrawerRef}
+        role={open ? "dialog" : undefined}
+        aria-modal={open ? "true" : undefined}
+        aria-label={msg("Menú de navegación", "Navigation menu")}
+        aria-hidden={open ? undefined : "true"}
+        inert={open ? undefined : ""}
         style={{
           position: "fixed",
           top: 0,
@@ -53,7 +119,16 @@ export default function CoachMobileDrawer({
       >
         {/* Header del drawer */}
         <div style={{ padding: "calc(20px + env(safe-area-inset-top, 0px)) 16px 14px", borderBottom: "1px solid " + (darkMode ? "#1A2535" : "#E2E8F0"), flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 14, position: "relative" }}>
+            <button
+              ref={closeRef}
+              type="button"
+              onClick={onClose}
+              aria-label={msg("Cerrar menú", "Close menu")}
+              style={{ position: "absolute", right: -8, top: -14, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", color: darkMode ? "#94a3b8" : "#475569", cursor: "pointer", fontSize: 22, lineHeight: 1 }}
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
             <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: "-.3px" }}>
               <span style={{ color: "#2563EB" }}>IRON</span>
               <span style={{ color: darkMode ? "#fff" : "#0F1923" }}>TRACK</span>
@@ -104,8 +179,8 @@ export default function CoachMobileDrawer({
           {/* PRINCIPAL */}
           <div
             style={{
-              color: "#374151",
-              fontSize: 9,
+              color: darkMode ? "#94a3b8" : "#475569",
+              fontSize: 11,
               fontWeight: 700,
               letterSpacing: "1.2px",
               textTransform: "uppercase",
@@ -124,20 +199,12 @@ export default function CoachMobileDrawer({
             { k: "biblioteca", icon: "activity", label: msg("Ejercicios", "Exercises"), sub: null },
             { k: "progress", icon: "trending-up", label: msg("Progreso", "Progress"), sub: msg("Estadísticas generales", "General stats") },
           ].map((item) => (
-            <div
+            <DrawerNavItem
               key={item.k}
+              active={activeTab === item.k}
               onClick={() => {
                 onNavigate(item.k);
                 onClose();
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 16px",
-                cursor: "pointer",
-                background: activeTab === item.k ? "rgba(37,99,235,.1)" : "transparent",
-                borderLeft: activeTab === item.k ? "3px solid #2563EB" : "3px solid transparent",
               }}
             >
               <div
@@ -155,10 +222,10 @@ export default function CoachMobileDrawer({
                 <Ic name={item.icon} size={14} color={activeTab === item.k ? "#3B82F6" : "#94a3b8"} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: activeTab === item.k ? "#3B82F6" : (darkMode ? "#e2e8f0" : "#0F1923"), fontSize: 12, fontWeight: 600 }}>{item.label}</div>
-                {item.sub && <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{item.sub}</div>}
+                <div style={{ color: activeTab === item.k ? "#3B82F6" : (darkMode ? "#e2e8f0" : "#0F1923"), fontSize: 13, fontWeight: 600 }}>{item.label}</div>
+                {item.sub && <div style={{ color: darkMode ? "#94a3b8" : "#475569", fontSize: 11, marginTop: 1 }}>{item.sub}</div>}
               </div>
-            </div>
+            </DrawerNavItem>
           ))}
 
           <div style={{ height: 1, background: darkMode ? "#1A2535" : "#E2E8F0", margin: "6px 16px" }} />
@@ -166,8 +233,8 @@ export default function CoachMobileDrawer({
           {/* PERFIL */}
           <div
             style={{
-              color: "#374151",
-              fontSize: 9,
+              color: darkMode ? "#94a3b8" : "#475569",
+              fontSize: 11,
               fontWeight: 700,
               letterSpacing: "1.2px",
               textTransform: "uppercase",
@@ -181,20 +248,12 @@ export default function CoachMobileDrawer({
             { k: "perfil", icon: "user", label: msg("Mi perfil", "My profile"), sub: msg("Foto, bio, datos", "Photo, bio, data") },
             { k: "settings", icon: "settings", label: msg("Configuración", "Settings"), sub: msg("Preferencias", "Preferences") },
           ].map((item) => (
-            <div
+            <DrawerNavItem
               key={item.k}
+              active={activeTab === item.k}
               onClick={() => {
                 onNavigate(item.k);
                 onClose();
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 16px",
-                cursor: "pointer",
-                background: activeTab === item.k ? "rgba(37,99,235,.1)" : "transparent",
-                borderLeft: activeTab === item.k ? "3px solid #2563EB" : "3px solid transparent",
               }}
             >
               <div
@@ -212,10 +271,10 @@ export default function CoachMobileDrawer({
                 <Ic name={item.icon} size={14} color="#3B82F6" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: darkMode ? "#e2e8f0" : "#0F1923", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
-                <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{item.sub}</div>
+                <div style={{ color: darkMode ? "#e2e8f0" : "#0F1923", fontSize: 13, fontWeight: 600 }}>{item.label}</div>
+                <div style={{ color: darkMode ? "#94a3b8" : "#475569", fontSize: 11, marginTop: 1 }}>{item.sub}</div>
               </div>
-            </div>
+            </DrawerNavItem>
           ))}
 
           <div style={{ height: 1, background: darkMode ? "#1A2535" : "#E2E8F0", margin: "6px 16px" }} />
@@ -223,8 +282,8 @@ export default function CoachMobileDrawer({
           {/* PAGOS */}
           <div
             style={{
-              color: "#374151",
-              fontSize: 9,
+              color: darkMode ? "#94a3b8" : "#475569",
+              fontSize: 11,
               fontWeight: 700,
               letterSpacing: "1.2px",
               textTransform: "uppercase",
@@ -278,9 +337,10 @@ export default function CoachMobileDrawer({
 
         {/* Footer: cerrar sesión */}
         <div style={{ borderTop: "1px solid " + (darkMode ? "#1A2535" : "#E2E8F0"), flexShrink: 0 }}>
-          <div
+          <button
+            type="button"
             onClick={onLogout}
-            style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", cursor: "pointer" }}
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", minHeight: 52, padding: "8px 16px calc(8px + env(safe-area-inset-bottom, 0px))", cursor: "pointer", font: "inherit", textAlign: "left", background: "transparent", border: "none" }}
           >
             <div
               style={{
@@ -296,8 +356,8 @@ export default function CoachMobileDrawer({
             >
               <Ic name="log-out" size={14} color="#ef4444" />
             </div>
-            <div style={{ color: "#ef4444", fontSize: 12, fontWeight: 600 }}>{msg("Cerrar sesión", "Log out")}</div>
-          </div>
+            <div style={{ color: "#ef4444", fontSize: 13, fontWeight: 600 }}>{msg("Cerrar sesión", "Log out")}</div>
+          </button>
         </div>
       </div>
     </>

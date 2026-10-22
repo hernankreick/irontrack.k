@@ -106,7 +106,8 @@ export default function StudentsSection(props) {
                     <button
                       key={chip.k}
                       type="button"
-                      className="hov"
+                      className="hov coach-tap"
+                      aria-pressed={sel}
                       onClick={function () { setCoachAlumnosFilter(chip.k); }}
                       style={{
                         padding: "6px 12px",

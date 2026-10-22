@@ -75,14 +75,14 @@ export default function StudentCard({
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginLeft:"auto"}}>
           <button
-            className="hov"
+            className="hov coach-tap"
             style={{background:"#3b82f6",color:"#fff",border:"none",borderRadius:10,padding:"8px 18px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
             onClick={onVer}
           >{isActive ? msg("CERRAR", "CLOSE", "FECHAR") : msg("VER", "VIEW", "VER")}</button>
           <div style={{position:"relative"}}>
             <button
               type="button"
-              className="hov"
+              className="hov coach-tap"
               aria-label={msg("Más opciones", "More options")}
               style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:10,cursor:"pointer"}}
               onClick={onToggleMenu}

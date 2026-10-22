@@ -3617,6 +3617,7 @@ function GymApp() {
         msg: msg,
         mobileDrawerRef: mobileDrawerRef,
         onClose: function () { setMobileDrawerOpen(false); },
+        onOpen: function () { setMobileDrawerOpen(true); },
         onNavigate: setTab,
         onLogout: handleCoachLogout,
         coachInitials: coachInitialsFromFullName(sessionData?.name),

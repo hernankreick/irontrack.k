@@ -15,10 +15,13 @@ export default function AppHeaderBrand({
     <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
       {showCoachDesktopShell && !coachDesktop1024 && (
         <button
+          type="button"
           onClick={onOpenMobileDrawer}
+          aria-label={msg("Abrir menú", "Open menu")}
+          aria-haspopup="dialog"
           style={{
-            width: 34,
-            height: 34,
+            width: 44,
+            height: 44,
             background: darkMode ? "#111827" : "#ffffff",
             border: darkMode ? "1px solid #1A2535" : "1px solid #e2e8f0",
             borderRadius: 9,
