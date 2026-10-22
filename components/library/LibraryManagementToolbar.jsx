@@ -41,8 +41,7 @@ export default function LibraryManagementToolbar({
           <div style={{ flex: 1 }}>
             <input
               type="search"
-              className="coach-tap"
-              style={{...inpS, marginBottom: 0}}
+              style={{...inpS, marginBottom: 0, minHeight: 44, boxSizing: 'border-box'}}
               placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")}
               value={busq}
               onChange={e=>setBusq(e.target.value)}
@@ -50,7 +49,6 @@ export default function LibraryManagementToolbar({
           </div>
           <button
             type="button"
-            className="coach-tap"
             onClick={function () { setSortModo(function (m) { return (m + 1) % 3; }); }}
             title={sortModo === 0 ? (msg("Sin orden definido — clic para A-Z", "Default order — click for A-Z")) : sortModo === 1 ? (msg("Orden: A-Z — clic para Z-A", "Order: A-Z — click for Z-A")) : (msg("Orden: Z-A — clic para quitar orden", "Order: Z-A — click to clear sort"))}
             style={{
@@ -60,7 +58,7 @@ export default function LibraryManagementToolbar({
               background: sortModo === 0 ? bgSub : "#2563EB22",
               color: sortModo === 0 ? textMuted : "#2563EB",
               fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer",
-              flexShrink: 0, whiteSpace: 'nowrap',
+              flexShrink: 0, whiteSpace: 'nowrap', minHeight: 44, minWidth: 44,
             }}
           >
             <Ic name="arrow-up-down" size={18} color={sortModo === 0 ? "#8B9AB2" : "#2563EB"} />
