@@ -720,18 +720,23 @@ export default function CoachDashboard({
   var _mobile = React.useState(false);
   var isMobile = _mobile[0];
   var setIsMobile = _mobile[1];
+  var _phone = React.useState(false);
+  var isPhone = _phone[0];
+  var setIsPhone = _phone[1];
   React.useEffect(function () {
     if (typeof window === "undefined" || !window.matchMedia) return;
     var mq = window.matchMedia("(max-width: 768px)");
+    var mqPhone = window.matchMedia("(max-width: 767px)");
     function update() {
       setIsMobile(mq.matches);
+      setIsPhone(mqPhone.matches);
     }
     update();
-    if (mq.addEventListener) mq.addEventListener("change", update);
-    else mq.addListener(update);
+    if (mq.addEventListener) { mq.addEventListener("change", update); mqPhone.addEventListener("change", update); }
+    else { mq.addListener(update); mqPhone.addListener(update); }
     return function () {
-      if (mq.removeEventListener) mq.removeEventListener("change", update);
-      else mq.removeListener(update);
+      if (mq.removeEventListener) { mq.removeEventListener("change", update); mqPhone.removeEventListener("change", update); }
+      else { mq.removeListener(update); mqPhone.removeListener(update); }
     };
   }, []);
 
@@ -916,7 +921,7 @@ export default function CoachDashboard({
       >
         <header
           style={{
-            padding: S.headerPadding,
+            padding: isPhone ? "16px 16px" : S.headerPadding,
             borderBottom: `1px solid ${C.brd}`,
             display: "flex",
             justifyContent: "space-between",
@@ -945,6 +950,7 @@ export default function CoachDashboard({
             }}
           >
             <div
+              className="coach-search-wrap"
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -1015,7 +1021,7 @@ export default function CoachDashboard({
             display: "flex",
             flexDirection: "column",
             gap: isMobile ? 16 : 22,
-            padding: S.pagePadding,
+            padding: isPhone ? 16 : S.pagePadding,
             background: dashBg,
           }}
         >

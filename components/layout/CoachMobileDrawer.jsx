@@ -137,8 +137,8 @@ export default function CoachMobileDrawer({
               style={{
                 background: "rgba(37,99,235,.15)",
                 border: "1px solid rgba(59,130,246,.3)",
-                color: "#3B82F6",
-                fontSize: 8,
+                color: darkMode ? "#93C5FD" : "#1D4ED8",
+                fontSize: 10,
                 fontWeight: 700,
                 borderRadius: 99,
                 padding: "2px 7px",
@@ -169,7 +169,7 @@ export default function CoachMobileDrawer({
             </div>
             <div>
               <div style={{ color: darkMode ? "#fff" : "#0F1923", fontSize: 13, fontWeight: 700 }}>{sessionData?.name || "Entrenador"}</div>
-              <div style={{ color: "#64748b", fontSize: 10, marginTop: 2 }}>Entrenador personal</div>
+              <div style={{ color: darkMode ? "#94a3b8" : "#475569", fontSize: 11, marginTop: 2 }}>Entrenador personal</div>
             </div>
           </div>
         </div>
@@ -299,7 +299,7 @@ export default function CoachMobileDrawer({
           ].map((item, i) => (
             <div
               key={i}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", cursor: "pointer", opacity: 0.6 }}
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", cursor: "default" }}
             >
               <div
                 style={{
@@ -316,14 +316,14 @@ export default function CoachMobileDrawer({
                 <Ic name={item.icon} size={14} color="#22c55e" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: darkMode ? "#e2e8f0" : "#0F1923", fontSize: 12, fontWeight: 600 }}>{item.label}</div>
-                <div style={{ color: "#64748b", fontSize: 10, marginTop: 1 }}>{item.sub}</div>
+                <div style={{ color: darkMode ? "#cbd5e1" : "#334155", fontSize: 13, fontWeight: 600 }}>{item.label}</div>
+                <div style={{ color: darkMode ? "#94a3b8" : "#475569", fontSize: 11, marginTop: 1 }}>{item.sub}</div>
               </div>
               <span
                 style={{
                   background: darkMode ? "#1A2535" : "#E2E8F0",
-                  color: "#64748b",
-                  fontSize: 8,
+                  color: darkMode ? "#cbd5e1" : "#334155",
+                  fontSize: 10,
                   borderRadius: 99,
                   padding: "2px 6px",
                   fontWeight: 700,

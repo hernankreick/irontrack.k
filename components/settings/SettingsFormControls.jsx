@@ -141,7 +141,7 @@ export function SaveBtn({ onClick, saved, savedHint, saveLabel, savedLabel }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20, gap: 10, alignItems: 'center' }}>
       {saved && <span style={{ fontSize: 12, color: C.green }}>{savedHint ?? 'Saved ✓'}</span>}
-      <button
+      <button className="coach-tap"
         type="button"
         onClick={onClick}
         style={{

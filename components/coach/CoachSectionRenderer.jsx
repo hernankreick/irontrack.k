@@ -56,7 +56,8 @@ export default function CoachSectionRenderer({
       )}
       {/* Main coach sections */}
       {(tab === "plan" || tab === "progress") && isCoach && (
-        <div style={mobilePad}>
+        // El Dashboard ya trae su propio margen lateral (16 px en movil): sin el del contenedor no se suma a 36 px.
+        <div style={isUnder768 ? { ...mobilePad, paddingLeft: 0, paddingRight: 0 } : mobilePad}>
           <CoachDashboardMain
             activeNav={tab === "progress" ? "progreso" : "dashboard"}
             {...dashboardProps}

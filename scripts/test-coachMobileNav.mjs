@@ -143,4 +143,55 @@ await test("areas tactiles del panel del coach (< 768 px): VER, menu de opciones
   assert.match(read("components/coach/CoachActiveStudentsCard.jsx"), /className="coach-tap"/);
 });
 
+// ---- Fase 3: areas tactiles restantes, contraste del drawer y margen lateral del Dashboard ----
+const lum = (hex) => { const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const mix = (fg, a, bg) => "#" + [1, 3, 5].map((i) => Math.round(parseInt(fg.slice(i, i + 2), 16) * a + parseInt(bg.slice(i, i + 2), 16) * (1 - a)).toString(16).padStart(2, "0")).join("");
+
+await test("areas tactiles < 768 px: reglas de rutinas (botones, orden, filtros) y clase coach-tap en campana, menu de rutina, biblioteca y Configuracion", () => {
+  const css = renderToStaticMarkup(h(AppGlobalStyles, { darkMode: true, bgSub: "#162234", textMain: "#fff", border: "#2D4057" }));
+  const media = css.match(/@media \(max-width:767px\)\{[^]*?\}\}/)[0];
+  assert.match(media, /\.it-routine-btn,\.it-routine-sort-select,\.it-routine-filter-chip\{min-height:44px\}/, "las reglas de rutinas viven DENTRO del media < 768 (tablet y escritorio no cambian)");
+  assert.match(read("components/CoachNotificationCenter.jsx"), /className="hov coach-tap coach-bell"\s+aria-expanded=\{open\}/);
+  assert.match(read("components/students/StudentRoutineActions.jsx"), /className="hov coach-tap" aria-label=\{msg\("Opciones de rutina"/);
+  assert.equal((read("components/library/LibraryExerciseCard.jsx").match(/className="coach-tap"/g) || []).length, 4, "menu, ver video (boton y enlace) y borrar");
+  const settings = ["SettingsFormControls", "SettingsPage", "SettingsShell", "SettingsSubscriptionTab"].map((f) => (read("components/settings/" + f + ".jsx").match(/coach-tap/g) || []).length).reduce((x, y) => x + y, 0);
+  assert.ok(settings >= 7, "botones de Configuracion marcados: " + settings);
+  assert.ok(!/\.it-routine-btn[^{]*\{[^}]*min-width/.test(media), "no se fuerza ancho minimo a los botones de rutinas");
+});
+
+await test("drawer: los textos pendientes llegan a >= 4.5:1 en oscuro y claro (antes #64748b 3.7:1, PRONTO 3.2:1, PRO 4.2:1) y los items de PAGOS ya no se atenuan con opacity", () => {
+  const dark = "#111827", light = "#FFFFFF";
+  assert.ok(ratio("#94a3b8", dark) >= 4.5, "subtitulos oscuro");
+  assert.ok(ratio("#475569", light) >= 4.5, "subtitulos claro");
+  assert.ok(ratio("#cbd5e1", "#1A2535") >= 4.5, "PRONTO oscuro");
+  assert.ok(ratio("#334155", "#E2E8F0") >= 4.5, "PRONTO claro");
+  assert.ok(ratio("#93C5FD", mix("#2563EB", 0.15, dark)) >= 4.5, "PRO oscuro");
+  assert.ok(ratio("#1D4ED8", mix("#2563EB", 0.15, light)) >= 4.5, "PRO claro");
+  const html = drawer({ open: true });
+  assert.ok(!/color:#64748b/.test(html), "no quedan textos #64748b");
+  assert.ok(!/opacity:0\.6/.test(html));
+  assert.ok(!/font-size:8px/.test(html) && !/font-size:9px/.test(html));
+});
+
+await test("Dashboard movil: el margen lateral se aplica una sola vez (16 px en lugar de 16 + 20) y escritorio/tablet no cambian", () => {
+  const r = read("components/coach/CoachSectionRenderer.jsx");
+  assert.match(r, /isUnder768 \? \{ \.\.\.mobilePad, paddingLeft: 0, paddingRight: 0 \} : mobilePad/);
+  const d = read("components/CoachDashboard.jsx");
+  assert.match(d, /padding: isPhone \? "16px 16px" : S\.headerPadding/);
+  assert.match(d, /padding: isPhone \? 16 : S\.pagePadding/);
+  assert.match(read("components/coachUiScale.js"), /pagePadding: 20/);
+});
+
+await test("campana y buscador del Dashboard: la campana llega a 44 px solo en movil (<768) y el buscador puede encogerse para no solaparla", () => {
+  const css = read("components/layout/AppGlobalStyles.jsx");
+  const m = css.match(/@media \(max-width:767px\)\{[^`]*?\}\}/) || css.match(/@media \(max-width:767px\)[\s\S]*?input:not/);
+  assert.ok(m && /\.coach-bell\{min-width:44px!important;min-height:44px!important\}/.test(m[0]), "regla coach-bell dentro de la media query");
+  assert.ok(/\.coach-search-wrap>div\{min-width:0!important\}/.test(m[0]), "regla del buscador dentro de la media query");
+  assert.match(read("components/CoachNotificationCenter.jsx"), /className="hov coach-tap coach-bell"/);
+  assert.match(read("components/CoachDashboard.jsx"), /className="coach-search-wrap"/);
+  const st = read("components/students/StudentsSection.jsx");
+  assert.equal((st.match(/className="hov coach-tap" style/g) || []).length, 3, "Datos de pago, Actualizar y + Nuevo");
+});
+
 console.log("\n" + count + " pruebas OK");

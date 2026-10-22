@@ -23,7 +23,7 @@ export default function StudentRoutineActions({
   if (variant === "menu") {
     return (
       <div style={{position:"relative",flexShrink:0}}>
-        <button type="button" className="hov" aria-label={msg("Opciones de rutina", "Routine options")} style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:10,cursor:"pointer"}} onClick={onToggleMenu}>
+        <button type="button" className="hov coach-tap" aria-label={msg("Opciones de rutina", "Routine options")} style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:10,cursor:"pointer"}} onClick={onToggleMenu}>
           <Ic name="more-vertical" size={18} color={textMuted}/>
         </button>
         {isMenuOpen && (
