@@ -583,7 +583,7 @@ export default function CoachNotificationCenter({
     <div ref={wrapRef} style={{ position: "relative", flexShrink: 0 }}>
       <button
         type="button"
-        className="hov"
+        className="hov coach-tap coach-bell"
         aria-expanded={open}
         aria-haspopup="true"
         aria-label={M(lang, "Notificaciones", "Notifications", "Notificações")}

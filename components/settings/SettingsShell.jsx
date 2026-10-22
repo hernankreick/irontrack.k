@@ -71,7 +71,7 @@ export default function SettingsShell({
             {ui.coachMode}
           </div>
         </div>
-        <button
+        <button className="coach-tap"
           type="button"
           onClick={onClose}
           style={{
@@ -112,7 +112,7 @@ export default function SettingsShell({
                   {isDanger && (
                     <div style={{ width: 1, background: pal.border, flexShrink: 0, margin: '8px 2px' }} />
                   )}
-                  <button
+                  <button className="coach-tap"
                     type="button"
                     onClick={function () { setActive(s.id); }}
                     style={{
@@ -194,7 +194,7 @@ export default function SettingsShell({
                   {s.danger && i > 0 && (
                     <div style={{ height: 1, background: pal.border, margin: '8px 0' }} />
                   )}
-                  <button
+                  <button className="coach-tap"
                     type="button"
                     onClick={function () { setActive(s.id); }}
                     style={{

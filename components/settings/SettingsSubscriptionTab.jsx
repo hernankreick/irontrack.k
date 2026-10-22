@@ -70,7 +70,7 @@ export default function SettingsSubscriptionTab({
 
       <SubscriptionSectionTitle C={C}>{t.billing}</SubscriptionSectionTitle>
       <SubscriptionRow label={t.paymentMethod} desc={t.paymentMethodDesc} C={C}>
-        <button type="button" style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 14px', fontSize: 12, color: C.muted, cursor: 'pointer', fontFamily: 'inherit' }}>{t.update}</button>
+        <button className="coach-tap" type="button" style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 14px', fontSize: 12, color: C.muted, cursor: 'pointer', fontFamily: 'inherit' }}>{t.update}</button>
       </SubscriptionRow>
     </div>
   );

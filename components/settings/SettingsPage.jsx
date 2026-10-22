@@ -400,7 +400,7 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
         <div style={{ fontSize: 14, fontWeight: 500, color: C.red }}>{label}</div>
         <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{desc}</div>
       </div>
-      <button type="button" onClick={onClick} style={{
+      <button className="coach-tap" type="button" onClick={onClick} style={{
         background: variant === 'fill' ? C.red : 'transparent',
         border: `1px solid ${C.red}`, color: variant === 'fill' ? '#fff' : C.red,
         borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600,
@@ -447,7 +447,7 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
             }}
           />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" onClick={doDelete} disabled={deletePhrase !== t.deleteWord} style={{
+            <button className="coach-tap" type="button" onClick={doDelete} disabled={deletePhrase !== t.deleteWord} style={{
               background: deletePhrase === t.deleteWord ? C.red : C.deleteDisabledBg,
               color: deletePhrase === t.deleteWord ? '#fff' : C.deleteBtnDisabledFg, border: 'none', borderRadius: 7, padding: '8px 18px',
               fontSize: 12, fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase',
