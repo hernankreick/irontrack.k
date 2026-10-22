@@ -6,4 +6,10 @@ dist
 .env.*
 !.env.example
 .env*.local
-.claude/
+# Claude Code: se versiona la configuracion del flujo de agentes; lo local/personal no.
+.claude/*
+!.claude/agents/
+!.claude/hooks/
+!.claude/settings.json
+.claude/settings.local.json
+.claude/agent-memory-local/
