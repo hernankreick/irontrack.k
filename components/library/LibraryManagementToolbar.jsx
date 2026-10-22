@@ -1,5 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ic } from '../Ic.jsx';
+
+// < 768 px: true. Estado inicial seguro para SSR (false); el media query lo corrige en el cliente.
+function useIsUnder768() {
+  const [v, setV] = useState(false);
+  useEffect(function () {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    var mq = window.matchMedia('(max-width: 767px)');
+    function onChange() { setV(mq.matches); }
+    onChange();
+    mq.addEventListener('change', onChange);
+    return function () { mq.removeEventListener('change', onChange); };
+  }, []);
+  return v;
+}
 
 export default function LibraryManagementToolbar({
   busq,
@@ -27,8 +41,11 @@ export default function LibraryManagementToolbar({
   allEx,
   msg,
   textMuted,
+  compactFilters,
 }) {
   const [filterExpanded, setFilterExpanded] = useState(false);
+  const isUnder768 = useIsUnder768();
+  const compact = compactFilters !== undefined && compactFilters !== null ? !!compactFilters : isUnder768;
   const isFilterActive = modoFiltro === "patron" ? filtPat !== "todos" : filtMus !== "todos";
   const activeFilterLabel = isFilterActive
     ? (modoFiltro === "patron" ? patLabel(filtPat) : musLabel(filtMus))
@@ -122,7 +139,32 @@ export default function LibraryManagementToolbar({
               </button>
             ))}
           </div>
-          {modoFiltro==="patron" && (
+          {compact && (
+            <div className="min-w-0" style={{ position: "relative", width: "100%" }}>
+              <select
+                id="bib-filt-categoria"
+                aria-label={msg("Categoría", "Category", "Categoria")}
+                value={modoFiltro==="patron" ? filtPat : filtMus}
+                onChange={e=>{
+                  const v = e.target.value;
+                  if (modoFiltro==="patron") setFiltPat(v);
+                  else setFiltMus(v==="todos"?"todos":v);
+                }}
+                style={{
+                  ...inpS, marginBottom: 0, width: "100%", minHeight: 44, boxSizing: "border-box",
+                  fontSize: 16, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
+                  appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
+                  padding: "10px 40px 10px 14px",
+                }}
+              >
+                {modoFiltro==="patron"
+                  ? patrones.map(p=>(<option key={p} value={p}>{patLabel(p)}</option>))
+                  : musculos.map(m=>(<option key={m} value={m}>{musLabel(m)}</option>))}
+              </select>
+              <span aria-hidden="true" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: _dm ? "#6B7280" : textMuted, fontSize: 16 }}>▾</span>
+            </div>
+          )}
+          {!compact && modoFiltro==="patron" && (
             <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
               {patrones.map(p=>(
                 <button
@@ -141,7 +183,7 @@ export default function LibraryManagementToolbar({
               ))}
             </div>
           )}
-          {modoFiltro==="musculo" && (
+          {!compact && modoFiltro==="musculo" && (
             <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
               {musculos.map(m=>(
                 <button
