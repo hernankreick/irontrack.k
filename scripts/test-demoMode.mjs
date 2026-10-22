@@ -10,6 +10,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { decideDemoBuild } from "../lib/demoBuildGuard.js";
 import { demoRutinaRow, demoSesiones, demoProgresoRows, demoDays, DEMO_ALUMNO_ID } from "../demo/demoData.js";
+import { COACH_ALUMNOS, COACH_RUTINAS, coachSesiones, coachProgreso, coachMensajes } from "../demo/demoCoachData.js";
+import { createDemoClient } from "../demo/demoClient.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (f) => readFileSync(path.join(ROOT, f), "utf8");
@@ -63,7 +65,8 @@ await test("el codigo de demo solo se alcanza detras de DEMO_MODE (sin imports e
     assert.ok(!/from ['"][^'"]*\/demo\/[^'"]*['"]/.test(read(f)), f + " importa demo/ estaticamente");
   }
   assert.match(read("main.jsx"), /if \(DEMO_MODE\) \{\s*import\('\.\/demo\/bootDemo\.js'\)/);
-  assert.match(read("lib/supabaseClient.js"), /!DEMO_MODE && url && key/);
+  assert.match(read("lib/supabaseClient.js"), /export const supabase = DEMO_MODE \? demoClient : url && key/);
+  assert.ok(!/^import .*demo\/demoClient/m.test(read("lib/supabaseClient.js")), "el cliente simulado se registra en runtime (demo/bootDemo.js), no se importa estaticamente");
   const app = read("App.jsx");
   assert.match(app, /if \(DEMO_MODE\) return demoApi\(\)\.fetch\(/);
   assert.match(app, /if \(DEMO_MODE\) return \[\]; \/\/ demo: sin red/);
@@ -95,6 +98,47 @@ await test("datos ficticios: alumno, rutina de 3 dias, historial con semana y se
   const rows = demoProgresoRows();
   assert.ok(rows.length >= 36 && rows.every((p) => p.semana === 0 && p.alumno_id === DEMO_ALUMNO_ID && p.fecha && Number.isFinite(p.kg)));
   assert.ok(!/@|\bhttps?:\/\//.test(JSON.stringify([r, ses, rows])), "sin correos ni URLs");
+});
+
+await test("demo del ENTRENADOR: datos ficticios (4 alumnos: activos, inactivo y sin rutina), correos .invalid, sin URLs ni datos reales", () => {
+  assert.equal(COACH_ALUMNOS.length, 4);
+  for (const a of COACH_ALUMNOS) assert.ok(/@ejemplo\.invalid$/.test(a.email) && /Demo$/.test(a.nombre), a.nombre);
+  const conRutina = new Set(COACH_RUTINAS.map((r) => r.alumno_id).filter(Boolean));
+  assert.ok(COACH_ALUMNOS.some((a) => !conRutina.has(a.id)), "hay un alumno sin rutina");
+  assert.ok(COACH_RUTINAS.some((r) => r.es_plantilla) && COACH_RUTINAS.some((r) => !r.es_plantilla));
+  const ses = coachSesiones();
+  assert.ok(ses.every((x) => Number.isFinite(x.semana) && x.dia_label && x.fecha && COACH_ALUMNOS.some((a) => a.id === x.alumno_id)));
+  assert.ok(ses.some((x) => Date.now() - Date.parse(x.created_at) > 21 * 864e5), "hay un alumno inactivo (>21 dias)");
+  assert.ok(coachProgreso().every((p) => p.semana === 0 && Number.isFinite(p.kg)));
+  const msgs = coachMensajes();
+  assert.ok(msgs.some((m) => !m.de_entrenador && !m.leido), "hay mensajes sin leer del alumno");
+  assert.ok(!/https?:\/\//.test(JSON.stringify([COACH_ALUMNOS, COACH_RUTINAS, ses, msgs])));
+});
+
+await test("cliente simulado de la demo: sin red; lecturas vacias, escrituras descartadas, sesion solo para el entrenador y login deshabilitado", async () => {
+  const src = read("demo/demoClient.js");
+  assert.ok(!/fetch\(|XMLHttpRequest|WebSocket|import\s/.test(src), "el cliente simulado no usa red ni importa nada");
+  const coach = createDemoClient({ coachUserId: "demo-entrenador-0001" });
+  assert.deepEqual(await coach.from("alumnos").select("*").eq("x", 1), { data: [], error: null, count: 0 });
+  assert.deepEqual((await coach.from("mensajes").insert([{ texto: "hola" }])).data, [{ texto: "hola" }]);
+  assert.equal((await coach.from("entrenadores").select("*").maybeSingle()).data, null);
+  assert.equal((await coach.auth.getSession()).data.session.user.id, "demo-entrenador-0001");
+  assert.equal((await createDemoClient({}).auth.getSession()).data.session, null);
+  const login = await coach.auth.signInWithPassword({ email: "x", password: "y" });
+  assert.equal(login.data, null); assert.match(login.error.message, /deshabilitado/);
+});
+
+await test("bootDemo: por defecto abre como entrenador (?rol=alumno abre al alumno), sin credenciales; el cliente real nunca se crea en demo", () => {
+  const b = read("demo/bootDemo.js");
+  assert.match(b, /get\("rol"\) === "alumno" \? "alumno" : "entrenador"/);
+  assert.match(b, /role: "entrenador", name: COACH_NAME/);
+  assert.match(b, /createDemoClient\(\{ coachUserId: COACH_AUTH_ID \}\)/);
+  const sup = read("lib/supabaseClient.js");
+  assert.match(sup, /export const supabase = DEMO_MODE \? demoClient : url && key/);
+  for (const f of ["demo/bootDemo.js", "demo/demoCoachData.js", "demo/demoClient.js"]) {
+    const t = read(f);
+    assert.ok(!/eyJ[A-Za-z0-9_-]{10,}/.test(t) && !/supabase\.(co|in)/i.test(t) && !/sb_(publishable|secret)_/.test(t), f);
+  }
 });
 
 await test("CI: construye la demo, verifica los bundles y Production con demo debe fallar", () => {

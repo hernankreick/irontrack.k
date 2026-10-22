@@ -15,7 +15,7 @@ const files = [];
 (function walk(d) { for (const n of readdirSync(d)) { const p = path.join(d, n); statSync(p).isDirectory() ? walk(p) : /\.(js|html|css|map)$/.test(n) && files.push(p); } })(dir);
 const text = files.map((f) => readFileSync(f, "utf8")).join("\n");
 
-const DEMO_MARKERS = ["IRONTRACK_DEMO_BUILD_MARKER", "__IRONTRACK_DEMO_API__", "DEMO · datos ficticios", "Plan Demo - Fuerza base", "demo-alumno-0001"];
+const DEMO_MARKERS = ["IRONTRACK_DEMO_BUILD_MARKER", "__IRONTRACK_DEMO_API__", "DEMO · datos ficticios", "Plan Demo - Fuerza base", "demo-alumno-0001", "Entrenador Demo", "demo-entrenador-0001"];
 const found = DEMO_MARKERS.filter((m) => text.includes(m));
 const supabaseHost = /https?:\/\/[a-z0-9-]{8,}\.supabase\.(co|in)/i.test(text);
 const jwt = /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\./.test(text);
