@@ -119,6 +119,7 @@ import CoachDesktopShellFrame from './components/layout/CoachDesktopShellFrame.j
 import OfflineSyncBanner from './components/layout/OfflineSyncBanner.jsx';
 import { applyItPrefsToDocument } from './components/settings/SettingsPage.jsx';
 import { supabase } from './lib/supabaseClient.js';
+import { DEMO_MODE, demoApi } from './lib/demoMode.js';
 import { clearIronTrackStorageForNewLogin, clearAllIronTrackPrefixedKeys } from './lib/irontrackLocalStorage.js';
 import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMsg.js';
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
@@ -278,6 +279,7 @@ async function getActiveSupabaseSession() {
 }
 
 const sbFetch = async (path, method="GET", body=null) => {
+  if (DEMO_MODE) return demoApi().fetch(path, method, body); // demo: datos ficticios, nada sale del navegador
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
   const opts = { method, headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json", "Prefer": "return=representation" } };
@@ -321,6 +323,7 @@ const sbRequestStatus = async (path, method="GET", body=null) => {
 
 // Variante estricta: lanza ante error HTTP/red en vez de devolver null (no confundir error con "sin alumnos").
 const sbFetchStrict = async (path) => {
+  if (DEMO_MODE) return []; // demo: sin red
   var activeSession = await getActiveSupabaseSession();
   var accessToken = activeSession && activeSession.access_token ? activeSession.access_token : SB_KEY;
   const r = await fetch(SB_URL+"/rest/v1/"+path, { method: "GET", headers: { "apikey": SB_KEY, "Authorization": "Bearer "+accessToken, "Content-Type": "application/json" } });
@@ -630,6 +633,19 @@ const sb = {
     return sbFetch("entrenadores?id=eq."+encodeURIComponent(id||"entrenador_principal"), "PATCH", clean);
   },
 };
+
+// Demo (solo builds de demo): TODA llamada a la capa de datos se resuelve con datos ficticios o como no-op local; nunca toca el cliente
+// de Supabase ni la red. Lo no listado en demo/bootDemo.js devuelve [] (lecturas) o null (escrituras).
+if (DEMO_MODE) {
+  Object.keys(sb).forEach(function (k) {
+    sb[k] = function () {
+      var api = demoApi();
+      var fn = api && api.sb && api.sb[k];
+      if (fn) return fn.apply(null, arguments);
+      return Promise.resolve(/^get/.test(k) ? [] : null);
+    };
+  });
+}
 
 /**
  * ── Plan alumno: diagnóstico scroll / micro-saltos (Chrome mobile) ─────────────────

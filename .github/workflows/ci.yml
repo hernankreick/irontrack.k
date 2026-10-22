@@ -93,6 +93,7 @@ jobs:
         run: |
           npm run build -- --outDir dist-prod --emptyOutDir
           node scripts/check-bundle-target.mjs dist-prod/assets --target production
+          node scripts/check-demo-bundle.mjs dist-prod --expect=no-demo
           rm -rf dist-prod
 
       # El build de Production DEBE fallar si falta la configuracion: las variables vacias pisan al .env versionado.
@@ -108,3 +109,30 @@ jobs:
             exit 1
           fi
           rm -rf dist-prod-neg
+
+      # El build normal (el de Production lo es) no contiene ni codigo ni datos de demo.
+      - name: Demo - el build normal no incluye el modo demo
+        run: node scripts/check-demo-bundle.mjs dist --expect=no-demo
+
+      # Build de demo explicito (interfaz del alumno con datos ficticios): sin URL ni clave de Supabase y con el demo incluido.
+      - name: Demo - build explicito sin Supabase
+        env:
+          IRONTRACK_DEMO: "1"
+        run: |
+          npm run build -- --outDir dist-demo --emptyOutDir
+          node scripts/check-demo-bundle.mjs dist-demo --expect=demo
+          rm -rf dist-demo
+
+      # Production NUNCA admite el modo demo: pedirlo hace fallar el build.
+      - name: Demo - Production con IRONTRACK_DEMO debe fallar
+        env:
+          VERCEL: "1"
+          VERCEL_ENV: production
+          IRONTRACK_DEMO: "1"
+          VITE_SUPABASE_URL: https://ci-simulado.example.com
+          VITE_SUPABASE_ANON_KEY: ci-simulada-anon-key-0123456789
+        run: |
+          if npm run build -- --outDir dist-prod-demo --emptyOutDir; then
+            echo "::error::el build de Production con IRONTRACK_DEMO=1 debia fallar y termino bien"
+            exit 1
+          fi
