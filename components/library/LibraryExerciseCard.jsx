@@ -144,6 +144,7 @@ export default function LibraryExerciseCard({
           />
           <button
             onClick={() => setShowVideo(false)}
+            className="coach-tap"
             style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', color: '#fff', fontSize: '14px', cursor: 'pointer', zIndex: 1 }}
           >✕</button>
         </div>

@@ -154,7 +154,7 @@ await test("areas tactiles < 768 px: reglas de rutinas (botones, orden, filtros)
   assert.match(media, /\.it-routine-btn,\.it-routine-sort-select,\.it-routine-filter-chip\{min-height:44px\}/, "las reglas de rutinas viven DENTRO del media < 768 (tablet y escritorio no cambian)");
   assert.match(read("components/CoachNotificationCenter.jsx"), /className="hov coach-tap coach-bell"\s+aria-expanded=\{open\}/);
   assert.match(read("components/students/StudentRoutineActions.jsx"), /className="hov coach-tap" aria-label=\{msg\("Opciones de rutina"/);
-  assert.equal((read("components/library/LibraryExerciseCard.jsx").match(/className="coach-tap"/g) || []).length, 4, "menu, ver video (boton y enlace) y borrar");
+  assert.equal((read("components/library/LibraryExerciseCard.jsx").match(/className="coach-tap"/g) || []).length, 5, "menu, ver video (boton y enlace), borrar y cierre del video");
   const settings = ["SettingsFormControls", "SettingsPage", "SettingsShell", "SettingsSubscriptionTab"].map((f) => (read("components/settings/" + f + ".jsx").match(/coach-tap/g) || []).length).reduce((x, y) => x + y, 0);
   assert.ok(settings >= 7, "botones de Configuracion marcados: " + settings);
   assert.ok(!/\.it-routine-btn[^{]*\{[^}]*min-width/.test(media), "no se fuerza ancho minimo a los botones de rutinas");
@@ -192,6 +192,19 @@ await test("campana y buscador del Dashboard: la campana llega a 44 px solo en m
   assert.match(read("components/CoachDashboard.jsx"), /className="coach-search-wrap"/);
   const st = read("components/students/StudentsSection.jsx");
   assert.equal((st.match(/className="hov coach-tap" style/g) || []).length, 3, "Datos de pago, Actualizar y + Nuevo");
+});
+
+await test("Biblioteca movil (<768): buscador, Ordenar, cierre/modo/chips de filtros, cierre del video y 'Abrir en YouTube' llegan a 44 px solo en movil", () => {
+  const css = renderToStaticMarkup(h(AppGlobalStyles, { darkMode: true, bgSub: "#162234", textMain: "#fff", border: "#2D4057" }));
+  const media = css.match(/@media \(max-width:767px\)\{[^]*?\}\}/)[0];
+  assert.match(media, /\.coach-tap-link\{display:inline-flex;align-items:center;min-height:44px\}/, "regla del enlace dentro del media < 768");
+  const tb = read("components/library/LibraryManagementToolbar.jsx");
+  assert.match(tb, /type="search"\s+className="coach-tap"/, "buscador del modo estrecho");
+  assert.match(tb, /<button\s+type="button"\s+className="coach-tap"\s+onClick=\{function \(\) \{ setSortModo/, "Ordenar del modo estrecho");
+  assert.match(tb, /className="coach-tap" aria-label=\{msg\("Cerrar filtros"/, "cierre del panel de filtros");
+  assert.equal((tb.match(/className="coach-tap"/g) || []).length, 6, "buscador, Ordenar, cierre, selector de modo, chips de patron y de musculo");
+  assert.match(read("components/library/LibraryExerciseCard.jsx"), /onClick=\{\(\) => setShowVideo\(false\)\}\s+className="coach-tap"/);
+  assert.match(read("components/library/GestionBiblioteca.jsx"), /rel="noreferrer" className="coach-tap-link"/);
 });
 
 console.log("\n" + count + " pruebas OK");
