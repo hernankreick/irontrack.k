@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import useDialogA11y from './useDialogA11y.js';
 
 const MODAL_TRANSITION_MS = 200;
 const MODAL_EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
@@ -10,6 +11,8 @@ export default function BaseModal({
   children,
   maxWidth = 480,
   closeOnOutside = true,
+  closeOnEscape = true,
+  ariaLabel,
   zIndex = 9999,
   overlayStyle,
   contentStyle,
@@ -39,16 +42,14 @@ export default function BaseModal({
     };
   }, [shouldRender]);
 
-  useEffect(function () {
-    if (!shouldRender) return undefined;
-    function onKeyDown(e) {
-      if (e.key === 'Escape' && typeof onClose === 'function') onClose();
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return function () {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [shouldRender, onClose]);
+  // Foco inicial, trampa de Tab, Escape (solo el modal superior) y retorno del foco: ver useDialogA11y.
+  // closeOnEscape=false evita cerrar en silencio un formulario con datos tipeados.
+  var contentRef = useRef(null);
+  useDialogA11y({
+    open: !!open,
+    containerRef: contentRef,
+    onEscape: closeOnEscape !== false && typeof onClose === 'function' ? onClose : undefined,
+  });
 
   if (!shouldRender || typeof document === 'undefined') return null;
 
@@ -85,6 +86,10 @@ export default function BaseModal({
       }}
     >
       <div
+        ref={contentRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
         {...(contentProps || {})}
         style={{
           background: modalBg,

@@ -44,7 +44,7 @@ export default function StudentRoutineActions({
     return (
       <div style={{display:"flex",gap:8,marginTop:14}}>
         <button className="hov" style={{flex:2,padding:"10px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMain,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={onEditRoutine}><Ic name="edit-2" size={16} color={textMuted}/>{msg("Editar rutina", "Edit routine")}</button>
-        <button className="hov" style={{padding:"10px 16px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={onRemoveRoutine}><Ic name="trash-2" size={15}/></button>
+        <button type="button" className="hov" aria-label={msg("Quitar rutina", "Remove routine")} style={{padding:"10px 16px",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={onRemoveRoutine}><Ic name="trash-2" size={15}/></button>
       </div>
     );
   }

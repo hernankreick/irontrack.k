@@ -219,10 +219,10 @@ export default function CoachMobileDrawer({
                   flexShrink: 0,
                 }}
               >
-                <Ic name={item.icon} size={14} color={activeTab === item.k ? "#3B82F6" : "#94a3b8"} />
+                <Ic name={item.icon} size={14} color={activeTab === item.k ? (darkMode ? "#60A5FA" : "#1D4ED8") : "#94a3b8"} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: activeTab === item.k ? "#3B82F6" : (darkMode ? "#e2e8f0" : "#0F1923"), fontSize: 13, fontWeight: 600 }}>{item.label}</div>
+                <div style={{ color: activeTab === item.k ? (darkMode ? "#60A5FA" : "#1D4ED8") : (darkMode ? "#e2e8f0" : "#0F1923"), fontSize: 13, fontWeight: 600 }}>{item.label}</div>
                 {item.sub && <div style={{ color: darkMode ? "#94a3b8" : "#475569", fontSize: 11, marginTop: 1 }}>{item.sub}</div>}
               </div>
             </DrawerNavItem>
@@ -268,7 +268,7 @@ export default function CoachMobileDrawer({
                   flexShrink: 0,
                 }}
               >
-                <Ic name={item.icon} size={14} color="#3B82F6" />
+                <Ic name={item.icon} size={14} color={darkMode ? "#60A5FA" : "#1D4ED8"} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: darkMode ? "#e2e8f0" : "#0F1923", fontSize: 13, fontWeight: 600 }}>{item.label}</div>

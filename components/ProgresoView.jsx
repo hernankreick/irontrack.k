@@ -7,7 +7,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { buildCoachProgresoModel, getRoutineForAlumno } from "./coachProgresoMetrics.js";
-import { coachType as T, coachSpace as S } from "./coachUiScale.js";
+import { coachType as T, coachSpace as S0 } from "./coachUiScale.js";
 import ProgressAdherenceCard from "./progreso/ProgressAdherenceCard.jsx";
 import ProgressLoadChart from "./progreso/ProgressLoadChart.jsx";
 import ProgressLoadControls from "./progreso/ProgressLoadControls.jsx";
@@ -120,6 +120,8 @@ export default function ProgresoView({
 }) {
   const { lang } = useIronTrackI18n();
   const isUnder768 = useIsUnder768();
+  // Movil: margen lateral de 16 px, igual que el resto de pantallas del coach (antes 20 px).
+  const S = isUnder768 ? Object.assign({}, S0, { pagePadding: 16, headerPadding: "16px 16px" }) : S0;
   const [periodo, setPeriodo] = useState("semanas4");
 
   var C = useMemo(
@@ -427,28 +429,23 @@ export default function ProgresoView({
     );
   }
 
+  // Movil: tarjetas apiladas a ancho completo (antes carrusel horizontal cortado a la derecha, sin indicio de scroll).
   var mobileScrollRow = {
-    display: "flex",
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr)",
     gap: 10,
-    overflowX: "auto",
-    padding: "0 4px 8px",
-    scrollSnapType: "x mandatory",
-    WebkitOverflowScrolling: "touch",
-    msOverflowStyle: "none",
-    scrollbarWidth: "none",
   };
 
   /** Fila de chips: scroll horizontal en móvil, grilla de `cols` columnas en desktop. */
   function renderChips(chips, cols) {
     return isUnder768 ? (
-      <div style={mobileScrollRow}>
-        {chips.map(function (c) {
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+        {chips.map(function (c, ci) {
           return (
             <div
               key={c.key}
               style={{
-                flex: "0 0 44%",
-                scrollSnapAlign: "start",
+                gridColumn: chips.length % 2 === 1 && ci === chips.length - 1 ? "1 / -1" : undefined,
                 background: C.cardDark,
                 border: "1px solid " + C.brd,
                 borderRadius: 8,
@@ -686,6 +683,7 @@ export default function ProgresoView({
                   color: active ? C.blue : C.t2,
                   ...T.periodTab,
                   padding: "8px 14px",
+                  minHeight: isUnder768 ? 44 : undefined,
                   borderRadius: 8,
                   cursor: "pointer",
                   fontFamily: "inherit",

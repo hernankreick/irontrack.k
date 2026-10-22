@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import useDialogA11y from '../modals/useDialogA11y.js';
 
 function useIsUnder768() {
   var [v, setV] = useState(function () {
@@ -28,6 +29,29 @@ export default function SettingsShell({
   onClose,
 }) {
   var isUnder768 = useIsUnder768();
+  // Pestañas moviles con scroll horizontal: degradado a la derecha mientras quedan pestañas ocultas.
+  var tabsRef = useRef(null);
+  var [tabsMore, setTabsMore] = useState(false);
+  function measureTabs() {
+    var el = tabsRef.current;
+    if (!el) return;
+    setTabsMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+  }
+  useEffect(function () {
+    var el = tabsRef.current;
+    // La pestaña activa no debe quedar tapada por el borde ni por el degradado: se desplaza lo justo para mostrarla.
+    var b = el && el.querySelector('[data-tab-active="1"]');
+    if (b && b.offsetLeft + b.offsetWidth > el.scrollLeft + el.clientWidth - 48) {
+      el.scrollLeft = b.offsetLeft + b.offsetWidth - el.clientWidth + 48;
+    }
+    measureTabs();
+    if (typeof window === 'undefined') return undefined;
+    window.addEventListener('resize', measureTabs);
+    return function () { window.removeEventListener('resize', measureTabs); };
+  }, [isUnder768, active]);
+  // Como pantalla completa (no embebida) es un dialogo modal: foco, Tab atrapado, Escape (= boton cerrar) y retorno de foco.
+  var dialogRef = useRef(null);
+  useDialogA11y({ open: !embed, containerRef: dialogRef, onEscape: !embed && typeof onClose === 'function' ? onClose : undefined });
 
   var outerStyle = embed ? {
     position: 'relative',
@@ -60,7 +84,11 @@ export default function SettingsShell({
   };
 
   return (
-    <div style={outerStyle}>
+    <div
+      ref={dialogRef}
+      style={outerStyle}
+      {...(embed ? {} : { role: 'dialog', 'aria-modal': 'true', 'aria-label': String(ui.settingsHeader || '') + ' ' + String(ui.coachMode || '') })}
+    >
       {/* HEADER — identical on both mobile and desktop */}
       <div style={headerStyle}>
         <div>
@@ -91,7 +119,10 @@ export default function SettingsShell({
           <style>{'.it-stg-mob * { grid-template-columns: 1fr !important; }'}</style>
 
           {/* Horizontal scrollable tab bar */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
           <div
+            ref={tabsRef}
+            onScroll={measureTabs}
             style={{
               display: 'flex',
               overflowX: 'auto',
@@ -114,6 +145,7 @@ export default function SettingsShell({
                   )}
                   <button className="coach-tap"
                     type="button"
+                    data-tab-active={isActive ? '1' : undefined}
                     onClick={function () { setActive(s.id); }}
                     style={{
                       padding: '12px 14px',
@@ -135,6 +167,18 @@ export default function SettingsShell({
                 </React.Fragment>
               );
             })}
+          </div>
+          {tabsMore ? (
+            <div
+              aria-hidden="true"
+              data-testid="settings-tabs-fade"
+              style={{
+                position: 'absolute', top: 0, right: 0, bottom: 1, width: 40,
+                background: 'linear-gradient(to left, ' + pal.chrome + ' 15%, transparent 100%)',
+                pointerEvents: 'none',
+              }}
+            />
+          ) : null}
           </div>
 
           {/* Content: full-width scrollable column */}

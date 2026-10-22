@@ -36,6 +36,7 @@ export default function ProgressMovementPatternRow({
     <div key={pattern.key}>
       <button
         type="button"
+        className="coach-tap"
         onClick={onToggle}
         style={{
           width: "100%",

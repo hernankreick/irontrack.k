@@ -777,6 +777,13 @@ export default function CoachDashboard({
         : bajaActividadCount > 0
           ? M(lang, "Revisar alumnos con baja actividad", "Review low-activity athletes", "Revisar alunos com baixa atividade")
           : M(lang, "Revisar progreso del equipo", "Review team progress", "Revisar progresso da equipe");
+  // El boton describe a donde lleva el handler (Rutinas o Alumnos con filtro), no el titulo de la recomendacion.
+  var accionCtaLabel =
+    sinRutinaCount > 0
+      ? M(lang, "Ir a Rutinas", "Go to Routines", "Ir para Rotinas")
+      : inactivosCount > 0
+        ? M(lang, "Ver alumnos inactivos", "View inactive athletes", "Ver alunos inativos")
+        : M(lang, "Ver alumnos", "View athletes", "Ver alunos");
   var accionPrincipalHandler =
     sinRutinaCount > 0
       ? onCrearRutina
@@ -794,7 +801,7 @@ export default function CoachDashboard({
       Icon: Target,
       count: sinRutinaCount,
       color: C.red,
-      cta: M(lang, "Asignar ahora", "Assign now", "Atribuir agora"),
+      cta: M(lang, "Ir a Rutinas", "Go to Routines", "Ir para Rotinas"),
       onClick: onCrearRutina,
       title: M(lang, "alumnos sin rutina", "athletes without routine", "alunos sem rotina"),
       sub: M(lang, "Asignales una rutina para que comiencen", "Assign routines so they can start", "Atribua rotinas para começarem"),
@@ -804,7 +811,7 @@ export default function CoachDashboard({
       Icon: Clock3,
       count: inactivosCount,
       color: C.yel,
-      cta: M(lang, "Enviar mensaje", "Send message", "Enviar mensagem"),
+      cta: M(lang, "Ver alumnos inactivos", "View inactive athletes", "Ver alunos inativos"),
       onClick: onEnviarMensaje,
       title: M(lang, "alumnos inactivos", "inactive athletes", "alunos inativos"),
       sub: M(lang, "Hace más de 21 días sin actividad", "No activity in over 21 days", "Mais de 21 dias sem atividade"),
@@ -814,7 +821,7 @@ export default function CoachDashboard({
       Icon: AlertCircle,
       count: bajaActividadCount,
       color: C.yel,
-      cta: M(lang, "Ver y revisar", "View and review", "Ver e revisar"),
+      cta: M(lang, "Ver alumnos", "View athletes", "Ver alunos"),
       onClick: onRevisarAlumnos,
       title: M(lang, "alumnos con baja actividad", "athletes with low activity", "alunos com baixa atividade"),
       sub: M(lang, "Menos del 30% de cumplimiento", "Under 30% compliance", "Menos de 30% de cumprimento"),
@@ -831,7 +838,7 @@ export default function CoachDashboard({
       pct: row.pct,
       percentColor: br,
       avatarBg: br + "33",
-      estadoColor: estadoTextColor(row, lang, C.t2),
+      estadoColor: estadoTextColor(row, lang, dashMuted),
       statusLabel: status.label,
       statusBg: status.bg,
       statusColor: status.color,
@@ -854,7 +861,7 @@ export default function CoachDashboard({
       pct: row.pct,
       percentColor: col,
       avatarBg: col + "22",
-      sessionColor: sesionColor(row.ult, lang, C.t2),
+      sessionColor: sesionColor(row.ult, lang, dashMuted),
       statusLabel: status.label,
       statusBg: status.bg,
       statusColor: status.color,
@@ -935,7 +942,7 @@ export default function CoachDashboard({
               {greetingLine}
               {coachSaludoNombre}
             </h2>
-            <p style={{ ...T.screenSubtitle, color: C.t2, margin: "6px 0 0 0" }}>
+            <p style={{ ...T.screenSubtitle, color: dashMuted, margin: "6px 0 0 0" }}>
               {M(lang, "Acá tenés el resumen de tu equipo", "Here's your team's summary", "Aqui está o resumo da sua equipe")}
             </p>
           </div>
@@ -964,7 +971,7 @@ export default function CoachDashboard({
                 ejercicios={globalSearchData.ejercicios}
                 sesiones={globalSearchData.sesiones}
                 onNavigate={onGlobalSearchNavigate}
-                placeholder={M(lang, "Buscar alumno, rutina, ejercicio...", "Search athlete, routine, exercise...", "Buscar aluno, rotina, exercício...")}
+                placeholder={isMobile ? M(lang, "Buscar…", "Search…", "Buscar…") : M(lang, "Buscar alumno, rutina, ejercicio...", "Search athlete, routine, exercise...", "Buscar aluno, rotina, exercício...")}
                 compactInputEnd
                 darkMode={darkMode}
               />
@@ -1035,10 +1042,11 @@ export default function CoachDashboard({
             dashMuted={dashMuted}
             colors={{ ...C, darkMode: darkMode }}
             type={T}
+            okLabel={M(lang, "Al día", "All clear", "Em dia")}
           />
           <CoachDashboardSummaryGrid
             isMobile={isMobile}
-            mobileGap={10}
+            mobileGap={16}
             desktopGap={S.gridGap}
             recommendationProps={{
               eyebrow: M(lang, "RECOMENDACIÓN PRINCIPAL", "MAIN RECOMMENDATION", "RECOMENDAÇÃO PRINCIPAL"),
@@ -1046,7 +1054,7 @@ export default function CoachDashboard({
               description: diagnosticoPrincipal,
               impactLabel: M(lang, "IMPACTO ESTIMADO", "ESTIMATED IMPACT", "IMPACTO ESTIMADO"),
               impactText: impactoEstimado,
-              ctaLabel: accionRecomendada,
+              ctaLabel: accionCtaLabel,
               onAction: accionPrincipalHandler,
               colors: C,
               type: T,
@@ -1068,7 +1076,7 @@ export default function CoachDashboard({
               label: M(lang, "Rendimiento", "Performance", "Desempenho"),
               value: rendimientoScore,
               suffix: "/100",
-              deltaText: "+" + rendimientoDeltaPts + " " + M(lang, "pts vs sem. ant.", "pts vs last wk", "pts vs sem. ant."),
+              deltaText: (rendimientoDeltaPts >= 0 ? "+" : "") + rendimientoDeltaPts + " " + M(lang, "pts vs sem. ant.", "pts vs last wk", "pts vs sem. ant."),
               progress: rendimientoScore,
               accent: "#22C55E",
               colors: C,

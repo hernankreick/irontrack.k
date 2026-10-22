@@ -1,4 +1,5 @@
 import React from 'react';
+import useDialogA11y from './useDialogA11y.js';
 import { Chat } from '../Chat.jsx';
 import { Ic } from '../Ic.jsx';
 
@@ -15,11 +16,13 @@ export default function CoachChatModal({
   onMensajesLeidos,
   onClose,
 }) {
+  const dialogRef = React.useRef(null);
+  useDialogA11y({ open: !!chatModal, containerRef: dialogRef, onEscape: onClose });
   if (!chatModal) return null;
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-      <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxWidth:480,border:"1px solid "+border,maxHeight:"80dvh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={msg("Chat interno", "Internal chat") + ": " + (chatModal.alumnoNombre || "")} style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"16px",width:"100%",maxWidth:480,border:"1px solid "+border,maxHeight:"80dvh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{width:32,height:32,borderRadius:"50%",background:"#2563EB22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#2563EB"}}>
@@ -30,7 +33,7 @@ export default function CoachChatModal({
               <div style={{fontSize:11,color:textMuted}}>{msg("Chat interno", "Internal chat")}</div>
             </div>
           </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer",padding:"4px"}}><Ic name="x" size={18}/></button>
+          <button type="button" onClick={onClose} aria-label={msg("Cerrar chat", "Close chat")} className="coach-tap" style={{background:"none",border:"none",color:textMuted,fontSize:22,cursor:"pointer",padding:"4px"}}><Ic name="x" size={18}/></button>
         </div>
         <div style={{flex:1,overflow:"hidden"}}>
           <Chat darkMode={darkMode} es={es} alumnoId={chatModal.alumnoId} alumnoNombre={chatModal.alumnoNombre} esEntrenador={true} sb={sb} onMensajesLeidos={onMensajesLeidos}/>

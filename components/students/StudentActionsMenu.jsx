@@ -23,7 +23,7 @@ export default function StudentActionsMenu({
     >
       <button
         type="button"
-        className="hov"
+        className="hov coach-tap"
         disabled={disabled}
         style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:textMain,fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit"}}
         onClick={onEdit}
@@ -32,7 +32,7 @@ export default function StudentActionsMenu({
       </button>
       <button
         type="button"
-        className="hov"
+        className="hov coach-tap"
         disabled={disabled}
         style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:textMain,fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit"}}
         onClick={onChat}
@@ -41,7 +41,7 @@ export default function StudentActionsMenu({
       </button>
       <button
         type="button"
-        className="hov"
+        className="hov coach-tap"
         disabled={disabled}
         style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#22c55e",fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit"}}
         onClick={onMarkPaid}
@@ -50,7 +50,7 @@ export default function StudentActionsMenu({
       </button>
       <button
         type="button"
-        className="hov"
+        className="hov coach-tap"
         disabled={disabled}
         style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f59e0b",fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit"}}
         onClick={onClearProgress}
@@ -59,7 +59,7 @@ export default function StudentActionsMenu({
       </button>
       <button
         type="button"
-        className="hov"
+        className="hov coach-tap"
         disabled={disabled}
         style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#f87171",fontSize:14,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit"}}
         onClick={onDelete}

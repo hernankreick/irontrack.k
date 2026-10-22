@@ -135,7 +135,7 @@ export default function StudentRoutinePreview({
                       return <div key={item.key} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:!item.isLast?"1px solid "+coachAluBorderSoft:"none"}}>
                         <div style={{flex:1,fontSize:14,fontWeight:600,color:textMain}}>{item.nombre}</div>
                         <div style={{fontSize:12,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
-                        <button className="hov" onClick={function(){onEditWarmupExercise(item);}} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
+                        <button type="button" className="hov" aria-label={msg("Editar ejercicio", "Edit exercise") + ": " + item.nombre} onClick={function(){onEditWarmupExercise(item);}} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
                       </div>;
                     })}
                     <button className="hov" onClick={onAddWarmupExercise} style={{width:"100%",marginTop:6,padding:"8px",background:"transparent",border:"1px dashed rgba(245,158,11,0.45)",borderRadius:8,fontSize:12,fontWeight:700,color:"#f59e0b",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={14} color="#f59e0b"/>{msg("+ Añadir ejercicio", "+ Add exercise")}</button>
@@ -153,7 +153,7 @@ export default function StudentRoutinePreview({
                   return <div key={item.key} style={{display:"flex",gap:8,padding:"8px 0",alignItems:"center",borderBottom:!item.isLast?"1px solid "+coachAluBorderSoft:"none"}}>
                     <div style={{flex:1,fontSize:15,fontWeight:700,color:textMain}}>{item.nombre}</div>
                     <div style={{fontSize:12,color:textMuted,marginRight:4}}>{ex.sets}×{ex.reps}{ex.kg?" · "+ex.kg+"kg":""}</div>
-                    <button className="hov" onClick={function(){onEditMainExercise(item);}} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
+                    <button type="button" className="hov" aria-label={msg("Editar ejercicio", "Edit exercise") + ": " + item.nombre} onClick={function(){onEditMainExercise(item);}} style={{background:"transparent",border:"1px solid rgba(59,130,246,0.3)",borderRadius:8,padding:"6px 10px",cursor:"pointer",display:"flex",alignItems:"center"}}><Ic name="edit-2" size={14} color="#94a3b8"/></button>
                   </div>;
                 })}
                 <button className="hov" onClick={onAddMainExercise} style={{width:"100%",marginTop:8,padding:"8px",background:"transparent",border:"1px dashed rgba(59,130,246,0.4)",borderRadius:8,fontSize:13,fontWeight:700,color:"#3b82f6",cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}><Ic name="plus" size={15} color="#3b82f6"/>{msg("+ Añadir ejercicio", "+ Add exercise")}</button>

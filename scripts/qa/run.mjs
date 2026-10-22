@@ -18,6 +18,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 const BASELINE = path.join(HERE, "baseline.json");
 const SIZES = { 375: 667, 390: 844, 430: 932, 768: 1024, 1280: 800 };
+const SETTINGS_TABS = ["Perfil", "Negocio", "Suscripción", "Notificaciones", "Zona de riesgo"];
 const ALL_SECTIONS = ["Dashboard", "Alumnos", "Rutinas", "Ejercicios", "Calendario", "Mensajes", "Progreso", "Configuración"];
 
 export function parseArgs(argv) {
@@ -78,6 +79,23 @@ async function main() {
       const shot = o.shots ? path.join(out, section.replace(/\W+/g, "") + "_" + width + ".png") : null;
       if (shot) await page.screenshot({ path: shot });
       results.push({ section, width, audit, pageErrors: [...state.pageErrors], shot });
+      // Configuracion en movil: ademas de la primera pestaña, captura y audita las demas (cada una como "Configuración-<pestaña>").
+      if (section === "Configuración" && width < 768) {
+        for (const tab of SETTINGS_TABS) {
+          const clicked = await page.evaluate((label) => {
+            const b = [...document.querySelectorAll("button")].find((x) => (x.innerText || "").trim() === label);
+            if (b) b.click();
+            return !!b;
+          }, tab);
+          if (!clicked) { results.push({ section: section + "-" + tab, width, skipped: "pestaña no encontrada" }); continue; }
+          await page.waitForTimeout(250);
+          const tabAudit = await page.evaluate(AUDIT);
+          const id = section + "-" + tab;
+          const tabShot = o.shots ? path.join(out, id.replace(/\W+/g, "") + "_" + width + ".png") : null;
+          if (tabShot) await page.screenshot({ path: tabShot });
+          results.push({ section: id, width, audit: tabAudit, pageErrors: [...state.pageErrors], shot: tabShot });
+        }
+      }
     }
     results.external = [...(results.external || []), ...state.external];
     await ctx.close();

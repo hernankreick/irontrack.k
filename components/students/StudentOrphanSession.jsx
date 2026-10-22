@@ -4,7 +4,7 @@ import { detectOrphanSessions, confirmOrphanSessions, validateOrphanSession, adv
 import { applySemanaActivaToRutinas } from '../../lib/rutinaOperationalState.js';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 
-// "Descartar" solo oculta el aviso en la UI (en memoria, hasta recargar la app): no borra nada ni usa localStorage.
+// "Ocultar por ahora" solo oculta el aviso en la UI (en memoria, hasta recargar la app): no borra nada ni usa localStorage.
 const dismissedKeys = new Set();
 
 function mergeSesiones(prev, incoming) {
@@ -171,7 +171,7 @@ export default function StudentOrphanSession({
         );
       })}
 
-      <BaseModal open={!!current} onClose={close} maxWidth={440}>
+      <BaseModal open={!!current} onClose={close} maxWidth={440} ariaLabel={msg("Validar sesión no finalizada", "Validate unfinished session")}>
         {current && (
           <div>
             <div style={{ fontSize: 18, fontWeight: 900, color: textMain, marginBottom: 4 }}>{msg("Validar sesión no finalizada", "Validate unfinished session")}</div>
@@ -208,7 +208,7 @@ export default function StudentOrphanSession({
             {error && <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", margin: "8px 0" }}>{error}</div>}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14, flexWrap: "wrap" }}>
               <button type="button" disabled={busy} onClick={discard} style={Object.assign({}, btn, { background: "transparent", color: textMuted, border: "1px solid " + coachAluBorderSoft })}>
-                {msg("Descartar", "Dismiss")}
+                {msg("Ocultar por ahora", "Hide for now")}
               </button>
               <button type="button" disabled={busy || diaSel === ""} onClick={validate} style={Object.assign({}, btn, { background: "#22c55e", color: "#fff", opacity: busy || diaSel === "" ? 0.6 : 1 })}>
                 {busy ? msg("Validando…", "Validating…") : msg("Validar", "Validate")}

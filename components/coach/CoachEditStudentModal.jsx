@@ -1,4 +1,5 @@
 import React from 'react';
+import useDialogA11y from '../modals/useDialogA11y.js';
 
 export default function CoachEditStudentModal({
   editAlumnoModal,
@@ -15,13 +16,17 @@ export default function CoachEditStudentModal({
   onSave,
 }) {
   const [showPass, setShowPass] = React.useState(false);
+  const dialogRef = React.useRef(null);
+  // Escape cierra solo si no hay cambios sin guardar (email igual al actual y sin contraseña nueva).
+  const pristine = !editAlumnoModal || (!editAlumnoPass && (editAlumnoEmail || "") === (editAlumnoModal.email || ""));
+  useDialogA11y({ open: !!editAlumnoModal, containerRef: dialogRef, onEscape: pristine ? onClose : undefined });
 
   if (!editAlumnoModal) return null;
 
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:120,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={onClose}>
-      <div style={{background:bgCard,borderRadius:16,padding:20,width:"100%",maxWidth:400,border:"1px solid "+border,animation:"fadeIn 0.25s ease"}} onClick={e=>e.stopPropagation()}>
-        <div style={{fontSize:18,fontWeight:800,marginBottom:4}}>Editar alumno</div>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:120,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={pristine ? onClose : undefined}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="edit-alumno-title" style={{background:bgCard,borderRadius:16,padding:20,width:"100%",maxWidth:400,border:"1px solid "+border,animation:"fadeIn 0.25s ease"}} onClick={e=>e.stopPropagation()}>
+        <div id="edit-alumno-title" style={{fontSize:18,fontWeight:800,marginBottom:4}}>Editar alumno</div>
         <div style={{fontSize:13,color:textMuted,marginBottom:16}}>{editAlumnoModal.nombre}</div>
         <div style={{marginBottom:8}}>
           <span style={{fontSize:11,fontWeight:500,color:textMuted,letterSpacing:0.3,display:"block",marginBottom:4}}>EMAIL</span>

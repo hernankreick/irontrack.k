@@ -107,8 +107,9 @@ export function buildQuickActions(lang, darkMode) {
     {
       action: "message",
       ...v.message,
-      title: M(lang, "Enviar mensaje", "Send message", "Enviar mensagem"),
-      sub: M(lang, "a tu equipo", "to your team", "à sua equipe"),
+      // La accion abre Alumnos (ya filtrado): el texto dice lo que hace.
+      title: M(lang, "Contactar alumnos", "Contact athletes", "Contatar alunos"),
+      sub: M(lang, "elegí a quién escribir", "choose who to message", "escolha a quem escrever"),
     },
     {
       action: "routine",
