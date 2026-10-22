@@ -90,7 +90,7 @@ export default function LibraryManagementToolbar({
         <div style={{ background: _dm ? '#111827' : bgSub, border: '1px solid ' + (_dm ? '#1E293B' : border), borderRadius: '8px', padding: '14px', marginTop: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: _dm ? '#9CA3AF' : textMuted, letterSpacing: '.5px', textTransform: 'uppercase' }}>{msg("Filtrar ejercicios", "Filter exercises", "Filtrar exercícios")}</span>
-            <button type="button" onClick={() => setFilterExpanded(false)} style={{ background: 'none', border: 'none', color: _dm ? '#6B7280' : textMuted, fontSize: '16px', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>✕</button>
+            <button type="button" className="coach-tap" aria-label={msg("Cerrar filtros", "Close filters", "Fechar filtros")} onClick={() => setFilterExpanded(false)} style={{ background: 'none', border: 'none', color: _dm ? '#6B7280' : textMuted, fontSize: '16px', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>✕</button>
           </div>
           {!libNarrow && (
             <input
@@ -109,6 +109,7 @@ export default function LibraryManagementToolbar({
               <button
                 type="button"
                 key={i===0?"bib-filt-patron":"bib-filt-muscle"}
+                className="coach-tap"
                 onClick={()=>{setModoFiltro(i===0?"patron":"musculo");setFiltPat("todos");setFiltMus("todos");}}
                 style={{
                   flex:1, padding:"9px 8px", border:"none", borderRadius:8, fontFamily:"inherit", fontSize:14, fontWeight:700, cursor:"pointer",
@@ -127,6 +128,7 @@ export default function LibraryManagementToolbar({
                 <button
                   type="button"
                   key={p}
+                  className="coach-tap"
                   onClick={()=>setFiltPat(p)}
                   style={{...chipBtnPad,
                     border: filtPat===p ? "1px solid "+patColors[p] : filtPat==="todos"&&p==="todos" ? "1px solid #243040" : "1px solid "+border,
@@ -145,6 +147,7 @@ export default function LibraryManagementToolbar({
                 <button
                   type="button"
                   key={m}
+                  className="coach-tap"
                   onClick={()=>setFiltMus(m==="todos"?"todos":m)}
                   style={{...chipBtnPad,
                     border: filtMus===m ? "1px solid #60a5fa" : "1px solid "+border,

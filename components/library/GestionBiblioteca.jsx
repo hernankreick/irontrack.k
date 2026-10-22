@@ -488,7 +488,7 @@ export default function GestionBiblioteca({allEx, setPatternOverrides, sb, entre
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#22C55E" }}>✓ {msg("Video detectado", "Video detected", "Vídeo detectado")}</div>
                         <div style={{ fontSize: 11, color: _dm ? "#94a3b8" : textMuted, marginTop: 2 }}>ID: {videoId}</div>
-                        <a href={editYT} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: "#3b82f6", textDecoration: "none", marginTop: 4, display: "inline-block" }}>{msg("Abrir en YouTube ↗", "Open in YouTube ↗", "Abrir no YouTube ↗")}</a>
+                        <a href={editYT} target="_blank" rel="noreferrer" className="coach-tap-link" style={{ fontSize: 11, color: "#3b82f6", textDecoration: "none", marginTop: 4, display: "inline-block" }}>{msg("Abrir en YouTube ↗", "Open in YouTube ↗", "Abrir no YouTube ↗")}</a>
                       </div>
                     </div>
                   </div>
