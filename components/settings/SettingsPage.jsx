@@ -130,7 +130,7 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
       />
 
       <SectionTitle>{t.personal}</SectionTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 16px' }}>
         <Input label={t.fullName} value={fullName} onChange={setFullName} placeholder={t.fullNamePh} />
         <Input label={t.professionalTitle} value={titulo} onChange={setTitulo} placeholder={t.professionalTitlePh} />
         <Input label={t.email} value={email} onChange={setEmail} type="email" placeholder={t.emailPh} />
@@ -139,7 +139,7 @@ function TabPerfil({ coach, setSessionData, toast2, entrenadorId, t }) {
       {saveError ? <div style={{ color: C.red, fontSize: 13, fontWeight: 700, marginTop: 10 }}>{saveError}</div> : null}
 
       <SectionTitle>{t.password}</SectionTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 16px' }}>
         <Input label={t.newPassword} value={passNew} onChange={setPassNew} type="password" placeholder={t.newPasswordPh} />
         <Input label={t.confirmPassword} value={passConf} onChange={setPassConf} type="password" placeholder={t.confirmPasswordPh} />
       </div>
@@ -221,9 +221,13 @@ function TabPreferencias({ lang, setLang, darkMode, setDarkMode, toast2 }) {
           className="it-set-select"
           value={tz} onChange={e => setTz(e.target.value)}
           style={{
-            background: C.bg, border: `1px solid ${C.border}`,
-            borderRadius: 8, padding: '8px 12px', fontSize: 13,
+            background: C.control, border: `1px solid ${C.borderStrong}`,
+            borderRadius: C.rCtrl, padding: '10px 40px 10px 12px', fontSize: 14,
             color: C.text, fontFamily: 'inherit', cursor: 'pointer',
+            appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+            backgroundImage: C.selectChevron, backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 12px center', backgroundSize: '16px 16px',
+            minWidth: 0, maxWidth: '100%', textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden',
           }}
         >
           {P.timezones.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
@@ -277,16 +281,16 @@ function TabNegocio({ toast2, alumnosCount, t }) {
   return (
     <div>
       <SectionTitle>{t.identity}</SectionTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 16px' }}>
         <Input label={t.gymName} value={nombre} onChange={setNombre} placeholder={t.gymNamePh} />
         <Input label={t.commercialPhone} value={tel} onChange={setTel} placeholder={t.commercialPhonePh} />
       </div>
 
       <SectionTitle>{t.operation}</SectionTitle>
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: '16px 18px', marginBottom: 6 }}>
-        <div style={{ fontSize: 12, color: C.muted, marginBottom: 8 }}>{t.maxCapacity}</div>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: C.rCard, padding: '16px 18px', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: C.sub, marginBottom: 8 }}>{t.maxCapacity}</div>
         <div style={{ fontSize: 28, fontWeight: 800, color: C.text, fontFamily: 'DM Mono, monospace' }}>{capMax}</div>
-        <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
           {t.free}: <span style={{ color: C.green, fontWeight: 600 }}>{cupos}</span>
           {' · '}{t.current}: <span style={{ color: C.sub }}>{alumnosCount || 0}</span>
         </div>
@@ -298,9 +302,9 @@ function TabNegocio({ toast2, alumnosCount, t }) {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {MONEDAS.map(m => (
             <button key={m} type="button" className="it-set-btn it-set-chip" onClick={() => setMoneda(m)} style={{
-              padding: '5px 12px', borderRadius: 7, border: `1px solid ${moneda === m ? C.blue : C.border}`,
+              padding: '5px 12px', borderRadius: C.rCtrl, border: `1px solid ${moneda === m ? C.blue : C.borderStrong}`,
               background: moneda === m ? C.currencySelBg : 'transparent',
-              color: moneda === m ? C.blueL : C.muted,
+              color: moneda === m ? C.blueText : C.sub,
               fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
             }}>{m}</button>
           ))}
@@ -395,16 +399,16 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
       padding: '14px 18px', background: C.card,
-      border: `1px solid ${C.dangerCardBorder}`, borderRadius: 10, marginBottom: 6,
+      border: `1px solid ${C.dangerCardBorder}`, borderRadius: C.rCard, marginBottom: 8,
     }}>
       <div>
         <div style={{ fontSize: 14, fontWeight: 500, color: C.red }}>{label}</div>
-        <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{desc}</div>
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{desc}</div>
       </div>
       <button className="coach-tap" type="button" onClick={onClick} style={{
-        background: variant === 'fill' ? C.red : 'transparent',
-        border: `1px solid ${C.red}`, color: variant === 'fill' ? '#fff' : C.red,
-        borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600,
+        background: variant === 'fill' ? C.redBtn : 'transparent',
+        border: `1px solid ${variant === 'fill' ? C.redBtn : C.red}`, color: variant === 'fill' ? C.onRed : C.red,
+        borderRadius: C.rCtrl, padding: '7px 14px', fontSize: 12, fontWeight: 600,
         letterSpacing: '0.5px', textTransform: 'uppercase', cursor: 'pointer',
         fontFamily: 'inherit', flexShrink: 0,
       }}>{btnLabel}</button>
@@ -433,7 +437,7 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
       {!showConfirm ? (
         dangerRow(t.deleteAccount, t.deleteAccountDesc, t.deleteAccountBtn, () => setShowConfirm(true))
       ) : (
-        <div style={{ background: C.card, border: `1px solid ${C.dangerCardBorder}`, borderRadius: 10, padding: '16px 18px', marginBottom: 6 }}>
+        <div style={{ background: C.card, border: `1px solid ${C.dangerCardBorder}`, borderRadius: C.rCard, padding: '16px 18px', marginBottom: 8 }}>
           <div style={{ fontSize: 13, color: C.deleteWarnText, marginBottom: 12 }}>
             {t.confirmHtml[0]}<strong>{t.deleteWord}</strong>{t.confirmHtml[1]}
           </div>
@@ -441,22 +445,22 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
             value={deletePhrase} onChange={e => setDeletePhrase(e.target.value)}
             placeholder={t.deleteWord}
             style={{
-              width: '100%', background: C.bg, border: `1px solid ${C.red}`,
-              borderRadius: 8, padding: '10px 14px', fontSize: 14,
+              width: '100%', background: C.control, border: `1px solid ${C.red}`,
+              borderRadius: C.rCtrl, padding: '10px 14px', fontSize: 14,
               color: C.text, fontFamily: 'monospace', boxSizing: 'border-box', outline: 'none',
               marginBottom: 12,
             }}
           />
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="coach-tap" type="button" onClick={doDelete} disabled={deletePhrase !== t.deleteWord} style={{
-              background: deletePhrase === t.deleteWord ? C.red : C.deleteDisabledBg,
-              color: deletePhrase === t.deleteWord ? '#fff' : C.deleteBtnDisabledFg, border: 'none', borderRadius: 7, padding: '8px 18px',
+              background: deletePhrase === t.deleteWord ? C.redBtn : C.deleteDisabledBg,
+              color: deletePhrase === t.deleteWord ? C.onRed : C.deleteBtnDisabledFg, border: 'none', borderRadius: C.rCtrl, padding: '8px 18px',
               fontSize: 12, fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase',
               cursor: deletePhrase === t.deleteWord ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
             }}>{t.deleteAccountFinal}</button>
             <button className="coach-tap" type="button" onClick={() => { setShowConfirm(false); setDeletePhrase(''); }} style={{
-              background: 'transparent', border: `1px solid ${C.border}`, color: C.muted,
-              borderRadius: 7, padding: '8px 18px', fontSize: 12, fontWeight: 600,
+              background: 'transparent', border: `1px solid ${C.borderStrong}`, color: C.sub,
+              borderRadius: C.rCtrl, padding: '8px 18px', fontSize: 12, fontWeight: 600,
               cursor: 'pointer', fontFamily: 'inherit',
             }}>{t.cancel}</button>
           </div>
