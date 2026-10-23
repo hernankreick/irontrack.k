@@ -15,7 +15,18 @@ export default function ProgressLoadControls({
   lang,
   M,
   emptyBox,
+  compact,
 }) {
+  var uid = React.useId();
+  var idDia = "pl-dia-" + uid;
+  var idWarm = "pl-warm-" + uid;
+  var idMain = "pl-main-" + uid;
+  // Movil (compact): label mas junto al control, selects >=44 px y 16 px (sin zoom en iOS); el nombre largo se corta dentro del select.
+  var selStyle = compact
+    ? Object.assign({}, selectBaseStyle, { minHeight: 44, fontSize: 16, textOverflow: "ellipsis", minWidth: 0 })
+    : selectBaseStyle;
+  var lblStyle = Object.assign({ display: "block" }, T.labelMd, { color: C.t2, marginBottom: compact ? 4 : 6 }, compact ? { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : null);
+  var gap = compact ? S.blockGap : S.blockGapLoose;
   var options = exerciseOptions || [];
   var warmupOptions = options.filter(function (ex) {
     return ex.section === "warmup";
@@ -41,23 +52,17 @@ export default function ProgressLoadControls({
         </div>
       ) : (
         <>
-          <div style={{ marginBottom: S.blockGapLoose }}>
-            <label
-              style={{
-                display: "block",
-                ...T.labelMd,
-                color: C.t2,
-                marginBottom: 6,
-              }}
-            >
+          <div style={{ marginBottom: gap }}>
+            <label htmlFor={idDia} style={lblStyle}>
               {M(lang, "Día de entrenamiento", "Training day")}
             </label>
             <select
+              id={idDia}
               value={String(Math.min(diaIdx, Math.max(0, diasRutina.length - 1)))}
               onChange={function (e) {
                 setDiaIdx(parseInt(e.target.value, 10) || 0);
               }}
-              style={selectBaseStyle}
+              style={selStyle}
             >
               {diasRutina.map(function (d, i) {
                 var lbl = d && d.label ? String(d.label).trim() : "";
@@ -83,20 +88,20 @@ export default function ProgressLoadControls({
               )}
             </div>
           ) : (
-            <>
+            <div
+              style={
+                compact && warmupOptions.length > 0 && mainOptions.length > 0
+                  ? { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", columnGap: 8 }
+                  : undefined
+              }
+            >
               {warmupOptions.length > 0 ? (
-                <div style={{ marginBottom: S.blockGap }}>
-                  <label
-                    style={{
-                      display: "block",
-                      ...T.labelMd,
-                      color: C.t2,
-                      marginBottom: 6,
-                    }}
-                  >
+                <div style={{ marginBottom: compact ? gap : S.blockGap, minWidth: 0 }}>
+                  <label htmlFor={idWarm} style={lblStyle}>
                     {M(lang, "Calentamiento", "Warm-up")}
                   </label>
                   <select
+                    id={idWarm}
                     value={
                       warmupOptions.some(function (ex) {
                         return String(ex.id) === String(ejercicioSelId);
@@ -107,7 +112,7 @@ export default function ProgressLoadControls({
                     onChange={function (e) {
                       setEjercicioSelId(e.target.value || null);
                     }}
-                    style={selectBaseStyle}
+                    style={selStyle}
                   >
                     <option value="">{M(lang, "Seleccionar...", "Select...")}</option>
                     {warmupOptions.map(function (ex) {
@@ -121,18 +126,12 @@ export default function ProgressLoadControls({
                 </div>
               ) : null}
               {mainOptions.length > 0 ? (
-                <div style={{ marginBottom: S.blockGapLoose }}>
-                  <label
-                    style={{
-                      display: "block",
-                      ...T.labelMd,
-                      color: C.t2,
-                      marginBottom: 6,
-                    }}
-                  >
+                <div style={{ marginBottom: gap, minWidth: 0 }}>
+                  <label htmlFor={idMain} style={lblStyle}>
                     {M(lang, "Principal", "Main")}
                   </label>
                   <select
+                    id={idMain}
                     value={
                       mainOptions.some(function (ex) {
                         return String(ex.id) === String(ejercicioSelId);
@@ -143,7 +142,7 @@ export default function ProgressLoadControls({
                     onChange={function (e) {
                       setEjercicioSelId(e.target.value || null);
                     }}
-                    style={selectBaseStyle}
+                    style={selStyle}
                   >
                     <option value="">{M(lang, "Seleccionar...", "Select...")}</option>
                     {mainOptions.map(function (ex) {
@@ -156,7 +155,7 @@ export default function ProgressLoadControls({
                   </select>
                 </div>
               ) : null}
-            </>
+            </div>
           )}
         </>
       )}

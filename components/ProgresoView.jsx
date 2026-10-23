@@ -5,6 +5,7 @@ import {
   BarChart2,
   Users,
   CheckCircle,
+  X,
 } from "lucide-react";
 import { buildCoachProgresoModel, getRoutineForAlumno } from "./coachProgresoMetrics.js";
 import { coachType as T, coachSpace as S0 } from "./coachUiScale.js";
@@ -541,6 +542,7 @@ export default function ProgresoView({
         lang={lang}
         M={M}
         emptyBox={emptyBox}
+        compact={isUnder768}
       />
       {loadHasChartScope ? (
         !model.hasChartData || chartComputed.empty ? (
@@ -554,6 +556,7 @@ export default function ProgresoView({
             T={T}
             lang={lang}
             M={M}
+            currentRoutineWeekIndex={model.currentRoutineWeekIndex}
           />
         )
       ) : null}
@@ -630,6 +633,20 @@ export default function ProgresoView({
 
   var topPr = (model.prsRecientes || [])[0];
   var sheetIsTeam = activeSheet === "adherencia" || activeSheet === "ranking";
+  // Hoja inferior: textos de cabecera (solo presentacion; el nombre del ejercicio ya viene en model.exerciseOptions).
+  var sheetContextLabel = sheetIsTeam
+    ? M(lang, "Equipo", "Team", "Equipe") + " · " + teamScopeLabel
+    : M(lang, "Alumno seleccionado", "Selected athlete", "Aluno selecionado") + " · " + alumnoName;
+  var sheetExerciseName = (function () {
+    var opt = (model.exerciseOptions || []).find(function (o) {
+      return String(o.id) === String(ejercicioSelId);
+    });
+    return opt ? opt.name : "";
+  })();
+  var sheetAriaLabel =
+    activeSheet === "carga"
+      ? M(lang, "Evolución de carga", "Load progression", "Evolução de carga") + " · " + sheetContextLabel
+      : sheetContextLabel;
 
   return (
     <div
@@ -901,55 +918,80 @@ export default function ProgresoView({
           >
             <div
               onClick={function (e) { e.stopPropagation(); }}
+              role="dialog"
+              aria-modal="true"
+              aria-label={sheetAriaLabel}
+              className="coach-sheet"
+              data-qa-sheet="1"
               style={{
                 background: darkMode !== false ? "#0D1424" : C.card,
                 borderRadius: "18px 18px 0 0",
-                maxHeight: "80vh",
-                overflowY: "auto",
-                padding: "16px 16px 36px",
+                display: "flex",
+                flexDirection: "column",
+                width: "100%",
+                overflow: "hidden",
               }}
             >
-              <div
-                style={{
-                  width: 40,
-                  height: 4,
-                  background: C.brd,
-                  borderRadius: 99,
-                  margin: "0 auto 16px",
-                }}
-              />
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <span style={{ ...T.meta, color: C.t2 }}>
-                  {sheetIsTeam
-                    ? M(lang, "Equipo", "Team", "Equipe") + " · " + teamScopeLabel
-                    : M(lang, "Alumno seleccionado", "Selected athlete", "Aluno selecionado") + " · " + alumnoName}
-                </span>
-                <button
-                  type="button"
-                  onClick={function () { setActiveSheet(null); }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: C.t2,
-                    fontSize: 22,
-                    cursor: "pointer",
-                    lineHeight: 1,
-                    padding: "4px 8px",
-                  }}
-                >
-                  ×
-                </button>
+              {/* Cabecera fija: handle + titulo/contexto + cierre (la hoja solo hace scroll en el cuerpo, sin saltos). */}
+              <div style={{ flexShrink: 0, padding: "10px 8px 6px 16px", borderBottom: "1px solid " + C.brd }}>
+                <div
+                  aria-hidden="true"
+                  style={{ width: 40, height: 4, background: C.t2, opacity: 0.45, borderRadius: 99, margin: "0 auto 8px" }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ minWidth: 0, flex: "1 1 auto", paddingTop: 4 }}>
+                    {activeSheet === "carga" ? (
+                      <div style={{ ...T.cardTitle, color: C.t, overflowWrap: "anywhere" }}>
+                        {M(lang, "Evolución de carga", "Load progression", "Evolução de carga")}
+                      </div>
+                    ) : null}
+                    <div style={{ ...T.meta, color: C.t2, overflowWrap: "anywhere" }}>
+                      {sheetContextLabel}
+                    </div>
+                    {activeSheet === "carga" && sheetExerciseName ? (
+                      <div style={{ ...T.bodySemibold, color: C.t, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {sheetExerciseName}
+                      </div>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={M(lang, "Cerrar", "Close", "Fechar")}
+                    onClick={function () { setActiveSheet(null); }}
+                    style={{
+                      flexShrink: 0,
+                      width: 44,
+                      height: 44,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "none",
+                      border: "none",
+                      color: C.t2,
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    <X size={22} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                </div>
               </div>
+              <div
+                data-sheet-body="1"
+                style={{
+                  flex: "1 1 auto",
+                  minHeight: 0,
+                  overflowY: "auto",
+                  overscrollBehavior: "contain",
+                  padding: "14px 16px calc(24px + env(safe-area-inset-bottom, 0px))",
+                }}
+              >
               {activeSheet === "prs" && prsCard(true)}
               {activeSheet === "vol" && volumeCard(true)}
-              {activeSheet === "carga" && (
-                <>
-                  {loadTitleRow}
-                  {loadBody}
-                </>
-              )}
+              {activeSheet === "carga" && loadBody}
               {activeSheet === "adherencia" && adherenceCard}
               {activeSheet === "ranking" && rankingCard(true)}
+              </div>
             </div>
           </div>
         ) : null}
