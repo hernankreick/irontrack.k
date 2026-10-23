@@ -2,7 +2,17 @@
 
 Flujo: `.github/workflows/deploy-update-alumno-password.yml`. Es **manual**, corre solo desde `main` y **no se ejecuta sin la aprobación de una persona** en un entorno protegido de GitHub. Ningún agente tiene credenciales de producción: el token solo existe dentro de ese entorno y solo es legible por el job después de la aprobación.
 
-> Estado: el flujo está **validado de forma estática** (`node scripts/test-deployWorkflow.mjs`: 13 comprobaciones y 13 mutaciones detectadas) pero **todavía no se ejecutó en GitHub**. La primera ejecución puede requerir ajustes (ver «Supuestos sin verificar»). Falla cerrado: ante cualquier duda no despliega.
+> Estado: el flujo está **validado de forma estática** (`node scripts/test-deployWorkflow.mjs`: 17 comprobaciones y 22 versiones debilitadas a propósito, todas detectadas) pero **todavía no se ejecutó en GitHub**. La primera ejecución puede requerir ajustes (ver «Supuestos sin verificar»). Falla cerrado: ante cualquier duda no despliega.
+
+## Medidas de seguridad del flujo (revisión de Security)
+- El token de acceso **no está en el entorno del job**: solo lo reciben los 4 pasos que lo necesitan (validación, verificaciones previas, despliegue y verificación posterior). Las dependencias (`npm ci`), las suites, el build y la instalación de la CLI nunca lo ven.
+- **Sin acciones de terceros**: solo `actions/checkout` y `actions/setup-node` (oficiales, con tag, como el CI). La CLI se instala desde npm con **versión concreta** (`2.122.0`) en un directorio temporal fuera del repositorio; no hay `latest`.
+- El checkout es del **commit exacto del flujo** (`github.sha`), sin dejar credenciales en `.git/config`, y se exige que ese commit pertenezca a `main` y que el repositorio no desactive `verify_jwt`.
+- La consulta previa de Verify JWT **falla cerrado**: solo se admite HTTP 200 (y se exige JWT activo) o 404 (primer despliegue); cualquier otro resultado cancela el despliegue. La versión previa se valida como número antes de guardarla.
+- La fila del secreto `COACH_UIDS` se compara por nombre exacto, no por subcadena.
+- Limitación conocida: el `if: github.ref == main` del flujo **no es un control de seguridad** (una rama que edite el archivo puede quitarlo). Lo que impide que otra rama use el entorno es la política «Deployment branches = main» del entorno; **confirmala antes de cargar el token**.
+- Recomendado (no incluido): `CODEOWNERS` sobre `.github/workflows/` y `.claude/`, porque quien aprueba el entorno aprueba un despliegue pero no ve el diff del flujo.
+- Riesgo residual externo preexistente: `index.ts` importa el cliente desde `esm.sh` sin fijar versión exacta, en una función con la clave de administración.
 
 ## Configuración única (la hace el propietario en GitHub)
 1. **Entorno protegido.** Settings → Environments → New environment → nombre exacto `production-functions`.
@@ -31,7 +41,8 @@ No ejecuta migraciones ni SQL, no escribe ni cambia secretos, no toca otras func
 ## Supuestos sin verificar (revisar en la primera ejecución)
 - Que el listado de secretos de la CLI muestre la huella SHA-256 del valor, para compararla con los UID indicados. Si el formato fuera otro, el paso falla (no despliega) y habrá que ajustarlo.
 - Que la API de gestión devuelva los campos `verify_jwt`, `status` y `version` de la función. Si faltara alguno, falla cerrado.
-- Que el comando de descarga de funciones de la CLI funcione con el token del entorno para comparar el código.
+- Que el comando de descarga de funciones de la CLI funcione con el token del entorno para comparar el código (puede requerir Docker en el runner). Si falla, el despliegue ya ocurrió y el job queda en rojo: revisar a mano.
+- Que la versión fija de la CLI (`2.122.0`) siga disponible y mantenga el formato del listado de secretos.
 
 ## Recuperación (nunca volver a la versión vulnerable `d53db36`)
 - El entrenador recibe 403 en todo: corregir el secreto `COACH_UIDS` (no requiere nuevo despliegue).

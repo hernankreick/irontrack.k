@@ -52,9 +52,10 @@ t("despliega exactamente UNA funcion, solo esa, con Verify JWT activado", () => 
   assert.ok(!/no-verify-jwt/.test(code));
   assert.ok(!/--all\b/.test(code));
 });
-t("la CLI de despliegue se usa SOLO para: secrets list, functions deploy y functions download", () => {
-  const used = uniq([...code.matchAll(/\bsupabase\b[ \t]+([a-z-]+)[ \t]+([a-z-]+)/g)].filter((m) => !/^(?:run|uses|setup)/.test(m[1])).map((m) => m[1] + " " + m[2]));
+t("la CLI (\"$SUPA\") se usa SOLO para: secrets list, functions deploy y functions download", () => {
+  const used = uniq([...code.matchAll(/"\$SUPA"[ \t]+([a-z-]+)[ \t]+([a-z-]+)/g)].map((m) => m[1] + " " + m[2]));
   assert.deepEqual(used, ["functions deploy", "functions download", "secrets list"]);
+  assert.ok(!/(^|[^"$A-Z_])supabase[ \t]+(functions|secrets|db|link|login)/m.test(code), "la CLI debe invocarse solo mediante la variable SUPA");
 });
 t("no incluye migraciones, SQL, escritura de secretos ni borrado de funciones, ni usa la herramienta de vinculacion", () => {
   for (const bad of ["db push", "db reset", "migration", "secrets set", "secrets unset", "functions delete", "link-alumno", "sudo", "npx "]) assert.ok(!code.includes(bad), bad);
@@ -64,7 +65,34 @@ t("verifica el commit exacto de main y ambos archivos, y corre suites, build y v
   for (const s of ["EXPECTED_SHA", "handler.js", "scripts/test-*.mjs", "npm run build", "secrets list", "verify_jwt", "functions deploy"]) assert.ok(i(s) > 0, s);
   const d = i("functions deploy");
   assert.ok(i("scripts/test-*.mjs") < d && i("npm run build") < d && i("secrets list") < d && i("verify_jwt") < d);
-  assert.match(code, /ref:\s*main/);
+  assert.match(code, /ref:\s*\$\{\{\s*github\.sha\s*\}\}/);
+  assert.match(code, /persist-credentials:\s*false/);
+  assert.match(code, /merge-base --is-ancestor HEAD origin\/main/);
+});
+t("el token de acceso NO esta en el entorno del job: solo en los pasos que lo usan", () => {
+  const jobEnv = /^    env:\n((?:      .*\n)+)/m.exec(code)[1];
+  assert.ok(!jobEnv.includes("SUPABASE_ACCESS_TOKEN"), "token en el env del job");
+  const steps = code.split(/\n      - /).slice(1);
+  const withToken = steps.filter((st) => st.includes("secrets.SUPABASE_ACCESS_TOKEN")).map((st) => /name:\s*(.*)/.exec(st)[1]);
+  assert.equal(withToken.length, 4, JSON.stringify(withToken));
+  for (const st of steps) if (/npm ci|npm run build|scripts\/test-|actions\/(checkout|setup-node)/.test(st)) assert.ok(!st.includes("SUPABASE_ACCESS_TOKEN"), "token en un paso de dependencias o pruebas");
+});
+t("sin acciones de terceros (solo actions/*) y la CLI se instala con version concreta fuera del repo", () => {
+  const uses = [...code.matchAll(/uses:\s*(\S+)/g)].map((m) => m[1]);
+  for (const u of uses) assert.match(u, /^actions\/(checkout|setup-node)@v\d+$/, u);
+  assert.ok(!/version:\s*latest|@latest/.test(code), "no se admite latest");
+  assert.match(code, /npm install --prefix "\$RUNNER_TEMP\/cli"[^\n]*supabase@\d+\.\d+\.\d+\b/);
+});
+t("la verificacion previa de Verify JWT falla cerrado: no usa || true y solo admite 200 o 404", () => {
+  assert.ok(!/\|\|\s*true/.test(code), "|| true");
+  assert.match(code, /404\)[^\n]*primer despliegue/);
+  assert.match(code, /\*\)[^\n]*no se despliega[^\n]*exit 1 ;;/);
+  assert.match(code, /PREV[^\n]*\^\[0-9\]\+\$/);
+  assert.match(code, /verify_jwt\[\[:space:\]\]\*=\[\[:space:\]\]\*false/);
+});
+t("la fila del secreto se compara por nombre exacto (no por subcadena)", () => {
+  assert.match(code, /g==\"COACH_UIDS\"/);
+  assert.ok(!/grep -E "COACH_UIDS"/.test(code));
 });
 t("verificacion posterior: version activa con Verify JWT, codigo identico a main y 401 sin autorizacion, sin tocar contrasenas", () => {
   const post = code.slice(code.indexOf("Verificacion posterior"));

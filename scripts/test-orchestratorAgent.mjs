@@ -18,7 +18,7 @@ function parse(file) {
   for (const line of m[1].split("\n")) { const k = /^([A-Za-z]+):\s*(.*)$/.exec(line); if (k) fm[k[1]] = k[2]; }
   return { fm, raw: m[1], body: m[2] };
 }
-// .claude/ esta ignorado por git: en un checkout limpio (CI) no existe y esta prueba no aplica.
+// Si por algun motivo el agente no existe en este checkout, la prueba no aplica (el conjunto cerrado de agentes lo exige test-agentFlow.mjs).
 if (!existsSync(AGENTS_DIR + "irontrack-orchestrator.md")) { console.log("# omitido: .claude/agents/irontrack-orchestrator.md no existe en este checkout (.claude/ no se versiona)"); process.exit(0); }
 const orch = parse(AGENTS_DIR + "irontrack-orchestrator.md");
 const toolNames = (s) => s.split(/,(?![^()]*\))/).map((x) => x.trim()).filter(Boolean);
@@ -84,6 +84,21 @@ t("existe la documentacion de uso del orquestador", () => {
   const d = readFileSync(ROOT + ".claude/ORQUESTADOR.md", "utf8");
   assert.match(d, /claude --agent irontrack-orchestrator/);
   for (const a of TEAM) assert.ok(d.includes(a), a);
+});
+t("conjunto cerrado de agentes irontrack-*: exactamente los 6 esperados, con las herramientas y los hooks que corresponden", () => {
+  const found = readdirSync(AGENTS_DIR).filter((f) => /^irontrack-/.test(f)).sort();
+  assert.deepEqual(found, [...TEAM, "irontrack-orchestrator"].map((x) => x + ".md").sort());
+  for (const f of found) {
+    const a = parse(AGENTS_DIR + f);
+    const tools = toolNames(a.fm.tools || "");
+    assert.equal(a.fm.name, f.replace(/\.md$/, ""), f + ": nombre = archivo");
+    assert.ok(!/permissionMode|mcpServers|allowed-tools|bypassPermissions/.test(a.raw), f + ": no debe declarar permisos propios");
+    assert.ok(!tools.some((x) => /^mcp__/.test(x)), f + ": sin herramientas MCP");
+    if (tools.includes("Bash")) assert.match(a.raw, /bash-guard\.mjs"\s+(readonly|qa|fixer)/, f + ": Bash sin hook de guard");
+    const writes = tools.some((x) => /^(Edit|Write|NotebookEdit)$/.test(x));
+    if (f === "irontrack-fixer.md") { assert.ok(writes); assert.match(a.raw, /fix-gate\.mjs/); }
+    else assert.ok(!writes, f + ": solo el fixer puede editar");
+  }
 });
 t("el orquestador no figura con permisos amplios (sin permissionMode bypass/acceptEdits)", () => {
   assert.ok(!/permissionMode:\s*(bypassPermissions|acceptEdits|auto)/.test(orch.raw));

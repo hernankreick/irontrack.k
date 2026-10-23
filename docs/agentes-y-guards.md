@@ -14,11 +14,25 @@ Copiar `.claude/authorization/fix.example.json` a `.claude/authorization/fix.jso
 El guard inspecciona **texto**: bloquea cualquier comando que *mencione* la CLI de producción, la clave de administración, SQL destructivo o un host del proyecto, aunque solo sea un mensaje de commit, un `echo` o una búsqueda con `grep`. Medido con `scripts/test-bashGuard.mjs`, el guard activo bloquea cinco usos inofensivos: mensajes de commit que nombran la herramienta, imprimir la URL del proyecto, buscar la clave en el código, buscar SQL en `sql/` y buscar texto SQL en el historial.
 
 **Propuesta** (`.claude/hooks/bash-guard.next.mjs`, **no activada**): las cuatro reglas de «mención» y la de la clave de administración pasan a evaluarse sobre una vista donde se vacía el texto que solo se imprime o se busca (`echo`, `printf`, `grep`, `rg`, `git commit|log|show|diff|grep|tag`, y el cuerpo de un heredoc de `git commit` o `cat`). **No se relaja nunca**: lo que se ejecuta (cualquier otro programa, `bash -c`, `xargs`, `node -e`), comillas con `$` o comillas invertidas, `rg --pre`, `git -c`, ni las reglas de archivos de credenciales, volcado de entorno, git destructivo o `rm`. Además cierra dos huecos del guard activo: la CLI dentro de un alias de git con `!` y dentro de un grupo `{ …; }`.
-`scripts/test-bashGuard.mjs` (14 comprobaciones) verifica que las protecciones sigan bloqueando en ambos guards y modos, que los falsos positivos se permitan solo en la propuesta, que la lista de avisos y el modo de solo lectura sean idénticos y que la compuerta del fixer siga bloqueando.
+`scripts/test-bashGuard.mjs` (15 comprobaciones) verifica que las protecciones sigan bloqueando en ambos guards y modos, que los falsos positivos se permitan solo en la propuesta, que la lista de avisos y el modo de solo lectura sean idénticos y que la compuerta del fixer siga bloqueando.
 Para activarla: revisar el diff y reemplazar `bash-guard.mjs` por `bash-guard.next.mjs` (es una edición de `.claude/` y la hace una persona).
 
-Cobertura: las 9 mutaciones de la propuesta que se probaron quedan detectadas (se agregaron los casos de `git push` con `--receive-pack` y de comilla simple sin cerrar).
-Hueco detectado también en el guard **activo**: una opción con la CLI pegada a un `=` (por ejemplo `git push --exec=<CLI>`) no se reconoce como comando. La propuesta lo cierra; el guard activo no se modificó.
+Cobertura: las 9 versiones debilitadas de la propuesta que se probaron quedan detectadas. Una opción con la CLI pegada a un `=` (por ejemplo `git push --exec=<CLI>`) no la reconocía ni el guard **activo** ni la propuesta; la propuesta ahora revisa esas opciones que ejecutan programas (`--exec=`, `--receive-pack=`, `--upload-pack=`, `--pre=`) sin tratar cualquier `=` como comando (así no genera falsos positivos como `--grep=<palabra>`). El guard activo no se modificó.
+
+### Condiciones ANTES de activar la propuesta (revisión de Security; no bloquean este merge)
+- **G1** Una comilla simple escapada (`\'`) se interpreta como apertura y se vacía lo que sigue, aunque el shell la trate como literal y ejecute lo que haya después.
+- **G2** Un heredoc con delimitador **sin comillas** (que sí expande) no se revisa por `$(…)` ni comillas invertidas en el cuerpo.
+- **G3** El texto de un `echo`/`printf` que se envía por tubería o redirección a un intérprete o archivo se vacía igual (el guard activo lo bloquea).
+Hasta cerrar G1–G3 y agregarlas a `PROTECT` en `test-bashGuard.mjs`, la propuesta **no debe activarse**.
+
+### Límites conocidos de los agentes `irontrack-*` (no son un sandbox)
+- Sus límites dependen de hooks declarados en cada agente; Claude Code los omite en carpetas no confiadas y los hooks de agente fallan abiertos. Uso seguro: sesión interactiva con la carpeta confiada.
+- Con los permisos de `main` (que permiten commit y push a ramas que no sean `main`), un agente descrito como «solo lectura» podría hacerlos si su hook no corre.
+- `bash-guard.mjs` en modo readonly/qa/fixer deja pasar algunas formas que ejecutan o escriben (`rg --pre`, `git branch <nombre>`, `--output=`, `sort -o`, `find -fprintf/-okdir`, y una opción pegada a `git remote -v`). Pendiente de endurecer; fuera del alcance de este cambio.
+- `fix-gate.mjs` no resuelve enlaces simbólicos y el fixer puede editar `scripts/` si está autorizado (y `node scripts/*` está permitido).
+
+### Conjunto cerrado de agentes
+`scripts/test-agentFlow.mjs` (de `main`) ahora exige exactamente los 4 agentes del flujo de UI **más** los 6 `irontrack-*` con nombre exacto; cualquier otro agente, o uno faltante, lo hace fallar. `scripts/test-orchestratorAgent.mjs` valida cada `irontrack-*`: nombre = archivo, sin permisos ni MCP propios, `Bash` solo con su guard y edición solo el fixer con `fix-gate`.
 
 ## Autorización antigua detectada (IT-019)
 Existe `.claude/authorization/fix.json` local con `approved_by_user: true`, id `IT-019`, rama `test/it-009-pr-records` y los archivos `lib/workoutSession.js` y `scripts/test-prRecords.mjs`. Esa corrección ya está integrada en `main` (PR #97), por lo que la autorización quedó **vencida**. No se eliminó (requiere aprobación específica). Riesgo bajo: la compuerta exige que la rama actual coincida, pero si alguien volviera a usar esa rama el fixer podría editar esos dos archivos. Recomendación: borrarlo a mano. Con la lista blanca de `.gitignore` este archivo no puede subirse al repositorio.

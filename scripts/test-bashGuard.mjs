@@ -77,6 +77,14 @@ const FALSE_POSITIVES = [
   ["heredoc de commit con texto sobre la herramienta", "git commit -F - <<'E'\nfix: nota sobre Supabase CLI y delete from en la guia\nE", "ask"],
   ["heredoc con cat que solo imprime", "cat <<'E'\nsupabase db push es la CLI\nE", "allow"],
 ];
+// Falsos positivos que NO debe introducir la propuesta (la opcion "=algo" no es un comando).
+const NO_NEW_FP = [
+  ["git log --grep=<palabra>", "git log --grep=supabase --oneline"],
+  ["rg --glob=<palabra>", "rg -n foo --glob=supabase ."],
+  ["variable de texto", "echo target=vercel"],
+  ["modo del build", "npm run build -- --mode=vercel"],
+  ["autor", "git log --author=vc"],
+];
 // Siempre permitido (no debe volverse restrictivo).
 const BENIGN = [["estado de git", "git status"], ["listar la carpeta de funciones", "ls supabase/functions"], ["ruta bajo supabase/ en git show", "git show origin/main:supabase/functions/update-alumno-password/index.ts"], ["prueba local", "node scripts/test-prRecords.mjs"]];
 
@@ -97,6 +105,9 @@ if (existsSync(NEXT)) {
   t("[propuesta] cierra los huecos detectados en el guard activo (alias de git con !, grupos { })", () => {
     const leaks = GAPS.filter(([, c]) => run(NEXT, "global", c) !== "block").map(([l]) => l);
     assert.deepEqual(leaks, []);
+  });
+  t("[propuesta] la opcion con '=' no introduce falsos positivos nuevos respecto del guard activo", () => {
+    for (const [l, c] of NO_NEW_FP) assert.equal(run(NEXT, "global", c), run(CURRENT, "global", c), l);
   });
   t("[propuesta] los falsos positivos por mencion de texto ya no se bloquean (modo global)", () => {
     const bad = FALSE_POSITIVES.filter(([, cmd, want]) => run(NEXT, "global", cmd) !== want).map(([l, cmd]) => l + " => " + run(NEXT, "global", cmd));

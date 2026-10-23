@@ -26,8 +26,8 @@ const DENY = [
   [git("branch\\s+[^;&|\\n]*(?:-D\\b|--delete\\s+--force)|checkout\\s+[^;&|\\n]*--\\s|restore\\s+[^;&|\\n]*(?:--worktree|\\.)"), "descarta cambios locales"],
   [/\bgit-?filter-repo\b|\bbfg\b/i, "herramienta de purga de historial"],
   // Las cuatro reglas marcadas RELAX buscan una MENCION de texto; se relajan solo cuando esa mencion es un dato (ver relaxedView).
-  // "!", "{" y "=" tambien abren una posicion de comando (alias de git "!cmd", grupos { cmd; }, opciones como --exec=cmd).
-  [/(?:^|[\s;&|(\/!{=])(?:supabase|psql|pg_dump|pg_restore|pgcli|vercel|vc)(?:\s|$)/i, "CLI de Supabase/Postgres/Vercel (produccion): prohibido", "RELAX"],
+  // "!" y "{" tambien abren una posicion de comando (alias de git "!cmd", grupos { cmd; }); las opciones que ejecutan un programa (--exec=, --receive-pack=, --upload-pack=, --pre=) se revisan aparte, sin tratar cualquier "=" como comando (evita falsos positivos como --grep=<palabra>).
+  [/(?:^|[\s;&|(\/!{])(?:supabase|psql|pg_dump|pg_restore|pgcli|vercel|vc)(?:\s|$)|--(?:exec|receive-pack|upload-pack|pre)=["']?(?:supabase|psql|pg_dump|pg_restore|pgcli|vercel|vc)(?:\s|$|["'])/i, "CLI de Supabase/Postgres/Vercel (produccion): prohibido", "RELAX"],
   [/\bnpx\s+(?:-y\s+)?(?:supabase|vercel)\b|\bpnpm\s+dlx\s+(?:supabase|vercel)\b/i, "CLI de Supabase/Vercel via npx", "RELAX"],
   [/(?:curl|wget|http|https|fetch|nc|ncat|ssh|scp|rsync)\b[^;&|\n]*(?:supabase\.(?:co|com|in)|vercel\.(?:app|com)|api\.vercel)/i, "red hacia Supabase/Vercel reales", "RELAX"],
   [/\b(?:drop|truncate)\s+(?:table|schema|database)\b|\bdelete\s+from\b|\balter\s+table\b|\bcreate\s+policy\b|\balter\s+policy\b|\bdisable\s+row\s+level\b/i, "SQL destructivo o de RLS", "RELAX"],
