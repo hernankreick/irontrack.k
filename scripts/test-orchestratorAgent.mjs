@@ -19,7 +19,7 @@ function parse(file) {
   return { fm, raw: m[1], body: m[2] };
 }
 // Si por algun motivo el agente no existe en este checkout, la prueba no aplica (el conjunto cerrado de agentes lo exige test-agentFlow.mjs).
-if (!existsSync(AGENTS_DIR + "irontrack-orchestrator.md")) { console.log("# omitido: .claude/agents/irontrack-orchestrator.md no existe en este checkout (.claude/ no se versiona)"); process.exit(0); }
+if (!existsSync(AGENTS_DIR + "irontrack-orchestrator.md")) { console.log("# omitido: .claude/agents/irontrack-orchestrator.md no existe en este checkout (el conjunto cerrado de agentes lo exige test-agentFlow.mjs)"); process.exit(0); }
 const orch = parse(AGENTS_DIR + "irontrack-orchestrator.md");
 const toolNames = (s) => s.split(/,(?![^()]*\))/).map((x) => x.trim()).filter(Boolean);
 

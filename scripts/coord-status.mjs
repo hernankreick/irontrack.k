@@ -1,5 +1,6 @@
 // Preflight de coordinacion entre sesiones/carriles (solo LECTURA). Uso:
 //   node scripts/coord-status.mjs [--fetch] [--files a,b,c] [--strict] [--title "titulo del PR a crear"] [--head rama]
+// Solo lectura sobre el arbol de trabajo y sobre GitHub; con --fetch se actualizan las referencias remotas locales (git fetch origin --prune).
 // Informa: PR abiertos (carril, estado frente a main), ramas ajenas con trabajo reciente, archivos en comun con el trabajo
 // propio (--files, o el diff contra origin/main) y posibles PR duplicados. No escribe nada, no usa tokens ni variables de
 // entorno: consulta solo la API publica de GitHub del repositorio. --fetch hace "git fetch origin --prune".
@@ -49,6 +50,9 @@ export function duplicates(prs, { head, title } = {}) {
   return out;
 }
 
+/** Los nombres de rama y de archivo vienen de terceros: se imprimen saneados y acotados (un agente los lee). */
+export const safe = (t) => String(t == null ? "" : t).replace(/[^A-Za-z0-9\/_.@+-]/g, "?").slice(0, 80);
+
 /** Texto del informe a partir de datos ya recolectados (funcion pura, probada sin red). */
 export function render({ branch, behind, ahead, myFiles, prs, branches, dup, strict }) {
   const L = [];
@@ -62,14 +66,14 @@ export function render({ branch, behind, ahead, myFiles, prs, branches, dup, str
   for (const p of prs) {
     const ov = overlaps(myFiles, p.files);
     conflicts += ov.length ? 1 : 0;
-    L.push("  #" + p.number + " [" + p.lane + "] " + p.head + (p.draft ? " (draft)" : "") + " estado=" + (p.state || "?") + (p.state === "behind" ? " -> desactualizado frente a main" : "") + (ov.length ? "\n      SOLAPE de archivos: " + ov.join(", ") : ""));
+    L.push("  #" + p.number + " [" + p.lane + "] " + safe(p.head) + (p.draft ? " (draft)" : "") + " estado=" + (p.state || "?") + (p.state === "behind" ? " -> desactualizado frente a main" : "") + (ov.length ? "\n      SOLAPE de archivos: " + ov.map(safe).join(", ") : ""));
   }
   L.push("");
   L.push("Ramas remotas con trabajo reciente (<" + RECENT_HOURS + " h) sin fusionar (" + branches.length + "):");
   for (const b of branches) {
     const ov = overlaps(myFiles, b.files);
     conflicts += ov.length ? 1 : 0;
-    L.push("  " + b.ref + " [" + b.lane + "] " + b.hours + " h" + (ov.length ? "\n      SOLAPE de archivos: " + ov.join(", ") : ""));
+    L.push("  " + safe(b.ref) + " [" + b.lane + "] " + b.hours + " h" + (ov.length ? "\n      SOLAPE de archivos: " + ov.map(safe).join(", ") : ""));
   }
   L.push("");
   if (dup.length) L.push("POSIBLE PR DUPLICADO: " + dup.map((d) => "#" + d.number + " (" + d.motivo + ")").join(", ") + " -> actualizar ese PR en vez de crear otro.");

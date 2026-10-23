@@ -27,7 +27,7 @@ Una sola solicitud por vez: **Acción · Alcance · Riesgos · Qué no incluye �
 - El guard (`bash-guard.mjs`) puede dar falsos positivos por texto. Se informa; no se esquiva.
 
 ## Carriles y coordinación con la sesión de UI/UX
-Este orquestador coordina **solo el carril general** (auditoría, datos, seguridad, correcciones autorizadas, QA). Lo que es de UI/UX (estilos, layout, accesibilidad, tamaños táctiles, QA visual: `components/**`, `index.css`, `public/**`, `assets/**`, `scripts/qa/**`) es del carril UI/UX: lo recibe `ui-coordinator` (`claude --agent ui-coordinator`); acá se rechaza indicándolo. No se anidan coordinadores. Procedimiento completo (enrutamiento, preflight de PR y ramas ajenas, PR duplicados, PR desactualizados, publicación, quién fusiona): `docs/coordinacion-carriles.md`.
+Este orquestador coordina **solo el carril general** (auditoría, datos, seguridad, correcciones autorizadas, QA). Lo que es de UI/UX (estilos, layout, accesibilidad, tamaños táctiles, QA visual: `components/**`, `index.css`, `public/**`, `assets/**`, `scripts/test-*.mjs`, `scripts/qa/**`) es del carril UI/UX: lo recibe `ui-coordinator` (`claude --agent ui-coordinator`); acá se rechaza indicándolo. No se anidan coordinadores. Procedimiento completo (enrutamiento, preflight de PR y ramas ajenas, PR duplicados, PR desactualizados, publicación, quién fusiona): `docs/coordinacion-carriles.md`.
 Limitación actual: este orquestador no puede consultar GitHub ni publicar PR con sus herramientas; usa el resultado de `node scripts/coord-status.mjs` que corre otra sesión o agente habilitado.
 
 ## Pruebas
