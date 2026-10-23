@@ -26,6 +26,10 @@ Una sola solicitud por vez: **Acción · Alcance · Riesgos · Qué no incluye �
 - Una llamada de Bash no comparte estado con la siguiente; `node_modules/` versionado hace fallar el build local (validar con el CI o con un árbol limpio).
 - El guard (`bash-guard.mjs`) puede dar falsos positivos por texto. Se informa; no se esquiva.
 
+## Carriles y coordinación con la sesión de UI/UX
+Este orquestador coordina **solo el carril general** (auditoría, datos, seguridad, correcciones autorizadas, QA). Lo que es de UI/UX (estilos, layout, accesibilidad, tamaños táctiles, QA visual: `components/**`, `index.css`, `public/**`, `assets/**`, `scripts/qa/**`) es del carril UI/UX: lo recibe `ui-coordinator` (`claude --agent ui-coordinator`); acá se rechaza indicándolo. No se anidan coordinadores. Procedimiento completo (enrutamiento, preflight de PR y ramas ajenas, PR duplicados, PR desactualizados, publicación, quién fusiona): `docs/coordinacion-carriles.md`.
+Limitación actual: este orquestador no puede consultar GitHub ni publicar PR con sus herramientas; usa el resultado de `node scripts/coord-status.mjs` que corre otra sesión o agente habilitado.
+
 ## Pruebas
-- `node scripts/test-orchestratorAgent.mjs` — 14 comprobaciones estáticas de la definición (lista blanca exacta, sin `Edit`/`Write`, hook de solo lectura, prompt con las reglas de autorización y honestidad, `settings.json` sin debilitar). Detecta degradaciones deliberadas (agente fuera de lista, `Write` agregado, hook en modo global, regla anti-simulación eliminada).
+- `node scripts/test-orchestratorAgent.mjs` — 19 comprobaciones estáticas de la definición (lista blanca exacta, sin `Edit`/`Write`, hook de solo lectura, prompt con las reglas de autorización y honestidad, `settings.json` sin debilitar). Detecta degradaciones deliberadas (agente fuera de lista, `Write` agregado, hook en modo global, regla anti-simulación eliminada).
 - Delegación real: se ejecutó con `claude --agent irontrack-orchestrator -p …` (solo lectura) y los cinco agentes fueron lanzados; ver el informe de entrega.

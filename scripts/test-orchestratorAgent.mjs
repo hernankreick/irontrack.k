@@ -100,6 +100,19 @@ t("conjunto cerrado de agentes irontrack-*: exactamente los 6 esperados, con las
     else assert.ok(!writes, f + ": solo el fixer puede editar");
   }
 });
+t("el orquestador conoce su carril, rechaza UI/UX y no invoca a los agentes del otro carril", () => {
+  assert.match(orch.body, /Carril y enrutamiento/);
+  assert.match(orch.body, /ui-coordinator/);
+  assert.match(orch.body, /coord-status\.mjs/);
+  assert.match(orch.body, /docs\/coordinacion-carriles\.md/);
+  const tools = toolNames(orch.fm.tools);
+  for (const other of ["ui-coordinator", "ui-implementer", "ui-qa", "pr-publisher"]) assert.ok(!tools.join(",").includes(other), other + " no debe estar entre las herramientas");
+});
+t("la documentacion de coordinacion cubre enrutamiento, preflight, duplicados, actualizacion, publicacion, merges reservados y limitaciones", () => {
+  const d = readFileSync(ROOT + "docs/coordinacion-carriles.md", "utf8");
+  for (const k of ["Carriles y a quién va cada tarea", "Antes de empezar", "Evitar PR duplicados", "Actualizar PR desactualizados", "Un solo procedimiento de publicación", "Quién puede preparar, publicar y fusionar", "Limitaciones conocidas", "reservados a autorizaciones humanas explícitas", "node scripts/coord-status.mjs", "no se hace"]) assert.ok(d.includes(k), k);
+  assert.match(readFileSync(ROOT + ".claude/ORQUESTADOR.md", "utf8"), /docs\/coordinacion-carriles\.md/);
+});
 t("el orquestador no figura con permisos amplios (sin permissionMode bypass/acceptEdits)", () => {
   assert.ok(!/permissionMode:\s*(bypassPermissions|acceptEdits|auto)/.test(orch.raw));
 });
