@@ -13,3 +13,20 @@ dist
 !.claude/settings.json
 .claude/settings.local.json
 .claude/agent-memory-local/
+
+# --- Lista blanca adicional (agentes irontrack-*, orquestador, plantilla de autorizacion) y exclusion de credenciales ---
+!.claude/ORQUESTADOR.md
+# Autorizacion temporal de correcciones: la crea cada persona en su maquina y NUNCA se versiona (solo la plantilla de ejemplo).
+!.claude/authorization/
+.claude/authorization/*
+!.claude/authorization/fix.example.json
+# Defensa en profundidad dentro de las carpetas permitidas: nada de secretos, llaves ni ajustes locales.
+.claude/**/.env
+.claude/**/.env.*
+.claude/**/*.env
+.claude/**/*.key
+.claude/**/*.pem
+.claude/**/*.token
+.claude/**/*secret*
+.claude/**/*credential*
+.claude/**/*.local.*

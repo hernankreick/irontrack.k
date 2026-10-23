@@ -33,8 +33,12 @@ const toolsOf = (fm) => (fm.tools || "").split(/,(?![^(]*\))/).map((s) => s.trim
 await test("los 4 agentes existen, tienen nombre = archivo, descripcion y un prompt con alcance", () => {
   const dir = path.join(ROOT, ".claude/agents");
   const files = readdirSync(dir).filter((f) => f.endsWith(".md")).sort();
-  assert.deepEqual(files, ["pr-publisher.md", "ui-coordinator.md", "ui-implementer.md", "ui-qa.md"]);
-  for (const f of files) {
+  // Conjunto CERRADO: los 4 agentes del flujo de UI y los 6 del sistema irontrack-* (revisados por separado en test-orchestratorAgent.mjs).
+  // Cualquier otro nombre, o un irontrack-* nuevo, hace fallar esta prueba hasta que alguien lo agregue a proposito.
+  const UI = ["pr-publisher.md", "ui-coordinator.md", "ui-implementer.md", "ui-qa.md"];
+  const IRONTRACK = ["irontrack-auditor.md", "irontrack-data.md", "irontrack-fixer.md", "irontrack-orchestrator.md", "irontrack-qa.md", "irontrack-security.md"];
+  assert.deepEqual(files, [...UI, ...IRONTRACK].sort());
+  for (const f of UI) {
     const { fm, body } = frontmatter(".claude/agents/" + f);
     assert.equal(fm.name, f.replace(/\.md$/, ""));
     assert.ok(fm.description && fm.description.length > 40, f + ": descripcion");
