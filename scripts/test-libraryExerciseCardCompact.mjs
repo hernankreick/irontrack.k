@@ -46,19 +46,36 @@ test("las reglas it-bib-ex-* viven en un unico bloque @media (max-width:767px)",
   assert.equal(/\.it-bib-ex-card\s*\{[^}]*padding/.test(outside), false);
 });
 
-test("bloque movil: padding 8, titulo a todo el ancho, acciones 44 px en rejilla y etiquetas debajo", () => {
+test("bloque movil: padding 8, titulo a todo el ancho, acciones 44 px en rejilla y etiquetas que comparten fila solo si caben", () => {
   const b = mediaBlock[0];
   assert.match(b, /\.it-bib-ex-card\{padding-top:8px!important;padding-bottom:8px!important\}/);
+  assert.match(b, /\.it-bib-ex-main\{display:flex!important;flex-flow:row-reverse wrap;/);
   assert.match(b, /\.it-bib-ex-head\{display:contents!important\}/);
-  assert.match(b, /\.it-bib-ex-name\{grid-column:1 \/ -1;grid-row:1/);
-  assert.match(b, /\.it-bib-ex-acts\{display:grid!important;grid-template-columns:repeat\(2,44px\)/);
-  assert.match(b, /\.it-bib-ex-tags\{grid-column:1;grid-row:2/);
+  assert.match(b, /\.it-bib-ex-name\{flex:0 0 100%!important;min-width:0/);
+  assert.match(b, /\.it-bib-ex-acts\{display:grid!important;grid-template-columns:repeat\(2,44px\);gap:6px!important;flex:0 0 auto\}/);
+  assert.match(b, /\.it-bib-ex-tags\{flex:1 1 max\(80px,calc\(var\(--it-tl,0\)\*3\.5px \+ 18px\)\);min-width:0;/);
+  assert.match(b, /@media \(max-width:340px\)\{\.it-bib-ex-card:has\(\.it-bib-ex-acts>:nth-child\(3\)\)\{padding-left:8px!important;padding-right:8px!important\}/);
+  assert.equal(/(?<![-\w])height:\d|overflow:hidden|text-overflow|ellipsis/.test(b), false, "sin alturas fijas, overflow:hidden ni ellipsis");
 });
 
-test("ejercicio propio con video (3 acciones): fila de 3 botones de 44 px y etiquetas en la fila de abajo", () => {
+test("etiquetas largas: min-width:0 y overflow-wrap:anywhere en el bloque movil; se parten tras cada / sin cambiar el texto", () => {
   const b = mediaBlock[0];
-  assert.match(b, /:has\(\.it-bib-ex-acts>:nth-child\(3\)\) \.it-bib-ex-acts\{grid-template-columns:repeat\(3,44px\)/);
-  assert.match(b, /:has\(\.it-bib-ex-acts>:nth-child\(3\)\) \.it-bib-ex-tags\{grid-column:1 \/ -1;grid-row:3\}/);
+  assert.match(b, /\.it-bib-ex-tags>span\{min-width:0;max-width:100%;overflow-wrap:anywhere;/);
+  const plain = render({ muscleLine: "Cuadriceps/Gluteos/Abductores" });
+  assert.equal(plain.includes("<wbr"), false, "sin matchMedia (escritorio/SSR) el texto es un unico nodo, como en main");
+  assert.match(plain, />Cuadriceps\/Gluteos\/Abductores<\/span>/);
+  globalThis.window = { matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) };
+  const html = render({ muscleLine: "Cuadriceps/Gluteos/Abductores" });
+  delete globalThis.window;
+  assert.match(html, /Cuadriceps\/<wbr\/>Gluteos\/<wbr\/>Abductores/);
+  assert.equal(html.replace(/<wbr\/>|<!-- -->/g, "").includes("Cuadriceps/Gluteos/Abductores"), true, "el texto visible no cambia");
+  assert.equal(/ellipsis/.test(html), false);
+});
+
+test("ejercicio propio con video (3 acciones): fila de 3 botones de 44 px y etiquetas siempre en la fila de abajo", () => {
+  const b = mediaBlock[0];
+  assert.match(b, /:has\(\.it-bib-ex-acts>:nth-child\(3\)\) \.it-bib-ex-acts\{grid-template-columns:repeat\(3,44px\)\}/);
+  assert.match(b, /:has\(\.it-bib-ex-acts>:nth-child\(3\)\) \.it-bib-ex-tags\{flex-basis:100%\}/);
   const html = render({ isCustom: true });
   const acts = html.match(/class="it-bib-ex-acts"[^>]*>([\s\S]*?)<\/div><\/div>/)[1];
   assert.equal((acts.match(/<button|<a /g) || []).length, 3);
@@ -75,7 +92,7 @@ test(">= 768: el markup conserva los estilos en linea de main (30x30, pila verti
   const html = render({ isCustom: true });
   assert.match(html, /class="it-bib-ex-head" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"/);
   assert.match(html, /class="it-bib-ex-acts" style="display:flex;flex-direction:column;gap:6px;align-items:center;flex-shrink:0"/);
-  assert.match(html, /class="it-bib-ex-tags" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px"/);
+  assert.match(html, /class="it-bib-ex-tags" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px;--it-tl:10"/);
   assert.match(html, /class="it-bib-ex-main" style="flex:1;min-width:0;padding-left:10px"/);
   assert.equal((html.match(/width:30px;height:30px/g) || []).length, 3);
   assert.match(html, /width:90px;height:68px/);

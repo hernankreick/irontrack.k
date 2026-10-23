@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 function extractYouTubeId(url) {
   if (!url) return null;
@@ -39,6 +39,16 @@ export default function LibraryExerciseCard({
   void lang;
   const [showVideo, setShowVideo] = useState(false);
   const videoId = extractYouTubeId(ytUrl);
+  // <wbr> tras cada "/" solo en movil (<768): en escritorio el texto sigue siendo un unico nodo, identico a main.
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width:767px)").matches);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
+    const mq = window.matchMedia("(max-width:767px)");
+    const on = () => setIsMobile(mq.matches);
+    on();
+    if (mq.addEventListener) mq.addEventListener("change", on); else mq.addListener(on);
+    return () => { if (mq.removeEventListener) mq.removeEventListener("change", on); else mq.removeListener(on); };
+  }, []);
 
   const btnStyle = { width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", background: _dm ? '#111827' : bgSub, border: '1px solid ' + (_dm ? '#1E293B' : border), borderRadius: 7, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", padding: 0, color: textMuted };
 
@@ -116,7 +126,7 @@ export default function LibraryExerciseCard({
           </div>
 
           {/* Tags */}
-          <div className="it-bib-ex-tags" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 7 }}>
+          <div className="it-bib-ex-tags" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 7, "--it-tl": muscleLine ? String(muscleLine).length : 0 }}>
             <span
               className="inline-flex"
               style={{ background: _dm ? "rgba(22, 34, 52, 0.85)" : "rgba(226, 232, 240, 0.85)", color: textMuted, padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700, border: "1px solid " + cardBorder, letterSpacing: 0.2 }}
@@ -128,7 +138,11 @@ export default function LibraryExerciseCard({
                 className="inline-flex"
                 style={{ background: _dm ? "rgba(22, 34, 52, 0.5)" : "rgba(37, 99, 235, 0.08)", color: _dm ? textMuted : "#0F1923", padding: "2px 7px", borderRadius: 8, fontSize: 10, fontWeight: 600, border: "1px solid " + (_dm ? "rgba(45, 64, 87, 0.45)" : border), maxWidth: "100%" }}
               >
-                {muscleLine}
+                {isMobile
+                  ? String(muscleLine).split("/").map((part, i) => (
+                      <React.Fragment key={i}>{i > 0 && "/"}{i > 0 && <wbr />}{part}</React.Fragment>
+                    ))
+                  : muscleLine}
               </span>
             )}
           </div>
