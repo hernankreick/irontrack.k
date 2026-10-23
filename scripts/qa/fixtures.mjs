@@ -58,6 +58,13 @@ export function sessionSeed(role) {
   return ls;
 }
 
+// Ejercicios propios FICTICIOS con etiquetas largas y titulo de 4 lineas. Opt-in extra (QA_CUSTOM_LONG=1), solo para library-cards-overflow.
+const CUSTOM_LONG = [
+  ["custom_qa_2", "Prensa propia de prueba", "Cuadriceps/Gluteos/Abductores"],
+  ["custom_qa_3", "Curl femoral propio de prueba", "Isquios/Gluteos/Abductores"],
+  ["custom_qa_4", "Ejercicio propio ficticio con un titulo larguisimo que ocupa cuatro lineas completas en pantallas angostas de telefono", "Cuadriceps/Gluteos/Abductores/Isquiotibiales"],
+].map(([id, name, muscle]) => ({ id, entrenador_id: EID, name, name_en: name, pattern: "rodilla", muscle, equip: "Libre", video_url: "https://youtu.be/dQw4w9WgXcQ", is_custom: true }));
+
 // Respuesta simulada de PostgREST. Devuelve { status, body, headers? } o null si no hay fila definida.
 export function respond({ method, table, search }) {
   if (method === "HEAD") return { status: 200, headers: { "content-range": "*/0" }, body: "" };
@@ -74,7 +81,7 @@ export function respond({ method, table, search }) {
   }
   // Ejercicios propios FICTICIOS (tarjeta con 3 acciones: editar, video y borrar). Opt-in (QA_CUSTOM_EX=1) para no alterar el baseline de qa:ui.
   if (table.startsWith("ejercicios_custom") && process.env.QA_CUSTOM_EX === "1") {
-    return { status: 200, body: [{ id: "custom_qa_1", entrenador_id: EID, name: "Ejercicio propio de prueba con nombre largo", name_en: "Custom test exercise with a long name", pattern: "empuje", muscle: "Pecho, Triceps", equip: "Libre", video_url: "https://youtu.be/dQw4w9WgXcQ", is_custom: true }] };
+    return { status: 200, body: [{ id: "custom_qa_1", entrenador_id: EID, name: "Ejercicio propio de prueba con nombre largo", name_en: "Custom test exercise with a long name", pattern: "empuje", muscle: "Pecho, Triceps", equip: "Libre", video_url: "https://youtu.be/dQw4w9WgXcQ", is_custom: true }, ...(process.env.QA_CUSTOM_LONG === "1" ? CUSTOM_LONG : [])] };
   }
   if (table.startsWith("entrenadores")) return { status: 200, body: [{ id: EID, email: "coach@example.invalid", nombre: "Entrenador Prueba" }] };
   return { status: 200, body: [] };
