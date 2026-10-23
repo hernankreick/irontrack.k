@@ -76,9 +76,58 @@ test("espaciado constante de titulos, placeholder y slider con tokens de la pale
   assert.match(sh, /padding: embed \? '24px 20px 24px 20px'/, "padding lateral derecho simetrico al izquierdo en el area de contenido (>= 768 px)");
   assert.match(sh, /padding: '20px 16px 80px'/, "movil < 768 px sin cambios");
   assert.match(sh, /borderRadius: 0,/, "sin radio exterior en modo embebido");
-  assert.match(sh, /boxShadow: '88px 0 0 0 ' \+ pal\.bg/);
+  assert.doesNotMatch(sh, /boxShadow|88px/, "sin box-shadow de relleno: el fondo continuo lo da AppMainScroll");
   assert.match(readFileSync(path.join(dir, "SettingsFormControls.jsx"), "utf8"), /className="it-set-input"/);
   assert.match(readFileSync(path.join(dir, "SettingsSubscriptionTab.jsx"), "utf8"), /className="it-set-title"/);
 });
+
+// SSR de AppMainScroll: el fondo del scroller en Configuracion/Perfil del coach es el de la paleta; el resto, sin cambios.
+{
+  const { mkdtempSync } = await import("node:fs");
+  const os = await import("node:os");
+  const outfile = path.join(mkdtempSync(path.join(os.tmpdir(), "irontrack-setbg-")), "bundle.mjs");
+  const { build } = await import("esbuild");
+  await build({
+    stdin: {
+      contents: 'import React from "react"; import { renderToStaticMarkup } from "react-dom/server"; import AppMainScroll from "./components/layout/AppMainScroll.jsx"; export { React, renderToStaticMarkup, AppMainScroll };',
+      resolveDir: ROOT, sourcefile: "setbg-entry.jsx", loader: "jsx",
+    },
+    bundle: true, format: "esm", platform: "node", outfile, logLevel: "silent", alias: { "@": ROOT },
+    define: { "process.env.NODE_ENV": '"production"' },
+    banner: { js: 'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);' },
+  });
+  const { React, renderToStaticMarkup, AppMainScroll } = await import(pathToFileURL(outfile).href);
+  const bgOf = (o) => {
+    const html = renderToStaticMarkup(React.createElement(AppMainScroll, {
+      showCoachDesktopShell: true, esAlumno: false, tab: "plan", showAlumnoProgressStack: false, coachSuppressTopNav: true,
+      coachDesktop1024: false, planScrollDiag: {}, alumnoTopBarFixed: false, alumnoFullScreenShell: false, session: null, activeDay: null,
+      darkMode: true, ...o,
+    }, "x"));
+    return /background:([^;"]+)/.exec(html)[1].trim().toLowerCase();
+  };
+  test("AppMainScroll: coach + settings/perfil pinta pal.bg (oscuro y claro)", () => {
+    for (const tab of ["settings", "perfil"]) for (const dm of [true, false]) {
+      assert.equal(bgOf({ tab, darkMode: dm }), palette(dm).bg.toLowerCase(), `${tab} ${dm}`);
+    }
+  });
+  test("AppMainScroll: coach en otras pestanas conserva #0B1120 / #ffffff", () => {
+    for (const tab of ["plan", "dashboard", "alumnos", "routines", "biblioteca", "progress", "calendar", "mensajes"]) {
+      assert.equal(bgOf({ tab, darkMode: true }), "#0b1120", tab);
+      assert.equal(bgOf({ tab, darkMode: false }), "#ffffff", tab);
+    }
+  });
+  test("AppMainScroll: coach sin shell de escritorio o alumno sin cambios", () => {
+    assert.equal(bgOf({ showCoachDesktopShell: false, tab: "settings", darkMode: true }), "#0b1120");
+    assert.equal(bgOf({ showCoachDesktopShell: false, tab: "settings", darkMode: false }), "#f1f5f9");
+    for (const tab of ["settings", "perfil"]) {
+      assert.equal(bgOf({ esAlumno: true, showCoachDesktopShell: false, tab, darkMode: true }), "#0b1120");
+      assert.equal(bgOf({ esAlumno: true, showCoachDesktopShell: true, tab, darkMode: false }), "#f1f5f9");
+    }
+    assert.equal(bgOf({ esAlumno: true, showCoachDesktopShell: false, tab: "plan", darkMode: true }), "#0b1220");
+    assert.equal(bgOf({ esAlumno: true, showCoachDesktopShell: false, tab: "library", darkMode: true }), "#0b1220");
+    assert.equal(bgOf({ esAlumno: true, showCoachDesktopShell: false, tab: "progress", showAlumnoProgressStack: true, darkMode: true }), "#0b1220");
+    assert.equal(bgOf({ esAlumno: true, showCoachDesktopShell: false, tab: "plan", darkMode: false }), "#f1f5f9");
+  });
+}
 
 console.log(`\n${count} pruebas OK`);

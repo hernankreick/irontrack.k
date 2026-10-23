@@ -82,8 +82,7 @@ export default function SettingsShell({
     fontFamily: "'DM Sans', sans-serif",
     borderRadius: 0,
     boxSizing: 'border-box',
-    // A sangre: el contenedor padre (App) deja relleno a la derecha y abajo; se pinta con el mismo fondo para que no haya costura ni esquina visible.
-    boxShadow: '88px 0 0 0 ' + pal.bg + ', 0 88px 0 0 ' + pal.bg + ', 88px 88px 0 0 ' + pal.bg,
+    // Fondo continuo: el relleno del contenedor padre lo pinta AppMainScroll con pal.bg (coach + settings/perfil); aqui no hay sombras de relleno.
   } : {
     position: 'fixed', inset: 0, zIndex: 220,
     display: 'flex', flexDirection: 'column',

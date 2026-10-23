@@ -1,4 +1,5 @@
 import React from 'react';
+import coachSettingsPalette from '../settings/coachSettingsPalette.js';
 
 export default function AppMainScroll({
   showCoachDesktopShell,
@@ -17,6 +18,9 @@ export default function AppMainScroll({
   hasBottomNav = true,
   children,
 }) {
+  // Configuracion/Perfil del coach (SettingsPage embebido): el scroller pinta el fondo de la paleta para que el relleno
+  // (abajo, derecha, laterales) no muestre otro tono. Cualquier otro caso conserva el fondo de siempre.
+  const coachSettingsEmbedded = !!showCoachDesktopShell && !esAlumno && (tab === "settings" || tab === "perfil");
   return (
     <div
       className={
@@ -88,7 +92,9 @@ export default function AppMainScroll({
         scrollBehavior: "auto",
         overflowAnchor: "none",
         overscrollBehavior: "contain",
-        background: darkMode
+        background: coachSettingsEmbedded
+          ? coachSettingsPalette(darkMode).bg
+          : darkMode
           ? esAlumno &&
               (tab === "plan" || tab === "library" || (tab === "progress" && showAlumnoProgressStack))
             ? "#0B1220"
