@@ -9,6 +9,7 @@ import { spawnSync } from "node:child_process";
 import { chromiumPath, gotoSection, openPage, resolvePlaywright, serve } from "./lib.mjs";
 import { MOCK_HOST } from "./fixtures.mjs";
 
+process.env.QA_CUSTOM_EX = "1"; // activa el ejercicio propio ficticio (fixtures.mjs)
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SIZES = { 375: 667, 390: 844, 430: 932, 768: 1024, 1280: 800 };
 
@@ -59,7 +60,24 @@ const MEASURE = () => {
   const l3 = lum(bcolOver);
   const borderRatio = (Math.max(l3, l2) + 0.05) / (Math.min(l3, l2) + 0.05);
   const r = card.getBoundingClientRect();
+  // Alto de varias tarjetas: primera, titulo mas largo, con 2 etiquetas y propia (con papelera).
+  const info = (c) => {
+    const bs = [...c.querySelectorAll("button,a")].map((b) => { const q = b.getBoundingClientRect(); return { w: +q.width.toFixed(1), h: +q.height.toFixed(1) }; });
+    const img = c.querySelector("img,div > span"); const th = (c.querySelector("img") || (img && img.parentElement));
+    const tb = th ? th.getBoundingClientRect() : { width: 0, height: 0 };
+    const nm = c.querySelector("div > div > div > div");
+    return { name: nm ? nm.textContent.slice(0, 40) : "", h: +c.getBoundingClientRect().height.toFixed(1), buttons: bs, thumb: { w: Math.round(tb.width), h: Math.round(tb.height) }, overflowX: c.scrollWidth > c.clientWidth + 1 };
+  };
+  const all = [...document.querySelectorAll(".it-bib-ex-card")];
+  const nameH = (c) => { const n = c.querySelector("div > div > div > div"); return n ? n.getBoundingClientRect().height : 0; };
+  const longest = all.slice().sort((a, b) => nameH(b) - nameH(a))[0];
+  const tags2 = all.find((c) => c.querySelectorAll("span.inline-flex").length >= 2);
+  const custom = all.find((c) => c.querySelectorAll("button,a").length >= 3);
+  if (custom) custom.setAttribute("data-qa-custom", "1");
+  all[0].setAttribute("data-qa-first", "1");
+  const cards = { first: info(all[0]), longest: longest && info(longest), tags2: tags2 && info(tags2), custom: custom && info(custom) };
   return {
+    cards, count: all.length,
     cardBg: cs.backgroundColor, parentBg: `rgb(${Math.round(parentBg.r)}, ${Math.round(parentBg.g)}, ${Math.round(parentBg.b)})`,
     bgContrast: +ratio.toFixed(3), border: cs.borderTopWidth + " " + cs.borderTopStyle + " " + cs.borderTopColor, borderVisible: bw > 0 && cs.borderTopStyle !== "none" && bcol.a > 0,
     borderVsParent: +borderRatio.toFixed(3), shadow: cs.boxShadow, radius: cs.borderTopLeftRadius, rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },
@@ -90,11 +108,12 @@ async function main() {
         await page.waitForTimeout(1500);
       }
       if (!(await openLibrary(page, width))) { report.push({ theme, width, skipped: "no se pudo abrir Ejercicios" }); await ctx.close(); continue; }
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1500);
       const m = await page.evaluate(MEASURE);
       if (!m) { report.push({ theme, width, skipped: "sin tarjetas" }); await ctx.close(); continue; }
       const file = path.join(o.out, `${o.tag}_${theme}_${width}.png`);
       await page.screenshot({ path: file });
+      for (const k of ["first", "custom"]) { try { await page.locator(`[data-qa-${k}]`).screenshot({ path: path.join(o.out, `${o.tag}_card-${k}_${theme}_${width}.png`) }); } catch (e) { /* tarjeta ausente */ } }
       report.push({ theme, width, file, ...m, pageErrors: state.pageErrors.length });
       await ctx.close();
     }
@@ -103,9 +122,25 @@ async function main() {
   server.close();
   fs.writeFileSync(path.join(o.out, `${o.tag}_report.json`), JSON.stringify(report, null, 1));
   for (const r of report) {
+    if (r.cards) for (const [k, c] of Object.entries(r.cards)) console.log(`  ${r.theme}@${r.width} ${k}: alto=${c ? c.h : "-"} miniatura=${c ? c.thumb.w + "x" + c.thumb.h : "-"} botones=${c ? c.buttons.map((b) => b.w + "x" + b.h).join(",") : "-"}`);
     if (r.skipped) console.log(`${r.theme}@${r.width}: OMITIDA (${r.skipped})`);
     else console.log(`${r.theme}@${r.width}: bg ${r.cardBg} vs ${r.parentBg} ratio=${r.bgContrast} | borde ${r.border} visible=${r.borderVisible} vsPadre=${r.borderVsParent} | sombra=${r.shadow} | radio=${r.radius} overflow=${r.overflow} errores=${r.pageErrors}`);
   }
+  // Comprobaciones moviles (<768): botones de accion >= 44x44 y tarjeta al menos 18 % mas baja que antes del cambio (a 390 px).
+  const BEFORE = { first: { dark: 141, light: 143 }, custom: { dark: 191, light: 193 } };
+  const fails = [];
+  for (const r of report) {
+    if (r.skipped || !r.cards || r.width >= 768) continue;
+    for (const [k, c] of Object.entries(r.cards)) {
+      if (!c) { if (k === "first" || k === "custom") fails.push(`${r.theme}@${r.width} ${k}: tarjeta ausente`); continue; }
+      for (const b of c.buttons) if (b.w < 44 || b.h < 44) fails.push(`${r.theme}@${r.width} ${k}: boton ${b.w}x${b.h} < 44`);
+      if (c.overflowX) fails.push(`${r.theme}@${r.width} ${k}: desborde horizontal`);
+      const base = BEFORE[k] && BEFORE[k][r.theme];
+      if (r.width === 390 && base && c.h > base * 0.82) fails.push(`${r.theme}@390 ${k}: alto ${c.h} > ${(base * 0.82).toFixed(1)} (menos de 18 % de reduccion)`);
+    }
+  }
+  if (fails.length) { console.error("FALLOS:\n" + fails.join("\n")); process.exitCode = 1; }
+  else console.log("Comprobaciones moviles OK (botones >= 44 px, reduccion >= 18 % a 390).");
   console.log("Salida:", o.out);
 }
 

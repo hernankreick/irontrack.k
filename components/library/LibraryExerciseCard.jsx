@@ -69,13 +69,13 @@ export default function LibraryExerciseCard({
         )}
 
         {/* Right side */}
-        <div style={{ flex: 1, minWidth: 0, paddingLeft: '10px' }}>
+        <div className="it-bib-ex-main" style={{ flex: 1, minWidth: 0, paddingLeft: '10px' }}>
           {/* Name + action buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-            <div style={{ flex: 1, fontSize: 17, fontWeight: 800, color: textMain, lineHeight: 1.3, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+          <div className="it-bib-ex-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+            <div className="it-bib-ex-name" style={{ flex: 1, fontSize: 17, fontWeight: 800, color: textMain, lineHeight: 1.3, wordBreak: "break-word", overflowWrap: "anywhere" }}>
               {nombre}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
+            <div className="it-bib-ex-acts" style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
               <button
                 type="button"
                 onClick={onEdit}
@@ -116,7 +116,7 @@ export default function LibraryExerciseCard({
           </div>
 
           {/* Tags */}
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 7 }}>
+          <div className="it-bib-ex-tags" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 7 }}>
             <span
               className="inline-flex"
               style={{ background: _dm ? "rgba(22, 34, 52, 0.85)" : "rgba(226, 232, 240, 0.85)", color: textMuted, padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700, border: "1px solid " + cardBorder, letterSpacing: 0.2 }}
