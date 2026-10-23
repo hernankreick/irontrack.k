@@ -46,11 +46,12 @@ export default function LibraryExerciseCard({
     <div
       className={"it-bib-ex-card min-w-0 " + (_dm ? "it-bib-ex-card-d" : "it-bib-ex-card-l")}
       style={{
-        background: bgCard,
-        border: libNarrow ? "none" : "1px solid " + cardBorder,
+        background: _dm ? bgCard : "#F8FAFC",
+        border: _dm ? (libNarrow ? "none" : "1px solid " + cardBorder) : "1px solid #CBD5E1",
         borderRadius: 17,
         padding: '10px 12px',
         minWidth: 0,
+        ...(_dm ? null : { boxShadow: "0 1px 3px rgba(15, 23, 42, 0.08)" }),
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 0 }}>
