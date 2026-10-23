@@ -72,6 +72,10 @@ export function respond({ method, table, search }) {
     if (aq && aq.startsWith("eq.")) rows = rows.filter((r) => r.alumno_id === aq.slice(3));
     return { status: 200, body: rows };
   }
+  // Ejercicios propios FICTICIOS (tarjeta con 3 acciones: editar, video y borrar). Opt-in (QA_CUSTOM_EX=1) para no alterar el baseline de qa:ui.
+  if (table.startsWith("ejercicios_custom") && process.env.QA_CUSTOM_EX === "1") {
+    return { status: 200, body: [{ id: "custom_qa_1", entrenador_id: EID, name: "Ejercicio propio de prueba con nombre largo", name_en: "Custom test exercise with a long name", pattern: "empuje", muscle: "Pecho, Triceps", equip: "Libre", video_url: "https://youtu.be/dQw4w9WgXcQ", is_custom: true }] };
+  }
   if (table.startsWith("entrenadores")) return { status: 200, body: [{ id: EID, email: "coach@example.invalid", nombre: "Entrenador Prueba" }] };
   return { status: 200, body: [] };
 }

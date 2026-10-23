@@ -221,7 +221,7 @@ function TabPreferencias({ lang, setLang, darkMode, setDarkMode, toast2 }) {
           className="it-set-select"
           value={tz} onChange={e => setTz(e.target.value)}
           style={{
-            background: C.control, border: `1px solid ${C.borderStrong}`,
+            backgroundColor: C.control, border: `1px solid ${C.borderStrong}`,
             borderRadius: C.rCtrl, padding: '10px 40px 10px 12px', fontSize: 14,
             color: C.text, fontFamily: 'inherit', cursor: 'pointer',
             appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
