@@ -1,8 +1,9 @@
 import React from 'react';
 import { Chat } from './Chat.jsx';
 import { Ic } from './Ic.jsx';
+import { siguienteBadge, textoBadge } from '../lib/chatMessages.js';
 
-export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode, es}) {
+export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode, es, hasBottomNav = true, hidden = false}) {
   const _dm = typeof darkMode !== "undefined" ? darkMode : true;
   const bgCard = _dm?"#162234":"#FFFFFF";
   const border = _dm?"#2D4057":"#E2E8F0";
@@ -15,10 +16,10 @@ export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode
   // ✅ Cuenta mensajes no leídos REALES desde Supabase (de_entrenador=true, leido=false)
   const checkUnread = React.useCallback(()=>{
     if(!alumnoId || abierto) return;
-    sb.getMensajes(alumnoId).then(function(m){
-      const noLeidos = (m||[]).filter(msg => msg.de_entrenador && !msg.leido).length;
-      setUnread(noLeidos);
-    });
+    // Conteo exacto e independiente de la ventana de 50 mensajes. Si falla (null) se conserva el valor anterior del badge.
+    Promise.resolve(sb.getMensajesNoLeidosCount(alumnoId)).then(function(n){
+      setUnread(function(prev){ return siguienteBadge(prev, n); });
+    }).catch(function(){});
   }, [alumnoId, abierto]);
 
   React.useEffect(()=>{
@@ -43,8 +44,12 @@ export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode
 
   if(!alumnoId) return null;
 
-  const fabBottom = "calc(env(safe-area-inset-bottom, 0px) + 112px)";
-  const panelBottom = "calc(env(safe-area-inset-bottom, 0px) + 118px)";
+  // Oculto durante un entrenamiento abierto: el boton (z-index 155) quedaba encima de los controles de la serie.
+  if(hidden) return null;
+
+  // Con barra inferior el boton queda por encima de ella; sin barra, cerca del borde respetando el area segura.
+  const fabBottom = hasBottomNav ? "calc(env(safe-area-inset-bottom, 0px) + 112px)" : "calc(env(safe-area-inset-bottom, 0px) + 20px)";
+  const panelBottom = hasBottomNav ? "calc(env(safe-area-inset-bottom, 0px) + 118px)" : "calc(env(safe-area-inset-bottom, 0px) + 68px)";
   /** Por encima del bottom nav alumno (z-index 40) y debajo de modales (600+). */
 
   return (
@@ -60,7 +65,7 @@ export function ChatFlotante({alumnoId, alumnoNombre, sb, esEntrenador, darkMode
       )}
       <button type="button" onClick={toggleChat} style={{position:"fixed",bottom:fabBottom,right:16,background:"#2563EB",color:"#fff",border:"none",borderRadius:"50%",width:40,height:40,fontSize:15,cursor:"pointer",zIndex:155,boxShadow:"0 4px 12px rgba(239,68,68,0.4)",display:"flex",alignItems:"center",justifyContent:"center",WebkitTapHighlightColor:"transparent",boxSizing:"border-box"}}>
         💬
-        {unread>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#22C55E",color:"#fff",borderRadius:"50%",width:18,height:18,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{unread}</span>}
+        {unread>0&&<span style={{position:"absolute",top:-4,right:-4,background:"#22C55E",color:"#fff",borderRadius:9,minWidth:18,height:18,padding:"0 4px",boxSizing:"border-box",fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{textoBadge(unread)}</span>}
       </button>
     </div>
   );

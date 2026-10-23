@@ -16,7 +16,7 @@ export default function DuplicateDayModal({
   if (!dupDayModal) return null;
 
   return (
-    <BaseModal open={!!dupDayModal && !dupDayClosing} onClose={onClose} maxWidth={480}>
+    <BaseModal open={!!dupDayModal && !dupDayClosing} onClose={onClose} maxWidth={480} ariaLabel={msg("Duplicar día", "Duplicate day")}>
       <div style={{ fontSize: 18, fontWeight: 800, color: textMain, marginBottom: 4 }}>
         {msg("Duplicar", "Duplicate")} {dupDayModal.days[dupDayModal.dIdx]?.label || ("Día " + (dupDayModal.dIdx + 1))}
       </div>

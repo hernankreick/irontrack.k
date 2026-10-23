@@ -4,7 +4,7 @@ export default function AppGlobalStyles({ darkMode, bgSub, textMain, border }) {
   return (
     <style dangerouslySetInnerHTML={{__html:
       "@import url(https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap);" +
-      "*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased}input,textarea,select{outline:none!important}input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid #60A5FA!important;outline-offset:2px}button:focus-visible,a:focus-visible,[role=button]:focus-visible,[tabindex]:not([tabindex=\"-1\"]):focus-visible{outline:2px solid #60A5FA;outline-offset:2px}" +
+      "*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',sans-serif;line-height:1.4;-webkit-font-smoothing:antialiased}input,textarea,select{outline:none!important}input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid #60A5FA!important;outline-offset:2px}button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible,[role=button]:focus-visible,[tabindex]:not([tabindex=\"-1\"]):focus-visible{outline:2px solid #60A5FA!important;outline-offset:2px}" +
       "html{scrollbar-color:"+(darkMode?"#64748b #0f172a":"#64748b #e2e8f0")+"}" +
       "::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:"+(darkMode?"rgba(15,23,42,.55)":"#e2e8f0")+";border-radius:8px}::-webkit-scrollbar-thumb{background:"+(darkMode?"#64748b":"#64748b")+";border-radius:8px;border:2px solid transparent;background-clip:padding-box}" +
       ".plan-main-scroll{scrollbar-gutter:stable;scrollbar-color:"+(darkMode?"#94a3b8 #0b1120":"#64748b #f1f5f9")+"}" +
@@ -18,6 +18,13 @@ export default function AppGlobalStyles({ darkMode, bgSub, textMain, border }) {
       "@keyframes bounceIn{0%{transform:scale(0) rotate(-10deg);opacity:0}50%{transform:scale(1.2) rotate(5deg)}70%{transform:scale(0.92) rotate(-2deg)}100%{transform:scale(1) rotate(0);opacity:1}}" +
       "@keyframes rippleOut{0%{box-shadow:0 0 0 0 rgba(34,197,94,0.5)}100%{box-shadow:0 0 0 20px rgba(34,197,94,0)}}" +
 
+      // Movil (< 768 px): areas tactiles >= 44 px en el panel del entrenador y campos a 16 px (con menos, iOS Safari hace zoom al enfocar el campo).
+      "@media (max-width:767px){.coach-tap,.cd-btn{min-height:44px;min-width:44px}.coach-field-tap{min-height:44px;box-sizing:border-box}.coach-stu-name{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal!important;text-overflow:clip!important;overflow-wrap:anywhere;line-height:1.2;min-width:0}.coach-stu-ver{padding:8px 14px!important}.coach-stu-search{padding:0 12px!important}.coach-stu-search-input{padding:11px 0!important;box-sizing:border-box}.coach-bell{min-width:44px!important;min-height:44px!important}.coach-search-wrap>div{min-width:0!important}.coach-tap-link{display:inline-flex;align-items:center;min-height:44px}.it-routine-btn,.it-routine-sort-select,.it-routine-filter-chip{min-height:44px}" +
+      // Calendario (< 768 px): 16 px a cada lado y rejilla compacta para que los dias midan >= 44 px a 375 px.
+      ".it-cal-wrap{padding-right:16px!important}.it-cal-body{padding:0 8px 14px!important}.it-cal-grid{gap:2px!important}" +
+      // Configuracion (< 768 px): filas apiladas (texto arriba, control abajo a ancho completo), botones y controles a 44 px, interruptor con area de 44 px y mas aire entre secciones.
+      ".it-set-row{flex-direction:column!important;align-items:stretch!important;gap:12px!important}.it-set-btngroup{width:100%}.it-set-btn{min-height:44px;flex:1 1 auto}.it-set-select{width:100%;min-height:44px}.it-set-range{min-height:44px;display:block}.it-set-toggle{width:44px!important;height:44px!important}.it-set-title{margin-top:22px!important}.it-set-title:first-child{margin-top:4px!important}" +
+      "input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]):not([type=hidden]):not([type=button]):not([type=submit]),select,textarea{font-size:16px!important}}" +
       ".num{font-family:'Barlow Condensed',sans-serif;font-variant-numeric:tabular-nums}" +
       "*{-webkit-tap-highlight-color:transparent}[style*='overflowY']{-webkit-overflow-scrolling:touch}.plan-main-scroll{scroll-behavior:auto!important;overflow-anchor:none;overscroll-behavior-y:contain}" +
       ".plan-scroll-diag-no-hov .hov{transition:none!important;filter:none!important}" +
@@ -42,6 +49,8 @@ export default function AppGlobalStyles({ darkMode, bgSub, textMain, border }) {
       ".add-ex-card--light{background:#E2E8F0}.add-ex-card--light:hover{background:#d6dee9}" +
       ".add-ex-card--dark{background:#162234}.add-ex-card--dark:hover{background:#1c2d45}" +
       ".app-inner{max-width:1200px;margin:0 auto;width:100%}" +
+      // Skeleton de carga: a TODOS los anchos (antes solo existia dentro del media >= 768 px y en el telefono eran bloques invisibles).
+      ".sk{background:linear-gradient(90deg,var(--sk1,#1E2D40) 25%,var(--sk2,#2D4057) 50%,var(--sk1,#1E2D40) 75%);background-size:200% 100%;animation:shimmer 1.4s ease-in-out infinite;border-radius:8px;}@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}" +
       "@media(min-width:768px){" +
       ".app-inner{font-size:142%}" +
       ".tab-content{padding:24px 32px!important}" +
@@ -50,7 +59,6 @@ export default function AppGlobalStyles({ darkMode, bgSub, textMain, border }) {
       "nav>*{max-width:140px;font-size:15px!important;padding:12px 0!important}" +
       "nav>* i{font-size:24px!important}" +
       ".scroll-area{padding:24px 32px!important;max-width:860px;margin:0 auto}" +
-      ".sk{background:linear-gradient(90deg,var(--sk1,#1E2D40) 25%,var(--sk2,#2D4057) 50%,var(--sk1,#1E2D40) 75%);background-size:200% 100%;animation:shimmer 1.4s ease-in-out infinite;border-radius:8px;}@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}" +
       "}"
     }}/>
   );

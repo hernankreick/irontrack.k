@@ -35,7 +35,7 @@ export default function ExerciseHistoryModal({
               <span style={{fontSize:13,color:textMuted}}>{exercise.muscle} · {exercise.equip}</span>
             </div>
           </div>
-          <button className="hov" style={{...btn(),marginLeft:"auto",fontSize:22,padding:"4px 8px"}} onClick={onClose}>x</button>
+          <button type="button" className="hov" aria-label={msg("Cerrar", "Close")} style={{...btn(),marginLeft:"auto",fontSize:22,padding:"4px 8px"}} onClick={onClose}>x</button>
         </div>
         <div style={{marginBottom:12}}>
           {imageSrc&&(

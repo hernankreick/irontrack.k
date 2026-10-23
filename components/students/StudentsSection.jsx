@@ -8,6 +8,7 @@ import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
 import StudentOrphanSession from './StudentOrphanSession.jsx';
 import StudentsSectionStates from './StudentsSectionStates.jsx';
+import useDialogA11y from '../modals/useDialogA11y.js';
 
 export default function StudentsSection(props) {
   const {
@@ -37,6 +38,12 @@ export default function StudentsSection(props) {
     msg,
     Ic,
   };
+  // Alta de alumno: foco/Tab/Escape/retorno de foco. El fondo NO cierra (se perdia lo tipeado); Escape solo cierra si el formulario esta vacio.
+  const newAlumnoDialogRef = React.useRef(null);
+  const [creatingAlumno, setCreatingAlumno] = React.useState(false);
+  const closeNewAlumnoForm = function () { setNewAlumnoForm(false); setNewAlumnoData({nombre:"",email:"",pass:""}); setNewAlumnoErrors({nombre:false,email:false}); };
+  const newAlumnoPristine = !((newAlumnoData.nombre || "").trim() || (newAlumnoData.email || "").trim());
+  useDialogA11y({ open: !!newAlumnoForm, containerRef: newAlumnoDialogRef, onEscape: newAlumnoPristine && !creatingAlumno ? closeNewAlumnoForm : undefined });
   const sesionesForAlumno = React.useCallback(function (a) {
     var aid = String(a && a.id != null ? a.id : a);
     var byGlobal = (sesionesGlobales || []).filter(function (s) {
@@ -58,9 +65,9 @@ export default function StudentsSection(props) {
             <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
               <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:textMain,minWidth:0,flex:"1 1 12rem"}}><Ic name="users" size={18} color={textMain}/> {msg("MIS ALUMNOS", "MY ATHLETES")}</div>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",flexShrink:0}}>
-                <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={msg("Datos de pago", "Payment info")}><Ic name="share" size={16}/></button>
-                <button className="hov" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={msg("Actualizar", "Refresh")}><Ic name="refresh-cw" size={16}/></button>
-                <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {msg("Nuevo", "New")}</button>
+                <button className="hov coach-tap" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={msg("Datos de pago", "Payment info")}><Ic name="share" size={16}/></button>
+                <button className="hov coach-tap" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={msg("Actualizar", "Refresh")}><Ic name="refresh-cw" size={16}/></button>
+                <button className="hov coach-tap" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {msg("Nuevo", "New")}</button>
               </div>
             </div>
 
@@ -84,10 +91,12 @@ export default function StudentsSection(props) {
             )}
 
             <div style={{marginBottom:12}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,background:coachAluSurface,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"10px 12px",boxShadow:darkMode ? "none" : "0 1px 2px rgba(15,23,42,0.06)"}}>
+              <div className="coach-field-tap coach-stu-search" style={{display:"flex",alignItems:"center",gap:10,background:coachAluSurface,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"10px 12px",boxShadow:darkMode ? "none" : "0 1px 2px rgba(15,23,42,0.06)"}}>
                 <Ic name="search" size={18} color={textMuted}/>
                 <input
                   type="search"
+                  className="coach-stu-search-input"
+                  aria-label={msg("Buscar alumno", "Search athlete")}
                   value={coachAlumnosSearch}
                   onChange={function (e) { setCoachAlumnosSearch(e.target.value); }}
                   placeholder={msg("Buscar alumno...", "Search athlete...")}
@@ -106,7 +115,8 @@ export default function StudentsSection(props) {
                     <button
                       key={chip.k}
                       type="button"
-                      className="hov"
+                      className="hov coach-tap"
+                      aria-pressed={sel}
                       onClick={function () { setCoachAlumnosFilter(chip.k); }}
                       style={{
                         padding: "6px 12px",
@@ -128,9 +138,9 @@ export default function StudentsSection(props) {
             </div>
 
             {newAlumnoForm&&(
-              <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>{setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}}>
-                <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxWidth:480,paddingBottom:32}} onClick={e=>e.stopPropagation()}>
-                  <div style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:16,color:textMain}}>{msg("NUEVO ALUMNO", "NEW ATHLETE")}</div>
+              <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+                <div ref={newAlumnoDialogRef} role="dialog" aria-modal="true" aria-labelledby="new-alumno-title" style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxWidth:480,paddingBottom:32}} onClick={e=>e.stopPropagation()}>
+                  <div id="new-alumno-title" style={{fontSize:15,fontWeight:800,letterSpacing:1,marginBottom:16,color:textMain}}>{msg("NUEVO ALUMNO", "NEW ATHLETE")}</div>
                   <div style={{marginBottom:8}}>
                     <span style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4,display:"block"}}>{msg("NOMBRE", "NAME")}</span>
                     <input
@@ -158,16 +168,20 @@ export default function StudentsSection(props) {
                     {newAlumnoErrors.email&&<div style={{fontSize:11,color:"#EF4444",marginTop:4,fontWeight:700}}><Ic name="alert-triangle" size={14} color="#F59E0B"/> {msg("Email inválido (ej: nombre@mail.com)", "Invalid email (e.g. name@mail.com)")}</div>}
                   </div>
                   <div style={{display:"flex",gap:8}}>
-                    <button className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"12px 16px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={()=>{setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}}>{msg("Cancelar", "Cancel")}</button>
-                    <button className="hov" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:12,padding:"12px 16px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",flex:1}} onClick={async()=>{
+                    <button type="button" className="hov" style={{background:bgSub,color:textMuted,border:"1px solid "+border,borderRadius:12,padding:"12px 16px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={closeNewAlumnoForm}>{msg("Cancelar", "Cancel")}</button>
+                    <button type="button" className="hov" disabled={creatingAlumno} aria-busy={creatingAlumno} style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:12,padding:"12px 16px",fontSize:15,fontWeight:700,cursor:creatingAlumno?"default":"pointer",opacity:creatingAlumno?0.6:1,fontFamily:"inherit",flex:1}} onClick={async()=>{
+                      if(creatingAlumno) return;
                       const errNom = !newAlumnoData.nombre.trim();
                       const errEm = !/^[^@]+@[^@]+\.[^@]+$/.test(newAlumnoData.email);
                       if(errNom||errEm){setNewAlumnoErrors({nombre:errNom,email:errEm});return;}
+                      setCreatingAlumno(true);
+                      try{
                       setLoadingSB(true);
                       const {data:createdRows,error:createErr} = await sb.createAlumno({nombre:newAlumnoData.nombre.trim(),email:newAlumnoData.email.trim(),entrenador_id:ENTRENADOR_ID});
                       if(createdRows&&createdRows[0]){setAlumnos(prev=>cleanActiveCoachAlumnos([...prev,createdRows[0]],ENTRENADOR_ID));toast2(msg("Alumno creado ✓", "Athlete created ✓"));setNewAlumnoForm(false);setNewAlumnoData({nombre:"",email:"",pass:""});setNewAlumnoErrors({nombre:false,email:false});}
                       else{const errMsg=createErr?.message||createErr?.details||"";toast2("Error al crear alumno"+(errMsg?" — "+errMsg:""));}
                       setLoadingSB(false);
+                      }finally{setCreatingAlumno(false);}
                     }}>GUARDAR</button>
                   </div>
                 </div>

@@ -6,14 +6,16 @@ dist
 .env.*
 !.env.example
 .env*.local
-
-# .claude/: se versiona SOLO la configuracion compartida de agentes y guards (lista blanca).
-# Todo lo demas queda fuera: estado local, cache, ajustes personales y cualquier credencial o dato sensible.
+# Claude Code: se versiona la configuracion del flujo de agentes; lo local/personal no.
 .claude/*
 !.claude/agents/
 !.claude/hooks/
-!.claude/ORQUESTADOR.md
 !.claude/settings.json
+.claude/settings.local.json
+.claude/agent-memory-local/
+
+# --- Lista blanca adicional (agentes irontrack-*, orquestador, plantilla de autorizacion) y exclusion de credenciales ---
+!.claude/ORQUESTADOR.md
 # Autorizacion temporal de correcciones: la crea cada persona en su maquina y NUNCA se versiona (solo la plantilla de ejemplo).
 !.claude/authorization/
 .claude/authorization/*
@@ -28,4 +30,3 @@ dist
 .claude/**/*secret*
 .claude/**/*credential*
 .claude/**/*.local.*
-.claude/settings.local.json

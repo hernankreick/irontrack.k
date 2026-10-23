@@ -40,6 +40,7 @@ export default function CoachActiveStudentsCard({
         <span style={{ ...T.cardTitleSemibold, color: C.t }}>{title}</span>
         <button
           type="button"
+          className="coach-tap"
           style={{
             background: "none",
             border: "none",

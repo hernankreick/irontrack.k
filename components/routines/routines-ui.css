@@ -277,6 +277,14 @@
   margin-bottom: 12px;
 }
 
+/* Movil: margen lateral unico de 16 px (el del contenedor), sin los 4 px extra. */
+@media (max-width: 767px) {
+  .it-routines-top-wrap {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
 .it-routines-toolbar {
   row-gap: 10px;
 }

@@ -88,9 +88,10 @@ t("existe la documentacion de uso del orquestador", () => {
 t("el orquestador no figura con permisos amplios (sin permissionMode bypass/acceptEdits)", () => {
   assert.ok(!/permissionMode:\s*(bypassPermissions|acceptEdits|auto)/.test(orch.raw));
 });
-t("settings.json no fue debilitado: mantiene deny de merge, CLI de produccion y .env", () => {
+t("settings.json (el de main) mantiene las denegaciones de merge, CLI de produccion, credenciales y push forzado", () => {
   const s = readFileSync(ROOT + ".claude/settings.json", "utf8");
-  for (const k of ["mcp__github__merge_pull_request", "Bash(supabase *)", "Bash(vercel *)", "Read(.env)", "Bash(git push --force *)"]) assert.ok(s.includes('"' + k + '"'), k);
+  const deny = JSON.parse(s).permissions.deny;
+  for (const k of ["mcp__github__merge_pull_request", "Bash(supabase *)", "Bash(vercel *)", "Bash(git push --force*)", "Bash(git push * main*)", "Read(./.env)", "Edit(supabase/**)"]) assert.ok(deny.includes(k), "falta en deny: " + k);
 });
 
 console.log(n + " tests ok" + (failed ? ", " + failed + " FAILED" : ""));

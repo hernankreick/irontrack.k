@@ -1,7 +1,12 @@
 import React from 'react';
+import useDialogA11y from '../modals/useDialogA11y.js';
 import { ROUTINE_TEMPLATES, instantiateTemplate, emptyDays, getTemplateById } from '../../lib/routineTemplates.js';
 
 export default function NewRoutineModal({newR, setNewR, es, msg, lbl, inp, btn, textMuted, bgCard, bgSub, border, setRoutines, setAssignRoutineId, uid, toast2}) {
+  const dialogRef = React.useRef(null);
+  // Un toque en el fondo NO cierra (se perdia lo tipeado). Escape solo cierra si todavia no hay nada escrito/elegido.
+  const pristine = !newR || (!(newR.name || "").trim() && !newR.note && !newR.alumno && (!newR.templateId || newR.templateId === "blank"));
+  useDialogA11y({ open: !!newR, containerRef: dialogRef, onEscape: pristine ? function(){ setNewR(null); } : undefined });
   if (!newR) return null;
   return (
         <div
@@ -17,9 +22,8 @@ export default function NewRoutineModal({newR, setNewR, es, msg, lbl, inp, btn, 
             boxSizing:"border-box",
             padding:"max(12px, env(safe-area-inset-top, 0px)) 16px max(12px, env(safe-area-inset-bottom, 0px))",
           }}
-          onClick={()=>setNewR(null)}
         >
-          <div style={{background:bgCard,margin:0,width:"100%",maxWidth:520,borderRadius:16,padding:"20px 16px",maxHeight:"min(85dvh, calc(100dvh - 32px))",overflowY:"auto",flexShrink:0}} onClick={e=>e.stopPropagation()}>
+          <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={msg("Nueva rutina", "New routine")} style={{background:bgCard,margin:0,width:"100%",maxWidth:520,borderRadius:16,padding:"20px 16px",maxHeight:"min(85dvh, calc(100dvh - 32px))",overflowY:"auto",flexShrink:0}} onClick={e=>e.stopPropagation()}>
             <div style={{fontSize:22,fontWeight:800,letterSpacing:1,marginBottom:4}}>{msg("Nueva rutina", "New routine")}</div>
             <div style={{fontSize:13,color:textMuted,marginBottom:14}}>{msg("Elegí una plantilla o en blanco. Podés afinar después.", "Pick a template or start blank. Refine anytime.")}</div>
             <span style={lbl}>{msg("INICIO RÁPIDO", "QUICK START")}</span>
@@ -106,7 +110,7 @@ export default function NewRoutineModal({newR, setNewR, es, msg, lbl, inp, btn, 
                 setRoutines(p=>[...p,{...payload,id:newId,created:new Date().toLocaleDateString("es-AR")}]);
                 if(!newR.es_plantilla) setAssignRoutineId(newId);
                 setNewR(null);
-                toast2(msg("Rutina creada ✓", "Routine created ✓"));
+                toast2(msg("Rutina creada (falta guardar)", "Routine created (not saved yet)"));
               }}>{msg("CREAR", "CREATE")}</button>
             </div>
           </div>

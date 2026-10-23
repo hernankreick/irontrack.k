@@ -36,6 +36,10 @@ const PROTECT = [
   ["CLI como argumento de rg --pre", "rg --pre 'supabase db push' x ."],
   ["heredoc ejecutado por bash", "bash <<'E'\nsupabase db push\nE"],
   ["heredoc enviado a bash por tuberia", "cat <<'E' | bash\nsupabase db push\nE"],
+  ["git push con --receive-pack que ejecuta la CLI", "git push --receive-pack=\"vercel --prod\" origin rama"],
+  ["comilla simple sin cerrar que oculta la CLI", "echo 'x; supabase db push"],
+  ["comilla simple sin cerrar, sin separador, que oculta la CLI", "echo 'x supabase db push"],
+  ["comilla simple sin cerrar tras grep", "grep 'x; vercel --prod"],
   ["texto sin cerrar (comilla abierta)", 'echo "supabase db push'],
   ["CLI no entrecomillada junto a un echo", 'echo "a" supabase db push "b"'],
   ["curl al host real", `curl https://${HOST}/rest/v1/alumnos`],
@@ -60,6 +64,7 @@ const PROTECT = [
 const GAPS = [
   ["CLI via alias de git -c (!cmd)", "git -c alias.x='!supabase db push' x"],
   ["CLI dentro de un grupo { cmd; }", "{ supabase db push; }"],
+  ["CLI pegada a un = (git push --exec=CLI)", "git push --exec=supabase origin rama"],
 ];
 // Menciones de TEXTO inofensivas: el guard actual las bloquea (falso positivo); la propuesta debe permitirlas.
 const FALSE_POSITIVES = [

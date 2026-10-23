@@ -1,5 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Ic } from '../Ic.jsx';
+
+// < 768 px: true. Estado inicial seguro para SSR (false); el media query lo corrige en el cliente.
+function useIsUnder768() {
+  const [v, setV] = useState(false);
+  useEffect(function () {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
+    var mq = window.matchMedia('(max-width: 767px)');
+    function onChange() { setV(mq.matches); }
+    onChange();
+    mq.addEventListener('change', onChange);
+    return function () { mq.removeEventListener('change', onChange); };
+  }, []);
+  return v;
+}
 
 export default function LibraryManagementToolbar({
   busq,
@@ -27,8 +41,11 @@ export default function LibraryManagementToolbar({
   allEx,
   msg,
   textMuted,
+  compactFilters,
 }) {
   const [filterExpanded, setFilterExpanded] = useState(false);
+  const isUnder768 = useIsUnder768();
+  const compact = compactFilters !== undefined && compactFilters !== null ? !!compactFilters : isUnder768;
   const isFilterActive = modoFiltro === "patron" ? filtPat !== "todos" : filtMus !== "todos";
   const activeFilterLabel = isFilterActive
     ? (modoFiltro === "patron" ? patLabel(filtPat) : musLabel(filtMus))
@@ -41,7 +58,7 @@ export default function LibraryManagementToolbar({
           <div style={{ flex: 1 }}>
             <input
               type="search"
-              style={{...inpS, marginBottom: 0}}
+              style={{...inpS, marginBottom: 0, minHeight: 44, boxSizing: 'border-box'}}
               placeholder={msg("🔍 Buscar ejercicio...", "🔍 Search exercise...")}
               value={busq}
               onChange={e=>setBusq(e.target.value)}
@@ -58,7 +75,7 @@ export default function LibraryManagementToolbar({
               background: sortModo === 0 ? bgSub : "#2563EB22",
               color: sortModo === 0 ? textMuted : "#2563EB",
               fontFamily: "inherit", fontSize: 14, fontWeight: 700, cursor: "pointer",
-              flexShrink: 0, whiteSpace: 'nowrap',
+              flexShrink: 0, whiteSpace: 'nowrap', minHeight: 44, minWidth: 44,
             }}
           >
             <Ic name="arrow-up-down" size={18} color={sortModo === 0 ? "#8B9AB2" : "#2563EB"} />
@@ -90,7 +107,7 @@ export default function LibraryManagementToolbar({
         <div style={{ background: _dm ? '#111827' : bgSub, border: '1px solid ' + (_dm ? '#1E293B' : border), borderRadius: '8px', padding: '14px', marginTop: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: _dm ? '#9CA3AF' : textMuted, letterSpacing: '.5px', textTransform: 'uppercase' }}>{msg("Filtrar ejercicios", "Filter exercises", "Filtrar exercícios")}</span>
-            <button type="button" onClick={() => setFilterExpanded(false)} style={{ background: 'none', border: 'none', color: _dm ? '#6B7280' : textMuted, fontSize: '16px', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>✕</button>
+            <button type="button" className="coach-tap" aria-label={msg("Cerrar filtros", "Close filters", "Fechar filtros")} onClick={() => setFilterExpanded(false)} style={{ background: 'none', border: 'none', color: _dm ? '#6B7280' : textMuted, fontSize: '16px', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>✕</button>
           </div>
           {!libNarrow && (
             <input
@@ -109,6 +126,7 @@ export default function LibraryManagementToolbar({
               <button
                 type="button"
                 key={i===0?"bib-filt-patron":"bib-filt-muscle"}
+                className="coach-tap"
                 onClick={()=>{setModoFiltro(i===0?"patron":"musculo");setFiltPat("todos");setFiltMus("todos");}}
                 style={{
                   flex:1, padding:"9px 8px", border:"none", borderRadius:8, fontFamily:"inherit", fontSize:14, fontWeight:700, cursor:"pointer",
@@ -121,12 +139,38 @@ export default function LibraryManagementToolbar({
               </button>
             ))}
           </div>
-          {modoFiltro==="patron" && (
+          {compact && (
+            <div className="min-w-0" style={{ position: "relative", width: "100%" }}>
+              <select
+                id="bib-filt-categoria"
+                aria-label={msg("Categoría", "Category", "Categoria")}
+                value={modoFiltro==="patron" ? filtPat : filtMus}
+                onChange={e=>{
+                  const v = e.target.value;
+                  if (modoFiltro==="patron") setFiltPat(v);
+                  else setFiltMus(v==="todos"?"todos":v);
+                }}
+                style={{
+                  ...inpS, marginBottom: 0, width: "100%", minHeight: 44, boxSizing: "border-box",
+                  fontSize: 16, fontWeight: 700, fontFamily: "inherit", cursor: "pointer",
+                  appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
+                  padding: "10px 40px 10px 14px",
+                }}
+              >
+                {modoFiltro==="patron"
+                  ? patrones.map(p=>(<option key={p} value={p}>{patLabel(p)}</option>))
+                  : musculos.map(m=>(<option key={m} value={m}>{musLabel(m)}</option>))}
+              </select>
+              <span aria-hidden="true" style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: _dm ? "#6B7280" : textMuted, fontSize: 16 }}>▾</span>
+            </div>
+          )}
+          {!compact && modoFiltro==="patron" && (
             <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
               {patrones.map(p=>(
                 <button
                   type="button"
                   key={p}
+                  className="coach-tap"
                   onClick={()=>setFiltPat(p)}
                   style={{...chipBtnPad,
                     border: filtPat===p ? "1px solid "+patColors[p] : filtPat==="todos"&&p==="todos" ? "1px solid #243040" : "1px solid "+border,
@@ -139,12 +183,13 @@ export default function LibraryManagementToolbar({
               ))}
             </div>
           )}
-          {modoFiltro==="musculo" && (
+          {!compact && modoFiltro==="musculo" && (
             <div className="min-w-0" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignContent: "flex-start" }}>
               {musculos.map(m=>(
                 <button
                   type="button"
                   key={m}
+                  className="coach-tap"
                   onClick={()=>setFiltMus(m==="todos"?"todos":m)}
                   style={{...chipBtnPad,
                     border: filtMus===m ? "1px solid #60a5fa" : "1px solid "+border,

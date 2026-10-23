@@ -43,7 +43,7 @@ export default function CoachRecommendationCard({
         className="cd-btn"
         style={{
           width: "100%",
-          minHeight: 42,
+          minHeight: 44,
           marginTop: "auto",
           border: "none",
           borderRadius: 10,

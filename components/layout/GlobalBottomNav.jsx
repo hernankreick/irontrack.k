@@ -11,6 +11,9 @@ const GlobalBottomNav = React.forwardRef(function GlobalBottomNav({ darkMode, es
     return function () { mq.removeEventListener('change', onChange); };
   }, []);
 
+  // Una barra con una sola pestana no aporta navegacion: no se muestra (alumno con solo "Plan").
+  if (!tabs2 || tabs2.length < 2) return null;
+
   return (
     <nav ref={ref} aria-label={esAlumno ? "Navegación del alumno" : "Navegación principal"} style={{
       position:"fixed",bottom:0,left:0,right:0,

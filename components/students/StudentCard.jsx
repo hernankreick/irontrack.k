@@ -60,7 +60,7 @@ export default function StudentCard({
         </div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
-            <span style={{fontSize:17,fontWeight:800,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
+            <span className="coach-stu-name" style={{fontSize:17,fontWeight:800,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
             <span style={{fontSize:11,fontWeight:800,padding:"2px 8px",borderRadius:6,background:badgeCfg.bg,color:badgeCfg.color}}>{badgeCfg.t}</span>
           </div>
           <div style={{fontSize:13,color:textMuted,lineHeight:1.4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</div>
@@ -75,14 +75,14 @@ export default function StudentCard({
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0,marginLeft:"auto"}}>
           <button
-            className="hov"
+            className="hov coach-tap coach-stu-ver"
             style={{background:"#3b82f6",color:"#fff",border:"none",borderRadius:10,padding:"8px 18px",fontSize:14,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}
             onClick={onVer}
           >{isActive ? msg("CERRAR", "CLOSE", "FECHAR") : msg("VER", "VIEW", "VER")}</button>
           <div style={{position:"relative"}}>
             <button
               type="button"
-              className="hov"
+              className="hov coach-tap"
               aria-label={msg("Más opciones", "More options")}
               style={{width:40,height:40,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:10,cursor:"pointer"}}
               onClick={onToggleMenu}

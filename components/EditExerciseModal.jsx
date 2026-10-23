@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import useDialogA11y from './modals/useDialogA11y.js';
 
 const METODOS = [
   { id: 'carga',  label: '+ Carga',   desc: 'Subir kg c/semana — completá los valores de cada semana abajo' },
@@ -89,6 +90,10 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
     }
   }, [exercise]);
 
+  // Dialogo modal: foco, Tab atrapado y retorno de foco. El fondo y Escape NO cierran (se perdian los valores tipeados); se cierra con "x".
+  const dialogRef = useRef(null);
+  useDialogA11y({ open: true, containerRef: dialogRef });
+
   const updW = (wi, field, val) =>
     setWeeks(prev => prev.map((w, i) => i === wi ? { ...w, [field]: val } : w));
 
@@ -135,7 +140,6 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
 
   return (
     <div
-      onClick={onClose}
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(0,0,0,0.85)',
@@ -148,6 +152,10 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={'Editar ejercicio: ' + (exercise?.name || '')}
         onClick={e => e.stopPropagation()}
         style={{
           background: BG_CARD,
@@ -165,7 +173,9 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
             {exercise?.name || 'Nuevo ejercicio'}
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Cerrar"
             style={{
               background: 'transparent', border: 'none',
               color: TEXT_MUTED, fontSize: 24, cursor: 'pointer',

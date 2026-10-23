@@ -124,6 +124,7 @@ import { irontrackMsg, localeForSort, pickExerciseName } from './lib/irontrackMs
 import { selectCoachStudentListState } from './lib/coachStudentListSelectors.js';
 import { buildCoachGlobalSearchData } from './lib/coachGlobalSearchSelectors.js';
 import { selectAppShellLayoutState } from './lib/appShellLayoutSelectors.js';
+import { mensajesPath, enOrdenCronologico, resolveDashboardMessageTarget, contarNoLeidosDelEntrenador } from './lib/chatMessages.js';
 import {
   buildRutinaInsertBody,
   cleanRutinaWriteBody,
@@ -533,7 +534,10 @@ const sb = {
   },
   getConfig: () => sbFetch("config?id=eq.pagos&select=*"),
   saveConfig: (data) => sbFetch("config?id=eq.pagos", "PATCH", data),
-  getMensajes: (alumnoId) => sbFetch("mensajes?alumno_id=eq."+alumnoId+"&select=*&order=created_at.asc&limit=50"),
+  // Ultimos 50 mensajes (desc en el servidor) devueltos en orden cronologico; `null` ante un error HTTP, igual que antes.
+  getMensajes: (alumnoId) => sbFetch(mensajesPath(alumnoId)).then(enOrdenCronologico),
+  // Conteo exacto de no leidos del entrenador para el badge del alumno (sin descargar mensajes); `null` si falla.
+  getMensajesNoLeidosCount: (alumnoId) => contarNoLeidosDelEntrenador(supabase, alumnoId),
   getMensajesConversaciones: async (alumnoIds) => {
     var ids = Array.from(new Set((alumnoIds || []).filter(Boolean).map(String)));
     if (!ids.length) return [];
@@ -1269,6 +1273,14 @@ function GymApp() {
       if (!esAlumno || tab !== "plan") return;
       headerCollapsedRef.current = false;
       applyAlumnoHeaderLayerStyles(false);
+    },
+    [esAlumno, tab]
+  );
+
+  /** Alumno: "Ejercicios" y "Progreso" ya no estan en la navegacion (se abren desde el Plan). Si algun flujo lo dejara ahi, vuelve al Plan. */
+  useEffect(
+    function () {
+      if (esAlumno && (tab === "library" || tab === "progress")) setTab("plan");
     },
     [esAlumno, tab]
   );
@@ -3306,13 +3318,16 @@ function GymApp() {
     </>
   );
 
+  // CTA global (sin alumno asociado): no abre ningun chat por si solo; lleva a Alumnos filtrado para que el entrenador elija a quien escribir.
   const handleCoachDashboardEnviarMensaje = function () {
-    var first = (alumnos || [])[0];
-    if (first) {
-      setChatModal({ alumnoId: first.id, alumnoNombre: first.nombre || first.email || "Alumno" });
-    } else {
+    var target = resolveDashboardMessageTarget(coachAlumnosCounts);
+    if (target.empty) {
       toast2(msg("No hay alumnos para contactar", "No athletes to message"));
+      return;
     }
+    setCoachAlumnosSearch("");
+    setCoachAlumnosFilter(target.filter);
+    setTab(target.tab);
   };
   const handleCoachDashboardCrearRutina = function () {
     setTab("routines");
@@ -3602,6 +3617,7 @@ function GymApp() {
         msg: msg,
         mobileDrawerRef: mobileDrawerRef,
         onClose: function () { setMobileDrawerOpen(false); },
+        onOpen: function () { setMobileDrawerOpen(true); },
         onNavigate: setTab,
         onLogout: handleCoachLogout,
         coachInitials: coachInitialsFromFullName(sessionData?.name),
@@ -3742,6 +3758,7 @@ function GymApp() {
         session={session}
         activeDay={activeDay}
         darkMode={darkMode}
+        hasBottomNav={tabs2.length > 1}
         onScrollNode={function (node) {
           scrollRef.current = node;
         }}
@@ -4149,8 +4166,10 @@ function GymApp() {
                     <RoutinePdfDownloadButton msg={msg} onDownload={function(){ downloadRoutinePdf(r); }} />
                   )}
 
-                  {/* Volumen de entrenamiento: últimas 4 semanas, kg × reps (lectura propia de progreso, sin el tope de 50 sets) */}
+                  {/* Volumen de entrenamiento: últimas 4 semanas, kg × reps. El alumno NO lo ve (su pantalla es solo el Plan); el entrenador que mira el plan de un alumno sí. */}
+                {sessionData?.role==="entrenador"&&(
                 <StudentTrainingVolumeCard alumnoId={sessionData?.alumnoId} progress={progress} routines={routines} fetchPage={sbFetch} _dm={darkMode} textMuted={textMuted} msg={msg} />
+                )}
                 </div>
               );
             })}
@@ -4220,7 +4239,7 @@ function GymApp() {
           </div>
         )}
       {esAlumno&&(sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null))&&(
-        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false}/>
+        <ChatFlotante darkMode={darkMode} es={es} alumnoId={sessionData?.alumnoId||(sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null)} alumnoNombre={sessionData?.name||"Alumno"} sb={sb} esEntrenador={false} hasBottomNav={tabs2.length>1} hidden={!!(session&&activeDay)}/>
       )}
       <AppShellModals
         welcomeProps={{

@@ -218,6 +218,7 @@ function TabPreferencias({ lang, setLang, darkMode, setDarkMode, toast2 }) {
       <SectionTitle>{P.behavior}</SectionTitle>
       <Row label={P.timezone} desc={P.timezoneDesc}>
         <select
+          className="it-set-select"
           value={tz} onChange={e => setTz(e.target.value)}
           style={{
             background: C.bg, border: `1px solid ${C.border}`,
@@ -289,14 +290,14 @@ function TabNegocio({ toast2, alumnosCount, t }) {
           {t.free}: <span style={{ color: C.green, fontWeight: 600 }}>{cupos}</span>
           {' · '}{t.current}: <span style={{ color: C.sub }}>{alumnosCount || 0}</span>
         </div>
-        <input type="range" min={1} max={100} value={capMax} onChange={e => setCapMax(Number(e.target.value))}
+        <input type="range" className="it-set-range" min={1} max={100} value={capMax} onChange={e => setCapMax(Number(e.target.value))}
           style={{ width: '100%', marginTop: 12, accentColor: C.blue }} />
       </div>
 
       <Row label={t.currency} desc={t.currencyDesc}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {MONEDAS.map(m => (
-            <button key={m} type="button" onClick={() => setMoneda(m)} style={{
+            <button key={m} type="button" className="it-set-btn it-set-chip" onClick={() => setMoneda(m)} style={{
               padding: '5px 12px', borderRadius: 7, border: `1px solid ${moneda === m ? C.blue : C.border}`,
               background: moneda === m ? C.currencySelBg : 'transparent',
               color: moneda === m ? C.blueL : C.muted,
@@ -353,12 +354,12 @@ function TabNotificaciones({ t }) {
   return (
     <div>
       <SectionTitle>{t.control}</SectionTitle>
-      <Row label={t.activateAll} desc={t.activateAllDesc(onCount, ITEMS.length)}>
+      <Row inline label={t.activateAll} desc={t.activateAllDesc(onCount, ITEMS.length)}>
         <Toggle checked={master} onChange={onMaster} />
       </Row>
       <SectionTitle>{t.byCategory}</SectionTitle>
       {ITEMS.map(it => (
-        <Row key={it.id} label={it.label} desc={it.desc}>
+        <Row inline key={it.id} label={it.label} desc={it.desc}>
           <Toggle checked={!!sw[it.id]} onChange={v => setOne(it.id, v)} />
         </Row>
       ))}
@@ -400,7 +401,7 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
         <div style={{ fontSize: 14, fontWeight: 500, color: C.red }}>{label}</div>
         <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{desc}</div>
       </div>
-      <button type="button" onClick={onClick} style={{
+      <button className="coach-tap" type="button" onClick={onClick} style={{
         background: variant === 'fill' ? C.red : 'transparent',
         border: `1px solid ${C.red}`, color: variant === 'fill' ? '#fff' : C.red,
         borderRadius: 7, padding: '7px 14px', fontSize: 12, fontWeight: 600,
@@ -447,13 +448,13 @@ function TabRiesgo({ toast2, syncStateWithLocalStorage, onClose, t }) {
             }}
           />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" onClick={doDelete} disabled={deletePhrase !== t.deleteWord} style={{
+            <button className="coach-tap" type="button" onClick={doDelete} disabled={deletePhrase !== t.deleteWord} style={{
               background: deletePhrase === t.deleteWord ? C.red : C.deleteDisabledBg,
               color: deletePhrase === t.deleteWord ? '#fff' : C.deleteBtnDisabledFg, border: 'none', borderRadius: 7, padding: '8px 18px',
               fontSize: 12, fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase',
               cursor: deletePhrase === t.deleteWord ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
             }}>{t.deleteAccountFinal}</button>
-            <button type="button" onClick={() => { setShowConfirm(false); setDeletePhrase(''); }} style={{
+            <button className="coach-tap" type="button" onClick={() => { setShowConfirm(false); setDeletePhrase(''); }} style={{
               background: 'transparent', border: `1px solid ${C.border}`, color: C.muted,
               borderRadius: 7, padding: '8px 18px', fontSize: 12, fontWeight: 600,
               cursor: 'pointer', fontFamily: 'inherit',

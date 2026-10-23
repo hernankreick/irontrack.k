@@ -78,6 +78,7 @@ export default function LibraryExerciseCard({
               <button
                 type="button"
                 onClick={onEdit}
+                className="coach-tap"
                 style={{ ...btnStyle, fontSize: 18 }}
               >⋮</button>
               {ytUrl && (
@@ -86,6 +87,7 @@ export default function LibraryExerciseCard({
                     type="button"
                     onClick={() => setShowVideo(v => !v)}
                     aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
+                    className="coach-tap"
                     style={{ ...btnStyle, fontSize: 14 }}
                   >▶</button>
                 ) : (
@@ -94,6 +96,7 @@ export default function LibraryExerciseCard({
                     target="_blank"
                     rel="noreferrer"
                     aria-label={msg("Ver video", "Watch video", "Ver vídeo")}
+                    className="coach-tap"
                     style={{ ...btnStyle, textDecoration: "none", fontSize: 14 }}
                   >▶</a>
                 )
@@ -102,6 +105,7 @@ export default function LibraryExerciseCard({
                 <button
                   type="button"
                   onClick={onDelete}
+                  className="coach-tap"
                   style={btnStyle}
                 >
                   <Ic name="trash-2" size={13}/>
@@ -140,6 +144,7 @@ export default function LibraryExerciseCard({
           />
           <button
             onClick={() => setShowVideo(false)}
+            className="coach-tap"
             style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', color: '#fff', fontSize: '14px', cursor: 'pointer', zIndex: 1 }}
           >✕</button>
         </div>

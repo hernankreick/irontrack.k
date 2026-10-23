@@ -10,7 +10,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "lottie:app-icon": "node scripts/generateIronTrackIconLottie.mjs",
-    "postinstall": "chmod +x node_modules/.bin/*"
+    "postinstall": "chmod +x node_modules/.bin/*",
+    "qa:ui": "node scripts/qa/run.mjs",
+    "check:scope": "node scripts/check-ui-scope.mjs",
+    "test:all": "node scripts/run-all-tests.mjs",
+    "qa:builds": "node scripts/qa/builds.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -1,4 +1,5 @@
 import React from 'react';
+import useDialogA11y from './useDialogA11y.js';
 
 export default function PaymentInfoModal({
   form,
@@ -14,9 +15,11 @@ export default function PaymentInfoModal({
   onClose,
   onSave,
 }) {
+  const dialogRef = React.useRef(null);
+  useDialogA11y({ open: true, containerRef: dialogRef, onEscape: onClose });
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:200,display:"flex",alignItems:"flex-end"}} onClick={onClose}>
-      <div style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:20,width:"100%",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={msg("Datos de Pago", "Payment Info")} style={{background:bgCard,borderRadius:"20px 20px 0 0",padding:20,width:"100%",maxHeight:"85dvh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontSize:22,fontWeight:800,marginBottom:4}}>💰 {msg("Datos de Pago", "Payment Info")}</div>
         <div style={{fontSize:13,color:textMuted,marginBottom:16}}>{msg("Configurá tu alias o CBU para recibir pagos", "Set up your alias or CBU to receive payments")}</div>
         <div>
