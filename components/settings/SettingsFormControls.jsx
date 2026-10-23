@@ -1,28 +1,7 @@
 import React, { createContext, useContext } from 'react';
+import coachSettingsPalette from './coachSettingsPalette.js';
 
-const DEFAULT_SETTINGS_PALETTE = {
-  bg: '#0B0E11',
-  card: '#111827',
-  border: '#1A2535',
-  blue: '#2563EB',
-  blueL: '#3B82F6',
-  green: '#22C55E',
-  red: '#EF4444',
-  text: '#F1F5F9',
-  muted: '#64748B',
-  sub: '#94A3B8',
-  chrome: '#0D1117',
-  navActiveBg: '#1D2D50',
-  navInactiveDangerText: '#FCA5A5',
-  currencySelBg: '#1D2D50',
-  proBadgeBg: '#1A2E1A',
-  proBadgeBorder: '#166534',
-  subscriptionBanner: 'linear-gradient(135deg, #1D2D50 0%, #0F1829 100%)',
-  deleteDisabledBg: '#4B1A1A',
-  deleteBtnDisabledFg: '#fff',
-  deleteWarnText: '#FCA5A5',
-  dangerCardBorder: '#4B1A1A',
-};
+const DEFAULT_SETTINGS_PALETTE = coachSettingsPalette(true);
 
 export const SettingsPaletteContext = createContext(null);
 
@@ -40,11 +19,11 @@ export function Row({ label, desc, children, inline = false }) {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       gap: 16, padding: '14px 18px',
       background: C.card, border: `1px solid ${C.border}`,
-      borderRadius: 10, marginBottom: 6,
+      borderRadius: C.rCard, marginBottom: 8,
     }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{label}</div>
-        {desc && <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{desc}</div>}
+        {desc && <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{desc}</div>}
       </div>
       {children}
     </div>
@@ -65,7 +44,7 @@ export function SectionTitle({ children }) {
 export function Input({ label, value, onChange, type = 'text', placeholder }) {
   const C = useSettingsPalette();
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div>
       {label && (
         <div style={{
           fontSize: 11, fontWeight: 600, letterSpacing: '0.8px',
@@ -73,13 +52,14 @@ export function Input({ label, value, onChange, type = 'text', placeholder }) {
         }}>{label}</div>
       )}
       <input
+        className="it-set-input"
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         style={{
-          width: '100%', background: C.bg, border: `1px solid ${C.border}`,
-          borderRadius: 8, padding: '10px 14px', fontSize: 14,
+          width: '100%', background: C.control, border: `1px solid ${C.borderStrong}`,
+          borderRadius: C.rCtrl, padding: '10px 14px', fontSize: 14,
           color: C.text, fontFamily: 'inherit', boxSizing: 'border-box',
           outline: 'none',
         }}
@@ -93,8 +73,8 @@ export function BtnGroup({ options, value, onChange }) {
   return (
     <div className="it-set-btngroup" style={{
       display: 'flex', gap: 4,
-      background: C.bg, border: `1px solid ${C.border}`,
-      borderRadius: 8, padding: 3,
+      background: C.control, border: `1px solid ${C.borderStrong}`,
+      borderRadius: C.rCtrl, padding: 3,
     }}>
       {options.map(o => (
         <button
@@ -103,11 +83,11 @@ export function BtnGroup({ options, value, onChange }) {
           className="it-set-btn"
           onClick={() => onChange(o.id)}
           style={{
-            padding: '6px 14px', borderRadius: 6, border: 'none',
-            cursor: 'pointer', fontSize: 12, fontWeight: 500,
+            padding: '6px 14px', borderRadius: C.rCtrl - 2, border: 'none',
+            cursor: 'pointer', fontSize: 12, fontWeight: value === o.id ? 700 : 500,
             fontFamily: 'inherit',
             background: value === o.id ? C.blue : 'transparent',
-            color: value === o.id ? '#fff' : C.muted,
+            color: value === o.id ? C.onBlue : C.sub,
           }}
         >{o.label}</button>
       ))}
@@ -134,12 +114,12 @@ export function Toggle({ checked, onChange }) {
       <span style={{
         position: 'absolute', left: '50%', top: '50%', width: 40, height: 22,
         transform: 'translate(-50%, -50%)', borderRadius: 11,
-        background: checked ? C.blue : C.border,
+        background: checked ? C.blue : C.borderStrong,
         transition: 'background .2s',
       }}>
         <span style={{
           position: 'absolute', width: 16, height: 16,
-          background: '#fff', borderRadius: '50%',
+          background: C.onBlue, borderRadius: '50%',
           top: 3, left: checked ? 21 : 3,
           transition: 'left .2s',
         }} />
@@ -157,8 +137,8 @@ export function SaveBtn({ onClick, saved, savedHint, saveLabel, savedLabel }) {
         type="button"
         onClick={onClick}
         style={{
-          background: C.blue, color: '#fff', border: 'none',
-          borderRadius: 8, padding: '10px 24px',
+          background: C.blue, color: C.onBlue, border: 'none',
+          borderRadius: C.rCtrl, padding: '10px 24px',
           fontSize: 12, fontWeight: 700, letterSpacing: '0.5px',
           textTransform: 'uppercase', cursor: 'pointer',
           fontFamily: 'inherit',

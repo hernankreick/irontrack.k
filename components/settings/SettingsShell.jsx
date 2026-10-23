@@ -17,6 +17,22 @@ function useIsUnder768() {
   return v;
 }
 
+// Estilos locales de Configuracion (solo clases it-set-* / it-stg-root, colores de la paleta):
+// espaciado constante de titulos, placeholder de inputs y slider de capacidad.
+function settingsLocalCss(pal) {
+  var thumb = 'width:22px;height:22px;border-radius:50%;background:' + pal.blue + ';border:3px solid ' + pal.card + ';box-shadow:0 0 0 1px ' + pal.blue + ';';
+  var track = 'height:6px;border-radius:3px;background:' + pal.borderStrong + ';';
+  return '.it-stg-root .it-set-title{margin-top:26px!important;margin-bottom:10px!important}' +
+    '.it-stg-root .it-set-title:first-child{margin-top:4px!important}' +
+    '.it-set-input::placeholder{color:' + pal.muted + ';opacity:1}' +
+    '.it-set-range{-webkit-appearance:none;appearance:none;background:transparent;height:24px;cursor:pointer;accent-color:' + pal.blue + '}' +
+    '.it-set-range::-webkit-slider-runnable-track{' + track + '}' +
+    '.it-set-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;margin-top:-8px;' + thumb + '}' +
+    '.it-set-range::-moz-range-track{' + track + '}' +
+    '.it-set-range::-moz-range-progress{height:6px;border-radius:3px;background:' + pal.blue + '}' +
+    '.it-set-range::-moz-range-thumb{box-sizing:border-box;' + thumb + '}';
+}
+
 export default function SettingsShell({
   embed,
   pal,
@@ -64,8 +80,9 @@ export default function SettingsShell({
     background: pal.bg,
     color: pal.text,
     fontFamily: "'DM Sans', sans-serif",
-    borderRadius: 12,
+    borderRadius: 0,
     boxSizing: 'border-box',
+    // Fondo continuo: el relleno del contenedor padre lo pinta AppMainScroll con pal.bg (coach + settings/perfil); aqui no hay sombras de relleno.
   } : {
     position: 'fixed', inset: 0, zIndex: 220,
     display: 'flex', flexDirection: 'column',
@@ -86,9 +103,11 @@ export default function SettingsShell({
   return (
     <div
       ref={dialogRef}
+      className="it-stg-root"
       style={outerStyle}
       {...(embed ? {} : { role: 'dialog', 'aria-modal': 'true', 'aria-label': String(ui.settingsHeader || '') + ' ' + String(ui.coachMode || '') })}
     >
+      <style>{settingsLocalCss(pal)}</style>
       {/* HEADER — identical on both mobile and desktop */}
       <div style={headerStyle}>
         <div>
@@ -103,8 +122,8 @@ export default function SettingsShell({
           type="button"
           onClick={onClose}
           style={{
-            background: 'transparent', border: '1px solid ' + pal.border, color: pal.muted,
-            borderRadius: 7, padding: '5px 14px', fontSize: 12, fontWeight: 600,
+            background: 'transparent', border: '1px solid ' + pal.borderStrong, color: pal.sub,
+            borderRadius: pal.rCtrl, padding: '5px 14px', fontSize: 12, fontWeight: 600,
             letterSpacing: '0.5px', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
@@ -136,8 +155,8 @@ export default function SettingsShell({
             {sections.map(function (s) {
               var isActive = active === s.id;
               var isDanger = !!s.danger;
-              var activeColor = isDanger ? '#ef4444' : '#2563EB';
-              var inactiveColor = isDanger ? 'rgba(239,68,68,0.65)' : pal.sub;
+              var activeColor = isDanger ? pal.red : pal.blueText;
+              var inactiveColor = isDanger ? pal.red : pal.sub;
               return (
                 <React.Fragment key={s.id}>
                   {isDanger && (
@@ -150,7 +169,7 @@ export default function SettingsShell({
                     style={{
                       padding: '12px 14px',
                       border: 'none',
-                      borderBottom: isActive ? '2px solid ' + activeColor : '2px solid transparent',
+                      borderBottom: isActive ? '3px solid ' + (isDanger ? pal.red : pal.blue) : '3px solid transparent',
                       background: 'transparent',
                       color: isActive ? activeColor : inactiveColor,
                       fontSize: 13,
@@ -243,12 +262,12 @@ export default function SettingsShell({
                     onClick={function () { setActive(s.id); }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
-                      width: '100%', padding: '9px 10px', borderRadius: 8,
+                      width: '100%', padding: '9px 10px', borderRadius: pal.rCtrl,
                       border: 'none', cursor: 'pointer', textAlign: 'left',
-                      fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-                      background: isActive ? (s.danger ? 'rgba(239,68,68,.15)' : pal.navActiveBg) : 'transparent',
-                      color: isActive ? (s.danger ? pal.red : pal.blueL) : (s.danger ? pal.navInactiveDangerText : pal.sub),
-                      borderLeft: isActive ? '3px solid ' + (s.danger ? pal.red : pal.blueL) : '3px solid transparent',
+                      fontSize: 13, fontWeight: isActive ? 700 : 500, fontFamily: 'inherit',
+                      background: isActive ? (s.danger ? pal.dangerBg : pal.navActiveBg) : 'transparent',
+                      color: isActive ? (s.danger ? pal.red : pal.blueText) : (s.danger ? pal.navInactiveDangerText : pal.sub),
+                      borderLeft: isActive ? '3px solid ' + (s.danger ? pal.red : pal.blue) : '3px solid transparent',
                       transition: 'all .15s',
                     }}
                   >
@@ -263,7 +282,7 @@ export default function SettingsShell({
           <main style={{
             flex: 1,
             overflowY: 'auto',
-            padding: embed ? '24px 0 24px 20px' : '24px 28px',
+            padding: embed ? '24px 20px 24px 20px' : '24px 28px',
             background: pal.bg,
             boxSizing: 'border-box',
           }}>
