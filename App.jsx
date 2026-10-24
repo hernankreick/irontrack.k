@@ -887,9 +887,11 @@ function GymApp() {
       var idsStr = ids.join(',');
       var results = await Promise.all([
         sbFetch('sesiones?alumno_id=in.(' + idsStr + ')&select=*&order=created_at.desc&limit=500'),
-        sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=alumno_id,ejercicio_id,kg,reps,fecha,semana&order=created_at.desc&limit=3000'),
+        sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=alumno_id,ejercicio_id,kg,reps,fecha,semana,ciclo&order=created_at.desc&limit=3000'),
         sbFetch('mensajes?alumno_id=in.(' + idsStr + ')&de_entrenador=eq.false&or=(leido.is.null,leido.eq.false)&select=*&order=created_at.desc&limit=200'),
       ]);
+      // `ciclo` separa los ciclos de una rutina reiniciada en Evolucion de carga. Si la columna no existiera (400), se reintenta sin ella.
+      if(!Array.isArray(results[1])) results[1] = await sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=alumno_id,ejercicio_id,kg,reps,fecha,semana&order=created_at.desc&limit=3000');
       if(results[0] && Array.isArray(results[0])) setSesionesGlobales(results[0]);
       if(results[1] && Array.isArray(results[1])) {
         var idx2 = {};

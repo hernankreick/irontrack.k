@@ -20,19 +20,19 @@ export const ALUMNOS = [
 export const PROGRESO_SCENARIO = () => process.env.QA_PROGRESO_SCENARIO || "";
 const fmtDMY = (d) => String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return fmtDMY(d); };
-// kg FICTICIOS del ejercicio de calentamiento "gcsq" (primer ejercicio del dia, el que Progreso selecciona por defecto).
+// Tercer valor = progreso.semana 0-based (como en produccion). kg FICTICIOS del ejercicio de calentamiento "gcsq" (primer ejercicio del dia, el que Progreso selecciona por defecto).
 const PROGRESO_ROWS = {
   vacio: [],
-  una: [[0, 40]],
-  varias: [[14, 40], [14, 37.5], [7, 42.5]],
-  hueco: [[14, 40], [0, 37.5]],
+  una: [[0, 40, 0]],
+  varias: [[14, 40, 0], [14, 37.5, 0], [7, 42.5, 1]],
+  hueco: [[14, 40, 0], [0, 37.5, 2]],
   // Opt-in: semanas consecutivas con decimales y rango grande (la ultima fecha cae en la semana siguiente si el bloque lo permite).
-  masdatos: [[14, 62.5], [7, 87.5], [0, 142.5], [-7, 120]],
+  masdatos: [[14, 62.5, 0], [7, 87.5, 1], [0, 142.5, 2], [-7, 120, 3]],
 };
 export function progresoRows(alumnoId) {
   const rows = PROGRESO_ROWS[PROGRESO_SCENARIO()];
   if (!rows || alumnoId !== ALUMNOS[0].id) return [];
-  return rows.map(([ago, kg], i) => ({ alumno_id: alumnoId, ejercicio_id: "gcsq", kg: String(kg), reps: "8", fecha: daysAgo(ago), semana: 1, created_at: "2026-01-0" + (i + 1) + "T10:00:00" }));
+  return rows.map(([ago, kg, wk], i) => ({ alumno_id: alumnoId, ejercicio_id: "gcsq", kg: String(kg), reps: "8", fecha: daysAgo(ago), semana: wk, created_at: "2026-01-0" + (i + 1) + "T10:00:00" }));
 }
 
 export function rutinaDe(alumno) {
