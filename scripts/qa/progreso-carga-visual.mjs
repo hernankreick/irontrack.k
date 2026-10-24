@@ -1,11 +1,12 @@
 // QA visual de Progreso -> Evolucion de carga con datos FICTICIOS (sin Supabase ni red).
 // Uso:  node scripts/qa/progreso-carga-visual.mjs --out <carpeta> [--dist <dir>] [--widths 320,375,390,430,768,1280]
-//         [--themes dark,light] [--scenarios vacio,una,varias,hueco] [--lang es|en|pt]
+//         [--themes dark,light] [--scenarios vacio,una,varias,hueco[,masdatos]] [--lang es|en|pt]
 //   (con el arnes del repo:  scratchpad/sync_and_run.sh node scripts/qa/progreso-carga-visual.mjs --out <carpeta>)
 // Por cada ancho x tema x escenario abre Progreso; en <768 abre la hoja inferior "Evolucion de carga" desde la mini-card,
 // en >=1024 usa la tarjeta en linea (a 768 el coach no tiene menu: se omite, igual que qa:ui).
 // Verifica: sin overflow horizontal; controles interactivos >=44 px en <768 (dentro de la hoja); texto dentro de su contenedor
-// (etiquetas del grafico y de la hoja); la hoja cabe en el viewport. Escribe capturas, summary.json y summary.md en --out.
+// (etiquetas del grafico y de la hoja); la hoja cabe en el viewport. Con puntos: ademas toca un punto (<768: tap; >=1024: click),
+// captura *_tap.png y verifica que el detalle seleccionado (aria-live) quede dentro del viewport y de la hoja, sin overflow. Escribe capturas, summary.json y summary.md en --out.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -77,6 +78,8 @@ const MEASURE = `(() => {
     controls: controls.length, small, outside,
     svgH: sr ? +sr.height.toFixed(1) : null, svgW: sr ? +sr.width.toFixed(1) : null,
     chartPresent: !!chart,
+    points: [...root.querySelectorAll('[data-qa-load-point]')].map((e) => { const r = e.getBoundingClientRect(); return { i: e.getAttribute('data-qa-load-point'), w: +r.width.toFixed(1), h: +r.height.toFixed(1), label: e.getAttribute('aria-label'), pressed: e.getAttribute('aria-pressed') }; }),
+    detail: (() => { const d = root.querySelector('[data-qa-load-detail]'); if (!d) return null; const r = d.getBoundingClientRect(); return { text: (d.innerText || '').replace(/\\s+/g, ' ').trim(), left: +r.left.toFixed(1), right: +r.right.toFixed(1), top: +r.top.toFixed(1), bottom: +r.bottom.toFixed(1), inRoot: r.left >= rr.left - 1 && r.right <= rr.right + 1, inViewport: r.left >= -0.5 && r.right <= innerWidth + 0.5 && r.top >= -0.5 && r.bottom <= innerHeight + 0.5, textFits: d.scrollWidth <= d.clientWidth + 1 }; })(),
     overflow: document.documentElement.scrollWidth > innerWidth + 1, docW: document.documentElement.scrollWidth, vw: innerWidth,
   };
 })()`;
@@ -146,7 +149,42 @@ async function main() {
           shot2 = path.join(o.out, id + "_scroll.png");
           await page.screenshot({ path: shot2 });
         }
-        rows.push({ id, scenario, theme, width, shot, shot2, ...m, pageErrors: [...state.pageErrors] });
+        // Con un punto tocado: uno que NO este seleccionado por defecto (si todos lo estan, se toca dos veces: cierra y vuelve a seleccionar).
+        let tap = null;
+        if (m.points && m.points.length) {
+          const target = m.points.find((p) => p.pressed !== "true") || m.points[0];
+          const loc = page.locator('[data-qa-load-root] [data-qa-load-point="' + target.i + '"]');
+          const press = async () => { if (width < 1024) await loc.tap(); else await loc.click(); await page.waitForTimeout(120); };
+          await press();
+          if (target.pressed === "true") await press();
+          await page.waitForTimeout(200);
+          await page.waitForTimeout(150);
+          const m2 = await page.evaluate(MEASURE); // sin scroll: el detalle debe verse completo con la hoja recien abierta
+          // La altura del detalle no cambia al seleccionar distintos puntos (ni al cerrar la seleccion).
+          const hs = [m2.detail && +(m2.detail.bottom - m2.detail.top).toFixed(1)];
+          for (const pt of m.points) {
+            await page.locator('[data-qa-load-root] [data-qa-load-point="' + pt.i + '"]').click({ force: true });
+            await page.waitForTimeout(80);
+            const mm = await page.evaluate(MEASURE);
+            hs.push(mm.detail && +(mm.detail.bottom - mm.detail.top).toFixed(1));
+          }
+          if (new Set(hs).size > 1) failures.push(id + ": la altura del detalle cambia al seleccionar puntos: " + hs.join(","));
+          await page.locator('[data-qa-load-root] [data-qa-load-point="' + target.i + '"]').click({ force: true });
+          await page.waitForTimeout(100);
+          const m3 = await page.evaluate(MEASURE);
+          if (m3.detail.text.indexOf(target.label.split(": ")[1]) < 0) { await page.locator('[data-qa-load-root] [data-qa-load-point="' + target.i + '"]').click({ force: true }); await page.waitForTimeout(100); }
+          const m2b = await page.evaluate(MEASURE); m2.detail = m2b.detail; m2.points = m2b.points;
+          const shotTap = path.join(o.out, id + "_tap.png");
+          if (width >= 1024) await page.locator("[data-qa-load-root]").screenshot({ path: shotTap });
+          else await page.screenshot({ path: shotTap });
+          tap = { shot: shotTap, point: target.label, detail: m2.detail, pressed: (m2.points.find((p) => p.i === target.i) || {}).pressed, overflow: m2.overflow, outside: m2.outside };
+          if (m2.overflow) failures.push(id + ": overflow horizontal con punto tocado");
+          if (m2.outside.length) failures.push(id + ": texto fuera del contenedor con punto tocado: " + m2.outside.slice(0, 4).join("; "));
+          if (!m2.detail || !m2.detail.inRoot || !m2.detail.inViewport || !m2.detail.textFits) failures.push(id + ": detalle seleccionado fuera de contenedor/viewport: " + JSON.stringify(m2.detail));
+          if (!m2.detail || target.label.split(": ")[1] === undefined || !m2.detail.text.includes(target.label.split(": ")[1])) failures.push(id + ": el detalle no muestra la carga del punto tocado: " + JSON.stringify(m2.detail));
+          if (tap.pressed !== "true") failures.push(id + ": el punto tocado no queda con aria-pressed=true");
+        }
+        rows.push({ id, scenario, theme, width, shot, shot2, tap, ...m, pageErrors: [...state.pageErrors] });
         if (m.overflow) failures.push(id + ": overflow horizontal (" + m.docW + " > " + m.vw + ")");
         if (state.pageErrors.length) failures.push(id + ": errores de pagina: " + state.pageErrors[0]);
         if (width < 768) {
@@ -161,7 +199,7 @@ async function main() {
   await browser.close();
   server.close();
   fs.writeFileSync(path.join(o.out, "summary.json"), JSON.stringify({ rows, failures }, null, 1));
-  const lines = ["id | overflow | <44px | fuera | cabe | scroll | svgH | hoja h", ...rows.map((r) => r.skipped ? r.id + " | omitida (" + r.skipped + ")" : [r.id, r.overflow ? "SI" : "no", r.small.length, r.outside.length, r.fitsViewport ? "si" : "NO", r.scrolls ? "si" : "no", r.svgH ?? "-", r.rect.h].join(" | "))];
+  const lines = ["id | overflow | <44px | fuera | cabe | scroll | svgH | hoja h | tap", ...rows.map((r) => r.skipped ? r.id + " | omitida (" + r.skipped + ")" : [r.id, r.overflow ? "SI" : "no", r.small.length, r.outside.length, r.fitsViewport ? "si" : "NO", r.scrolls ? "si" : "no", r.svgH ?? "-", r.rect.h, r.tap ? (r.tap.detail && r.tap.detail.inViewport ? "tap ok" : "TAP FALLA") : "sin puntos"].join(" | "))];
   fs.writeFileSync(path.join(o.out, "summary.md"), lines.join("\n") + "\n");
   console.log(lines.join("\n"));
   console.log("\nSalida:", o.out);
