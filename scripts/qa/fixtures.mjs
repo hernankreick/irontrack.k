@@ -15,7 +15,7 @@ export const ALUMNOS = [
   created_at: "2026-01-01T10:00:00.000000",
 }));
 
-// Escenarios opt-in de Progreso -> Evolucion de carga (QA_PROGRESO_SCENARIO=vacio|una|varias|hueco).
+// Escenarios opt-in de Progreso -> Evolucion de carga (QA_PROGRESO_SCENARIO=vacio|una|varias|hueco|masdatos).
 // Sin la variable, la rutina y la tabla progreso quedan EXACTAMENTE como antes (baseline de qa:ui intacto).
 export const PROGRESO_SCENARIO = () => process.env.QA_PROGRESO_SCENARIO || "";
 const fmtDMY = (d) => String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear();
@@ -26,6 +26,8 @@ const PROGRESO_ROWS = {
   una: [[0, 40]],
   varias: [[14, 40], [14, 37.5], [7, 42.5]],
   hueco: [[14, 40], [0, 37.5]],
+  // Opt-in: semanas consecutivas con decimales y rango grande (la ultima fecha cae en la semana siguiente si el bloque lo permite).
+  masdatos: [[14, 62.5], [7, 87.5], [0, 142.5], [-7, 120]],
 };
 export function progresoRows(alumnoId) {
   const rows = PROGRESO_ROWS[PROGRESO_SCENARIO()];

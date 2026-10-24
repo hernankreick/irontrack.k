@@ -77,7 +77,7 @@ test("maximo destacado (anillo + badge) solo con >= 2 semanas con dato y valores
   assert.deepEqual(w.map((x) => x.isMax), [false, true, false, false]);
   const html = render([40, 47.5, 45, null], 3);
   assert.equal((html.match(/>Máx\.</g) || []).length, 1);
-  assert.match(html, /r="9"/);
+  assert.match(html, /r="10"/);
   assert.equal(buildLoadWeekModel(computed([40, null, null, null]), 0).some((x) => x.isMax), false);
   assert.equal(buildLoadWeekModel(computed([40, 40, null, null]), 1).some((x) => x.isMax), false);
 });
@@ -87,13 +87,15 @@ test("variacion solo entre semanas consecutivas con dato; nunca contra una sin d
   assert.deepEqual(up.map((x) => x.delta), [null, 2.5, -1.5, null]);
   const gap = buildLoadWeekModel(computed([40, null, 45, null]), 3);
   assert.deepEqual(gap.map((x) => x.delta), [null, null, null, null]);
+  // En el grafico lineal la variacion se muestra en el detalle de la semana seleccionada (por defecto, la ultima con dato).
   const html = render([40, 42.5, 41, null], 3);
-  assert.match(html, /\+2\.5 kg/);
-  assert.match(html, /−1\.5 kg/);
-  assert.match(html, /↑/);
+  assert.match(html, /−1\.5 kg vs Semana 2/);
   assert.match(html, /↓/);
+  const html2 = render([40, 42.5, null, null], 1);
+  assert.match(html2, /\+2\.5 kg vs Semana 1/);
+  assert.match(html2, /↑/);
   const same = render([40, 40, null, null], 1);
-  assert.match(same, / Igual</);
+  assert.match(same, / Igual vs Semana 1</);
   assert.equal(buildLoadWeekModel(computed([40, 40, null, null]), 1)[1].delta, 0);
 });
 
@@ -101,7 +103,7 @@ test("una sola semana registrada: sin variacion, sin maximo, punto centrado en s
   const html = render([null, null, 45, null], 2);
   assert.doesNotMatch(html, /↑|↓|\+\d|−\d/);
   assert.doesNotMatch(html, />Máx\.</);
-  assert.match(html, /cx="187\.5"/, "columna 3 de 4 sobre un lienzo de 300");
+  assert.match(html, /cx="196\.5"/, "columna 3 de 4 sobre el area de trazado (34..294 de un lienzo de 300)");
   assert.equal((html.match(/Sin registro/g) || []).length >= 2, true);
 });
 
@@ -113,7 +115,7 @@ test("ninguna semana: el grafico no se usa (ProgresoView mantiene emptyBox)", ()
 
 test("las posiciones usan todas las columnas y las etiquetas van alineadas (grid de n columnas)", () => {
   const html = render([40, 42.5, 41, 43], 3);
-  for (const cx of ["37.5", "112.5", "187.5", "262.5"]) assert.match(html, new RegExp('cx="' + cx + '"'));
+  for (const cx of ["66.5", "131.5", "196.5", "261.5"]) assert.match(html, new RegExp('cx="' + cx + '"'));
   assert.match(html, /grid-template-columns:repeat\(4, ?minmax\(0, ?1fr\)\)/);
   assert.doesNotMatch(html, /height="124"/);
 });
