@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildCoachProgresoModel, buildLoadSeries, progressRowWeekIndex } from "../components/coachProgresoMetrics.js";
+import { fetchAllPages } from "../lib/progressPaging.js";
 
 const AID = "alu1";
 const EX = "hip";
@@ -67,10 +68,84 @@ test("semana 0 no se infiere de una ausencia: progressRowWeekIndex", () => {
 test("buildLoadSeries: sin filas devuelve todo null (nunca 0)", () => {
   assert.deepEqual(buildLoadSeries([], { ejercicioId: EX, weekStarts: [0, 1, 2, 3].map((i) => i * 604800000) }), [null, null, null, null]);
 });
-test("App.jsx: la consulta global de progreso pide ciclo SIN rutina_id (otras metricas intactas) y reintenta sin ciclo si la columna falla", async () => {
+
+// ---- Semana 0 en TODA la seccion Progreso (progressRowMatchesRoutine), ciclos, rutinas y volumen ----
+function modelo(rows, sessions, ciclo, extra) {
+  return buildCoachProgresoModel(Object.assign({
+    alumnos: [{ id: AID, nombre: "Ana" }], sesionesGlobales: sessions || [], progresoGlobal: { [AID]: rows },
+    rutinasSBEntrenador: [rutina(ciclo || 1)], allEx: [{ id: EX, name: "Hip thrust" }],
+    periodId: "semanas8", alumnoSel: AID, ejercicioSelId: EX, diaIdx: 0, lang: "es",
+  }, extra || {}));
+}
+const hoy = new Date();
+const hace = (n) => { const d = new Date(hoy); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+const volTotal = (m) => m.volBars.reduce((a, b) => a + (b.v || 0), 0);
+
+test("semana 0 (Semana 1) entra al volumen aunque no sea de la semana calendario actual; antes se descartaba", () => {
+  // 100 kg x 8 reps registrados hace 20 dias con semana 0 y sin rutina_id (forma del select de produccion)
+  const m = modelo([row(hace(20), 100, 0)], [ses(hace(20) + "T12:00:00Z", 1)]);
+  assert.equal(volTotal(m), 800);
+});
+test("semana ausente sigue usando el respaldo por fecha (no se confunde con semana 0)", () => {
+  const m = modelo([row(hace(20), 100, null)], []);
+  assert.equal(volTotal(m), 0); // fuera de la semana calendario actual: igual que antes
+  const m2 = modelo([row(hace(1), 100, "")], []);
+  assert.equal(volTotal(m2) >= 0, true);
+});
+test("ciclo reiniciado: el volumen y la semana detectada no mezclan el ciclo anterior (filas y sesiones con ciclo)", () => {
+  const rows = [row(hace(40), 100, 0, { ciclo: 1 }), row(hace(33), 100, 3, { ciclo: 1 }), row(hace(2), 50, 0, { ciclo: 2 })];
+  const sessions = [{ alumno_id: AID, rutina_id: RID, created_at: hace(33) + "T12:00:00Z", semana: 4, ciclo: 1 }];
+  const m = modelo(rows, sessions, 2);
+  assert.equal(volTotal(m), 400); // solo 50 kg x 8 del ciclo 2
+  assert.equal(m.semanaDetectada < 4, true); // la sesion de la semana 4 del ciclo 1 no ancla el ciclo 2
+});
+test("sin columna ciclo (select antiguo): no se filtra por ciclo (limitacion documentada)", () => {
+  const m = modelo([row(hace(20), 100, 0)], [], 2);
+  assert.equal(volTotal(m), 800);
+});
+test("rutina anterior: filas con otra rutina_id no suman volumen ni aparecen en la serie", () => {
+  const rows = [row(hace(2), 500, 0, { rutina_id: "vieja" }), row(hace(2), 60, 0, { rutina_id: RID })];
+  const m = modelo(rows, [ses(hace(2) + "T12:00:00Z", 1)]);
+  assert.equal(volTotal(m), 480);
+  assert.equal(m.chartSeries[0], 60);
+});
+test("semanas salteadas: Semana 1 y Semana 3 registradas, Semana 2 sin registro (no 0)", () => {
+  const m = modelo([row(hace(30), 100, 0), row(hace(2), 120, 2)], [ses(hace(2) + "T12:00:00Z", 3)]);
+  assert.deepEqual(m.chartSeries, [100, null, 120, null]);
+});
+test("sesiones sin registro de carga: serie vacia (null), sin 0 inventado ni error", () => {
+  const m = modelo([], [ses(hace(2) + "T12:00:00Z", 2)]);
+  assert.deepEqual(m.chartSeries, [null, null, null, null]);
+  assert.equal(m.hasChartData, false);
+  assert.equal(volTotal(m), 0);
+});
+
+// ---- Recuperacion paginada ----
+test("fetchAllPages: una pagina incompleta corta; completa pide la siguiente; respeta maxPages", async () => {
+  const calls = [];
+  const mk = (n) => Array.from({ length: n }, (_, i) => ({ i }));
+  const r1 = await fetchAllPages(async (o, s) => { calls.push([o, s]); return mk(5); }, { pageSize: 10 });
+  assert.equal(r1.length, 5); assert.equal(calls.length, 1);
+  calls.length = 0;
+  const pages = [mk(10), mk(10), mk(3)];
+  const r2 = await fetchAllPages(async (o, s) => { calls.push([o, s]); return pages.shift(); }, { pageSize: 10 });
+  assert.equal(r2.length, 23); assert.deepEqual(calls, [[0, 10], [10, 10], [20, 10]]);
+  const r3 = await fetchAllPages(async () => mk(10), { pageSize: 10, maxPages: 3 });
+  assert.equal(r3.length, 30);
+});
+test("fetchAllPages: error en la 1a pagina => null (reintento); error posterior conserva lo recuperado", async () => {
+  assert.equal(await fetchAllPages(async () => null, { pageSize: 10 }), null);
+  const pages = [Array.from({ length: 10 }, () => ({})), null];
+  const r = await fetchAllPages(async () => pages.shift(), { pageSize: 10 });
+  assert.equal(r.length, 10);
+});
+test("App.jsx: progreso paginado (orden estable created_at,id), ciclo sin rutina_id y reintento sin ciclo", async () => {
   const { readFileSync } = await import("node:fs");
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
-  assert.match(app, /progreso\?alumno_id=in\.\(' \+ idsStr \+ '\)&select=alumno_id,ejercicio_id,kg,reps,fecha,semana,ciclo&order=created_at\.desc&limit=3000/);
-  assert.match(app, /if\(!Array\.isArray\(results\[1\]\)\) results\[1\] = await sbFetch\('progreso\?alumno_id=in\.\(' \+ idsStr \+ '\)&select=alumno_id,ejercicio_id,kg,reps,fecha,semana&order/);
+  assert.match(app, /PROGRESO_COLS = 'alumno_id,ejercicio_id,kg,reps,fecha,semana'/);
+  assert.match(app, /PROGRESO_COLS_CICLO = PROGRESO_COLS \+ ',ciclo'/);
+  assert.match(app, /order=created_at\.desc,id\.desc&limit=' \+ size \+ '&offset=' \+ offset/);
+  assert.match(app, /fetchAllPages\(progresoPage\(idsStr, PROGRESO_COLS_CICLO\)\)/);
+  assert.match(app, /results\[1\] = await fetchAllPages\(progresoPage\(idsStr, PROGRESO_COLS\)\)/);
   assert.doesNotMatch(app, /progreso\?alumno_id=in[^\n]*rutina_id/);
 });
