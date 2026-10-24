@@ -1,5 +1,7 @@
 import React from 'react';
 import { Ic } from './Ic.jsx';
+import { MessageSquare } from 'lucide-react';
+import { getWeekNote } from './student-plan/studentPlanHelpers.js';
 import { ExerciseVideoPlayButton } from './ExerciseVideoPlayButton.jsx';
 import { WorkoutExerciseCompletedState } from './workout/WorkoutExerciseCompletedState.jsx';
 import { WorkoutTodaySetsList } from './workout/WorkoutTodaySetsList.jsx';
@@ -209,6 +211,8 @@ export function WorkoutExercisePanel(props) {
     }
   };
 
+  const coachNote = getWeekNote(ex, currentWeek);
+
   return (
     <>
       <div style={{marginBottom:12}}>
@@ -234,6 +238,12 @@ export function WorkoutExercisePanel(props) {
             ariaLabelDisabled={es?"Video no disponible":"No video available"}
           />
         </div>
+        {coachNote&&(
+          <div style={{display:"flex",alignItems:"flex-start",gap:8,marginTop:8,padding:"8px 10px",background:bgSub,border:"1px solid "+border,borderLeft:"3px solid #2563EB",borderRadius:8,color:textMain,fontSize:13,lineHeight:1.4}}>
+            <MessageSquare size={14} style={{flexShrink:0,marginTop:2,color:"#60A5FA"}} aria-hidden="true"/>
+            <span style={{wordBreak:"break-word"}}>{coachNote}</span>
+          </div>
+        )}
         {((hasSuggestedLoad&&pr>0)||ultimoSet)&&(
           <div style={{display:"flex",gap:8,marginTop:8}}>
             {hasSuggestedLoad&&pr>0&&<span style={{background:"#f59e0b15",border:"1px solid #f59e0b33",borderRadius:6,
