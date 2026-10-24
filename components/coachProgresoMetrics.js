@@ -188,22 +188,81 @@ export function progressRowWeekIndex(row, weeks) {
   return n;
 }
 
+function localDateKey(raw) {
+  // Clave y-m-d sin pasar por Date: "2026-10-13" (ISO) y "13/10/2026" deben dar la misma clave en cualquier zona horaria.
+  var str = String(raw == null ? "" : raw).trim();
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(str) || null;
+  if (m) return Number(m[1]) + "-" + Number(m[2]) + "-" + Number(m[3]);
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(str);
+  return m ? Number(m[3]) + "-" + Number(m[2]) + "-" + Number(m[1]) : null;
+}
+
+/** Cantidad de días de la rutina que incluyen el ejercicio (calentamiento o principal). */
+function daysContainingExercise(days, exerciseId) {
+  var n = 0;
+  (days || []).forEach(function (day) {
+    var found = false;
+    [].concat((day && day.warmup) || [], (day && day.exercises) || []).forEach(function (ex) {
+      if (ex && ex.id != null && String(ex.id) === String(exerciseId)) found = true;
+    });
+    if (found) n++;
+  });
+  return n;
+}
+
+/**
+ * Día de entrenamiento al que pertenece una fila de progreso, o null si los datos no lo demuestran.
+ * `progreso` no guarda el día: solo se infiere de una sesión del mismo alumno, ciclo, fecha y semana (sesiones.semana es 1-based,
+ * progreso.semana 0-based) cuya lista `ejercicios` incluya el ejercicio. Sin sesión, o con varias que apuntan a días distintos => null.
+ */
+export function resolveProgressRowDay(row, sessions) {
+  var w = progressRowWeekIndex(row, 4);
+  var key = localDateKey(row && row.fecha);
+  if (w == null || key == null) return null;
+  var days = {};
+  var count = 0;
+  (sessions || []).forEach(function (ses) {
+    if (!ses || Number(ses.semana) !== w + 1) return;
+    if (localDateKey(ses.fecha) !== key) return;
+    if (!rowSameCiclo(row, ses.ciclo !== undefined ? ses.ciclo : 1)) return;
+    var ids = String(ses.ejercicios || "").split(",").map(function (x) { return x.trim(); });
+    if (ids.indexOf(String(row.ejercicio_id)) < 0) return;
+    if (ses.dia_idx == null || ses.dia_idx === "" || typeof ses.dia_idx === "boolean" || Array.isArray(ses.dia_idx)) return;
+    var di = Number(ses.dia_idx);
+    if (!Number.isInteger(di) || di < 0) return;
+    if (!days[di]) { days[di] = true; count++; }
+  });
+  if (count !== 1) return null;
+  return Number(Object.keys(days)[0]);
+}
+
 /**
  * Serie «Evolución de carga»: kg máximo por semana de la rutina para un ejercicio (null = sin registro).
  * Usa la semana registrada de la fila (no depende de que las sesiones caigan en semanas calendario consecutivas);
  * solo las filas sin semana válida se reparten por fecha en `weekStarts`. Si la fila trae `ciclo`, solo cuenta el
  * ciclo vigente (así un reinicio de rutina no mezcla registros de ciclos anteriores); si trae rutina_id, la rutina vigente.
+ * Si el mismo ejercicio está en varios días de la rutina, una fila solo se descarta cuando una sesión demuestra que es de OTRO día;
+ * las filas cuyo día no se puede demostrar se incluyen y se marca `mixedDays` (el máximo puede incluir otro día).
+ * @returns {{ series: Array<number|null>, mixedDays: boolean }}
  */
-export function buildLoadSeries(rows, opts) {
+export function buildLoadSeriesDetailed(rows, opts) {
   var weeks = opts.weekStarts.length;
   var series = [];
   for (var w = 0; w < weeks; w++) series.push(null);
+  var multiDay = daysContainingExercise(opts.routineDays, opts.ejercicioId) > 1 && opts.dayIdx != null;
+  var mixedDays = false;
   (rows || []).forEach(function (rr) {
     if (!rr || String(rr.ejercicio_id) !== String(opts.ejercicioId)) return;
     if (rr.rutina_id != null && rr.rutina_id !== "" && opts.routineId && String(rr.rutina_id) !== String(opts.routineId)) return;
     if (Object.prototype.hasOwnProperty.call(rr, "ciclo") && !rowInCiclo(rr, opts.ciclo)) return;
     var kgv = parseFloat(rr.kg) || 0;
     if (!(kgv > 0)) return;
+    var rowUnknownDay = false;
+    if (multiDay) {
+      var rd = resolveProgressRowDay(rr, opts.sessions);
+      if (rd != null && rd !== opts.dayIdx) return;
+      rowUnknownDay = rd == null;
+    }
     var wi = progressRowWeekIndex(rr, weeks);
     if (wi == null) {
       var dd = parseProgresoDate(rr.fecha);
@@ -214,9 +273,14 @@ export function buildLoadSeries(rows, opts) {
       }
       if (wi == null) return;
     }
+    if (rowUnknownDay) mixedDays = true;
     if (series[wi] == null || kgv > series[wi]) series[wi] = kgv;
   });
-  return series.map(function (v) { return v == null ? null : Math.round(v * 10) / 10; });
+  return { series: series.map(function (v) { return v == null ? null : Math.round(v * 10) / 10; }), mixedDays: mixedDays };
+}
+
+export function buildLoadSeries(rows, opts) {
+  return buildLoadSeriesDetailed(rows, opts).series;
 }
 
 export function getRoutineForAlumno(rutinasSBEntrenador, alumnoId) {
@@ -520,15 +584,19 @@ export function buildCoachProgresoModel(params) {
   for (var wi = 0; wi < LOAD_BLOCK_WEEKS; wi++) {
     weekLabels.push(M(lang, "Semana " + (wi + 1), "Week " + (wi + 1), "Semana " + (wi + 1)));
   }
-  var series =
+  var loadDetail =
     alumnoSel && ejercicioSelId
-      ? buildLoadSeries(progresoGlobal[alumnoSel] || [], {
+      ? buildLoadSeriesDetailed(progresoGlobal[alumnoSel] || [], {
           ejercicioId: ejercicioSelId,
           routineId: routineForSelectedId,
           ciclo: routineCiclo,
           weekStarts: routineWeekContext.weekStarts.slice(0, LOAD_BLOCK_WEEKS),
+          routineDays: routineForSelected && routineForSelected.datos ? routineForSelected.datos.days || [] : [],
+          dayIdx: diaIdx,
+          sessions: selectedSessions,
         })
-      : weekLabels.map(function () { return null; });
+      : { series: weekLabels.map(function () { return null; }), mixedDays: false };
+  var series = loadDetail.series;
 
   /** PRs recientes: solo eventos del alumno seleccionado (alumnoPrEvents, ya ordenados del más reciente). */
   var prEvents = alumnoPrEvents.map(function (ev) {
@@ -780,6 +848,7 @@ export function buildCoachProgresoModel(params) {
     volKgDelta: volKgDelta,
     chartSeries: series,
     chartWeekLabels: weekLabels,
+    chartMixedDays: loadDetail.mixedDays,
     currentRoutineWeekIndex: routineWeekContext.currentRoutineWeekIndex,
     semanaDetectada: routineWeekContext.semanaDetectada,
     hasChartData: series.some(function (v) {

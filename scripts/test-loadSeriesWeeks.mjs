@@ -78,7 +78,7 @@ function modelo(rows, sessions, ciclo, extra) {
   }, extra || {}));
 }
 const hoy = new Date();
-const hace = (n) => { const d = new Date(hoy); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+const hace = (n) => { const d = new Date(hoy); d.setDate(d.getDate() - n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 const volTotal = (m) => m.volBars.reduce((a, b) => a + (b.v || 0), 0);
 
 test("semana 0 (Semana 1) entra al volumen aunque no sea de la semana calendario actual; antes se descartaba", () => {
@@ -148,4 +148,89 @@ test("App.jsx: progreso paginado (orden estable created_at,id), ciclo sin rutina
   assert.match(app, /fetchAllPages\(progresoPage\(idsStr, PROGRESO_COLS_CICLO\)\)/);
   assert.match(app, /results\[1\] = await fetchAllPages\(progresoPage\(idsStr, PROGRESO_COLS\)\)/);
   assert.doesNotMatch(app, /progreso\?alumno_id=in[^\n]*rutina_id/);
+});
+
+// ---- Mismo ejercicio en varios dias de la rutina (caso Catalina: Hip thrust "hip" en Dia 1 y Dia 3, ciclo 2) ----
+const rutinaDosDias = (ciclo) => ({
+  id: RID, alumno_id: AID, created_at: "2026-09-01T00:00:00Z",
+  datos: { ciclo_actual: ciclo, days: [
+    { label: "Día 1", warmup: [], exercises: [{ id: "hip" }, { id: "sq" }] },
+    { label: "Día 2", warmup: [], exercises: [{ id: "sq" }] },
+    { label: "Día 3", warmup: [], exercises: [{ id: "dl" }, { id: "hip" }] },
+  ] },
+});
+const filaHip = (fecha, kg, reps, semana) => ({ alumno_id: AID, ejercicio_id: "hip", kg, reps, fecha, semana, ciclo: 2 });
+const sesDia = (fecha, semana1, diaIdx, ejercicios, extra) =>
+  Object.assign({ alumno_id: AID, rutina_id: RID, fecha, semana: semana1, dia_idx: diaIdx, ejercicios, ciclo: 2, created_at: "2026-10-20T12:00:00Z" }, extra || {});
+const catalina = [filaHip("13/10/2026", "125", "6", 0), filaHip("20/10/2026", "120", "4", 1)];
+function dia(diaIdx, rows, sessions) {
+  const m = buildCoachProgresoModel({
+    alumnos: [{ id: AID, nombre: "Ana" }], sesionesGlobales: sessions, progresoGlobal: { [AID]: rows },
+    rutinasSBEntrenador: [rutinaDosDias(2)], allEx: [{ id: "hip", name: "Hip thrust" }],
+    periodId: "semanas4", alumnoSel: AID, ejercicioSelId: "hip", diaIdx, lang: "es",
+  });
+  return { serie: m.chartSeries, mixed: m.chartMixedDays };
+}
+
+test("Catalina sin sesiones que lo demuestren: 125 y 120 en la serie (maximos del ejercicio en el ciclo 2) y se avisa que puede incluir otro dia", () => {
+  assert.deepEqual(dia(0, catalina, []), { serie: [125, 120, null, null], mixed: true });
+  assert.deepEqual(dia(2, catalina, []), { serie: [125, 120, null, null], mixed: true });
+});
+test("sesiones que demuestran Dia 1 en ambas fechas: el Dia 1 muestra 125 y 120 sin aviso; el Dia 3 no recibe esos registros", () => {
+  const ses1 = [sesDia("13/10/2026", 1, 0, "hip,sq"), sesDia("20/10/2026", 2, 0, "hip,sq")];
+  assert.deepEqual(dia(0, catalina, ses1), { serie: [125, 120, null, null], mixed: false });
+  assert.deepEqual(dia(2, catalina, ses1), { serie: [null, null, null, null], mixed: false });
+});
+test("una fila demostrada del Dia 3 no se atribuye al Dia 1; la otra, sin sesion, se conserva con aviso", () => {
+  const ses = [sesDia("13/10/2026", 1, 2, "dl,hip")];
+  assert.deepEqual(dia(0, catalina, ses), { serie: [null, 120, null, null], mixed: true });
+  assert.deepEqual(dia(2, catalina, ses), { serie: [125, 120, null, null], mixed: true });
+});
+test("dos sesiones del mismo dia calendario con dias distintos que listan el ejercicio: ambiguo, se conserva y se avisa", () => {
+  const ses = [sesDia("13/10/2026", 1, 0, "hip,sq"), sesDia("13/10/2026", 1, 2, "dl,hip")];
+  assert.deepEqual(dia(0, [catalina[0]], ses), { serie: [125, null, null, null], mixed: true });
+});
+test("la sesion debe coincidir en fecha, semana (0-based vs 1-based), ciclo y ejercicio; si no, no demuestra nada", () => {
+  const malas = [
+    sesDia("14/10/2026", 1, 2, "dl,hip"),          // otra fecha
+    sesDia("13/10/2026", 2, 2, "dl,hip"),          // semana 1-based distinta (la fila es semana 0 => 1)
+    sesDia("13/10/2026", 1, 2, "dl,sq"),           // no lista el ejercicio
+    sesDia("13/10/2026", 1, 2, "dl,hip", { ciclo: 1 }), // ciclo anterior
+  ];
+  assert.deepEqual(dia(0, [catalina[0]], malas), { serie: [125, null, null, null], mixed: true });
+});
+test("ejercicio que esta en un solo dia: sin cambios ni aviso", () => {
+  const m = buildCoachProgresoModel({
+    alumnos: [{ id: AID, nombre: "Ana" }], sesionesGlobales: [], progresoGlobal: { [AID]: [row("2026-10-07", 100, 0, { ciclo: 1 })] },
+    rutinasSBEntrenador: [rutina(1)], allEx: [{ id: EX, name: "Hip thrust" }], periodId: "semanas4", alumnoSel: AID, ejercicioSelId: EX, diaIdx: 0, lang: "es",
+  });
+  assert.equal(m.chartMixedDays, false);
+  assert.equal(m.chartSeries[0], 100);
+});
+test("ciclos reiniciados con el mismo ejercicio en dos dias: el ciclo 1 no entra al ciclo 2", () => {
+  const viejas = [Object.assign(filaHip("06/10/2026", "300", "3", 0), { ciclo: 1 })];
+  assert.deepEqual(dia(0, catalina.concat(viejas), []).serie, [125, 120, null, null]);
+});
+test("resolveProgressRowDay: devuelve el dia solo cuando es unico; semana invalida o fecha ausente => null", async () => {
+  const { resolveProgressRowDay } = await import("../components/coachProgresoMetrics.js");
+  const ses = [sesDia("13/10/2026", 1, 2, "dl,hip")];
+  assert.equal(resolveProgressRowDay(catalina[0], ses), 2);
+  assert.equal(resolveProgressRowDay(Object.assign({}, catalina[0], { semana: null }), ses), null);
+  assert.equal(resolveProgressRowDay(Object.assign({}, catalina[0], { fecha: "" }), ses), null);
+  assert.equal(resolveProgressRowDay(catalina[0], []), null);
+});
+
+test("dia_idx nulo, vacio, booleano o arreglo NO demuestra el Dia 1 (Number(null) === 0)", () => {
+  for (const malo of [null, "", true, [], undefined]) {
+    const ses = [sesDia("13/10/2026", 1, malo, "hip,bp")];
+    assert.deepEqual(dia(2, [catalina[0]], ses), { serie: [125, null, null, null], mixed: true }, "dia_idx=" + JSON.stringify(malo));
+    assert.deepEqual(dia(0, [catalina[0]], ses), { serie: [125, null, null, null], mixed: true });
+  }
+});
+test("fechas con formatos mezclados (fila d/m/yyyy y sesion ISO, o al reves) se comparan igual en cualquier zona horaria", () => {
+  const sesIso = [sesDia("2026-10-13", 1, 2, "dl,hip")];
+  assert.deepEqual(dia(0, [catalina[0]], sesIso), { serie: [null, null, null, null], mixed: false });
+  const filaIso = [Object.assign({}, catalina[0], { fecha: "2026-10-13" })];
+  assert.deepEqual(dia(0, filaIso, [sesDia("13/10/2026", 1, 2, "dl,hip")]), { serie: [null, null, null, null], mixed: false });
+  assert.deepEqual(dia(2, filaIso, [sesDia("13/10/2026", 1, 2, "dl,hip")]), { serie: [125, null, null, null], mixed: false });
 });

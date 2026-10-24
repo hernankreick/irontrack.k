@@ -228,6 +228,15 @@ test("responsivo: viewBox proporcional, ancho fluido con tope y sin alturas fija
   assert.match(html, /min-height:58px/);
 });
 
+test("ejercicio en varios dias: aviso accesible solo cuando mixedDays; ProgresoView lo conecta al modelo", () => {
+  const withNote = renderToStaticMarkup(React.createElement(ProgressLoadChart, { chartComputed: computed([125, 120, null, null]), weekLabels: LABELS, alumnoColor: "#22c55e", C, T, lang: "es", M, currentRoutineWeekIndex: 1, mixedDays: true }));
+  assert.match(withNote, /role="note"[^>]*data-qa-load-mixed-days="1"/);
+  assert.match(withNote, /más de un día de la rutina/);
+  assert.match(renderToStaticMarkup(React.createElement(ProgressLoadChart, { chartComputed: computed([125, 120, null, null]), weekLabels: LABELS, alumnoColor: "#22c55e", C, T, lang: "en", M, currentRoutineWeekIndex: 1, mixedDays: true })), /more than one day of the routine/);
+  assert.doesNotMatch(render([125, 120, null, null], 1), /data-qa-load-mixed-days/);
+  assert.match(read("components/ProgresoView.jsx"), /mixedDays=\{model\.chartMixedDays\}/);
+});
+
 test("alcance: chartComputed/chartSeries y las formulas siguen intactos", () => {
   const v = read("components/ProgresoView.jsx");
   assert.match(v, /var min = Math\.min\.apply\(null, vals\) - 5;/);

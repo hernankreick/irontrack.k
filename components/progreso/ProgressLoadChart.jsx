@@ -143,6 +143,7 @@ export default function ProgressLoadChart({
   lang,
   M,
   currentRoutineWeekIndex,
+  mixedDays,
 }) {
   var weeks = buildLoadWeekModel(chartComputed, currentRoutineWeekIndex);
   var n = weeks.length || 1;
@@ -237,6 +238,16 @@ export default function ProgressLoadChart({
           "Bloco atual (4 semanas, seg–dom). Máx. kg registrado por semana."
         )}
       </p>
+      {mixedDays ? (
+        <p role="note" data-qa-load-mixed-days="1" style={{ ...T.subtitle, color: C.t2, margin: "0 0 10px 0" }}>
+          {M(
+            lang,
+            "Este ejercicio está en más de un día de la rutina: los registros no guardan el día, así que el máximo puede incluir otro día.",
+            "This exercise is in more than one day of the routine: records do not store the day, so the max may include another day.",
+            "Este exercício está em mais de um dia da rotina: os registros não guardam o dia, então o máximo pode incluir outro dia."
+          )}
+        </p>
+      ) : null}
       <div
         ref={rootRef}
         data-qa-load-chart="1"
