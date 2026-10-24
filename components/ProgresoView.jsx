@@ -551,6 +551,7 @@ export default function ProgresoView({
           <ProgressLoadChart
             chartComputed={chartComputed}
             weekLabels={model.chartWeekLabels}
+            mixedDays={model.chartMixedDays}
             alumnoColor={alumnoColor}
             C={C}
             T={T}

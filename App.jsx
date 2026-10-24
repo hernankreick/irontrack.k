@@ -30,6 +30,7 @@ import {
   isValidUuid,
 } from './lib/appHelpers.js';
 import { alumnosIdsKey } from './lib/coachAlumnosLoad.js';
+import { fetchAllPages } from './lib/progressPaging.js';
 import { getYTVideoId } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
 import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVideoUrl, isValidHttpUrlString, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from './lib/exerciseResolve.js';
@@ -332,6 +333,16 @@ const sbFetchStrict = async (path) => {
   }
   const text = await r.text();
   return text ? JSON.parse(text) : [];
+};
+
+// Progreso de todos los alumnos paginado de a 1000 filas (tope por defecto de PostgREST): una sola consulta con limit=3000 se truncaba
+// y descartaba primero las semanas mas antiguas. Orden estable (created_at, id) para que las paginas no se solapen.
+const PROGRESO_COLS = 'alumno_id,ejercicio_id,kg,reps,fecha,semana';
+const PROGRESO_COLS_CICLO = PROGRESO_COLS + ',ciclo';
+const progresoPage = function(idsStr, cols) {
+  return function(offset, size) {
+    return sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=' + cols + '&order=created_at.desc,id.desc&limit=' + size + '&offset=' + offset);
+  };
 };
 
 const sb = {
@@ -887,9 +898,11 @@ function GymApp() {
       var idsStr = ids.join(',');
       var results = await Promise.all([
         sbFetch('sesiones?alumno_id=in.(' + idsStr + ')&select=*&order=created_at.desc&limit=500'),
-        sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=alumno_id,ejercicio_id,kg,reps,fecha,semana&order=created_at.desc&limit=3000'),
+        fetchAllPages(progresoPage(idsStr, PROGRESO_COLS_CICLO)),
         sbFetch('mensajes?alumno_id=in.(' + idsStr + ')&de_entrenador=eq.false&or=(leido.is.null,leido.eq.false)&select=*&order=created_at.desc&limit=200'),
       ]);
+      // `ciclo` separa los ciclos de una rutina reiniciada. Si la columna no existiera (400), se reintenta sin ella.
+      if(!Array.isArray(results[1])) results[1] = await fetchAllPages(progresoPage(idsStr, PROGRESO_COLS));
       if(results[0] && Array.isArray(results[0])) setSesionesGlobales(results[0]);
       if(results[1] && Array.isArray(results[1])) {
         var idx2 = {};

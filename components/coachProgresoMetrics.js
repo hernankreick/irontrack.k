@@ -5,6 +5,7 @@
 
 import { FALLBACK_EXERCISE_NAME } from "../lib/exerciseResolve.js";
 import { selectCurrentRoutine } from "../lib/routineStore.js";
+import { readCicloActual, rowInCiclo } from "../lib/rutinaCiclo.js";
 import { irontrackMsg as M, pickExerciseName } from "../lib/irontrackMsg.js";
 
 const DAY_MS = 86400000;
@@ -176,6 +177,112 @@ export function patternToMovementKey(pat) {
   return null;
 }
 
+/**
+ * `progreso.semana` es 0-based (0..3, ver lib/orphanSessions.js). Devuelve ese índice si la fila lo trae válido, o null
+ * (sin columna, vacío o fuera de rango) para repartir por fecha. Nunca interpreta una ausencia como semana 0.
+ */
+export function progressRowWeekIndex(row, weeks) {
+  if (!row || row.semana == null || row.semana === "") return null;
+  var n = Number(row.semana);
+  if (!Number.isInteger(n) || n < 0 || n >= weeks) return null;
+  return n;
+}
+
+function localDateKey(raw) {
+  // Clave y-m-d sin pasar por Date: "2026-10-13" (ISO) y "13/10/2026" deben dar la misma clave en cualquier zona horaria.
+  var str = String(raw == null ? "" : raw).trim();
+  var m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(str) || null;
+  if (m) return Number(m[1]) + "-" + Number(m[2]) + "-" + Number(m[3]);
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(str);
+  return m ? Number(m[3]) + "-" + Number(m[2]) + "-" + Number(m[1]) : null;
+}
+
+/** Cantidad de días de la rutina que incluyen el ejercicio (calentamiento o principal). */
+function daysContainingExercise(days, exerciseId) {
+  var n = 0;
+  (days || []).forEach(function (day) {
+    var found = false;
+    [].concat((day && day.warmup) || [], (day && day.exercises) || []).forEach(function (ex) {
+      if (ex && ex.id != null && String(ex.id) === String(exerciseId)) found = true;
+    });
+    if (found) n++;
+  });
+  return n;
+}
+
+/**
+ * Día de entrenamiento al que pertenece una fila de progreso, o null si los datos no lo demuestran.
+ * `progreso` no guarda el día: solo se infiere de una sesión del mismo alumno, ciclo, fecha y semana (sesiones.semana es 1-based,
+ * progreso.semana 0-based) cuya lista `ejercicios` incluya el ejercicio. Sin sesión, o con varias que apuntan a días distintos => null.
+ */
+export function resolveProgressRowDay(row, sessions) {
+  var w = progressRowWeekIndex(row, 4);
+  var key = localDateKey(row && row.fecha);
+  if (w == null || key == null) return null;
+  var days = {};
+  var count = 0;
+  (sessions || []).forEach(function (ses) {
+    if (!ses || Number(ses.semana) !== w + 1) return;
+    if (localDateKey(ses.fecha) !== key) return;
+    if (!rowSameCiclo(row, ses.ciclo !== undefined ? ses.ciclo : 1)) return;
+    var ids = String(ses.ejercicios || "").split(",").map(function (x) { return x.trim(); });
+    if (ids.indexOf(String(row.ejercicio_id)) < 0) return;
+    if (ses.dia_idx == null || ses.dia_idx === "" || typeof ses.dia_idx === "boolean" || Array.isArray(ses.dia_idx)) return;
+    var di = Number(ses.dia_idx);
+    if (!Number.isInteger(di) || di < 0) return;
+    if (!days[di]) { days[di] = true; count++; }
+  });
+  if (count !== 1) return null;
+  return Number(Object.keys(days)[0]);
+}
+
+/**
+ * Serie «Evolución de carga»: kg máximo por semana de la rutina para un ejercicio (null = sin registro).
+ * Usa la semana registrada de la fila (no depende de que las sesiones caigan en semanas calendario consecutivas);
+ * solo las filas sin semana válida se reparten por fecha en `weekStarts`. Si la fila trae `ciclo`, solo cuenta el
+ * ciclo vigente (así un reinicio de rutina no mezcla registros de ciclos anteriores); si trae rutina_id, la rutina vigente.
+ * Si el mismo ejercicio está en varios días de la rutina, una fila solo se descarta cuando una sesión demuestra que es de OTRO día;
+ * las filas cuyo día no se puede demostrar se incluyen y se marca `mixedDays` (el máximo puede incluir otro día).
+ * @returns {{ series: Array<number|null>, mixedDays: boolean }}
+ */
+export function buildLoadSeriesDetailed(rows, opts) {
+  var weeks = opts.weekStarts.length;
+  var series = [];
+  for (var w = 0; w < weeks; w++) series.push(null);
+  var multiDay = daysContainingExercise(opts.routineDays, opts.ejercicioId) > 1 && opts.dayIdx != null;
+  var mixedDays = false;
+  (rows || []).forEach(function (rr) {
+    if (!rr || String(rr.ejercicio_id) !== String(opts.ejercicioId)) return;
+    if (rr.rutina_id != null && rr.rutina_id !== "" && opts.routineId && String(rr.rutina_id) !== String(opts.routineId)) return;
+    if (Object.prototype.hasOwnProperty.call(rr, "ciclo") && !rowInCiclo(rr, opts.ciclo)) return;
+    var kgv = parseFloat(rr.kg) || 0;
+    if (!(kgv > 0)) return;
+    var rowUnknownDay = false;
+    if (multiDay) {
+      var rd = resolveProgressRowDay(rr, opts.sessions);
+      if (rd != null && rd !== opts.dayIdx) return;
+      rowUnknownDay = rd == null;
+    }
+    var wi = progressRowWeekIndex(rr, weeks);
+    if (wi == null) {
+      var dd = parseProgresoDate(rr.fecha);
+      if (!dd) return;
+      var tt = dd.getTime();
+      for (var k = 0; k < weeks; k++) {
+        if (tt >= opts.weekStarts[k] && tt < opts.weekStarts[k] + 7 * DAY_MS) { wi = k; break; }
+      }
+      if (wi == null) return;
+    }
+    if (rowUnknownDay) mixedDays = true;
+    if (series[wi] == null || kgv > series[wi]) series[wi] = kgv;
+  });
+  return { series: series.map(function (v) { return v == null ? null : Math.round(v * 10) / 10; }), mixedDays: mixedDays };
+}
+
+export function buildLoadSeries(rows, opts) {
+  return buildLoadSeriesDetailed(rows, opts).series;
+}
+
 export function getRoutineForAlumno(rutinasSBEntrenador, alumnoId) {
   return selectCurrentRoutine(rutinasSBEntrenador, alumnoId);
 }
@@ -195,15 +302,22 @@ function routineExerciseIdSet(rut) {
   return ids;
 }
 
-function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackStartMs, fallbackEndMs, maxSemana) {
+/** Una fila que trae `ciclo` solo cuenta en el ciclo vigente de la rutina; sin la clave (select antiguo) no se puede distinguir y no se filtra. */
+function rowSameCiclo(row, ciclo) {
+  return !Object.prototype.hasOwnProperty.call(row, "ciclo") || rowInCiclo(row, ciclo);
+}
+
+function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackStartMs, fallbackEndMs, maxSemana, ciclo) {
   if (!row) return false;
+  if (!rowSameCiclo(row, ciclo)) return false;
   if (routineId && row.rutina_id != null && row.rutina_id !== "") {
     return String(row.rutina_id) === String(routineId);
   }
   if (row.ejercicio_id == null) return false;
   if (!routineExerciseIds[String(row.ejercicio_id)]) return false;
-  var semana = Number(row.semana);
-  if (Number.isFinite(semana) && semana > 0) {
+  // progreso.semana es 0-based: 0 es la Semana 1 y es una semana valida. Solo una ausencia (null/vacio) cae al respaldo por fecha.
+  var semana = row.semana == null || row.semana === "" ? NaN : Number(row.semana);
+  if (Number.isInteger(semana) && semana >= 0) {
     return semana <= maxSemana;
   }
   var d = parseProgresoDate(row.fecha);
@@ -211,8 +325,9 @@ function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackS
   return t >= fallbackStartMs && t < fallbackEndMs;
 }
 
-function sessionMatchesRoutine(ses, routineId, fallbackStartMs, fallbackEndMs) {
+function sessionMatchesRoutine(ses, routineId, fallbackStartMs, fallbackEndMs, ciclo) {
   if (!ses) return false;
+  if (!rowSameCiclo(ses, ciclo)) return false;
   if (routineId && ses.rutina_id != null && ses.rutina_id !== "") {
     return String(ses.rutina_id) === String(routineId);
   }
@@ -334,13 +449,14 @@ export function buildCoachProgresoModel(params) {
   var routineForSelected = getRoutineForAlumno(rutinasSBEntrenador, alumnoSel);
   var routineForSelectedId = routineForSelected && routineForSelected.id != null ? String(routineForSelected.id) : null;
   var routineExerciseIds = routineExerciseIdSet(routineForSelected);
+  var routineCiclo = readCicloActual(routineForSelected && routineForSelected.datos);
   var selectedProgressRows = alumnoSel
     ? (progresoGlobal[alumnoSel] || []).filter(function (row) {
-        return progressRowMatchesRoutine(row, routineForSelectedId, routineExerciseIds, fallbackWeekStartMs, fallbackWeekEndMs, maxSemanaPeriodo);
+        return progressRowMatchesRoutine(row, routineForSelectedId, routineExerciseIds, fallbackWeekStartMs, fallbackWeekEndMs, maxSemanaPeriodo, routineCiclo);
       })
     : [];
   var selectedSessions = (sesionesGlobales || []).filter(function (ses) {
-    return String(ses.alumno_id) === String(alumnoSel) && sessionMatchesRoutine(ses, routineForSelectedId, fallbackWeekStartMs, fallbackWeekEndMs);
+    return String(ses.alumno_id) === String(alumnoSel) && sessionMatchesRoutine(ses, routineForSelectedId, fallbackWeekStartMs, fallbackWeekEndMs, routineCiclo);
   });
   var routineWeekContext = buildRoutineWeekContext(selectedProgressRows, selectedSessions, now);
 
@@ -464,29 +580,23 @@ export function buildCoachProgresoModel(params) {
 
   /** Evolución de carga: semanas de la rutina activa del alumno seleccionado. */
   var LOAD_BLOCK_WEEKS = 4;
-  var series = [];
   var weekLabels = [];
   for (var wi = 0; wi < LOAD_BLOCK_WEEKS; wi++) {
-    var wkStartMs = routineWeekContext.weekStarts[wi];
-    var wkEndMs = wkStartMs + 7 * DAY_MS;
     weekLabels.push(M(lang, "Semana " + (wi + 1), "Week " + (wi + 1), "Semana " + (wi + 1)));
-    var maxKg = null;
-    if (alumnoSel && ejercicioSelId) {
-      var rows = selectedProgressRows;
-      for (var ri = 0; ri < rows.length; ri++) {
-        var rr = rows[ri];
-        if (String(rr.ejercicio_id) !== String(ejercicioSelId)) continue;
-        var dd = parseProgresoDate(rr.fecha);
-        if (!dd) continue;
-        var tt = dd.getTime();
-        if (tt >= wkStartMs && tt < wkEndMs) {
-          var kgv = parseFloat(rr.kg) || 0;
-          if (kgv > 0 && (maxKg == null || kgv > maxKg)) maxKg = kgv;
-        }
-      }
-    }
-    series.push(maxKg == null ? null : Math.round(maxKg * 10) / 10);
   }
+  var loadDetail =
+    alumnoSel && ejercicioSelId
+      ? buildLoadSeriesDetailed(progresoGlobal[alumnoSel] || [], {
+          ejercicioId: ejercicioSelId,
+          routineId: routineForSelectedId,
+          ciclo: routineCiclo,
+          weekStarts: routineWeekContext.weekStarts.slice(0, LOAD_BLOCK_WEEKS),
+          routineDays: routineForSelected && routineForSelected.datos ? routineForSelected.datos.days || [] : [],
+          dayIdx: diaIdx,
+          sessions: selectedSessions,
+        })
+      : { series: weekLabels.map(function () { return null; }), mixedDays: false };
+  var series = loadDetail.series;
 
   /** PRs recientes: solo eventos del alumno seleccionado (alumnoPrEvents, ya ordenados del más reciente). */
   var prEvents = alumnoPrEvents.map(function (ev) {
@@ -738,6 +848,7 @@ export function buildCoachProgresoModel(params) {
     volKgDelta: volKgDelta,
     chartSeries: series,
     chartWeekLabels: weekLabels,
+    chartMixedDays: loadDetail.mixedDays,
     currentRoutineWeekIndex: routineWeekContext.currentRoutineWeekIndex,
     semanaDetectada: routineWeekContext.semanaDetectada,
     hasChartData: series.some(function (v) {
