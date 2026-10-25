@@ -12,7 +12,10 @@ import {
   LandingStepDots4,
   UserGroupSVG,
 } from './OnboardingPrimitives.jsx';
-import IronTrackAppIcon from '../IronTrackAppIcon.jsx';
+
+// Isotipo recortado (sin baldosa cuadrada del ícono de app). Derivado de icon-1024.png; no reemplaza al ícono oficial.
+const ONBOARD_ISOTIPO_SRC = "/isotipo-onboarding.png";
+const ONBOARD_ISOTIPO_SIZE = "clamp(88px, min(40vw, calc((100dvh - var(--it-safe-top, env(safe-area-inset-top, 0px))) * 0.165)), 156px)";
 
 const Step0 = ({es, onNext, onYaTengoCuenta}) => {
   const [vis,setVis] = React.useState(false);
@@ -25,14 +28,16 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
     transform: vis ? "translateY(0)" : "translateY(14px)",
     transition: `all .6s cubic-bezier(.16,1,.3,1) ${d}ms`,
   });
-  const trackTitlePx = 54;
-  const trackBarH = Math.round(trackTitlePx * 0.9);
+  // Tipografía IRON/TRACK proporcional al alto: 54 px en pantallas altas, menos en bajas.
+  const trackTitlePx = "clamp(40px, 6.4vh, 54px)";
+  const trackBarH = "clamp(36px, 5.76vh, 49px)";
 
   return (
     <div
       style={{
-        flex: 1,
-        minHeight: "100dvh",
+        // Alto fijo = viewport: el scroll vive en el contenedor interior y el CTA queda sticky abajo.
+        flex: "0 0 auto",
+        height: "100dvh",
         display: "flex",
         flexDirection: "column",
         position: "relative",
@@ -85,29 +90,30 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
           position: "relative",
           zIndex: 5,
           flex: 1,
-          minHeight: "100dvh",
+          minHeight: 0,
           display: "flex",
           flexDirection: "column",
-          justifyContent: "center",
           alignItems: "center",
-          padding: "48px 24px 32px",
+          // Zona segura superior (notch / Dynamic Island) + aire; --it-safe-top permite emularla en QA.
+          padding:
+            "calc(var(--it-safe-top, env(safe-area-inset-top, 0px)) + clamp(20px, 2.4vh, 28px)) 24px 0",
           boxSizing: "border-box",
           overflowY: "auto",
+          overflowX: "hidden",
           WebkitOverflowScrolling: "touch",
         }}
       >
         {/* Bloque central: scroll + centrado vertical */}
         <div
           style={{
-            flex: "0 1 auto",
-            minHeight: 0,
-            width: "calc(100vw - 48px)",
+            flex: "0 0 auto",
+            width: "100%",
             maxWidth: LANDING_MAX_W,
             overflowY: "visible",
             display: "flex",
             flexDirection: "column",
-            justifyContent: "center",
-            transform: "translateY(-4%)",
+            // margin auto centra si sobra alto y nunca recorta por arriba si el contenido desborda.
+            margin: "auto 0",
           }}
         >
           <div
@@ -123,7 +129,22 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                 marginBottom: 0,
               }}
             >
-              <IronTrackAppIcon size="clamp(128px, 34vw, 172px)" animated={false} style={{ marginBottom: 28 }} />
+              <img
+                src={ONBOARD_ISOTIPO_SRC}
+                alt="IronTrack"
+                width={512}
+                height={512}
+                draggable={false}
+                style={{
+                  width: ONBOARD_ISOTIPO_SIZE,
+                  height: ONBOARD_ISOTIPO_SIZE,
+                  aspectRatio: "1 / 1",
+                  display: "block",
+                  objectFit: "contain",
+                  flexShrink: 0,
+                  marginBottom: "clamp(6px, 1.6vh, 22px)",
+                }}
+              />
 
               <div
                 style={{
@@ -185,13 +206,13 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
               style={{
                 ...a(100),
                 textAlign: "center",
-                marginTop: 20,
-                marginBottom: 22,
+                marginTop: "clamp(8px, 1.8vh, 20px)",
+                marginBottom: "clamp(10px, 2vh, 22px)",
               }}
             >
               <div
                 style={{
-                  fontSize: 22,
+                  fontSize: "clamp(19px, 2.6vh, 22px)",
                   fontWeight: 800,
                   color: "#FFFFFF",
                   lineHeight: 1.15,
@@ -201,11 +222,11 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
               </div>
               <div
                 style={{
-                  fontSize: 15,
+                  fontSize: 14,
                   color: "rgba(255,255,255,0.68)",
                   textAlign: "center",
-                  lineHeight: 1.4,
-                  marginTop: 10,
+                  lineHeight: 1.35,
+                  marginTop: "clamp(4px, 1vh, 10px)",
                 }}
               >
                 {es
@@ -220,8 +241,8 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                 width: "100%",
                 display: "flex",
                 flexDirection: "column",
-                gap: 10,
-                marginBottom: 8,
+                gap: "clamp(6px, 1.1vh, 12px)",
+                marginBottom: "clamp(8px, 1.2vh, 16px)",
               }}
             >
               {[
@@ -249,7 +270,7 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                     background: "rgba(13,20,36,0.78)",
                     border: "1px solid rgba(255,255,255,0.1)",
                     borderRadius: 16,
-                    padding: "14px 16px",
+                    padding: "clamp(8px, 1.4vh, 14px) 16px",
                     display: "flex",
                     alignItems: "center",
                     gap: 16,
@@ -259,9 +280,9 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                 >
                   <div
                     style={{
-                      width: 44,
-                      height: 44,
-                      minWidth: 44,
+                      width: "clamp(38px, 5vh, 44px)",
+                      height: "clamp(38px, 5vh, 44px)",
+                      minWidth: "clamp(38px, 5vh, 44px)",
                       borderRadius: 12,
                       background: "rgba(6,10,20,0.7)",
                       border: "1px solid rgba(255,255,255,0.06)",
@@ -272,9 +293,9 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                   >
                     {f.icon}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, textAlign: "left" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, textAlign: "left" }}>
                     <span style={{ fontSize: 16, fontWeight: 800, color: "#FFFFFF" }}>{f.t}</span>
-                    <span style={{ fontSize: 14, color: "rgba(255,255,255,0.68)", lineHeight: 1.35 }}>{f.s}</span>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.68)", lineHeight: 1.3 }}>{f.s}</span>
                   </div>
                 </div>
               ))}
@@ -285,19 +306,23 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
         {/* CTA + indicador + link — mismo ancho max que el contenido */}
         <div
           style={{
-            position: "relative",
+            // Siempre visible: sticky abajo dentro del contenedor con scroll; el contenido pasa por debajo.
+            position: "sticky",
+            bottom: 0,
             zIndex: 6,
             flexShrink: 0,
-            width: "calc(100vw - 48px)",
-            maxWidth: LANDING_MAX_W,
-            paddingTop: 8,
-            paddingBottom: "max(0px, env(safe-area-inset-bottom, 0px))",
-            background: "transparent",
+            alignSelf: "stretch",
+            margin: "0 -24px",
+            padding: "clamp(6px, 1.2vh, 12px) 24px max(12px, env(safe-area-inset-bottom, 0px))",
+            background:
+              "linear-gradient(180deg, rgba(5,10,20,0) 0%, rgba(5,10,20,0.94) 14px, rgba(5,10,20,0.98) 100%)",
+            // Mismo tipo de capa que las tarjetas (backdrop-filter) para que no se transparenten sobre el CTA.
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
             boxSizing: "border-box",
-            transform: "translateY(-4%)",
           }}
         >
-          <div style={{ ...ONBOARD_CONTENT_WRAP, padding: "12px 0 8px" }}>
+          <div style={{ ...ONBOARD_CONTENT_WRAP, padding: 0 }}>
             <button
               type="button"
               onClick={onNext}
@@ -305,7 +330,7 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
               style={{
                 width: "100%",
                 maxWidth: "100%",
-                height: 64,
+                height: "clamp(52px, 7.2vh, 64px)",
                 borderRadius: 16,
                 border: "none",
                 cursor: "pointer",
@@ -333,8 +358,8 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                 fontSize: 14,
                 color: "rgba(255,255,255,0.55)",
                 textAlign: "center",
-                marginTop: 18,
-                marginBottom: 10,
+                marginTop: "clamp(8px, 1.6vh, 16px)",
+                marginBottom: "clamp(6px, 1vh, 10px)",
                 fontWeight: 600,
               }}
             >
@@ -344,17 +369,23 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
             <button
               type="button"
               onClick={onYaTengoCuenta}
-              className="mt-3 w-full cursor-pointer border-0 bg-transparent p-0 text-center"
+              className="w-full cursor-pointer border-0 bg-transparent p-0 text-center"
               style={{
+                minHeight: 44,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexWrap: "wrap",
+                columnGap: "0.3em",
                 fontFamily: "system-ui,sans-serif",
                 fontSize: 15,
                 fontWeight: 600,
                 lineHeight: 1.4,
-                marginTop: 14,
+                marginTop: 0,
               }}
             >
               <span style={{ color: "rgba(255,255,255,0.55)" }}>
-                {es ? "Ya tengo cuenta — " : "I already have an account — "}
+                {es ? "Ya tengo cuenta —" : "I already have an account —"}
               </span>
               <span style={{ color: "#2563EB", fontWeight: 700 }}>{es ? "ingresar" : "sign in"}</span>
             </button>
