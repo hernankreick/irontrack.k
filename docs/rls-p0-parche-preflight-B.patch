@@ -1,0 +1,23 @@
+--- a/supabase/migrations/20261025110000_rls_p0_lockdown.sql
++++ b/supabase/migrations/20261025110000_rls_p0_lockdown.sql
+@@ -46,6 +46,20 @@
+     ELSE RAISE EXCEPTION 'RLS P0 abortada: % alumnos con entrenador_id que no es un entrenador de coach_accounts ni entrenador_principal (quedarían inaccesibles)', n; END IF;
+   END IF;
+ 
++  -- Datos con dueño por UID (ejercicios personalizados, overrides, rutinas, videos) cuyo dueño NO es un entrenador de coach_accounts ni
++  -- 'entrenador_principal': tras el bloqueo ningún entrenador los vería (siguen en la base, pero invisibles). Suele ser un UID mal cargado.
++  FOR r IN SELECT o.tbl, count(*) AS c FROM (
++             SELECT 'ejercicios_custom' AS tbl, entrenador_id::text AS v FROM public.ejercicios_custom
++             UNION ALL SELECT 'ejercicio_overrides', entrenador_id::text FROM public.ejercicio_overrides
++             UNION ALL SELECT 'video_overrides', entrenador_id::text FROM public.video_overrides
++             UNION ALL SELECT 'rutinas', entrenador_id::text FROM public.rutinas) o
++            WHERE o.v IS NOT NULL AND o.v <> 'entrenador_principal'
++              AND NOT EXISTS (SELECT 1 FROM public.coach_accounts c WHERE c.uid::text = o.v)
++            GROUP BY o.tbl LOOP
++    IF force THEN RAISE WARNING 'RLS P0: % filas de % pertenecen a un UID que no está en coach_accounts: quedarán invisibles', r.c, r.tbl;
++    ELSE RAISE EXCEPTION 'RLS P0 abortada: % filas de % pertenecen a un UID que no está en coach_accounts (quedarían invisibles). Cargar ese UID en coach_accounts (si es el entrenador) o, a sabiendas, SET it.rls_p0_force = ''on''', r.c, r.tbl; END IF;
++  END LOOP;
++
+   -- Avisos (no abortan): filas huérfanas que el entrenador dejaría de ver y tablas no gestionadas expuestas.
+   SELECT count(*) INTO n FROM public.rutinas ru WHERE ru.alumno_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.alumnos a WHERE a.id::text = ru.alumno_id::text);
+   IF n > 0 THEN RAISE WARNING 'RLS P0: % rutinas con alumno_id inexistente: quedarán inaccesibles para el entrenador', n; END IF;

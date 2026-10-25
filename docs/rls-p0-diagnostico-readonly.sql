@@ -6,6 +6,9 @@
 -- Validado en un PostgreSQL local con datos ficticios, dentro de una transacción READ ONLY.
 -- Salida: una tabla (orden, seccion, objeto, detalle, estado). Estados: OK · INFO · ATENCION · REQUIERE_VINCULACION · BLOQUEA.
 -- Privacidad: los emails salen enmascarados (ab***@dominio) y no se lee ningún contenido de las tablas (solo conteos y claves).
+-- OPCIONAL pero recomendado: pegar abajo (CTE coach_uids) los UIDs del secreto COACH_UIDS. Son identificadores, no credenciales; no los subas al repositorio.
+--   Con ellos el script separa la autorización real de entrenador de las filas de la tabla `entrenadores` (que el cliente escribe y NO prueban nada),
+--   comprueba que ninguna cuenta de entrenador esté vinculada como alumno y que los datos con dueño por UID pertenezcan a un entrenador autorizado.
 -- Guardá la salida (exportar CSV) FUERA del repositorio y enviámela/compartila para decidir GO/NO-GO.
 -- Si falla con «relation ... does not exist», anotá cuál: es un hallazgo (tabla ausente), no un daño.
 -- =============================================================================
@@ -49,6 +52,10 @@ al AS (
     (SELECT count(*) FROM au WHERE a.email IS NOT NULL AND a.email <> '' AND au.em = lower(a.email)) AS n_email,
     (SELECT count(*) FROM public.alumnos a2 WHERE a.email IS NOT NULL AND a.email <> '' AND lower(a2.email) = lower(a.email) AND a2.id::text <> a.id::text) AS n_dup
     FROM public.alumnos a),
+coach_uids(uid) AS (
+  SELECT lower(trim(x)) FROM unnest(ARRAY[
+    -- PEGAR AQUÍ los UIDs de COACH_UIDS entre comillas simples y separados por coma. Ejemplo: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+  ]::text[]) x),
 ent_vals AS (
   SELECT 'alumnos' AS t, entrenador_id::text AS v FROM public.alumnos
   UNION ALL SELECT 'rutinas', entrenador_id::text FROM public.rutinas
@@ -100,20 +107,33 @@ todo AS (
   -- 06 entrenadores: ¿cuales son legitimos? (comparar con el secreto COACH_UIDS) -------
   UNION ALL SELECT 6, '06 entrenadores (fila en tabla)', e.id::text,
     'en_auth=' || (u.uid IS NOT NULL) || ' email=' || coalesce(left(u.em, 2) || '***@' || split_part(u.em, '@', 2), '-')
-      || ' vinculada_como_alumno=' || coalesce(u.link IS NOT NULL, false) || ' alumnos_que_la_usan_como_entrenador_id=' || (SELECT count(*) FROM al WHERE al.ent = e.id::text),
-    CASE WHEN u.link IS NOT NULL THEN 'BLOQUEA' ELSE 'ATENCION' END   -- ATENCION: confirmar que el UID figura en COACH_UIDS; una fila aqui NO prueba nada
-    FROM public.entrenadores e LEFT JOIN au u ON u.uid = e.id::text
-  UNION ALL SELECT 6, '06 entrenadores (fila en tabla)', 'total filas', (SELECT count(*) FROM public.entrenadores)::text,
-    CASE WHEN (SELECT count(*) FROM public.entrenadores) > 1 THEN 'ATENCION' ELSE 'INFO' END
+      || ' en_COACH_UIDS=' || (cu.uid IS NOT NULL) || ' cuenta_de_alumno=' || (ac.aid IS NOT NULL) || ' vinculada_como_alumno=' || coalesce(u.link IS NOT NULL, false)
+      || ' alumnos_que_la_usan_como_entrenador_id=' || (SELECT count(*) FROM al WHERE al.ent = e.id::text),
+    CASE WHEN cu.uid IS NOT NULL AND u.link IS NOT NULL THEN 'BLOQUEA'        -- entrenador autorizado vinculado como alumno
+         WHEN cu.uid IS NOT NULL THEN 'OK'                                     -- entrenador autorizado por COACH_UIDS
+         WHEN ac.aid IS NOT NULL THEN 'INFO'                                   -- cuenta de alumno: fila creada por el cliente, inerte (no otorga permisos)
+         ELSE 'ATENCION' END                                                   -- ni autorizada ni de alumno: confirmar a quien pertenece
+    FROM public.entrenadores e LEFT JOIN au u ON u.uid = e.id::text LEFT JOIN coach_uids cu ON cu.uid = lower(e.id::text)
+    LEFT JOIN LATERAL (SELECT a.aid FROM al a WHERE a.aid = u.link OR (u.em IS NOT NULL AND a.em = u.em) LIMIT 1) ac ON true
+  UNION ALL SELECT 6, '06 entrenadores (fila en tabla)', 'total filas', (SELECT count(*) FROM public.entrenadores)::text
+      || ' (de alumnos, inertes: ' || (SELECT count(*) FROM public.entrenadores e JOIN au u ON u.uid = e.id::text WHERE EXISTS (SELECT 1 FROM al a WHERE a.aid = u.link OR (u.em IS NOT NULL AND a.em = u.em))) || ')', 'INFO'
+  UNION ALL SELECT 6, '06 COACH_UIDS (referencia pegada arriba)', 'uids pegados', (SELECT count(*) FROM coach_uids)::text,
+    CASE WHEN (SELECT count(*) FROM coach_uids) = 0 THEN 'ATENCION' ELSE 'OK' END
+  UNION ALL SELECT 6, '06 COACH_UIDS (referencia pegada arriba)', 'uid ' || left(c.uid, 8), 'existe_en_auth=' || (u.uid IS NOT NULL) || ' fila_en_entrenadores=' || EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = c.uid)
+      || ' vinculada_como_alumno=' || coalesce(u.link IS NOT NULL, false),
+    CASE WHEN u.uid IS NULL OR u.link IS NOT NULL THEN 'BLOQUEA' ELSE 'OK' END
+    FROM coach_uids c LEFT JOIN au u ON u.uid = c.uid
   -- 07 a quien pertenecen los datos (entrenador_id) -----------------------------
   UNION ALL SELECT 7, '07 entrenador_id por tabla', t || ' :: ' ||
       CASE WHEN v = 'entrenador_principal' THEN 'entrenador_principal (legacy)'
-           WHEN EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = v) THEN 'UID ' || v || ' (hay que cargarlo en coach_accounts)'
+           WHEN EXISTS (SELECT 1 FROM coach_uids c WHERE c.uid = lower(v)) THEN 'UID ' || v || ' (entrenador de COACH_UIDS: cargarlo en coach_accounts)'
+           WHEN EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = v) THEN 'UID ' || v || ' (fila en entrenadores, pero NO en COACH_UIDS)'
            ELSE 'OTRO valor: ' || coalesce(left(v, 12), 'NULL') END,
     count(*)::text || ' filas',
     CASE WHEN v = 'entrenador_principal' THEN 'OK'
-         WHEN t = 'alumnos' AND NOT EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = v) THEN 'BLOQUEA'
-         ELSE 'ATENCION' END
+         WHEN EXISTS (SELECT 1 FROM coach_uids c WHERE c.uid = lower(v)) THEN 'OK'
+         WHEN (SELECT count(*) FROM coach_uids) = 0 THEN 'ATENCION'          -- sin COACH_UIDS pegados no se puede decidir
+         ELSE 'BLOQUEA' END                                                  -- dueño fuera de COACH_UIDS: quedaria invisible tras el bloqueo
     FROM ent_vals GROUP BY t, v
   -- 08 vinculacion de alumnos (¿que cuentas hay que vincular?) --------------------
   UNION ALL SELECT 8, '08 vinculacion alumnos', 'alumno ' || al.aid,
@@ -123,6 +143,7 @@ todo AS (
         || CASE WHEN cu.banned_until IS NOT NULL AND cu.banned_until > now() THEN ' SUSPENDIDA' ELSE '' END, ' | sin cuenta con ese email')
       || CASE WHEN al.n_dup > 0 THEN ' | EMAIL REPETIDO EN OTRA FICHA' ELSE '' END,
     CASE WHEN al.n_link > 1 THEN 'BLOQUEA'
+         WHEN EXISTS (SELECT 1 FROM coach_uids c WHERE c.uid = cu.uid) THEN 'BLOQUEA'   -- cuenta de entrenador autorizado: nunca se vincula como alumno
          WHEN al.n_dup > 0 AND al.n_email > 0 THEN 'BLOQUEA'
          WHEN al.n_link = 1 AND EXISTS (SELECT 1 FROM au x WHERE x.link = al.aid AND x.em = al.em) THEN 'OK'
          WHEN al.n_link = 1 THEN 'ATENCION'
@@ -133,7 +154,7 @@ todo AS (
   UNION ALL SELECT 8, '08 vinculacion alumnos', 'cuenta ' || left(u.uid, 8) || ' vinculada a alumno inexistente ' || u.link, 'el alumno ya no existe', 'ATENCION'
     FROM au u WHERE u.link IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.alumnos a WHERE a.id::text = u.link)
   UNION ALL SELECT 8, '08 vinculacion alumnos', 'cuenta ' || left(u.uid, 8) || ' es entrenador Y esta vinculada como alumno', 'riesgo de escalada/confusion', 'BLOQUEA'
-    FROM au u WHERE u.link IS NOT NULL AND EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = u.uid)
+    FROM au u WHERE u.link IS NOT NULL AND EXISTS (SELECT 1 FROM coach_uids c WHERE c.uid = u.uid)
   UNION ALL SELECT 8, '08 vinculacion alumnos', 'resumen',
     'alumnos=' || (SELECT count(*) FROM al) || ' vinculados=' || (SELECT count(*) FROM al WHERE n_link = 1)
       || ' con_cuenta_sin_vincular=' || (SELECT count(*) FROM al WHERE n_link = 0 AND n_email > 0) || ' sin_cuenta=' || (SELECT count(*) FROM al WHERE n_link = 0 AND n_email = 0)
@@ -160,11 +181,34 @@ todo AS (
     FROM storage.buckets b
   UNION ALL SELECT 10, '10 storage / realtime', 'realtime publica ' || tablename, 'Realtime respeta RLS', 'INFO'
     FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public'
+  -- 12 plan de vinculacion: correspondencia inequivoca cuenta <-> alumno y comando exacto (de a uno) ---------------------------
+  UNION ALL SELECT 12, '12 plan de vinculacion', 'alumno ' || p.aid,
+    CASE WHEN p.ok THEN 'node scripts/admin/link-alumno.mjs --project-ref <REF> --alumno-id ' || p.aid || ' --auth-id ' || p.uid
+           || '   (aplicar: agregar --apply --confirm ' || p.aid || ':' || left(p.uid, 8) || ')'
+         ELSE 'NO vincular todavia: ' || p.motivos END,
+    CASE WHEN p.ok THEN 'REQUIERE_VINCULACION' ELSE 'BLOQUEA' END
+    FROM (
+      SELECT al.aid, cu.uid,
+        (al.n_email = 1 AND al.n_dup = 0 AND al.n_link = 0 AND cu.uid IS NOT NULL
+          AND cu.email_confirmed_at IS NOT NULL AND (cu.banned_until IS NULL OR cu.banned_until <= now())
+          AND coalesce(cu.prov, '["email"]'::jsonb) = '["email"]'::jsonb
+          AND NOT EXISTS (SELECT 1 FROM coach_uids c WHERE c.uid = cu.uid)
+          AND NOT EXISTS (SELECT 1 FROM public.entrenadores e WHERE e.id::text = cu.uid AND EXISTS (SELECT 1 FROM coach_uids c2 WHERE c2.uid = lower(e.id::text)))) AS ok,
+        concat_ws('; ', CASE WHEN al.n_email <> 1 THEN 'cuentas con ese email: ' || al.n_email END, CASE WHEN al.n_dup > 0 THEN 'email repetido en otra ficha' END,
+          CASE WHEN cu.email_confirmed_at IS NULL THEN 'email de la cuenta sin confirmar' END,
+          CASE WHEN cu.banned_until IS NOT NULL AND cu.banned_until > now() THEN 'cuenta suspendida' END,
+          CASE WHEN coalesce(cu.prov, '["email"]'::jsonb) <> '["email"]'::jsonb THEN 'proveedor distinto de email' END,
+          CASE WHEN EXISTS (SELECT 1 FROM coach_uids c WHERE c.uid = cu.uid) THEN 'es cuenta de entrenador (COACH_UIDS)' END) AS motivos
+        FROM al LEFT JOIN LATERAL (SELECT * FROM au WHERE au.em = al.em LIMIT 1) cu ON true
+       WHERE al.n_link = 0 AND al.n_email > 0) p
+  UNION ALL SELECT 12, '12 plan de vinculacion', 'resumen',
+    'pendientes=' || (SELECT count(*) FROM al WHERE n_link = 0 AND n_email > 0) || ' ya_vinculados=' || (SELECT count(*) FROM al WHERE n_link = 1)
+      || '. Condicion para aplicar la migracion B: pendientes=0 y ningun BLOQUEA. Vincular de a una y repetir este diagnostico.', 'INFO'
   -- 11 lo que este SQL NO puede ver (verificar a mano) --------------------------------
   UNION ALL SELECT 11, '11 verificar a mano', 'Auth → Sign In / Providers', '¿«Allow new users to sign up» habilitado? (con la migracion B un usuario externo no ve nada, pero conviene saberlo)', 'INFO'
   UNION ALL SELECT 11, '11 verificar a mano', 'Edge Function update-alumno-password', 'secreto COACH_UIDS cargado y con los mismos UIDs que se pasaran a coach_accounts (no se puede leer desde SQL)', 'INFO'
 )
 SELECT orden, seccion, objeto, detalle, estado FROM (
-  SELECT 0 AS orden, '00 RESUMEN' AS seccion, estado AS objeto, count(*)::text AS detalle, estado FROM todo WHERE estado IN ('BLOQUEA','REQUIERE_VINCULACION','ATENCION') GROUP BY estado
+  SELECT 0 AS orden, '00 RESUMEN' AS seccion, estado AS objeto, count(*)::text AS detalle, estado FROM todo WHERE estado IN ('BLOQUEA','REQUIERE_VINCULACION','ATENCION') AND orden <> 12 GROUP BY estado  -- el plan (12) repite filas de 08
   UNION ALL SELECT * FROM todo
 ) r ORDER BY orden, seccion, estado DESC, objeto;

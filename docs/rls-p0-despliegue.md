@@ -23,10 +23,24 @@ de `entrenador_principal` (el cliente de `main` lo consulta tal cual) y la Edge 
 | `supabase/rollback/20261025110000_rls_p0_rollback.sql` | Rollback de emergencia (vuelve al estado inseguro conocido). |
 | `tests/rls/` | Batería local (ver `tests/rls/README.md`). |
 
+## Hallazgos de la validación con el estado real de producción (preproducción)
+Ver también `docs/rls-p0-vinculacion.md` (las 9 vinculaciones) y `tests/rls/prod-sim.mjs` (simulación del estado real con datos ficticios).
+1. **Pre-vuelo de B incompleto (parche listo, pendiente de aplicar):** B no verificaba que los datos con dueño por UID (hoy: 75 `ejercicios_custom` y 1 `ejercicio_overrides`)
+   pertenezcan a un UID de `coach_accounts`. Si se carga un UID distinto, B se aplicaba sin avisar y esos datos quedaban invisibles para todo entrenador.
+   El parche está en `docs/rls-p0-parche-preflight-B.patch` (`git apply docs/rls-p0-parche-preflight-B.patch` sobre `supabase/migrations/20261025110000_rls_p0_lockdown.sql`).
+   Mientras no se aplique, la sección 07 del diagnóstico (con `coach_uids` pegado) hace esa comprobación: **no aplicar B si hay un `BLOQUEA` en 07**.
+2. **Frontend (corregido en `App.jsx`):** el efecto que carga `config` (alias de pagos), `video_overrides` y `ejercicio_overrides` corría una sola vez al montar, antes del login
+   (clave anónima). Con RLS, un primer login en un dispositivo sin sesión guardada no los cargaba hasta reiniciar la app. Ahora depende del usuario autenticado.
+3. **Enlaces `?r=` (modo solo lectura, sin sesión):** leen `rutinas` y `sesiones` por `alumnoId` con la clave anónima, que es exactamente el acceso que cierra el bloqueo.
+   Tras B el enlace cae a la copia de la rutina embebida en el propio enlace (si la tiene) y deja de mostrar sesiones realizadas. Es un cambio de comportamiento deliberado;
+   si se usan enlaces `?r=` con alumnos reales, hace falta una decisión de producto (p. ej. exigir inicio de sesión).
+4. **Ruido esperado:** el cliente hace `upsert` en `entrenadores` en cada login, también de alumnos; tras B falla en silencio para ellos (solo `console.error`).
+5. **Sin cambios necesarios en:** `coach_notification_reads` (no existe; B lo omite), `entrenador_principal` (alcance legacy), la Edge Function y el cambio de contraseña.
+
 ## Antes de empezar (sin tocar nada)
 1. Backup de la base (Supabase → Database → Backups / PITR) y confirmar que se puede restaurar.
 2. Ejecutar `rls_p0_snapshot_readonly.sql` en el SQL Editor y guardar la salida **fuera del repositorio**.
-3. Solo lectura, para saber qué hay realmente (esto el código no lo confirma): tipos de `alumnos.id` / `*.alumno_id` / `entrenador_id`; políticas y grants
+3. Ejecutar `docs/rls-p0-diagnostico-readonly.sql` pegando antes en `coach_uids` los UIDs de `COACH_UIDS`. Solo lectura, para saber qué hay realmente (esto el código no lo confirma): tipos de `alumnos.id` / `*.alumno_id` / `entrenador_id`; políticas y grants
    vigentes (`pg_policies`); si existen `notas`, `coach_notification_reads`; otras tablas de `public` (la migración avisa de las no gestionadas); registro público de Auth.
 4. Elegir una **ventana de bajo uso**. Probar primero en un proyecto de Supabase de prueba si se dispone de uno.
 

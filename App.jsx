@@ -1897,7 +1897,9 @@ function GymApp() {
       }
     } catch (e) {}
     // Los ejercicios custom se cargan en un efecto separado, atado al auth user real.
-  }, []);
+    // Se vuelve a ejecutar cuando cambia el usuario autenticado: con RLS (anon sin acceso) la primera carga, previa al login, no trae
+    // nada y un login nuevo no recargaba la config de pagos ni los overrides hasta reiniciar la app.
+  }, [supabaseSessionUserId]);
 
   useEffect(function () {
     if (readOnly || sessionData?.role !== "entrenador") return;
