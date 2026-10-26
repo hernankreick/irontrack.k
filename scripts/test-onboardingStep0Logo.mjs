@@ -47,3 +47,26 @@ assert.ok(sz > 1000 && sz < 150 * 1024, "peso del isotipo < 150 KB: " + sz);
 const png = fs.readFileSync("public/isotipo-onboarding.png");
 assert.equal(png.readUInt32BE(16), 512); assert.equal(png.readUInt32BE(20), 512);
 console.log("test-onboardingStep0Logo: OK");
+
+// Splash de React: usa la variante isotipo (sin baldosa); el resto de usos del ícono siguen con /icon-1024.png.
+{
+  const splash = fs.readFileSync("components/IronTrackSplash.jsx", "utf8");
+  const app = fs.readFileSync("App.jsx", "utf8");
+  assert.match(splash, /<IronTrackAppIcon variant="isotipo" size=\{98\}/, "splash usa la variante isotipo a 98 px");
+  assert.ok(!/<IronTrackAppIcon size=\{112\}/.test(splash), "splash ya no usa el ícono con baldosa");
+  assert.match(icon, /variant === "isotipo" \? ISOTIPO_SRC : OFFICIAL_ICON_SRC/, "variante opt-in; por defecto icon-1024.png");
+  assert.match(icon, /ISOTIPO_SRC = "\/isotipo-onboarding\.png"/);
+  assert.match(icon, /width: 512, height: 512/, "dimensiones explicitas del isotipo");
+  assert.match(icon, /alt=\{ariaLabel != null/, "alt intacto");
+  // duracion, fade, rol y aria del splash intactos
+  for (const re of [/reduced \? 560 : 1480/, /totalMs - 240/, /role="dialog"/, /aria-modal="true"/, /aria-labelledby="it-splash-title"/, /aria-describedby="it-splash-sub"/, /#0f172a 0%, #070d18 48%, #020308 100%/, /Tu entrenamiento\. Tu progreso\. Tu mejor versión\./]) assert.match(splash, re);
+  // login (App.jsx): sin variante -> sigue con icon-1024.png
+  assert.ok(!/variant="isotipo"/.test(app), "App.jsx no usa la variante isotipo");
+  assert.ok((app.match(/<IronTrackAppIcon/g) || []).length >= 2, "login/carga siguen con IronTrackAppIcon por defecto");
+  // manifest e index.html sin cambios (apple-touch-icon y manifest siguen apuntando a icon-1024.png)
+  const html = fs.readFileSync("index.html", "utf8");
+  assert.match(html, /rel="apple-touch-icon" href="\/icon-1024\.png"/);
+  assert.ok(!/isotipo-onboarding/.test(html), "index.html no referencia el isotipo");
+  assert.ok(!/isotipo-onboarding/.test(fs.readFileSync("public/manifest.webmanifest", "utf8")), "manifest sin isotipo");
+}
+console.log("test-onboardingStep0Logo (splash): OK");

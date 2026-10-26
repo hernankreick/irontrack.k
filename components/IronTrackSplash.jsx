@@ -54,7 +54,8 @@ export default function IronTrackSplash({ onComplete }) {
       }}
     >
       <div style={{ flex: 1, minHeight: 0 }} aria-hidden="true" />
-      <IronTrackAppIcon size={112} animated={!reducedMotion} />
+      {/* Isotipo sin baldosa: 98 px con el círculo al ~0,94 del lienzo ≈ el círculo de 112 px del ícono de app (~0,82). */}
+      <IronTrackAppIcon variant="isotipo" size={98} animated={!reducedMotion} />
       <h1
         id="it-splash-title"
         style={{
