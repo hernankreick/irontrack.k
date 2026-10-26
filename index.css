@@ -206,3 +206,10 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+/* Onboarding pasos 2-5 (OnboardingShell): con el teclado abierto se compacta el bloque inferior; en telefonos (ancho <768 px o alto <=520 px) se omiten los detalles secundarios de las tarjetas de perfil. */
+[data-onb-kb] [data-onb-kb-hide] { display: none !important; }
+[data-onb-kb] [data-onb-bottom] { padding-bottom: 8px !important; }
+@media (max-width: 767px), (max-height: 520px) { .onb-hide-short { display: none !important; } }
+/* Foco visible por teclado en las tarjetas seleccionables del onboarding (tienen outline:none inline). */
+[data-onb-root] [role="button"]:focus-visible { outline: 2px solid #60A5FA !important; outline-offset: 2px; }

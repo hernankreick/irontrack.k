@@ -6,7 +6,6 @@ import {
   GLOW,
   ONBOARD_PREMIUM_BG,
   ONBOARD_PREMIUM_CARD,
-  ONBOARD_PROFILE_H_PAD,
   ONBOARD_PROFILE_WRAP,
 } from '../../lib/onboardingTokens.js';
 import {
@@ -19,6 +18,7 @@ import {
   ClipboardSVG,
   CoachSVG,
   OnboardingProgress3,
+  OnboardingShell,
   TrendSVG,
   UserGroupSVG,
 } from './OnboardingPrimitives.jsx';
@@ -27,7 +27,7 @@ import {
    PASO 1 — ROL
 ═══════════════════════════════════════════ */
 const Step1 = ({onNext,onBack,role: activeRole,setRole}) => {
-  const cardPad = "clamp(20px, 2.2vw, 34px)";
+  const cardPad = "clamp(12px, 2vh, 18px) clamp(14px, 4vw, 20px)";
   const roles = [
     {
       id: "entrenador",
@@ -55,259 +55,25 @@ const Step1 = ({onNext,onBack,role: activeRole,setRole}) => {
     },
   ];
   return (
-    <div
-      style={{
-        flex: 1,
-        width: "100%",
-        minHeight: "100svh",
-        display: "flex",
-        flexDirection: "column",
-        background: ONBOARD_PREMIUM_BG,
-        boxSizing: "border-box",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          ...ONBOARD_PROFILE_WRAP,
-          padding: "clamp(16px, 3.5svh, 32px) " + ONBOARD_PROFILE_H_PAD + "px 0",
-          flexShrink: 0,
-          textAlign: "center",
-        }}
-      >
+    <OnboardingShell
+      bg={ONBOARD_PREMIUM_BG}
+      wrap={ONBOARD_PROFILE_WRAP}
+      justify="center"
+      bottom={
         <div
           style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: "0.2em",
-            color: "rgba(96,165,250,0.7)",
-            marginBottom: 8,
-            textTransform: "uppercase",
-            fontFamily: "system-ui,sans-serif",
+            opacity: activeRole ? 1 : 0.9,
+            transform: activeRole ? "translateY(0)" : "translateY(4px)",
+            transition: "opacity 0.3s ease, transform 0.3s ease",
           }}
         >
-          TU PERFIL
-        </div>
-        <h1
-          style={{
-            fontSize: "clamp(34px, 3.2vw, 56px)",
-            fontWeight: 900,
-            color: "#F8FAFC",
-            lineHeight: 1.1,
-            letterSpacing: "-0.5px",
-            margin: "0 0 8px",
-            fontFamily: "system-ui,sans-serif",
-          }}
-        >
-          ¿CÓMO USÁS <span style={{ color: "#2563EB" }}>LA APP?</span>
-        </h1>
-        <p
-          style={{
-            fontSize: "clamp(16px, 1.1vw, 19px)",
-            color: "rgba(255,255,255,0.52)",
-            lineHeight: 1.5,
-            margin: 0,
-            maxWidth: "100%",
-            marginLeft: "auto",
-            marginRight: "auto",
-            fontFamily: "system-ui,sans-serif",
-          }}
-        >
-          Esto cambia tu experiencia en IronTrack.
-        </p>
-      </div>
-
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          WebkitOverflowScrolling: "touch",
-        }}
-      >
-        <div
-          style={{
-            minHeight: "100%",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            boxSizing: "border-box",
-            padding: "12px 0 8px",
-          }}
-        >
-          <div
-            style={{
-              ...ONBOARD_PROFILE_WRAP,
-              padding: "0 " + ONBOARD_PROFILE_H_PAD + "px 8px",
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              {roles.map((r) => {
-                const sel = activeRole === r.id;
-                return (
-                  <div
-                    key={r.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setRole(r.id)}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setRole(r.id))}
-                    style={{
-                      background: ONBOARD_PREMIUM_CARD,
-                      border: "2px solid " + (sel ? "#2563EB" : "rgba(255,255,255,0.1)"),
-                      borderRadius: 22,
-                      padding: cardPad,
-                      cursor: "pointer",
-                      boxSizing: "border-box",
-                      width: "100%",
-                      opacity: sel ? 1 : 0.78,
-                      transform: sel ? "scale(1.01)" : "scale(1)",
-                      boxShadow: sel ? "0 0 0 1px rgba(37,99,235,0.2),0 0 32px rgba(37,99,235,0.2),0 8px 28px rgba(0,0,0,0.2)" : "none",
-                      transition: "transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, border-color 0.2s ease",
-                      outline: "none",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 10 }}>
-                      <div
-                        style={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: 16,
-                          flexShrink: 0,
-                          background: sel ? "rgba(37,99,235,0.12)" : "rgba(255,255,255,0.04)",
-                          border: "1px solid " + (sel ? "rgba(37,99,235,0.35)" : "rgba(255,255,255,0.08)"),
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {r.icon(sel)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
-                        <div
-                          style={{
-                            fontSize: "clamp(20px, 1.3vw, 24px)",
-                            fontWeight: 800,
-                            color: "#F8FAFC",
-                            letterSpacing: "0.1px",
-                            marginBottom: 6,
-                            fontFamily: "system-ui,sans-serif",
-                          }}
-                        >
-                          {r.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "clamp(14px, 0.9vw, 16px)",
-                            color: "rgba(255,255,255,0.55)",
-                            lineHeight: 1.5,
-                            fontFamily: "system-ui,sans-serif",
-                          }}
-                        >
-                          {r.desc}
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: "50%",
-                          border: "2px solid " + (sel ? "#2563EB" : "rgba(255,255,255,0.2)"),
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          marginTop: 4,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: "50%",
-                            background: "#2563EB",
-                            opacity: sel ? 1 : 0,
-                            transform: sel ? "scale(1)" : "scale(0)",
-                            transition: "all 0.2s ease",
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                      {r.chips.map((c) => (
-                        <span
-                          key={c}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            padding: "5px 12px",
-                            borderRadius: 999,
-                            background: sel ? "rgba(37,99,235,0.15)" : "rgba(255,255,255,0.06)",
-                            color: sel ? "#BFDBFE" : "rgba(255,255,255,0.5)",
-                            fontFamily: "system-ui,sans-serif",
-                            border: "1px solid " + (sel ? "rgba(37,99,235,0.35)" : "rgba(255,255,255,0.1)"),
-                          }}
-                        >
-                          {sel && <CheckSVG size={10} color="#93C5FD" />}
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        alignItems: "center",
-                        gap: 12,
-                      }}
-                    >
-                      {r.hints.map((h, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            fontSize: 12,
-                            color: "rgba(255,255,255,0.5)",
-                            lineHeight: 1.35,
-                            fontFamily: "system-ui,sans-serif",
-                          }}
-                        >
-                          {h.g(i)}
-                          <span>{h.t}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          padding: "0 0 max(6px, env(safe-area-inset-bottom, 0px))",
-          flexShrink: 0,
-          background: ONBOARD_PREMIUM_BG,
-          opacity: activeRole ? 1 : 0.9,
-          transform: activeRole ? "translateY(0)" : "translateY(4px)",
-          transition: "opacity 0.3s ease, transform 0.3s ease",
-        }}
-      >
-        <div style={{ ...ONBOARD_PROFILE_WRAP, padding: "0 " + ONBOARD_PROFILE_H_PAD + "px" }}>
           <OnboardingProgress3 text="Paso 2 de 3" filled={2} barMaxWidth="100%" progressFontSize={13} />
           <div
             style={{
               display: "flex",
               flexDirection: "row",
               gap: 10,
-              minHeight: BTN_H,
+              height: BTN_H,
               maxWidth: 520,
               width: "100%",
               margin: "0 auto 6px",
@@ -322,7 +88,7 @@ const Step1 = ({onNext,onBack,role: activeRole,setRole}) => {
                 flex: 1,
                 minWidth: 0,
                 maxWidth: 520,
-                minHeight: BTN_H,
+                height: BTN_H,
                 border: "none",
                 borderRadius: 16,
                 background: !activeRole ? "rgba(37,99,235,0.15)" : BLUE_GRAD,
@@ -361,8 +127,197 @@ const Step1 = ({onNext,onBack,role: activeRole,setRole}) => {
             Podés cambiarlo después en ajustes.
           </div>
         </div>
+      }
+    >
+      <div style={{ textAlign: "center", flexShrink: 0, marginBottom: "clamp(12px, 2.4vh, 20px)" }}>
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.2em",
+            color: "rgba(96,165,250,0.7)",
+            marginBottom: 6,
+            textTransform: "uppercase",
+            fontFamily: "system-ui,sans-serif",
+          }}
+        >
+          TU PERFIL
+        </div>
+        <h1
+          style={{
+            fontSize: "clamp(26px, 4.4vh, 34px)",
+            fontWeight: 900,
+            color: "#F8FAFC",
+            lineHeight: 1.1,
+            letterSpacing: "-0.5px",
+            margin: "0 0 6px",
+            fontFamily: "system-ui,sans-serif",
+          }}
+        >
+          ¿CÓMO USÁS <span style={{ color: "#2563EB" }}>LA APP?</span>
+        </h1>
+        <p
+          style={{
+            fontSize: "clamp(14px, 2vh, 17px)",
+            color: "rgba(255,255,255,0.52)",
+            lineHeight: 1.4,
+            margin: "0 auto",
+            maxWidth: "100%",
+            fontFamily: "system-ui,sans-serif",
+          }}
+        >
+          Esto cambia tu experiencia en IronTrack.
+        </p>
       </div>
-    </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "clamp(10px, 1.8vh, 16px)", flexShrink: 0 }}>
+        {roles.map((r) => {
+          const sel = activeRole === r.id;
+          return (
+            <div
+              key={r.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={sel}
+              onClick={() => setRole(r.id)}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setRole(r.id))}
+              style={{
+                background: ONBOARD_PREMIUM_CARD,
+                border: "2px solid " + (sel ? "#2563EB" : "rgba(255,255,255,0.1)"),
+                borderRadius: 18,
+                padding: cardPad,
+                cursor: "pointer",
+                boxSizing: "border-box",
+                width: "100%",
+                opacity: sel ? 1 : 0.78,
+                transform: sel ? "scale(1.01)" : "scale(1)",
+                boxShadow: sel ? "0 0 0 1px rgba(37,99,235,0.2),0 0 32px rgba(37,99,235,0.2),0 8px 28px rgba(0,0,0,0.2)" : "none",
+                transition: "transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, border-color 0.2s ease",
+                outline: "none",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                <div
+                  style={{
+                    width: "clamp(40px, 6vh, 52px)",
+                    height: "clamp(40px, 6vh, 52px)",
+                    borderRadius: 14,
+                    flexShrink: 0,
+                    background: sel ? "rgba(37,99,235,0.12)" : "rgba(255,255,255,0.04)",
+                    border: "1px solid " + (sel ? "rgba(37,99,235,0.35)" : "rgba(255,255,255,0.08)"),
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {r.icon(sel)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                  <div
+                    style={{
+                      fontSize: "clamp(18px, 2.6vh, 22px)",
+                      fontWeight: 800,
+                      color: "#F8FAFC",
+                      letterSpacing: "0.1px",
+                      marginBottom: 2,
+                      fontFamily: "system-ui,sans-serif",
+                    }}
+                  >
+                    {r.title}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(13px, 1.8vh, 15px)",
+                      color: "rgba(255,255,255,0.55)",
+                      lineHeight: 1.35,
+                      fontFamily: "system-ui,sans-serif",
+                    }}
+                  >
+                    {r.desc}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: "50%",
+                    border: "2px solid " + (sel ? "#2563EB" : "rgba(255,255,255,0.2)"),
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: "#2563EB",
+                      opacity: sel ? 1 : 0,
+                      transform: sel ? "scale(1)" : "scale(0)",
+                      transition: "all 0.2s ease",
+                    }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 2 }}>
+                {r.chips.map((c) => (
+                  <span
+                    key={c}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      background: sel ? "rgba(37,99,235,0.15)" : "rgba(255,255,255,0.06)",
+                      color: sel ? "#BFDBFE" : "rgba(255,255,255,0.5)",
+                      fontFamily: "system-ui,sans-serif",
+                      border: "1px solid " + (sel ? "rgba(37,99,235,0.35)" : "rgba(255,255,255,0.1)"),
+                    }}
+                  >
+                    {sel && <CheckSVG size={10} color="#93C5FD" />}
+                    {c}
+                  </span>
+                ))}
+              </div>
+              <div
+                className="onb-hide-short"
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: "4px 12px",
+                  marginTop: 6,
+                }}
+              >
+                {r.hints.map((h, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.5)",
+                      lineHeight: 1.3,
+                      fontFamily: "system-ui,sans-serif",
+                    }}
+                  >
+                    {h.g(i)}
+                    <span>{h.t}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </OnboardingShell>
   );
 };
 
