@@ -13,7 +13,7 @@ import { MOCK_HOST } from "./fixtures.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // [ancho, alto, safe-top simulado en px (0 = sin notch)]
-const SIZES = [[320, 568, 0], [375, 667, 0], [390, 844, 0], [393, 852, 59], [430, 932, 0], [768, 1024, 0], [1280, 800, 0]];
+const SIZES = [[320, 480, 0], [375, 560, 0], [390, 620, 0], [844, 390, 0], [320, 568, 0], [375, 667, 0], [390, 844, 0], [393, 852, 59], [430, 932, 0], [768, 1024, 0], [1280, 800, 0]];
 
 function parse(argv) {
   const o = { tag: "after" };
@@ -67,30 +67,31 @@ function checkAsset(file) {
   return { size: n + "x" + im.h, bytes: fs.statSync(file).size, cornerMaxAlpha: corner, edgeMaxAlpha: edge, outsideCircleMaxAlpha: outside };
 }
 
-async function measure(page, safeTop) {
-  return page.evaluate((safeTop) => {
-    const r = (e) => { const b = e.getBoundingClientRect(); return { top: b.top + scrollY, bottom: b.bottom + scrollY, left: b.left, right: b.right, w: b.width, h: b.height }; };
-    const q = (re) => [...document.querySelectorAll("button,div,span")].filter((e) => e.children.length === 0 || e.tagName === "BUTTON").find((e) => re.test((e.innerText || "").trim()));
+// Medicion en la pagina. Estado = scroll del contenedor interior [data-onb-scroll] (el documento NO debe hacer scroll).
+async function measure(page) {
+  return page.evaluate(() => {
+    const r = (e) => { const b = e.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right, w: b.width, h: b.height }; };
+    const byText = (tag, re) => [...document.querySelectorAll(tag)].find((e) => re.test((e.innerText || "").trim()) && e.children.length <= 2);
+    const sc = document.querySelector("[data-onb-scroll]"), bot = document.querySelector("[data-onb-bottom]");
     const img = document.querySelector("img[alt='IronTrack']");
     const cta = [...document.querySelectorAll("button")].find((b) => /EMPEZAR GRATIS|GET STARTED FREE/i.test(b.innerText));
-    const paso = q(/^(Paso 1 de 4|Step 1 of 4)$/);
-    const titulo = q(/^(Convertí datos en resultados reales|Turn data into real results)$/);
-    const desc = q(/^(Rutinas, alumnos y progresión|Routines, athletes)/);
-    const card = q(/^(Rutinas personalizadas|Personalized routines)$/);
-    const track = q(/^TRACK$/);
-    // El scroll vive en un contenedor interior (el CTA es sticky abajo): se detecta el que desborda.
-    const sc = [...document.querySelectorAll("div")].find((e) => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
-    const docH = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
-    const last = q(/^(Progresión inteligente|Smart progression)$/);
+    const paso = byText("div", /^(Paso 1 de 4|Step 1 of 4)$/);
+    const titulo = byText("div", /^(Convertí datos en resultados reales|Turn data into real results)$/);
+    const desc = byText("div", /^(Rutinas, alumnos y progresión|Routines, athletes)/);
+    const track = byText("div", /^TRACK$/);
+    const cards = ["Rutinas personalizadas|Personalized routines", "Seguimiento de alumnos|Athlete tracking", "Progresión inteligente|Smart progression"].map((t) => byText("span", new RegExp("^(" + t + ")$")));
+    const root = sc && sc.parentElement && sc.parentElement.parentElement;
     return {
-      vw: innerWidth, vh: innerHeight, docW: document.documentElement.scrollWidth, docH,
+      vw: innerWidth, vh: innerHeight, docW: document.documentElement.scrollWidth, docH: document.documentElement.scrollHeight, scrollY: scrollY,
       overflowX: document.documentElement.scrollWidth > innerWidth + 1,
+      rootRect: root && r(root), rootPos: root && getComputedStyle(root).position,
+      sc: sc && { ...r(sc), scrollTop: sc.scrollTop, scrollHeight: sc.scrollHeight, clientHeight: sc.clientHeight },
+      bot: bot && r(bot),
       img: img && { ...r(img), complete: img.complete, nat: img.naturalWidth, src: img.getAttribute("src") },
-      scrollOverflow: sc ? sc.scrollHeight - sc.clientHeight : 0, last: last && r(last),
-      cta: cta && r(cta), paso: paso && r(paso), titulo: titulo && r(titulo), desc: desc && r(desc), card: card && r(card), track: track && r(track),
-      safeTop,
+      cta: cta && r(cta), paso: paso && r(paso), titulo: titulo && r(titulo), desc: desc && r(desc), track: track && r(track),
+      cards: cards.map((c) => c && r(c.closest("div[style*='border-radius: 16px']") || c)),
     };
-  }, safeTop);
+  });
 }
 
 async function main() {
@@ -128,45 +129,51 @@ async function main() {
     await page.waitForFunction(() => /EMPEZAR GRATIS|GET STARTED FREE/i.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(1200);
     const tag = `${o.tag}_${width}x${height}${safeTop ? "_notch" : ""}`;
+    const scrollTo = (where) => page.evaluate((w) => { const sc = document.querySelector("[data-onb-scroll]"); if (sc) sc.scrollTop = w === "end" ? sc.scrollHeight : 0; }, where);
+    await scrollTo("start");
+    await page.waitForTimeout(150);
     await page.screenshot({ path: path.join(o.out, tag + ".png") });
-    const m = await measure(page, safeTop);
-    const scrollEnd = () => page.evaluate(() => {
-      const sc = [...document.querySelectorAll("div")].find((e) => /auto|scroll/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1);
-      if (sc) sc.scrollTop = sc.scrollHeight;
-      const l = [...document.querySelectorAll("span")].find((e) => /^(Progresión inteligente|Smart progression)$/.test((e.innerText || "").trim()));
-      const c = [...document.querySelectorAll("button")].find((b) => /EMPEZAR GRATIS|GET STARTED FREE/i.test(b.innerText));
-      return { lastBottom: l.getBoundingClientRect().bottom, ctaTop: c.getBoundingClientRect().top, ctaBottom: c.getBoundingClientRect().bottom, vh: innerHeight };
-    });
-    await page.waitForTimeout(100);
-    const end = await scrollEnd();
+    const m0 = await measure(page);
+    await scrollTo("end");
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(o.out, tag + "_scrolled.png") });
+    const m1 = await measure(page);
     const issues = [];
-    if (!m.cta || !m.paso || !m.titulo || !m.desc || !m.card || !m.img || !m.track) issues.push("faltan elementos del Paso 1: " + JSON.stringify(Object.fromEntries(Object.entries(m).filter(([, v]) => v === null || v === undefined).map(([k]) => [k, 0]))));
+    if (!m0.cta || !m0.paso || !m0.titulo || !m0.desc || !m0.img || !m0.track || !m0.sc || !m0.bot || m0.cards.some((c) => !c)) issues.push("faltan elementos del Paso 1");
     else {
-      if (m.overflowX) issues.push(`overflow horizontal (${m.docW} > ${m.vw})`);
-      if (m.img.top < safeTop - 0.5) issues.push(`logo bajo la zona segura (top ${m.img.top.toFixed(1)} < ${safeTop})`);
-      if (m.img.top < 0 || m.img.left < 0 || m.img.right > m.vw + 0.5) issues.push("logo recortado");
-      if (!m.img.complete || m.img.nat === 0) issues.push("imagen del logo no cargo");
-      if (!/isotipo-onboarding/.test(m.img.src)) issues.push("el logo no usa el isotipo recortado: " + m.img.src);
-      if (m.cta.h < 44 || m.cta.w < 44) issues.push(`CTA < 44 px (${m.cta.w}x${m.cta.h})`);
-      if (m.cta.left < 0 || m.cta.right > m.vw + 0.5) issues.push("CTA fuera horizontalmente");
-      // Visibles SIN scroll (scroll en 0): CTA y "Paso 1 de 4" dentro del viewport en todos los tamaños.
-      for (const [k, e] of [["CTA", m.cta], ["Paso 1 de 4", m.paso]]) {
-        if (e.top < 0 || e.bottom > m.vh + 0.5) issues.push(`${k} fuera del viewport sin scroll (top ${e.top.toFixed(1)}, bottom ${e.bottom.toFixed(1)} > ${m.vh})`);
+      if (m0.overflowX) issues.push(`overflow horizontal (${m0.docW} > ${m0.vw})`);
+      if (m0.rootPos !== "fixed" || Math.abs(m0.rootRect.top) > 0.5 || Math.abs(m0.rootRect.bottom - m0.vh) > 0.5 || Math.abs(m0.rootRect.w - m0.vw) > 0.5) issues.push("la raiz del Paso 1 no cubre exactamente el viewport visible: " + JSON.stringify(m0.rootRect));
+      if (m1.scrollY !== 0 || m0.scrollY !== 0) issues.push("el documento hizo scroll (debe hacerlo solo el contenedor)");
+      if (m0.img.top < safeTop - 0.5) issues.push(`logo bajo la zona segura (top ${m0.img.top.toFixed(1)} < ${safeTop})`);
+      if (m0.img.top < 0 || m0.img.left < 0 || m0.img.right > m0.vw + 0.5) issues.push("logo recortado");
+      if (m0.titulo.top < 0) issues.push("titulo recortado arriba");
+      if (!m0.img.complete || m0.img.nat === 0) issues.push("imagen del logo no cargo");
+      if (!/isotipo-onboarding/.test(m0.img.src)) issues.push("el logo no usa el isotipo recortado: " + m0.img.src);
+      if (m0.cta.h < 44 || m0.cta.w < 44) issues.push(`CTA < 44 px (${m0.cta.w}x${m0.cta.h})`);
+      if (m0.cta.left < 0 || m0.cta.right > m0.vw + 0.5) issues.push("CTA fuera horizontalmente");
+      // (a) CTA y Paso 1 de 4 dentro del viewport en scroll 0 y en scroll final, en la MISMA posicion (fijos).
+      for (const [k, e0, e1] of [["CTA", m0.cta, m1.cta], ["Paso 1 de 4", m0.paso, m1.paso]]) {
+        for (const [st, e] of [["inicio", e0], ["final", e1]]) if (e.top < 0 || e.bottom > m0.vh + 0.5) issues.push(`${k} fuera del viewport en scroll ${st} (top ${e.top.toFixed(1)}, bottom ${e.bottom.toFixed(1)} > ${m0.vh})`);
+        if (Math.abs(e0.top - e1.top) > 0.5) issues.push(`${k} se movio entre scroll inicial y final`);
       }
-      // Alturas >= 800: todo el contenido entra sin scroll.
-      if (height >= 800 && m.scrollOverflow > 1) issues.push(`el contenido desborda ${m.scrollOverflow}px a ${width}x${height} (debe entrar sin scroll)`);
-      // Con scroll al final, la ultima tarjeta queda por encima del CTA (nada tapado).
-      if (end.lastBottom > end.ctaTop + 0.5) issues.push(`la ultima tarjeta queda tapada por el CTA (${end.lastBottom.toFixed(1)} > ${end.ctaTop.toFixed(1)})`);
-      const orden = [m.img, m.track, m.titulo, m.desc, m.card];
+      if (!(m0.paso.top >= m0.cta.bottom - 0.5)) issues.push("'Paso 1 de 4' no esta debajo del CTA");
+      // (b) tras scroll al final del contenedor, la ultima tarjeta queda completa y >= 8 px sobre el bloque inferior.
+      const last = m1.cards[2];
+      if (last.bottom > m1.bot.top - 8 + 0.5) issues.push(`3.a tarjeta tapada: bottom ${last.bottom.toFixed(1)} > top bloque inferior - 8 (${(m1.bot.top - 8).toFixed(1)})`);
+      if (last.top < m1.sc.top - 0.5) issues.push("3.a tarjeta cortada por arriba al final del scroll");
+      // (c) las 3 tarjetas alcanzables: cada una cabe en el alto del contenedor, y la 1.a es visible al inicio.
+      m0.cards.forEach((c, i) => { if (c.h > m0.sc.clientHeight) issues.push(`tarjeta ${i + 1} mas alta que el area de scroll`); });
+      if (m0.cards[0].top < m0.sc.top - 0.5) issues.push("1.a tarjeta cortada por arriba");
+      // Orden vertical (en scroll 0).
+      const orden = [m0.img, m0.track, m0.titulo, m0.desc, m0.cards[0], m0.cards[1], m0.cards[2]];
       for (let i = 1; i < orden.length; i++) if (!(orden[i].top >= orden[i - 1].bottom - 0.5)) issues.push("orden vertical roto en el elemento #" + i);
-      if (!(m.paso.top >= m.cta.bottom - 0.5)) issues.push("'Paso 1 de 4' no esta debajo del CTA");
-      if (m.scrollOverflow === 0 && !(m.cta.top >= m.last.bottom - 0.5)) issues.push("el CTA no esta debajo de las tarjetas");
+      // Alturas >= 800 sin notch: todo entra sin scroll (con notch simulado de 59 px el contenedor puede desbordar unos px y se recorre con scroll: la 3.a tarjeta se verifica arriba).
+      const overflow = m0.sc.scrollHeight - m0.sc.clientHeight;
+      if (height >= 800 && !safeTop && overflow > 1) issues.push(`el contenido desborda ${overflow}px a ${width}x${height} (debe entrar sin scroll)`);
+      m0.overflow = overflow; m0.lastGap = +(m1.bot.top - last.bottom).toFixed(1);
     }
     if (errors.length) issues.push("errores de pagina: " + errors.join(" | "));
-    const visibleSinScroll = !!(m.cta && m.paso && m.cta.bottom <= m.vh && m.paso.bottom <= m.vh);
-    report.push({ tag, width, height, safeTop, logoTop: m.img && +m.img.top.toFixed(1), logoSize: m.img && +m.img.w.toFixed(1), ctaH: m.cta && m.cta.h, docH: m.docH, scrollOverflow: m.scrollOverflow, ctaYPasoSinScroll: visibleSinScroll, issues });
+    report.push({ tag, width, height, safeTop, logoTop: m0.img && +m0.img.top.toFixed(1), logoSize: m0.img && +m0.img.w.toFixed(1), ctaH: m0.cta && +m0.cta.h.toFixed(1), scrollOverflow: m0.overflow, terceraTarjetaHolgura: m0.lastGap, issues });
     for (const i of issues) fails.push(`${tag}: ${i}`);
     await ctx.close();
   }
@@ -180,7 +187,7 @@ async function main() {
     if (asset.bytes > 150 * 1024) fails.push("el recurso pesa > 150 KB: " + asset.bytes);
   } else if (o.tag === "after") fails.push("no existe isotipo-onboarding.png en el build");
   fs.writeFileSync(path.join(o.out, o.tag + "_report.json"), JSON.stringify({ report, asset }, null, 1));
-  for (const r of report) console.log(`${r.tag}: logoTop=${r.logoTop} logo=${r.logoSize}px CTA=${r.ctaH}px desborde=${r.scrollOverflow}px CTA+paso visibles=${r.ctaYPasoSinScroll} ${r.issues.length ? "FALLA" : "ok"}`);
+  for (const r of report) console.log(`${r.tag}: logoTop=${r.logoTop} logo=${r.logoSize}px CTA=${r.ctaH}px desborde=${r.scrollOverflow}px 3a-tarjeta holgura sobre bloque=${r.terceraTarjetaHolgura}px ${r.issues.length ? "FALLA" : "ok"}`);
   if (asset) console.log("Recurso:", JSON.stringify(asset));
   if (fails.length) { console.log("\nFALLAS:\n- " + fails.join("\n- ")); process.exit(1); }
   console.log("PASS Paso 1 onboarding. Salida:", o.out);

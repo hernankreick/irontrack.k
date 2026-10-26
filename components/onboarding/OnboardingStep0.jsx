@@ -35,15 +35,17 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
   return (
     <div
       style={{
-        // Alto fijo = viewport: el scroll vive en el contenedor interior y el CTA queda sticky abajo.
-        flex: "0 0 auto",
-        height: "100dvh",
+        // Cubre el área VISIBLE real (iOS Safari / webviews) sin depender de 100dvh: el scroll vive en el
+        // área interior y el bloque del CTA es hermano fijo abajo.
+        position: "fixed",
+        inset: 0,
+        height: "100%",
         display: "flex",
         flexDirection: "column",
-        position: "relative",
         overflow: "hidden",
         background: "#050A14",
         fontFamily: "system-ui, sans-serif",
+        zIndex: 1,
       }}
     >
       {/* Fondo gimnasio + blur sutil (capa con overflow) */}
@@ -93,14 +95,26 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
           minHeight: 0,
           display: "flex",
           flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+      {/* Área con scroll: su alto es el espacio sobre el bloque inferior, así la 3.ª tarjeta siempre es alcanzable */}
+      <div
+        data-onb-scroll="1"
+        style={{
+          flex: "1 1 auto",
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           // Zona segura superior (notch / Dynamic Island) + aire; --it-safe-top permite emularla en QA.
           padding:
-            "calc(var(--it-safe-top, env(safe-area-inset-top, 0px)) + clamp(20px, 2.4vh, 28px)) 24px 0",
+            "calc(var(--it-safe-top, env(safe-area-inset-top, 0px)) + clamp(20px, 2.4vh, 28px)) 24px 16px",
           boxSizing: "border-box",
           overflowY: "auto",
           overflowX: "hidden",
           WebkitOverflowScrolling: "touch",
+          overscrollBehavior: "contain",
         }}
       >
         {/* Bloque central: scroll + centrado vertical */}
@@ -303,22 +317,17 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
           </div>
         </div>
 
-        {/* CTA + indicador + link — mismo ancho max que el contenido */}
+      </div>
+
+        {/* CTA + indicador + link — hermano del scroll (fuera de él), siempre visible abajo */}
         <div
+          data-onb-bottom="1"
           style={{
-            // Siempre visible: sticky abajo dentro del contenedor con scroll; el contenido pasa por debajo.
-            position: "sticky",
-            bottom: 0,
+            flex: "0 0 auto",
             zIndex: 6,
-            flexShrink: 0,
-            alignSelf: "stretch",
-            margin: "0 -24px",
             padding: "clamp(6px, 1.2vh, 12px) 24px max(12px, env(safe-area-inset-bottom, 0px))",
-            background:
-              "linear-gradient(180deg, rgba(5,10,20,0) 0%, rgba(5,10,20,0.94) 14px, rgba(5,10,20,0.98) 100%)",
-            // Mismo tipo de capa que las tarjetas (backdrop-filter) para que no se transparenten sobre el CTA.
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
+            background: "rgba(5,10,20,0.94)",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
             boxSizing: "border-box",
           }}
         >

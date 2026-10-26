@@ -15,9 +15,25 @@ assert.match(step, /var\(--it-safe-top, env\(safe-area-inset-top, 0px\)\)/, "saf
 assert.match(step, /env\(safe-area-inset-bottom/, "safe-area inferior del CTA");
 assert.ok(!/translateY\(-4%\)/.test(step), "sin translateY(-4%)");
 assert.ok(!/justifyContent: "center",\s*\n\s*transform/.test(step));
-assert.match(step, /position: "sticky",\s*bottom: 0/, "CTA + Paso 1 de 4 sticky abajo");
-assert.match(step, /height: "100dvh"/, "el scroll vive en el contenedor interior");
-assert.match(step, /flex: "0 0 auto",\s*width: "100%"/, "el bloque central no se encoge (sin recorte)");
+assert.match(step, /position: "fixed",\s*inset: 0,\s*height: "100%"/, "raiz fija sobre el area visible (inset:0)");
+assert.ok(!/height: "100dvh"/.test(step) && !/minHeight: "100dvh"/.test(step), "la raiz no depende de 100dvh");
+assert.ok(!/position: "sticky"/.test(step), "sin sticky");
+const iScroll = step.indexOf('data-onb-scroll'), iBottom = step.indexOf('data-onb-bottom');
+assert.ok(iScroll > 0 && iBottom > iScroll, "bloque inferior despues del area de scroll");
+const scrollStyle = step.slice(iScroll, iBottom);
+assert.match(scrollStyle, /flex: "1 1 auto",\s*minHeight: 0/);
+assert.match(scrollStyle, /overflowY: "auto"/);
+assert.match(scrollStyle, /overscrollBehavior: "contain"/);
+assert.match(scrollStyle, /24px 16px"/, "padding-bottom del scroll 16px");
+assert.match(scrollStyle, /WebkitOverflowScrolling: "touch"/);
+// El bloque inferior (CTA) es hermano del scroll: nada con data-onb-bottom dentro del area con scroll.
+const bottomStyle = step.slice(iBottom, iBottom + 700);
+assert.match(bottomStyle, /flex: "0 0 auto"/);
+assert.match(bottomStyle, /max\(12px, env\(safe-area-inset-bottom, 0px\)\)/);
+assert.match(bottomStyle, /borderTop/);
+assert.ok(step.indexOf("EMPEZAR GRATIS") > iBottom, "CTA dentro del bloque inferior");
+assert.ok(step.indexOf("Paso 1 de 4") > iBottom, "Paso 1 de 4 dentro del bloque inferior");
+assert.ok(!/transform: "translateY\(-/.test(step.replace(/translateY\(14px\)/g, "")), "sin desplazamientos fijos");
 assert.match(step, /fontSize: 13,/, "subtitulos de tarjeta >= 13 px");
 assert.match(step, /minHeight: 44,/, "enlace de cuenta con objetivo tactil 44 px");
 assert.match(step, /margin: "auto 0"/, "centrado sin recorte superior");
