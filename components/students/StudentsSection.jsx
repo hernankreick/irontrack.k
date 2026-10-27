@@ -236,13 +236,20 @@ export default function StudentsSection(props) {
               const pctBar = weeklyProgress ? weeklyProgress.pct : 0;
               const diSel = dias.length ? Math.min(coachRoutineDiaIdx, Math.max(0, dias.length - 1)) : 0;
               const dSel = dias[diSel] || { warmup: [], exercises: [], label: "" };
-              const proxTxt = weeklyProgress ? (function(){
+              const proxInfo = weeklyProgress ? (function(){
                 var proxDia, proxSemana;
                 if(diasCompletados >= dias.length) { proxDia = 1; proxSemana = semanaCiclo < 4 ? semanaCiclo + 1 : 1; }
                 else { proxDia = diasCompletados + 1; proxSemana = semanaCiclo; }
                 var proxLabel = dias[proxDia-1] ? (dias[proxDia-1].label || ("Día " + proxDia)) : ("Día " + proxDia);
-                return proxLabel + " · " + (msg("Semana ", "Week ")) + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (msg(" (nuevo ciclo)", " (new cycle)")) : "");
-              })() : "";
+                return { dia: proxDia, label: proxLabel, txt: proxLabel + " · " + (msg("Semana ", "Week ")) + proxSemana + (semanaCiclo >= 4 && diasCompletados >= dias.length ? (msg(" (nuevo ciclo)", " (new cycle)")) : "") };
+              })() : null;
+              const proxTxt = proxInfo ? proxInfo.txt : "";
+              // Resumen del encabezado de la ficha: mismos datos que la tarjeta de rutina (no recalcula nada).
+              const fichaSummary = weeklyProgress ? {
+                semanaTxt: msg("Semana ", "Week ") + semanaCiclo + msg("\u00a0de\u00a04", "\u00a0of\u00a04"),
+                diasTxt: diasCompletados + msg("\u00a0de\u00a0", "\u00a0of\u00a0") + dias.length + msg(" días", " days"),
+                proxTxt: proxInfo.label,
+              } : null;
               const warmupItems = (dSel.warmup||[]).map(function(ex,ei){
                 const exInfo=allEx.find(e=>e.id===ex.id);
                 return {
@@ -276,6 +283,7 @@ export default function StudentsSection(props) {
                 alumno={a}
                 rutinaAsignada={rutinaAsignada}
                 progresoSemanal={progresoSemanal}
+                summary={fichaSummary}
                 rutinasLoaded={rutinasLoaded}
                 isActive={alumnoActivo?.id===a.id}
                 isMenuOpen={coachCardMenuId === a.id}
@@ -371,6 +379,7 @@ export default function StudentsSection(props) {
                     diSel={diSel}
                     dSel={dSel}
                     proxTxt={proxTxt}
+                    proxDiaIdx={proxInfo ? proxInfo.dia - 1 : null}
                     warmupItems={warmupItems}
                     exerciseItems={exerciseItems}
                     sugs={sugs}

@@ -19,6 +19,7 @@ export default function StudentDetailPanel({
   diSel,
   dSel,
   proxTxt,
+  proxDiaIdx,
   warmupItems = [],
   exerciseItems = [],
   sugs = [],
@@ -108,6 +109,7 @@ export default function StudentDetailPanel({
         diSel={diSel}
         dSel={dSel}
         proxTxt={proxTxt}
+        proxDiaIdx={proxDiaIdx}
         warmupItems={warmupItems}
         exerciseItems={exerciseItems}
         completedDays={completedDays}
