@@ -220,31 +220,143 @@ export const OnboardingProgress3 = ({ text, filled, barMaxWidth, progressFontSiz
   </div>
 );
 
-/* Contenedor de botones — siempre perfecto (opcional: texto de progreso en lugar de dots) */
-export const BtnRow = ({ total, current, children, progressLabel, footerBg, progressBarFilled, contentWrap, progressBarWidth }) => (
-  <div style={{padding:"8px 0 18px",flexShrink:0,background:footerBg!=null?footerBg:C.bg}}>
-    <div style={{...(contentWrap || ONBOARD_CONTENT_WRAP),padding: "0 " + ONBOARD_PROFILE_H_PAD + "px" }}>
+/* Contenido del bloque inferior (progreso + fila de botones). El bloque fijo (safe-area, fondo, ancho) lo aporta OnboardingShell. */
+export const BtnRow = ({ total, current, children, progressLabel, progressBarFilled, progressBarWidth }) => (
+  <div>
+    <div data-onb-kb-hide="">
       {progressLabel != null && progressLabel !== "" ? (
         typeof progressBarFilled === "number" ? (
           <OnboardingProgress3 text={progressLabel} filled={progressBarFilled} barMaxWidth={progressBarWidth != null ? progressBarWidth : 260} progressFontSize={13} />
         ) : (
-          <div style={{textAlign:"center",fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.5)",marginBottom:12,letterSpacing:"0.2px",fontFamily:"system-ui,sans-serif"}}>
+          <div style={{textAlign:"center",fontSize:13,fontWeight:600,color:"rgba(255,255,255,0.5)",marginBottom:8,letterSpacing:"0.2px",fontFamily:"system-ui,sans-serif"}}>
             {progressLabel}
           </div>
         )
       ) : (
-        <Dots total={total} current={current}/>
+        <Dots total={total} current={current} marginBottom={10}/>
       )}
-      <div style={{
-        display:"flex",flexDirection:"row",
-        gap:10,
-        height:BTN_H,
-      }}>
-        {children}
-      </div>
+    </div>
+    <div style={{
+      display:"flex",flexDirection:"row",
+      gap:10,
+      height:BTN_H,
+    }}>
+      {children}
     </div>
   </div>
 );
+
+/* Teclado en iOS/Android modernos: el layout viewport NO cambia, solo visualViewport. Mientras el teclado esta abierto
+   (visualViewport mas bajo que window.innerHeight) la raiz del shell mide visualViewport (--onb-vh / --onb-vt, que se
+   eliminan al cerrarlo, asi que sin teclado el layout es el de siempre) y el input enfocado se lleva al centro del area con scroll. */
+export const useOnbViewport = (rootRef) => {
+  React.useEffect(() => {
+    const el = rootRef.current;
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!el || !vv) return undefined;
+    let raf = 0;
+    const timers = [];
+    const apply = () => {
+      raf = 0;
+      const open = vv.scale <= 1.01 && window.innerHeight - vv.height > 100;
+      if (open) {
+        el.style.setProperty("--onb-vh", vv.height + "px");
+        el.style.setProperty("--onb-vt", vv.offsetTop + "px");
+        el.setAttribute("data-onb-kb", "1");
+        const ae = document.activeElement;
+        if (ae && el.contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.scrollIntoView) ae.scrollIntoView({ block: "center" });
+      } else {
+        el.style.removeProperty("--onb-vh");
+        el.style.removeProperty("--onb-vt");
+        el.removeAttribute("data-onb-kb");
+      }
+    };
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(apply); };
+    // El teclado de iOS anima ~300 ms: al enfocar/desenfocar se recalcula tras la animacion ademas de los eventos del visualViewport.
+    const onFocus = () => { schedule(); timers.push(setTimeout(schedule, 120), setTimeout(schedule, 350)); };
+    vv.addEventListener("resize", schedule);
+    vv.addEventListener("scroll", schedule);
+    el.addEventListener("focusin", onFocus);
+    el.addEventListener("focusout", onFocus);
+    schedule();
+    return () => {
+      vv.removeEventListener("resize", schedule);
+      vv.removeEventListener("scroll", schedule);
+      el.removeEventListener("focusin", onFocus);
+      el.removeEventListener("focusout", onFocus);
+      if (raf) cancelAnimationFrame(raf);
+      timers.forEach(clearTimeout);
+    };
+  }, [rootRef]);
+};
+
+const SAFE_TOP = "var(--it-safe-top, env(safe-area-inset-top, 0px))";
+
+/* Shell compartido de las pantallas 2-5 del onboarding (perfil, nombre, alumnos, final).
+   Raiz fixed que cubre el area visible; zona segura superior fija; area central con scroll INTERNO; bloque inferior
+   (`bottom`: boton principal / navegacion) hermano fuera del scroll, siempre visible sobre la zona segura inferior. */
+export const OnboardingShell = ({ children, bottom, bg = C.bg, wrap = ONBOARD_CONTENT_WRAP, justify = "flex-start", backdrop = null, enter }) => {
+  const rootRef = React.useRef(null);
+  useOnbViewport(rootRef);
+  const animated = enter !== undefined;
+  return (
+    <div
+      ref={rootRef}
+      data-onb-root=""
+      style={{
+        position: "fixed",
+        left: 0,
+        right: 0,
+        top: "var(--onb-vt, 0px)",
+        height: "var(--onb-vh, 100%)",
+        zIndex: 1,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        // Horizontal con notch/isla: el contenido no queda bajo las zonas seguras laterales.
+        paddingLeft: "env(safe-area-inset-left, 0px)",
+        paddingRight: "env(safe-area-inset-right, 0px)",
+        background: bg,
+        fontFamily: "system-ui,sans-serif",
+        ...(animated ? { opacity: enter ? 1 : 0, transition: "opacity .5s cubic-bezier(.16,1,.3,1)" } : null),
+      }}
+    >
+      {backdrop}
+      <div data-onb-top="" style={{ flexShrink: 0, height: SAFE_TOP, position: "relative", zIndex: 5 }} />
+      <div
+        data-onb-scroll=""
+        style={{
+          position: "relative",
+          zIndex: 5,
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
+          overscrollBehavior: "contain",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <div
+          style={{
+            ...wrap,
+            minHeight: "100%",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: justify,
+            padding: "clamp(10px, 2vh, 20px) " + ONBOARD_PROFILE_H_PAD + "px 16px",
+            ...(animated ? { transform: enter ? "translateY(0)" : "translateY(18px)", transition: "transform .5s cubic-bezier(.16,1,.3,1)" } : null),
+          }}
+        >
+          {children}
+        </div>
+      </div>
+      <div data-onb-bottom="" style={{ position: "relative", zIndex: 5, flexShrink: 0, background: bg, padding: "8px 0 max(12px, env(safe-area-inset-bottom, 0px))" }}>
+        <div style={{ ...wrap, padding: "0 " + ONBOARD_PROFILE_H_PAD + "px" }}>{bottom}</div>
+      </div>
+    </div>
+  );
+};
 
 export const LandingStepDots4 = () => (
   <div
