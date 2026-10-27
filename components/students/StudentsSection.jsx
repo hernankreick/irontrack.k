@@ -7,6 +7,7 @@ import { CICLO_CARGAS, readCicloActual, readCicloCargas, rowInCiclo } from '../.
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
 import StudentOrphanSession from './StudentOrphanSession.jsx';
+import ManualSessionValidationModal from './ManualSessionValidationModal.jsx';
 import StudentsSectionStates from './StudentsSectionStates.jsx';
 import useDialogA11y from '../modals/useDialogA11y.js';
 
@@ -44,6 +45,7 @@ export default function StudentsSection(props) {
   const closeNewAlumnoForm = function () { setNewAlumnoForm(false); setNewAlumnoData({nombre:"",email:"",pass:""}); setNewAlumnoErrors({nombre:false,email:false}); };
   const newAlumnoPristine = !((newAlumnoData.nombre || "").trim() || (newAlumnoData.email || "").trim());
   useDialogA11y({ open: !!newAlumnoForm, containerRef: newAlumnoDialogRef, onEscape: newAlumnoPristine && !creatingAlumno ? closeNewAlumnoForm : undefined });
+  const [manualValidate, setManualValidate] = React.useState(null);
   const sesionesForAlumno = React.useCallback(function (a) {
     var aid = String(a && a.id != null ? a.id : a);
     var byGlobal = (sesionesGlobales || []).filter(function (s) {
@@ -395,6 +397,7 @@ export default function StudentsSection(props) {
                     onToggleRoutineMenu={function(){setCoachRutinaMenuOpen(function(o){return !o;});}}
                     onResetWeek={function(){ setCoachDialog({ t: 'resetWeek', a: a, rutinaActiva: rutinaActiva, semanaCiclo: semanaCiclo }); }}
                     onResetRoutine={function(){ setCoachDialog({ t: 'resetRoutine', a: a, rutinaActiva: rutinaActiva }); }}
+                    onValidateSession={function(){ setCoachRutinaMenuOpen(false); setManualValidate({ alumno: a, rutina: rutinaActiva, semana: semanaCiclo }); }}
                     onSelectDay={function(di){ setCoachRoutineDiaIdx(di); }}
                     onToggleWarmup={function(){ setCoachDiaSecsOpen(function(o){ return {...o, warmup:!o.warmup}; }); }}
                     onToggleMain={function(){ setCoachDiaSecsOpen(function(o){ return {...o, main:!o.main}; }); }}
@@ -465,6 +468,23 @@ export default function StudentsSection(props) {
                 )}
               </StudentCard>
             )})}
+            <ManualSessionValidationModal
+              open={!!manualValidate}
+              onClose={function(){ setManualValidate(null); }}
+              alumno={manualValidate ? manualValidate.alumno : null}
+              rutina={manualValidate ? manualValidate.rutina : null}
+              semana={manualValidate ? manualValidate.semana : null}
+              sb={sb}
+              setAlumnoSesiones={setAlumnoSesiones}
+              setRutinasSB={setRutinasSB}
+              setRutinasSBEntrenador={setRutinasSBEntrenador}
+              toast2={toast2}
+              msg={msg}
+              textMain={textMain}
+              textMuted={textMuted}
+              coachAluSurface={coachAluSurface}
+              coachAluBorderSoft={coachAluBorderSoft}
+            />
           </div>
   );
 }

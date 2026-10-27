@@ -16,6 +16,7 @@ export default function StudentRoutineActions({
   onToggleMenu,
   onResetWeek,
   onResetRoutine,
+  onValidateSession,
   onEditRoutine,
   onRemoveRoutine,
   onAssignRoutine,
@@ -28,6 +29,11 @@ export default function StudentRoutineActions({
         </button>
         {isMenuOpen && (
           <div style={{position:"absolute",right:0,top:"100%",marginTop:6,background:coachAluDropdown,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:6,zIndex:40,minWidth:200,boxShadow:coachAluDropdownShadow}} onClick={function(e){e.stopPropagation();}}>
+            {onValidateSession && (
+              <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",minHeight:44,background:"transparent",border:"none",borderRadius:8,color:"#22c55e",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={onValidateSession}>
+                <Ic name="check-circle" size={15} color="#22c55e"/> {msg("Validar sesión manualmente", "Validate session manually")}
+              </button>
+            )}
             <button type="button" className="hov" style={{width:"100%",textAlign:"left",display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"transparent",border:"none",borderRadius:8,color:"#fbbf24",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}} onClick={onResetWeek}>
               <Ic name="refresh-cw" size={15} color="#fbbf24"/> {msg("Reiniciar semana", "Reset week")}
             </button>

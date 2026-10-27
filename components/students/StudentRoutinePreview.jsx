@@ -35,6 +35,7 @@ export default function StudentRoutinePreview({
   onToggleRoutineMenu,
   onResetWeek,
   onResetRoutine,
+  onValidateSession,
   onSelectDay,
   onToggleWarmup,
   onToggleMain,
@@ -69,6 +70,7 @@ export default function StudentRoutinePreview({
             onToggleMenu={onToggleRoutineMenu}
             onResetWeek={onResetWeek}
             onResetRoutine={onResetRoutine}
+            onValidateSession={onValidateSession}
           />
         </div>
         <StudentProgressSummary
