@@ -45,6 +45,7 @@ export default function StudentDetailPanel({
   onToggleRoutineMenu,
   onResetWeek,
   onResetRoutine,
+  onValidateSession,
   onSelectDay,
   onToggleWarmup,
   onToggleMain,
@@ -125,6 +126,7 @@ export default function StudentDetailPanel({
         onToggleRoutineMenu={onToggleRoutineMenu}
         onResetWeek={onResetWeek}
         onResetRoutine={onResetRoutine}
+        onValidateSession={onValidateSession}
         onSelectDay={onSelectDay}
         onToggleWarmup={onToggleWarmup}
         onToggleMain={onToggleMain}
