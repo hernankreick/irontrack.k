@@ -24,8 +24,8 @@ export default function StudentRoutineActions({
   if (variant === "menu") {
     return (
       <div style={{position:"relative",flexShrink:0}}>
-        <button type="button" className="hov coach-tap" aria-label={msg("Opciones de rutina", "Routine options")} style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,cursor:"pointer"}} onClick={onToggleMenu}>
-          <Ic name="more-vertical" size={18} color={textMuted}/>
+        <button type="button" className="hov coach-tap" aria-label={msg("Opciones de rutina", "Routine options")} style={{width:44,height:44,display:"flex",alignItems:"center",justifyContent:"center",background:"transparent",border:"none",padding:0,cursor:"pointer"}} onClick={onToggleMenu}>
+          <span aria-hidden="true" style={{width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:10,boxSizing:"border-box"}}><Ic name="more-vertical" size={17} color={textMuted}/></span>
         </button>
         {isMenuOpen && (
           <div style={{position:"absolute",right:0,top:"100%",marginTop:6,background:coachAluDropdown,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:6,zIndex:40,minWidth:200,boxShadow:coachAluDropdownShadow}} onClick={function(e){e.stopPropagation();}}>
@@ -48,7 +48,7 @@ export default function StudentRoutineActions({
 
   if (variant === "editRemove") {
     return (
-      <div style={{display:"flex",gap:8,marginTop:14}}>
+      <div style={{display:"flex",gap:8,marginTop:8}}>
         <button className="hov" style={{flex:2,padding:"10px",minHeight:44,background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMain,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:6}} onClick={onEditRoutine}><Ic name="edit-2" size={16} color={textMuted}/>{msg("Editar rutina", "Edit routine")}</button>
         <button type="button" className="hov" aria-label={msg("Quitar rutina", "Remove routine")} style={{padding:"10px 16px",minHeight:44,background:coachAluSubtle,border:"1px solid "+coachAluBorderSoft,borderRadius:12,fontSize:14,fontWeight:800,color:textMuted,cursor:"pointer",fontFamily:"inherit"}} onClick={onRemoveRoutine}><Ic name="trash-2" size={15}/></button>
       </div>

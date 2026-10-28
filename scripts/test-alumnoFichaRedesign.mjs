@@ -122,13 +122,24 @@ await test("Handlers y calculo intactos: los mismos callbacks se cablean y el ch
   assert.match(sec, /if\(diasCompletados >= dias\.length\) \{ proxDia = 1; proxSemana = semanaCiclo < 4 \? semanaCiclo \+ 1 : 1; \}/, "regla de proxima sesion sin cambios");
 });
 
-await test("Movil: controles a 44 px y reglas estrechas solo en media queries", () => {
+await test("Movil: areas tactiles de 44 px con recuadros visibles mas chicos, filas de 44 y reglas estrechas solo en media queries", () => {
   const prev = read("components/students/StudentRoutinePreview.jsx");
-  assert.match(prev, /var editBtn = \{width:44,height:44,/);
+  // Lapiz: el boton (area tactil) mide 44 x 44 y el recuadro visible 34 x 34; la fila mide 44, asi las areas no se superponen.
+  assert.match(prev, /var editBtn = \{width:44,height:44,flexShrink:0,background:"transparent",border:"none",/);
+  assert.match(prev, /var editBox = \{width:34,height:34,/);
+  assert.match(prev, /<Ic name="edit-2" size=\{20\}/);
+  assert.match(prev, /return <div key=\{item\.key\} style=\{\{display:"flex",gap:8,padding:0,minHeight:44,/);
   assert.match(prev, /var addBtn = \{width:"100%",minHeight:44,/);
-  assert.match(prev, /flex:"1 0 auto",\s*minHeight:52,/, "los dias nunca se recortan: si no entran, el carrusel se desplaza");
+  assert.match(prev, /var secBtn = \{width:"100%",minHeight:44,/);
+  assert.match(prev, /flex:"1 0 auto",\s*minHeight:44,/, "los dias nunca se recortan: si no entran, el carrusel se desplaza");
+  const card = read("components/students/StudentCard.jsx");
+  assert.match(card, /var iconBtn = \{width:44,height:44,[^}]*background:"transparent",[^}]*border:"none"/);
+  assert.match(card, /var iconBox = \{width:36,height:36,/);
+  const actions = read("components/students/StudentRoutineActions.jsx");
+  assert.match(actions, /aria-label=\{msg\("Opciones de rutina", "Routine options"\)\} style=\{\{width:44,height:44,[\s\S]*?<span aria-hidden="true" style=\{\{width:36,height:36,/);
+  for (const src of [prev, card]) assert.doesNotMatch(src, /fontWeight:(800|900)/, "sin pesos extra-bold/black en la ficha");
   const css = read("components/layout/AppGlobalStyles.jsx");
-  assert.match(css, /@media \(max-width:429px\)\{\.it-ficha-sum-item\{/);
+  assert.match(css, /@media \(max-width:389px\)\{\.it-ficha-sum-item\{/, "resumen en una fila desde 390 px, como el mockup");
   assert.match(css, /@media \(max-width:379px\)\{\.it-ficha-stats\{grid-template-columns:minmax\(0,1fr\)!important\}/);
 });
 

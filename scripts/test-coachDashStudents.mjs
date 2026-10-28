@@ -121,7 +121,8 @@ await test("Arnes: la fixture usa weeks como array (formato real) para 'Editar e
 
 await test("Alumnos: en escritorio los estilos inline coinciden con main; lo movil vive en media <768", () => {
   const card = read("components/students/StudentCard.jsx");
-  assert.match(card, /className="coach-stu-name" style=\{\{fontSize:17,fontWeight:800,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"\}\}/);
+  // Peso 700 (no extra-bold) desde el ajuste de densidad del PR #130.
+  assert.match(card, /className="coach-stu-name" style=\{\{fontSize:17,fontWeight:700,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"\}\}/);
   assert.doesNotMatch(card, /WebkitLineClamp|overflowWrap/);
   const sec = read("components/students/StudentsSection.jsx");
   assert.match(sec, /borderRadius:12,padding:"10px 12px",boxShadow/);

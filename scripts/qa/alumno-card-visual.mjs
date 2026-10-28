@@ -3,7 +3,7 @@
 // Escenarios (QA_ALUMNO_CARD, ver fixtures.mjs): base = 3 dias, Semana 2 con 2 realizados; largo = 5 dias, nombre/correo/titulo extensos.
 // Por cada ancho x escenario: abre Alumnos, expande el primer alumno, captura; abre el menu de la rutina, captura y verifica que
 // "Validar sesion manualmente" este dentro del viewport; abre ese modal y captura. Con checks (por defecto) falla si hay overflow
-// horizontal, errores de pagina, controles <44 px dentro de la ficha o elementos de la ficha fuera de su tarjeta.
+// horizontal, errores de pagina, controles <44 px o areas tactiles superpuestas dentro de la ficha, o elementos de la ficha fuera de su tarjeta.
 // --no-checks: solo capturas (sirve para la captura "antes" sobre main).
 import fs from "node:fs";
 import os from "node:os";
@@ -59,7 +59,16 @@ const MEASURE = `(() => {
   }
   const overflowText = [...card.querySelectorAll('[data-qa-text]')].filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis').map(lab);
   const clippedBtn = [...card.querySelectorAll('button')].filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1).map(lab);
-  return { found: true, small, outside: outside.slice(0, 10), overflowText, clippedBtn, overflow: document.documentElement.scrollWidth > innerWidth + 1 };
+  // Areas tactiles que se superponen (pares no anidados con interseccion > 1 x 1 px).
+  const ctl = [...card.querySelectorAll('button,a[href],input,select,textarea,[role=button]')].filter(vis);
+  const overlaps = [];
+  for (let i = 0; i < ctl.length; i++) for (let j = i + 1; j < ctl.length; j++) {
+    const A = ctl[i], B = ctl[j]; if (A.contains(B) || B.contains(A)) continue;
+    const ra = A.getBoundingClientRect(), rb = B.getBoundingClientRect();
+    const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left), h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+    if (w > 1 && h > 1) overlaps.push(lab(A) + ' ~ ' + lab(B));
+  }
+  return { found: true, small, overlaps, outside: outside.slice(0, 10), overflowText, clippedBtn, overflow: document.documentElement.scrollWidth > innerWidth + 1 };
 })()`;
 
 async function clickByText(page, re) {
@@ -170,6 +179,7 @@ async function main() {
         if (m.overflow) failures.push(id + ": overflow horizontal");
         if (m.small && m.small.length) failures.push(id + ": controles <44 px: " + JSON.stringify(m.small));
         if (m.outside && m.outside.length) failures.push(id + ": elementos fuera de la ficha: " + JSON.stringify(m.outside));
+        if (m.overlaps && m.overlaps.length) failures.push(id + ": areas tactiles superpuestas: " + JSON.stringify(m.overlaps.slice(0, 5)));
         if (m.clippedBtn && m.clippedBtn.length) failures.push(id + ": botones con contenido recortado: " + JSON.stringify(m.clippedBtn));
         if (m.overflowText && m.overflowText.length) failures.push(id + ": texto desbordado: " + JSON.stringify(m.overflowText));
         if (!r.menu.found) failures.push(id + ": falta 'Validar sesión manualmente' en el menu de la rutina");
