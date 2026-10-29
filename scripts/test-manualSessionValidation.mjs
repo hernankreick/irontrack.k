@@ -35,6 +35,9 @@ function fakeSb(initial) {
       calls.read++;
       return table.filter((s) => s.alumno_id === aid && String(s.rutina_id) === String(rid) && Number(s.semana) === Number(semana));
     },
+    // Rutina fresca (validateManualSession la relee antes de insertar): por defecto la misma del fixture.
+    rutinas: null,
+    async getRutinas() { return this.rutinas || [rutina()]; },
     async addSesion(payload) {
       calls.add.push(payload);
       const row = Object.assign({ id: "new" + calls.add.length }, payload);

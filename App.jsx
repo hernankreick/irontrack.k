@@ -3,9 +3,6 @@ import { PATS, EX, VIDEOS, IMGS } from './lib/exerciseStaticData.js';
 import {
   cloneRoutineDay,
   exerciseMatchesLibraryFilter,
-  getRutinaExerciseIdsForCleanup,
-  sessionBelongsToRoutineForCleanup,
-  sessionBelongsToRoutineWeekForCleanup,
   uid,
 } from './lib/appPureHelpers.js';
 import { Ic } from './components/Ic.jsx';
@@ -145,7 +142,10 @@ import { updateRutinaSemanaActiva as updateRutinaSemanaActivaLib } from './lib/u
 import { updateRutinaPreservingOperational, withInitialSemanaActiva } from './lib/rutinaOperationalState.js';
 import { reconcileCurrentRoutineForAlumno } from './lib/reconcileCurrentRoutine.js';
 import { reiniciarRutinaCiclo as reiniciarRutinaCicloLib } from './lib/reiniciarRutinaCiclo.js';
-import { readCicloActual } from './lib/rutinaCiclo.js';
+import { readCicloActual, tipoReinicioVigente, TIPO_REINICIO } from './lib/rutinaCiclo.js';
+import { resumirSeriesSinFinalizar } from './lib/orphanSessions.js';
+import { textoErrorReinicio, textoPlanReiniciado, textoSeriesSinFinalizar } from './lib/reinicioMensajes.js';
+import RoutineRestartModal from './components/routines/RoutineRestartModal.jsx';
 import { applySemanaActivaToRutinas } from './lib/rutinaOperationalState.js';
 import { loadCoachRutinas } from './lib/coachDataLoaders.js';
 import {
@@ -378,13 +378,14 @@ const sb = {
     return created || [];
   },
   // Los guardados del entrenador NO pisan el estado operativo (semana_activa, semana_reiniciada, semana_reiniciada_at): se fusiona contra
-  // `datos` fresco de la DB. Solo las acciones explicitas de reinicio pasan options.writeOperationalState = true.
+  // `datos` fresco de la DB (con la migracion P0, dentro del mismo UPDATE atomico). Solo los reinicios (it_rutina_reiniciar) cambian ese estado.
   updateRutina: async (id, data, options) => {
     const body = cleanRutinaWriteBody(data);
     return updateRutinaPreservingOperational(supabase, id, body, options);
   },
-  // Avance MONOTONO (nunca retrocede) de la semana del alumno; lo usa finalizeStudentSession.
-  updateRutinaSemanaActiva: (rutinaId, nextWeek) => updateRutinaSemanaActivaLib(supabase, rutinaId, nextWeek),
+  // Avance MONOTONO (nunca retrocede) de la semana del alumno; lo usa finalizeStudentSession. expectedCiclo: el ciclo de la sesion; si la rutina
+  // fue reiniciada mientras tanto no avanza (devuelve { status: "ciclo_cambiado" }).
+  updateRutinaSemanaActiva: (rutinaId, nextWeek, expectedCiclo) => updateRutinaSemanaActivaLib(supabase, rutinaId, nextWeek, expectedCiclo),
   // Una pagina de sesiones de una rutina (para reconciliar la semana). Lanza ante error: la reconciliacion no escribe si falta algo.
   // Debe traer `ciclo`: sin esa columna toda fila cuenta como ciclo 1 y en una rutina reiniciada (ciclo >= 2) la semana nunca avanza.
   getSesionesPageByRutina: async ({ rutinaId, alumnoId, from, to }) => {
@@ -402,7 +403,7 @@ const sb = {
     fetchSesionesPage: sb.getSesionesPageByRutina,
     source: source,
   }),
-  // Reinicio conservando historial: abre un ciclo nuevo (rutinas.datos). No borra sesiones ni progreso.
+  // Reinicio (rutina o semana) conservando historial: abre un ciclo nuevo (rutinas.datos, RPC atomica). No borra sesiones ni progreso.
   reiniciarRutinaCiclo: (params) => reiniciarRutinaCicloLib(Object.assign({ client: supabase }, params)),
   deleteRutina: async function (id) {
     const { error } = await supabase.from("rutinas").delete().eq("id", id);
@@ -427,53 +428,6 @@ const sb = {
     if (error) throw error;
     return true;
   },
-  deleteSesionesByAlumnoRutina: async (alumnoId, rutinaId, rutinaNombre) => {
-    var aid = String(alumnoId);
-    var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
-    var rname = rutinaNombre != null && rutinaNombre !== "" ? String(rutinaNombre) : "";
-    if (rid) {
-      const { error } = await supabase.from("sesiones").delete().eq("alumno_id", aid).eq("rutina_id", rid);
-      if (error) throw error;
-    }
-    if (rid) {
-      const { error } = await supabase.from("sesiones").delete().eq("alumno_id", aid).is("rutina_id", null);
-      if (error) throw error;
-    }
-    if (rname) {
-      var q = supabase.from("sesiones").delete().eq("alumno_id", aid).eq("rutina_nombre", rname);
-      if (rid) q = q.is("rutina_id", null);
-      const { error } = await q;
-      if (error) throw error;
-    }
-    if (!rid && !rname) {
-      const { error } = await supabase.from("sesiones").delete().eq("alumno_id", aid);
-      if (error) throw error;
-    }
-    return true;
-  },
-  deleteSesionesByAlumnoRutinaSemana: async (alumnoId, rutinaId, rutinaNombre, semana) => {
-    var aid = String(alumnoId);
-    var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
-    var rname = rutinaNombre != null && rutinaNombre !== "" ? String(rutinaNombre) : "";
-    var week = Number(semana);
-    if (!Number.isFinite(week) || week <= 0) throw new Error("semana requerida");
-    if (rid) {
-      const { error } = await supabase.from("sesiones").delete().eq("alumno_id", aid).eq("rutina_id", rid).eq("semana", week);
-      if (error) throw error;
-    }
-    if (rname) {
-      var q = supabase.from("sesiones").delete().eq("alumno_id", aid).eq("rutina_nombre", rname).eq("semana", week);
-      if (rid) q = q.is("rutina_id", null);
-      const { error } = await q;
-      if (error) throw error;
-    }
-    if (!rid && !rname) {
-      const { error } = await supabase.from("sesiones").delete().eq("alumno_id", aid).eq("semana", week);
-      if (error) throw error;
-    }
-    return true;
-  },
-
   getSesionesByAlumnoRutinaSemana: async (alumnoId, rutinaId, rutinaNombre, semana) => {
     var aid = String(alumnoId);
     var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
@@ -499,22 +453,6 @@ const sb = {
       rows = rows.concat(data || []);
     }
     return rows;
-  },
-  deleteProgresoByAlumnoEjercicios: async (alumnoId, ejercicioIds) => {
-
-    var ids = Array.from(new Set((ejercicioIds || []).filter(Boolean).map(String)));
-    if (!ids.length) return true;
-    const { error } = await supabase.from("progreso").delete().eq("alumno_id", String(alumnoId)).in("ejercicio_id", ids);
-    if (error) throw error;
-    return true;
-  },
-  deleteProgresoByAlumnoEjerciciosFechas: async (alumnoId, ejercicioIds, fechas) => {
-    var ids = Array.from(new Set((ejercicioIds || []).filter(Boolean).map(String)));
-    var fs = Array.from(new Set((fechas || []).filter(Boolean).map(String)));
-    if (!ids.length || !fs.length) return true;
-    const { error } = await supabase.from("progreso").delete().eq("alumno_id", String(alumnoId)).in("ejercicio_id", ids).in("fecha", fs);
-    if (error) throw error;
-    return true;
   },
   getUltimaSesion: (alumnoId) => sbFetch("sesiones?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=1"),
   getFotos: (alumnoId) => sbFetch("fotos?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc"),
@@ -965,6 +903,8 @@ function GymApp() {
   const msg = useCallback(function (esStr, enStr, ptStr) {
     return irontrackMsg(lang, esStr, enStr, ptStr);
   }, [lang]);
+  // Misma traduccion con la firma de irontrackMsg (M(lang, es, en, pt)) para los modulos compartidos (lib/reinicioMensajes.js).
+  const msgM = useCallback(function (_lang, esStr, enStr, ptStr) { return msg(esStr, enStr, ptStr); }, [msg]);
   const { install: installPWA, canInstall: canInstallPWA } = usePWAInstall();
   const {
     toast,
@@ -1171,6 +1111,9 @@ function GymApp() {
   /** Diálogos reemplazando `confirm` en el panel coach (alumnos / rutinas). */
   const [coachDialog, setCoachDialog] = useState({ t: 'none' });
   const [coachDialogLoading, setCoachDialogLoading] = useState(false);
+  // Modal "Reiniciar rutina" de la ficha del alumno (RoutineRestartModal): estado propio, el dialogo generico no tiene opciones de cargas.
+  const [fichaRestartLoading, setFichaRestartLoading] = useState(false);
+  const [fichaRestartError, setFichaRestartError] = useState('');
   const [libQ, setLibQ] = useState("");
   const [filtPat, setFiltPat] = useState(null);
   const [editExModal, setEditExModal] = useState(null);
@@ -1809,27 +1752,35 @@ function GymApp() {
     }
   }, [sessionData?.alumnoId]);
   useEffect(() => { localStorage.setItem("it_cd",JSON.stringify(completedDays)); },[completedDays]);
-  // Reinicio de rutina por el entrenador (nuevo ciclo): el alumno con la app abierta lo ve al volver a la app, sin recargar.
-  // No interrumpe un entrenamiento abierto y solo actua si el ciclo del servidor es MAYOR al local.
+  // Reinicio de rutina o de semana por el entrenador (nuevo ciclo): el alumno con la app abierta lo ve al volver a la app, sin recargar.
+  // No interrumpe un entrenamiento abierto y solo actua si el ciclo del servidor es MAYOR al local. La misma comprobacion corre antes de
+  // iniciar un entrenamiento (startStudentWorkout) y al finalizar una sesion que quedo en el ciclo anterior (WorkoutScreen).
   const alumnoCicloRef = React.useRef({ session: null, routines: [] });
   alumnoCicloRef.current = { session: session, routines: routines };
+  // checkCicloAlumnoRef.current({ force, silent }) => Promise<"actualizado" | "sin_cambios" | "sin_datos">
+  const checkCicloAlumnoRef = React.useRef(null);
   useEffect(() => {
-    if (readOnly || sessionData?.role !== "alumno" || !sessionData?.alumnoId) return undefined;
+    if (readOnly || sessionData?.role !== "alumno" || !sessionData?.alumnoId) {
+      checkCicloAlumnoRef.current = null;
+      return undefined;
+    }
     var alumnoId = sessionData.alumnoId;
     var cancelled = false;
     var busy = false;
-    async function refreshCiclo() {
-      if (busy || document.hidden || alumnoCicloRef.current.session) return;
+    async function refreshCiclo(opts) {
+      var o = opts && typeof opts === "object" && !opts.type ? opts : {};
+      if (busy) return "sin_datos";
+      if (!o.force && (document.hidden || alumnoCicloRef.current.session)) return "sin_datos";
       busy = true;
       try {
         var rutsRaw = await sb.getRutinas(alumnoId);
-        if (cancelled || !Array.isArray(rutsRaw)) return;
+        if (cancelled || !Array.isArray(rutsRaw)) return "sin_datos";
         var cur = selectCurrentRoutine(rutsRaw, alumnoId);
         var local = alumnoCicloRef.current.routines[0];
-        if (!cur || !cur.datos || !local || String(local.id) !== String(cur.id)) return;
-        if (readCicloActual(cur.datos) <= readCicloActual(local.datos)) return;
+        if (!cur || !cur.datos || !local || String(local.id) !== String(cur.id)) return "sin_datos";
+        if (readCicloActual(cur.datos) <= readCicloActual(local.datos)) return "sin_cambios";
         var freshSes = await sb.getSesiones(alumnoId);
-        if (cancelled) return;
+        if (cancelled) return "sin_datos";
         setRoutines(function (prev) {
           return (prev || []).map(function (r0) {
             return String(r0 && r0.id) === String(cur.id) ? Object.assign({}, r0, { datos: cur.datos, days: (cur.datos && cur.datos.days) || r0.days }) : r0;
@@ -1842,17 +1793,21 @@ function GymApp() {
         });
         if (Array.isArray(freshSes)) setSesiones(freshSes);
         try { localStorage.removeItem("it_last_week_advance_date"); } catch (e) {}
-        toast2(msg("Tu entrenador reinició tu rutina: Semana 1, Día 1", "Your coach restarted your routine: Week 1, Day 1"));
+        if (!o.silent) toast2(textoPlanReiniciado(tipoReinicioVigente(cur.datos), wk, msgM));
+        return "actualizado";
       } catch (e) {
         console.error("[refreshCiclo alumno]", e);
+        return "sin_datos";
       } finally {
         busy = false;
       }
     }
+    checkCicloAlumnoRef.current = refreshCiclo;
     document.addEventListener("visibilitychange", refreshCiclo);
     window.addEventListener("focus", refreshCiclo);
     return function () {
       cancelled = true;
+      checkCicloAlumnoRef.current = null;
       document.removeEventListener("visibilitychange", refreshCiclo);
       window.removeEventListener("focus", refreshCiclo);
     };
@@ -2263,9 +2218,22 @@ function GymApp() {
       })
     : getWeekCompletionGate({});
   // Defensa central: TODO inicio de entrenamiento del alumno pasa por aqui; con el gate activo no se ejecuta setSession.
+  // Con conexion, antes de iniciar se lee la rutina FRESCA: si el entrenador la reinicio (ciclo nuevo) se actualiza el plan y NO se inicia
+  // el dia viejo (el alumno ve el aviso y vuelve a tocar Iniciar sobre el plan nuevo). Sin conexion o si la lectura falla, inicia igual.
+  const startingWorkoutRef = React.useRef(false);
   const startStudentWorkout = function (nextSession) {
     if (weekGate.active) return false;
-    setSession(nextSession);
+    var check = checkCicloAlumnoRef.current;
+    if (!esAlumno || readOnly || !isOnline || typeof check !== "function") {
+      setSession(nextSession);
+      return true;
+    }
+    if (startingWorkoutRef.current) return false;
+    startingWorkoutRef.current = true;
+    Promise.resolve(check({ force: true }))
+      .then(function (estado) { if (estado !== "actualizado") setSession(nextSession); })
+      .catch(function () { setSession(nextSession); })
+      .finally(function () { startingWorkoutRef.current = false; });
     return true;
   };
   const alumnoPlanHeaderDayNum = useMemo(
@@ -2445,311 +2413,23 @@ function GymApp() {
     exportRoutinePdfHtml(r, rows, es, toast2, { textMain, bgCard, border, darkMode, textMuted, currentWeek });
   };
 
-  async function resetAlumnoRoutineWeek(alumno, rutina, weekIndex) {
-    var aid = alumno && alumno.id != null ? String(alumno.id) : (alumnoActivo && alumnoActivo.id != null ? String(alumnoActivo.id) : "");
-    var rut = rutina || (aid ? getRutinaAsignadaAlumno(aid) : null);
-    var rid = rut && rut.id != null ? String(rut.id) : "";
-    var rname = rut && (rut.nombre || rut.name) ? String(rut.nombre || rut.name) : "";
-    var wi = Number.isFinite(Number(weekIndex)) ? Number(weekIndex) : currentWeek;
-    var weekNumber = wi + 1;
-    if (!aid) throw new Error("alumnoId requerido");
-
-    var exIds = getRutinaExerciseIdsForCleanup(rut);
-    var exSet = {};
-    exIds.forEach(function (id) { exSet[String(id)] = true; });
-    var weekSessions = [];
-    if (typeof sb.getSesionesByAlumnoRutinaSemana === "function") {
-      weekSessions = await sb.getSesionesByAlumnoRutinaSemana(aid, rid, rname, weekNumber) || [];
-    }
-    var dateSet = {};
-    weekSessions.forEach(function (s) {
-      if (s && s.fecha) dateSet[String(s.fecha)] = true;
-    });
-    var weekDates = Object.keys(dateSet);
-
-    if (typeof sb.deleteSesionesByAlumnoRutinaSemana === "function") {
-      await sb.deleteSesionesByAlumnoRutinaSemana(aid, rid, rname, weekNumber);
-    }
-    if (typeof sb.deleteProgresoByAlumnoEjerciciosFechas === "function" && weekDates.length) {
-      await sb.deleteProgresoByAlumnoEjerciciosFechas(aid, exIds, weekDates);
-    }
-    if (rut && rid && typeof sb.updateRutina === "function") {
-      var resetDatos = Object.assign({}, rut.datos || {}, {
-        days: (rut.datos && rut.datos.days) || rut.days || [],
-        semana_activa: weekNumber,
-        semana_reiniciada: weekNumber,
-        semana_reiniciada_at: new Date().toISOString(),
-      });
-      await sb.updateRutina(rid, {
-        nombre: rut.nombre || rut.name || "Rutina",
-        alumno_id: aid,
-        entrenador_id: rut.entrenador_id || ENTRENADOR_ID,
-        datos: resetDatos,
-      }, { writeOperationalState: true });
-      setRutinasSBEntrenador(function (prev) {
-        return (prev || []).map(function (r0) {
-          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetDatos }) : r0;
-        });
-      });
-      setRutinasSB(function (prev) {
-        return (prev || []).map(function (r0) {
-          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetDatos }) : r0;
-        });
-      });
-      setRoutines(function (prev) {
-        return (prev || []).map(function (r0) {
-          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetDatos, days: resetDatos.days }) : r0;
-        });
-      });
-    }
-
-    setAlumnoSesiones(function (prev) {
-      if (!alumnoActivo || String(alumnoActivo.id) !== aid) return prev || [];
-      return (prev || []).filter(function (s) {
-        return !sessionBelongsToRoutineWeekForCleanup(s, aid, rid, rname, weekNumber);
-      });
-    });
-    setSesionesGlobales(function (prev) {
-      return (prev || []).filter(function (s) {
-        return !sessionBelongsToRoutineWeekForCleanup(s, aid, rid, rname, weekNumber);
-      });
-    });
-    setSesiones(function (prev) {
-      if (!Array.isArray(prev)) return prev;
-      return prev.filter(function (s) {
-        return !sessionBelongsToRoutineWeekForCleanup(s, aid, rid, rname, weekNumber);
-      });
-    });
-    setAlumnoProgreso(function (prev) {
-      if (!alumnoActivo || String(alumnoActivo.id) !== aid) return prev || [];
-      if (!weekDates.length || !exIds.length) return prev || [];
-      return (prev || []).filter(function (r) {
-        return !(exSet[String(r && r.ejercicio_id)] && dateSet[String(r && r.fecha)]);
-      });
-    });
-    setProgresoGlobal(function (prev) {
-      if (!weekDates.length || !exIds.length) return prev || {};
-      var next = Object.assign({}, prev || {});
-      var key = Object.prototype.hasOwnProperty.call(next, aid) ? aid : Object.keys(next).find(function (k) { return String(k) === aid; });
-      if (key) {
-        next[key] = (next[key] || []).filter(function (r) {
-          return !(exSet[String(r && r.ejercicio_id)] && dateSet[String(r && r.fecha)]);
-        });
-      }
-      return next;
-    });
-    setProgress(function (prev) {
-      if (!prev || !exIds.length) return prev || {};
-      var next = Object.assign({}, prev || {});
-      exIds.forEach(function (id) {
-        var entry = next[id];
-        if (!entry || !Array.isArray(entry.sets)) return;
-        var sets = entry.sets.filter(function (s) {
-          if (s && s.week === wi) return false;
-          if (weekDates.length && dateSet[String(s && s.date)]) return false;
-          return true;
-        });
-        next[id] = Object.assign({}, entry, {
-          sets: sets,
-          max: sets.reduce(function (m, s) { return Math.max(m, parseFloat(s && s.kg) || 0); }, 0),
-        });
-      });
-      try { localStorage.setItem("it_pg", JSON.stringify(next)); } catch (e) {}
-      return next;
-    });
-    if (weekDates.length && exIds.length) {
-      // Lee y escribe la cola guardada (no el estado de React) y filtra por contenido, nunca por posicion: no pierde lo encolado durante un flush.
-      updateQueue(localStorage, function (items) {
-        return items.filter(function (item) {
-          if (!item) return true;
-          if (item.alumno_id != null && String(item.alumno_id) !== aid) return true;
-          var itemEx = String(item.exId || item.ejercicio_id || "");
-          var itemDate = String(item.fecha || item.date || "");
-          return !(exSet[itemEx] && dateSet[itemDate]);
-        });
-      });
-      setPendingSync(readVisiblePending());
-    }
-    setCompletedDays(function (prev) {
-      return (prev || []).filter(function (k) {
-        var text = String(k);
-        if (!text.endsWith("-w" + wi)) return true;
-        if (rid && text.startsWith(rid + "-")) return false;
-        if (!rid && text.indexOf(aid) >= 0) return false;
-        return true;
-      });
-    });
-    setSession(null);
-    setActiveExIdx(0);
-    setCoachRoutineDiaIdx(0);
-    setRegistrosSubTab(0);
-    try {
-      localStorage.removeItem("it_last_week_advance_date");
-    } catch (e) {}
-    await cargarSesionesGlobales();
-    return true;
-  }
-
-  function clearRoutineLocalKeysForAlumno(alumnoId, rutinaId) {
-    try {
-      localStorage.removeItem('it_last_week_advance_date');
-      var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
-      var cd = JSON.parse(localStorage.getItem("it_cd") || "[]");
-      if (Array.isArray(cd)) {
-        localStorage.setItem("it_cd", JSON.stringify(cd.filter(function (k) {
-          var text = String(k);
-          return !((rid && text.indexOf(rid) >= 0) || text.indexOf(String(alumnoId)) >= 0);
-        })));
-      }
-      for (var i = localStorage.length - 1; i >= 0; i--) {
-        var key = localStorage.key(i);
-        if (!key || key.indexOf("it_") !== 0) continue;
-        if (key.indexOf(String(alumnoId)) >= 0 || (rid && key.indexOf(rid) >= 0)) {
-          localStorage.removeItem(key);
-        }
-      }
-    } catch (e) {}
-  }
-
-  async function resetAlumnoRoutineHistory(alumno, rutina) {
-    var aid = alumno && alumno.id != null ? String(alumno.id) : (alumnoActivo && alumnoActivo.id != null ? String(alumnoActivo.id) : "");
-    var rut = rutina || (aid ? getRutinaAsignadaAlumno(aid) : null);
-    var rid = rut && rut.id != null ? String(rut.id) : "";
-    var rname = rut && (rut.nombre || rut.name) ? String(rut.nombre || rut.name) : "";
-    if (!aid) throw new Error("alumnoId requerido");
-
-    var exIds = getRutinaExerciseIdsForCleanup(rut);
-    await Promise.all([
-      typeof sb.deleteSesionesByAlumnoRutina === "function"
-        ? sb.deleteSesionesByAlumnoRutina(aid, rid, rname)
-        : sb.deleteSesionesByAlumno(aid),
-      typeof sb.deleteProgresoByAlumnoEjercicios === "function"
-        ? sb.deleteProgresoByAlumnoEjercicios(aid, exIds)
-        : Promise.resolve(true),
-    ]);
-
-    var exSet = {};
-    exIds.forEach(function (id) { exSet[String(id)] = true; });
-
-    setAlumnoSesiones(function (prev) {
-      if (!alumnoActivo || String(alumnoActivo.id) !== aid) return prev || [];
-      return (prev || []).filter(function (s) {
-        return !sessionBelongsToRoutineForCleanup(s, aid, rid, rname);
-      });
-    });
-    setSesionesGlobales(function (prev) {
-      return (prev || []).filter(function (s) {
-        return !sessionBelongsToRoutineForCleanup(s, aid, rid, rname);
-      });
-    });
-    setSesiones(function (prev) {
-      if (!Array.isArray(prev)) return prev;
-      return prev.filter(function (s) {
-        return !sessionBelongsToRoutineForCleanup(s, aid, rid, rname);
-      });
-    });
-    setAlumnoProgreso(function (prev) {
-      if (!alumnoActivo || String(alumnoActivo.id) !== aid) return prev || [];
-      if (!exIds.length) return prev || [];
-      return (prev || []).filter(function (r) {
-        return !exSet[String(r && r.ejercicio_id)];
-      });
-    });
-    setProgresoGlobal(function (prev) {
-      var next = Object.assign({}, prev || {});
-      var key = Object.prototype.hasOwnProperty.call(next, aid) ? aid : Object.keys(next).find(function (k) { return String(k) === aid; });
-      if (key && exIds.length) {
-        next[key] = (next[key] || []).filter(function (r) {
-          return !exSet[String(r && r.ejercicio_id)];
-        });
-      }
-      return next;
-    });
-    setProgress(function (prev) {
-      if (!prev || !exIds.length) return prev || {};
-      var next = Object.assign({}, prev);
-      exIds.forEach(function (id) { delete next[id]; });
-      try { localStorage.setItem("it_pg", JSON.stringify(next)); } catch (e) {}
-      return next;
-    });
-    updateQueue(localStorage, function (items) {
-      return items.filter(function (item) {
-        if (!item) return true;
-        if (item.alumno_id != null && String(item.alumno_id) !== aid) return true;
-        if (!exIds.length) return true;
-        return !exSet[String(item.exId || item.ejercicio_id)];
-      });
-    });
-    setPendingSync(readVisiblePending());
-    setSugerencias(function (prev) {
-      if (!prev || typeof prev !== "object") return prev;
-      var next = Object.assign({}, prev);
-      delete next[aid];
-      return next;
-    });
-    setCompletedDays(function (prev) {
-      return (prev || []).filter(function (k) {
-        var text = String(k);
-        return !((rid && text.indexOf(rid) >= 0) || text.indexOf(aid) >= 0);
-      });
-    });
-    if (rut && rid && typeof sb.updateRutina === "function") {
-      var resetAllDatos = Object.assign({}, rut.datos || {}, {
-        days: (rut.datos && rut.datos.days) || rut.days || [],
-        semana_activa: 4,
-      });
-      delete resetAllDatos.semana_reiniciada;
-      delete resetAllDatos.semana_reiniciada_at;
-      await sb.updateRutina(rid, {
-        nombre: rut.nombre || rut.name || "Rutina",
-        alumno_id: aid,
-        entrenador_id: rut.entrenador_id || ENTRENADOR_ID,
-        datos: resetAllDatos,
-      }, { writeOperationalState: true });
-      setRutinasSBEntrenador(function (prev) {
-        return (prev || []).map(function (r0) {
-          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetAllDatos }) : r0;
-        });
-      });
-      setRutinasSB(function (prev) {
-        return (prev || []).map(function (r0) {
-          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetAllDatos }) : r0;
-        });
-      });
-      setRoutines(function (prev) {
-        return (prev || []).map(function (r0) {
-          return String(r0 && r0.id) === rid ? Object.assign({}, r0, { datos: resetAllDatos, days: resetAllDatos.days }) : r0;
-        });
-      });
-    }
-    setCurrentWeek(3);
-    setCoachRoutineDiaIdx(0);
-    setRegistrosSubTab(0);
-    clearRoutineLocalKeysForAlumno(aid, rid);
-    try {
-      var freshSesiones = await sb.getSesiones(aid) || [];
-      var freshProgreso = await sb.getProgreso(aid) || [];
-      if (alumnoActivo && String(alumnoActivo.id) === aid) {
-        setAlumnoSesiones(freshSesiones);
-        setAlumnoProgreso(freshProgreso);
-      }
-      setProgresoGlobal(function (prev) {
-        var next = Object.assign({}, prev || {});
-        next[aid] = freshProgreso;
-        return next;
-      });
-    } catch (e) {
-      console.error("[resetAlumnoRoutineHistory] fetch after reset failed", e);
-    }
-    await cargarSesionesGlobales();
-    return true;
-  }
-
-  // Reinicia la rutina ASIGNADA conservando sesiones y sets: ciclo + 1, Semana 1 / Dia 1. Devuelve { ok, reason?, error? }; nunca falla en silencio.
-  async function reiniciarRutinaAsignada(rutinaId, cargas) {
+  // Reinicio de la rutina ASIGNADA conservando TODO el historial (sesiones, series, validaciones, PR): abre un ciclo nuevo (lib/reiniciarRutinaCiclo.js).
+  //  opts.tipo "rutina" (default): Semana 1 / Dia 1 con las cargas elegidas. "semana": queda en opts.semana, Dia 1, mismas cargas.
+  //  opts.cicloEsperado: el ciclo que vio el entrenador; si la rutina ya cambio (otro dispositivo, doble clic) => conflicto_ciclo, sin escribir.
+  // Nunca borra ni modifica sesiones/progreso ni la cola offline. Devuelve { ok, reason?, error? }; nunca falla en silencio.
+  async function reiniciarRutinaAsignada(rutinaId, cargas, opts) {
+    var o = opts || {};
     var rid = rutinaId != null ? String(rutinaId) : "";
-    var res = await sb.reiniciarRutinaCiclo({ rutinaId: rid, cargas: cargas });
-    if (!res || !res.ok) return res || { ok: false, reason: "sin_respuesta" };
+    var local = (rutinasSBEntrenador || []).concat(rutinasSB || []).find(function (r0) { return r0 && String(r0.id) === rid && r0.datos; });
+    var esperado = o.cicloEsperado != null ? o.cicloEsperado : (local ? readCicloActual(local.datos) : undefined);
+    var res = await sb.reiniciarRutinaCiclo({ rutinaId: rid, cargas: cargas, tipo: o.tipo, semana: o.semana, cicloEsperado: esperado });
+    if (!res || !res.ok) {
+      if (res && res.reason === "conflicto_ciclo") {
+        // Otro dispositivo ya cambio la rutina: refrescar lo que ve el entrenador (sin reintentar el reinicio).
+        Promise.all([cargarRutinasEntrenador(), cargarSesionesGlobales()]).catch(function (e) { console.error("[reinicio conflicto] refresco", e); });
+      }
+      return res || { ok: false, reason: "sin_respuesta" };
+    }
     var newDatos = res.datos;
     function applyDatos(list) {
       return (list || []).map(function (r0) {
@@ -2782,6 +2462,51 @@ function GymApp() {
       console.error("[reiniciarRutinaAsignada] refresco posterior fallo", e);
     }
     return res;
+  }
+
+  // Aviso previo a un reinicio: series del ciclo vigente sin entrenamiento finalizado (incluye hoy). Solo AVISA: el reinicio no borra nada,
+  // esas series quedan en el historial (ciclo anterior) y dejan de ofrecerse para validar.
+  function avisoSeriesSinFinalizar(alumno, rutina) {
+    if (!alumno || alumno.id == null || !rutina) return null;
+    var aid = String(alumno.id);
+    var esActivo = !!(alumnoActivo && String(alumnoActivo.id) === aid);
+    var prog = esActivo && Array.isArray(alumnoProgreso) && alumnoProgreso.length ? alumnoProgreso : ((progresoGlobal || {})[aid] || []);
+    var ses = (sesionesGlobales || []).concat(esActivo ? (alumnoSesiones || []) : []);
+    try {
+      return textoSeriesSinFinalizar(resumirSeriesSinFinalizar({ progreso: prog, sesiones: ses, rutina: rutina, alumnoId: aid }), msgM);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // "Reiniciar rutina" desde la ficha del alumno: mismo reinicio que en Rutinas (ciclo nuevo, Semana 1 / Dia 1, cargas elegidas).
+  async function confirmarReinicioRutinaFicha(cargas) {
+    var c = coachDialog;
+    if (fichaRestartLoading || !c || c.t !== 'resetRoutine') return;
+    var rut = c.rutinaActiva || (c.a ? getRutinaAsignadaAlumno(c.a) : null);
+    setFichaRestartLoading(true);
+    setFichaRestartError('');
+    try {
+      var res = rut && rut.id != null
+        ? await reiniciarRutinaAsignada(rut.id, cargas, { tipo: TIPO_REINICIO.RUTINA, cicloEsperado: readCicloActual(rut.datos) })
+        : { ok: false, reason: 'rutina_inexistente' };
+      if (res && res.ok) {
+        setCoachRutinaMenuOpen(false);
+        setCoachDialog({ t: 'none' });
+        toast2(msg('Rutina reiniciada ✓ Semana 1, Día 1. El historial se conserva.', 'Routine restarted ✓ Week 1, Day 1. History is kept.', 'Rotina reiniciada ✓ Semana 1, Dia 1. O histórico é mantido.'));
+      } else {
+        var text = textoErrorReinicio(res, msgM);
+        setFichaRestartError(text);
+        toast2(text);
+      }
+    } catch (e) {
+      console.error('[reiniciar rutina ficha]', e);
+      var text2 = textoErrorReinicio(null, msgM);
+      setFichaRestartError(text2);
+      toast2(text2);
+    } finally {
+      setFichaRestartLoading(false);
+    }
   }
 
   async function clearAlumnoProgressHistory(alumnoId) {
@@ -2869,7 +2594,7 @@ function GymApp() {
   async function confirmCoachDialog() {
     var c = coachDialog;
     if (c.t === 'none') return;
-    setCoachDialogLoading(c.t === 'deleteAlumno' || c.t === 'quitarRut' || c.t === 'assignRut' || c.t === 'clearProgress' || c.t === 'resetRoutine' || c.t === 'resetWeek');
+    setCoachDialogLoading(c.t === 'deleteAlumno' || c.t === 'quitarRut' || c.t === 'assignRut' || c.t === 'clearProgress' || c.t === 'resetWeek');
     try {
       if (c.t === 'deleteAlumno' && c.a) {
         if (typeof sb.deleteAlumno === 'function') {
@@ -2913,16 +2638,15 @@ function GymApp() {
         return;
       }
       if (c.t === 'resetWeek' && c.semanaCiclo != null) {
-        await resetAlumnoRoutineWeek(c.a || alumnoActivo, c.rutinaActiva || (c.a ? getRutinaAsignadaAlumno(c.a) : null), c.semanaCiclo - 1);
+        // Reiniciar semana: ciclo nuevo en la MISMA semana, Dia 1, mismas cargas. No borra sesiones, series ni validaciones.
+        var rutW = c.rutinaActiva || (c.a ? getRutinaAsignadaAlumno(c.a) : null);
+        var resW = rutW && rutW.id != null
+          ? await reiniciarRutinaAsignada(rutW.id, null, { tipo: TIPO_REINICIO.SEMANA, semana: c.semanaCiclo, cicloEsperado: readCicloActual(rutW.datos) })
+          : { ok: false, reason: 'rutina_inexistente' };
         setCoachRutinaMenuOpen(false);
-        toast2(msg('Semana reiniciada', 'Week reset', 'Semana reiniciada'));
-        setCoachDialog({ t: 'none' });
-        return;
-      }
-      if (c.t === 'resetRoutine') {
-        await resetAlumnoRoutineHistory(c.a || alumnoActivo, c.rutinaActiva || (c.a ? getRutinaAsignadaAlumno(c.a) : null));
-        setCoachRutinaMenuOpen(false);
-        toast2(msg('Rutina reiniciada ✓', 'Routine reset ✓', 'Rotina reiniciada ✓'));
+        toast2(resW && resW.ok
+          ? msg('Semana ' + c.semanaCiclo + ' reiniciada ✓ Día 1. El historial se conserva.', 'Week ' + c.semanaCiclo + ' restarted ✓ Day 1. History is kept.', 'Semana ' + c.semanaCiclo + ' reiniciada ✓ Dia 1. O histórico é mantido.')
+          : textoErrorReinicio(resW, msgM));
         setCoachDialog({ t: 'none' });
         return;
       }
@@ -3087,8 +2811,11 @@ function GymApp() {
       }
     } catch (e1) {
       console.error('[confirmCoachDialog]', e1);
-      if (c.t === 'clearProgress' || c.t === 'resetRoutine' || c.t === 'resetWeek') {
+      if (c.t === 'clearProgress') {
         toast2(msg('No se pudo limpiar el historial.', 'Could not clear the history.', 'Não foi possível limpar o histórico.'));
+      }
+      if (c.t === 'resetWeek') {
+        toast2(textoErrorReinicio(null, msgM));
       }
     } finally {
       setCoachDialogLoading(false);
@@ -4639,6 +4366,11 @@ function GymApp() {
           videoOverrides={videoOverrides}
           setVideoModal={setVideoModal}
           toast2={toast2}
+          onCicloCambiado={function () {
+            // La sesion termino despues de un reinicio: recargar el plan del ciclo nuevo sin repetir el aviso (ya lo muestra el resumen).
+            var f = checkCicloAlumnoRef.current;
+            return typeof f === "function" ? f({ force: true, silent: true }) : null;
+          }}
           onWeekAdvanced={function (rutinaId, nextWeek) {
             setRoutines(function (prev) {
               return (prev || []).map(function (r0) {
@@ -4697,10 +4429,13 @@ function GymApp() {
       </div>
     )}
     {(() => {
-      var cfg = getCoachDialogModalConfig(coachDialog, msg, es);
+      var dlg = coachDialog.t === 'resetWeek'
+        ? Object.assign({}, coachDialog, { aviso: avisoSeriesSinFinalizar(coachDialog.a, coachDialog.rutinaActiva) })
+        : coachDialog;
+      var cfg = getCoachDialogModalConfig(dlg, msg, es);
       return (
     <CoachConfirmDialog
-      dialog={(coachDialog.t === 'logout' || coachDialog.t === 'logoutSettings') ? {t:'none'} : coachDialog}
+      dialog={(coachDialog.t === 'logout' || coachDialog.t === 'logoutSettings' || coachDialog.t === 'resetRoutine') ? {t:'none'} : dlg}
       config={cfg}
       loading={coachDialogLoading}
       cancelLabel={msg('Cancelar', 'Cancel', 'Cancelar')}
@@ -4714,6 +4449,22 @@ function GymApp() {
     />
       );
     })()}
+    {/* Reiniciar rutina desde la ficha del alumno: el MISMO modal que en Rutinas (cargas mantener / cero). Conserva todo el historial. */}
+    <RoutineRestartModal
+      open={coachDialog.t === 'resetRoutine'}
+      alumnoName={coachDialog.t === 'resetRoutine' && coachDialog.a ? (coachDialog.a.nombre || coachDialog.a.email) : ''}
+      loading={fichaRestartLoading}
+      errorText={fichaRestartError}
+      warningText={coachDialog.t === 'resetRoutine' ? avisoSeriesSinFinalizar(coachDialog.a, coachDialog.rutinaActiva) : null}
+      onCancel={function () {
+        if (fichaRestartLoading) return;
+        setFichaRestartError('');
+        setCoachDialog({ t: 'none' });
+      }}
+      onConfirm={function (cargas) { void confirmarReinicioRutinaFicha(cargas); }}
+      M={msgM}
+      lang={null}
+    />
     </IronTrackI18nProvider>
     </>
   );

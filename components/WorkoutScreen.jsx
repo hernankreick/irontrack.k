@@ -17,7 +17,8 @@ import {
   removeUndefinedPayloadFields,
   sessionAlreadyExists,
 } from '../lib/workoutSession.js';
-import { readCicloActual } from '../lib/rutinaCiclo.js';
+import { readCicloActual, tipoReinicioVigente } from '../lib/rutinaCiclo.js';
+import { textoSesionTrasReinicio } from '../lib/reinicioMensajes.js';
 import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
 
 export function WorkoutScreen(props) {
@@ -26,7 +27,7 @@ export function WorkoutScreen(props) {
     setSession, setCompletedDays, completedDays, currentWeek, setCurrentWeek,
     preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode,
     prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData,
-    onSesionGuardada, sessionPRList, videoOverrides, setVideoModal, toast2, onWeekAdvanced,
+    onSesionGuardada, sessionPRList, videoOverrides, setVideoModal, toast2, onWeekAdvanced, onCicloCambiado,
   } = props;
 
   const [exitWorkoutOpen, setExitWorkoutOpen] = useState(false);
@@ -194,7 +195,8 @@ export function WorkoutScreen(props) {
           // Solo datos.semana_activa (lectura fresca de `datos` + PATCH acotado); NO reescribe entrenador_id ni otras columnas.
           updateRutinaWeek: function () {
             if (!r || !r.id || typeof sb.updateRutinaSemanaActiva !== "function") return null;
-            return sb.updateRutinaSemanaActiva(r.id, effectiveWeek + 2);
+            // Ciclo de ESTA sesion: si el entrenador reinicio mientras tanto, el avance no se aplica (la sesion queda en su ciclo original).
+            return sb.updateRutinaSemanaActiva(r.id, effectiveWeek + 2, cicloActual);
           },
         });
 
@@ -213,16 +215,30 @@ export function WorkoutScreen(props) {
           setCurrentWeek(effectiveWeek);
         }
         const weekAdvanceFailed = outcome.week.advance === "failed" || outcome.week.advance === "unverified";
-        setCompletedDays(newCompleted);
+        // El entrenador reinicio la rutina/semana mientras la sesion estaba abierta: la sesion YA quedo guardada en su ciclo original
+        // (historial) y no avanzo la planificacion nueva. Se avisa en el resumen y se recarga el plan (ciclo nuevo, Dia 1).
+        const cicloCambiado = outcome.week.advance === "ciclo_cambiado";
+        const cicloDatos = cicloCambiado ? (outcome.week.cicloDatos || {}) : null;
+        const cicloCambiadoAviso = cicloCambiado
+          ? textoSesionTrasReinicio(tipoReinicioVigente(cicloDatos), cicloDatos.semana_activa, function (_l, e, n) { return es ? e : n; }, null)
+          : null;
+        if (!cicloCambiado) setCompletedDays(newCompleted);
         // Si el avance de semana fallo, el resumen lo indica de forma persistente (el toast quedaba tapado por el resumen).
-        setResumenSesion(weekAdvanceFailed ? Object.assign({}, buildSummary(), { weekAdvanceFailed: true }) : buildSummary());
+        setResumenSesion(cicloCambiado
+          ? Object.assign({}, buildSummary(), { cicloCambiadoAviso: cicloCambiadoAviso })
+          : (weekAdvanceFailed ? Object.assign({}, buildSummary(), { weekAdvanceFailed: true }) : buildSummary()));
         setSession(null);
         if (typeof onSesionGuardada === "function") {
           Promise.resolve().then(function () { return onSesionGuardada(); }).catch(function (e) {
             console.error("[onSesionGuardada]", e);
           });
         }
-        if (outcome.week.advance === "ok") {
+        if (cicloCambiado) {
+          if (typeof toast2 === "function") toast2(cicloCambiadoAviso);
+          if (typeof onCicloCambiado === "function") {
+            Promise.resolve().then(function () { return onCicloCambiado(); }).catch(function (e) { console.error("[onCicloCambiado]", e); });
+          }
+        } else if (outcome.week.advance === "ok") {
           setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+effectiveWeek)));
           setCurrentWeek(effectiveWeek + 1);
           if (r && r.id && typeof onWeekAdvanced === "function") onWeekAdvanced(r.id, effectiveWeek + 2);

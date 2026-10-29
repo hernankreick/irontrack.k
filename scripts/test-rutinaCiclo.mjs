@@ -8,6 +8,7 @@ import { buildProgressPayload, buildSessionPayload, sessionAlreadyExists } from 
 import { countPersistedDistinctDays } from "../lib/finalizeWorkoutSession.js";
 import { reiniciarRutinaCiclo } from "../lib/reiniciarRutinaCiclo.js";
 import { mergeOperationalDatos } from "../lib/rutinaOperationalState.js";
+import { applyReinicioRow } from "../lib/rutinaRpc.js";
 
 let n = 0;
 async function test(name, fn) { await fn(); n++; console.log("ok -", name); }
@@ -112,45 +113,57 @@ await test("un guardado normal del entrenador no pisa las claves de ciclo", () =
   assert.equal(merged.semana_activa, 1);
 });
 
-// reiniciarRutinaCiclo con cliente falso
-function fakeClient({ probeError = null, rows = [{ id: "R1", alumno_id: "A1", es_plantilla: false, datos: { days, semana_activa: 4 } }], writeError = null, writeRows } = {}) {
+// reiniciarRutinaCiclo con cliente falso: lecturas por from(); la escritura SOLO por la RPC atomica (espejo de la migracion P0).
+function fakeClient({ probeError = null, rows = [{ id: "R1", alumno_id: "A1", es_plantilla: false, datos: { days, semana_activa: 4 } }], rpcError = null, rpcRows, noRpc = false } = {}) {
   const calls = [];
+  const db = rows.map((r) => JSON.parse(JSON.stringify(r)));
   const builder = (table) => {
     const st = { table, op: "select" };
     const b = {
-      select(cols) { if (st.op === "update") st.sel = true; else st.cols = cols; return b; },
+      select(cols) { st.cols = cols; return b; },
       limit() { return Promise.resolve({ data: [], error: table === "sesiones" ? probeError : null }); },
       eq() { return b; },
-      update(body) { st.op = "update"; st.body = body; calls.push(st); return b; },
-      then(res, rej) {
-        const out = st.op === "update"
-          ? { data: writeRows !== undefined ? writeRows : [Object.assign({}, rows[0], { datos: st.body.datos })], error: writeError }
-          : { data: rows, error: null };
-        return Promise.resolve(out).then(res, rej);
-      },
+      update(body) { st.op = "update"; calls.push(st); return b; },
+      delete() { st.op = "delete"; calls.push(st); return b; },
+      then(res, rej) { return Promise.resolve({ data: JSON.parse(JSON.stringify(db)), error: null }).then(res, rej); },
     };
     return b;
   };
-  return { from: builder, calls };
+  const client = { from: builder, calls, db };
+  if (!noRpc) client.rpc = async (name, args) => {
+    calls.push({ op: "rpc", name, args });
+    if (rpcError) return { data: null, error: rpcError };
+    if (rpcRows !== undefined) return { data: rpcRows, error: null };
+    const next = applyReinicioRow(db[0], args, "2026-05-01T12:00:00Z");
+    if (!next) return { data: [], error: null };
+    db[0] = next;
+    return { data: [next], error: null };
+  };
+  return client;
 }
 const origErr = console.error; console.error = () => {};
-await test("reiniciarRutinaCiclo: ok escribe SOLO datos (sin borrar nada)", async () => {
+await test("reiniciarRutinaCiclo: ok usa SOLO la RPC atomica (sin update/delete directos)", async () => {
   const c = fakeClient();
   const r = await reiniciarRutinaCiclo({ client: c, rutinaId: "R1", alumnoId: "A1", cargas: "cero" });
   assert.equal(r.ok, true);
   assert.equal(r.datos.ciclo_actual, 2);
   assert.equal(r.datos.semana_activa, 1);
-  assert.deepEqual(Object.keys(c.calls[0].body), ["datos"]);
-  assert.equal(c.calls.length, 1);
+  assert.equal(r.datos.ciclo_cargas, "cero");
+  assert.deepEqual(c.calls.map((x) => x.op), ["rpc"]);
+  assert.deepEqual(c.calls[0].args, { p_rutina_id: "R1", p_ciclo_esperado: 1, p_tipo: "rutina", p_semana: 1, p_cargas: "cero" });
 });
 await test("reiniciarRutinaCiclo: errores explicitos", async () => {
   assert.equal((await reiniciarRutinaCiclo({ client: fakeClient({ probeError: { message: "no col" } }), rutinaId: "R1" })).reason, "migracion_pendiente");
-  assert.equal((await reiniciarRutinaCiclo({ client: fakeClient({ writeError: { message: "x" } }), rutinaId: "R1" })).reason, "escritura");
-  assert.equal((await reiniciarRutinaCiclo({ client: fakeClient({ writeRows: [] }), rutinaId: "R1" })).reason, "sin_filas");
+  assert.equal((await reiniciarRutinaCiclo({ client: fakeClient({ noRpc: true }), rutinaId: "R1" })).reason, "migracion_pendiente");
+  assert.equal((await reiniciarRutinaCiclo({ client: fakeClient({ rpcError: { code: "PGRST202", message: "Could not find the function" } }), rutinaId: "R1" })).reason, "migracion_pendiente");
+  assert.equal((await reiniciarRutinaCiclo({ client: fakeClient({ rpcError: { message: "x" } }), rutinaId: "R1" })).reason, "escritura");
+  assert.equal((await reiniciarRutinaCiclo({ client: fakeClient({ rpcRows: [] }), rutinaId: "R1" })).reason, "sin_filas");
   assert.equal((await reiniciarRutinaCiclo({ client: fakeClient({ rows: [{ id: "R1", alumno_id: null, datos: {} }] }), rutinaId: "R1" })).reason, "no_asignada");
   assert.equal((await reiniciarRutinaCiclo({ client: fakeClient({ rows: [] }), rutinaId: "R1" })).reason, "rutina_inexistente");
   assert.equal((await reiniciarRutinaCiclo({ client: fakeClient(), rutinaId: "R1", alumnoId: "OTRO" })).reason, "alumno_distinto");
   assert.equal((await reiniciarRutinaCiclo({ client: fakeClient(), rutinaId: "" })).reason, "argumentos_invalidos");
+  assert.equal((await reiniciarRutinaCiclo({ client: fakeClient(), rutinaId: "R1", tipo: "semana", semana: 5 })).reason, "argumentos_invalidos");
+  assert.equal((await reiniciarRutinaCiclo({ client: fakeClient(), rutinaId: "R1", cicloEsperado: 2 })).reason, "conflicto_ciclo");
 });
 console.error = origErr;
 console.log(n + " tests ok");
