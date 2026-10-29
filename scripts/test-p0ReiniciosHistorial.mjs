@@ -368,5 +368,28 @@ await test("aviso de series sin finalizar (G4): se detectan, incluido hoy, sin e
   assert.ok(resumen.fechas.includes(fHoy));
 });
 
+await test("SIN la migracion (PostgREST responde PGRST202): guardar y avanzar siguen funcionando; reiniciar se rechaza sin escribir", async () => {
+  const c = makeDb(seed());
+  c.rpc = async (name) => { c.ops.push({ table: "rutinas", op: "rpc:" + name }); return { data: null, error: { code: "PGRST202", message: "Could not find the function public." + name } }; };
+  // guardado del entrenador: ruta anterior (lee fresco + fusiona), las claves operativas se conservan
+  const nuevos = days4().slice(0, 2);
+  const g = await updateRutinaPreservingOperational(c, R, cleanRutinaWriteBody({ nombre: "Fuerza", alumno_id: A, entrenador_id: "e1", datos: { days: nuevos, semana_activa: 4 } }));
+  assert.ok(Array.isArray(g) && g.length === 1, "el guardado se aplica");
+  assert.deepEqual([rutinaDe(c).datos.days, rutinaDe(c).datos.semana_activa], [nuevos, 2]);
+  // avance de semana del alumno: ruta anterior, con chequeo de ciclo
+  const a = await updateRutinaSemanaActiva(c, R, 3, 1);
+  assert.ok(Array.isArray(a) && a.length === 1);
+  assert.equal(rutinaDe(c).datos.semana_activa, 3);
+  assert.equal(isCicloCambiado(await updateRutinaSemanaActiva(c, R, 4, 2)), true, "con otro ciclo no avanza");
+  // reconciliacion al abrir la app: sigue funcionando (semana 3 aun incompleta => noop sin error)
+  assert.notEqual((await reconcileSemanaActiva({ client: c, rutinaId: R, alumnoId: A, fetchSesionesPage: pager(c) })).status, "failed");
+  // reinicio: se rechaza (no hay escritura atomica disponible) y no toca nada
+  const before = clone(c.db);
+  const r = await reiniciarRutinaCiclo({ client: c, rutinaId: R, alumnoId: A, tipo: "semana", semana: 3, cicloEsperado: 1 });
+  assert.deepEqual([r.ok, r.reason], [false, "migracion_pendiente"]);
+  assert.deepEqual(c.db, before);
+  assert.deepEqual(historyWrites(c.ops), []);
+});
+
 console.error = origErr;
 console.log("\n" + count + " pruebas OK");
