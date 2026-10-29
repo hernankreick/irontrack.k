@@ -92,13 +92,17 @@ await test("Movil: campos con .coach-field-tap (44 px) solo < 768; buscador de A
   assert.doesNotMatch(menu, /className="hov"/);
 });
 
-await test("Tarjeta de alumno: nombre en hasta 2 lineas (no aplastado), VER y menu siguen tactiles", () => {
+await test("Tarjeta de alumno: nombre en hasta 2 lineas (no aplastado), expandir/contraer compacto y botones tactiles", () => {
   const card = read("components/students/StudentCard.jsx");
   const css = read("components/layout/AppGlobalStyles.jsx");
   assert.match(css, /\.coach-stu-name\{display:-webkit-box!important;-webkit-line-clamp:2;/); assert.match(css, /overflow-wrap:anywhere/);
   assert.match(card, /className="coach-stu-name"/);
-  assert.match(card, /className="hov coach-tap coach-stu-ver"\s+style=\{\{background:"#3b82f6"/);
+  // VER/CERRAR se reemplazo por el bloque de identidad como control de expandir/contraer (mismo handler onVer).
+  assert.doesNotMatch(card, /coach-stu-ver|"CERRAR"/);
+  assert.match(card, /data-qa-alumno-toggle[\s\S]*?aria-expanded=\{!!isActive\}[\s\S]*?onClick=\{onVer\}[\s\S]*?minHeight:44/);
   assert.match(card, /aria-label=\{msg\("Más opciones"/);
+  assert.match(card, /aria-label=\{msg\("Mensaje a "[\s\S]*?onClick=\{onChat\}/);
+  assert.match(card, /var iconBtn = \{width:44,height:44,/);
 });
 
 await test("Editar alumno: el fondo NO cierra con cambios sin guardar; con el formulario intacto si", () => {
@@ -117,9 +121,9 @@ await test("Arnes: la fixture usa weeks como array (formato real) para 'Editar e
 
 await test("Alumnos: en escritorio los estilos inline coinciden con main; lo movil vive en media <768", () => {
   const card = read("components/students/StudentCard.jsx");
-  assert.match(card, /className="coach-stu-name" style=\{\{fontSize:17,fontWeight:800,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"\}\}/);
+  // Peso 700 (no extra-bold) desde el ajuste de densidad del PR #130.
+  assert.match(card, /className="coach-stu-name" style=\{\{fontSize:17,fontWeight:700,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"\}\}/);
   assert.doesNotMatch(card, /WebkitLineClamp|overflowWrap/);
-  assert.match(card, /borderRadius:10,padding:"8px 18px",fontSize:14/);
   const sec = read("components/students/StudentsSection.jsx");
   assert.match(sec, /borderRadius:12,padding:"10px 12px",boxShadow/);
   assert.match(sec, /fontFamily:"inherit",minWidth:0\}\}/);
@@ -128,7 +132,7 @@ await test("Alumnos: en escritorio los estilos inline coinciden con main; lo mov
   const media = css.slice(css.indexOf("@media (max-width:767px)"));
   const end = media.indexOf('" +');
   const block = media.slice(0, end);
-  for (const r of [".coach-stu-name{", ".coach-stu-ver{padding:8px 14px!important}", ".coach-stu-search{padding:0 12px!important}", ".coach-stu-search-input{padding:11px 0!important"]) assert.ok(block.includes(r), r);
+  for (const r of [".coach-stu-name{", ".coach-stu-search{padding:0 12px!important}", ".coach-stu-search-input{padding:11px 0!important"]) assert.ok(block.includes(r), r);
   assert.equal(css.replace(block, "").includes(".coach-stu-"), false, "reglas coach-stu-* fuera del media");
 });
 

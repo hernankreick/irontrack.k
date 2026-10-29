@@ -35,7 +35,40 @@ export function progresoRows(alumnoId) {
   return rows.map(([ago, kg, wk], i) => ({ alumno_id: alumnoId, ejercicio_id: "gcsq", kg: String(kg), reps: "8", fecha: daysAgo(ago), semana: wk, created_at: "2026-01-0" + (i + 1) + "T10:00:00" }));
 }
 
+// Escenario opt-in de la ficha del alumno (QA_ALUMNO_CARD=base|largo): rutina de 3 (o 5) dias, Semana 2 con 2 dias realizados.
+// "largo": nombre, correo y titulo de rutina extensos. Sin la variable todo queda EXACTAMENTE como antes (baseline de qa:ui intacto).
+export const ALUMNO_CARD_SCENARIO = () => process.env.QA_ALUMNO_CARD || "";
+const CARD_EX = (pfx, names) => names.map(([name, sets, reps], i) => ({ id: pfx + i, name, sets, reps }));
+function alumnoCardRutina(alumno) {
+  const largo = ALUMNO_CARD_SCENARIO() === "largo";
+  const nDays = largo ? 5 : 3;
+  const days = Array.from({ length: nDays }, (_, d) => ({
+    name: "Día " + (d + 1),
+    label: "Día " + (d + 1),
+    warmup: CARD_EX("wu" + d + "_", [["T90", 2, "8-10"], ["Rotacion toracica", 2, "8-10"], ["Puente de gluteos 1 pierna", 2, "8"], ["Bicho muerto con disco", 3, "12"]]),
+    exercises: CARD_EX("ex" + d + "_", [["Sentadilla goblet", 4, "8"], ["Press banca con mancuernas", 4, "10"], ["Remo con barra", 3, "10"]]),
+  }));
+  return {
+    id: "rr-" + alumno.id.slice(-2),
+    nombre: largo ? "Rutina de fuerza e hipertrofia para temporada de competencia" : "Rutina Full body",
+    alumno_id: alumno.id,
+    entrenador_id: "entrenador_principal",
+    es_plantilla: false,
+    created_at: "2026-01-02T10:00:00",
+    datos: { alumno: alumno.nombre, semana_activa: 2, days },
+  };
+}
+export function sesionesRows() {
+  if (!ALUMNO_CARD_SCENARIO()) return [];
+  return ALUMNOS.flatMap((a) => [0, 1].map((dia) => ({ id: "ses-" + a.id.slice(-2) + "-" + dia, alumno_id: a.id, rutina_id: "rr-" + a.id.slice(-2), rutina_nombre: alumnoCardRutina(a).nombre, dia_idx: dia, dia_label: "Día " + (dia + 1), semana: 2, fecha: "20/10/2026", hora: "18:00", ejercicios: "", created_at: "2026-10-20T18:00:0" + dia })));
+}
+export function alumnosRows() {
+  if (ALUMNO_CARD_SCENARIO() !== "largo") return ALUMNOS;
+  return ALUMNOS.map((a, i) => i ? a : { ...a, nombre: "Maria Fernanda de los Angeles Gonzalez Etcheverry", email: "maria.fernanda.gonzalez.etcheverry.entrenamiento@example.invalid" });
+}
+
 export function rutinaDe(alumno) {
+  if (ALUMNO_CARD_SCENARIO()) return alumnoCardRutina(alumno);
   const withIds = !!PROGRESO_SCENARIO();
   return {
     id: "rr-" + alumno.id.slice(-2),
@@ -61,7 +94,7 @@ export function rutinaDe(alumno) {
 
 // Sesion de localStorage que la app lee al arrancar (rol entrenador o alumno).
 export function sessionSeed(role) {
-  const ls = { it_onboard_done: "1", it_dark: "true", it_lang: "es", it_week: "0", it_pg: "{}" };
+  const ls = { it_onboard_done: "1", it_dark: process.env.QA_THEME === "light" ? "false" : "true", it_lang: "es", it_week: "0", it_pg: "{}" };
   if (role === "alumno") {
     const a = ALUMNOS[0];
     ls.it_session = JSON.stringify({ role: "alumno", name: a.nombre, alumnoId: a.id, entrenadorId: EID });
@@ -92,7 +125,8 @@ export function respond({ method, table, search }) {
   if (method !== "GET") return { status: 200, body: [] };
   if (table.startsWith("alumnos")) {
     const id = search.get("id");
-    return { status: 200, body: id && id.startsWith("eq.") ? ALUMNOS.filter((a) => a.id === id.slice(3)) : ALUMNOS };
+    const rows = alumnosRows();
+    return { status: 200, body: id && id.startsWith("eq.") ? rows.filter((a) => a.id === id.slice(3)) : rows };
   }
   if (table.startsWith("rutinas")) {
     const aq = search.get("alumno_id");
@@ -106,6 +140,12 @@ export function respond({ method, table, search }) {
   }
   if (table.startsWith("progreso") && PROGRESO_SCENARIO()) {
     return { status: 200, body: ALUMNOS.flatMap((a) => progresoRows(a.id)) };
+  }
+  if (table.startsWith("sesiones") && ALUMNO_CARD_SCENARIO()) {
+    const eq = (k) => { const v = search.get(k); return v && v.startsWith("eq.") ? v.slice(3) : null; };
+    const aid = eq("alumno_id"), rid = eq("rutina_id"), sem = eq("semana");
+    if (search.get("rutina_id") === "is.null") return { status: 200, body: [] };
+    return { status: 200, body: sesionesRows().filter((r) => (!aid || r.alumno_id === aid) && (!rid || r.rutina_id === rid) && (!sem || String(r.semana) === sem)) };
   }
   if (table.startsWith("entrenadores")) return { status: 200, body: [{ id: EID, email: "coach@example.invalid", nombre: "Entrenador Prueba" }] };
   return { status: 200, body: [] };

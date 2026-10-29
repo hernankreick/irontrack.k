@@ -27,7 +27,7 @@ export default function StudentNotesPanel({
         value={nota}
         onChange={onChange}
       />
-      <button className="hov" style={{width:"100%",marginTop:8,padding:"8px",
+      <button className="hov" style={{width:"100%",marginTop:8,padding:"8px",minHeight:44,
         background:"#2563EB",color:"#fff",border:"none",borderRadius:12,
         fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}
         onClick={onSave}
