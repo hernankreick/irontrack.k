@@ -149,14 +149,15 @@ await test("cableado: WorkoutScreen usa la operacion acotada, sincroniza la ruti
   const start = ws.indexOf("const finalizarSesion = async");
   const fn = ws.slice(start, ws.indexOf("return (\n    <div style={{ position:\"fixed\"", start));
   const student = fn.slice(fn.indexOf("finalizeStudentSession({"), fn.indexOf("// ── Flujo previo"));
-  assert.ok(student.includes("sb.updateRutinaSemanaActiva(r.id, effectiveWeek + 2)"));
+  // P0: el avance va condicionado al ciclo de ESTA sesion (un reinicio concurrente gana).
+  assert.ok(student.includes("sb.updateRutinaSemanaActiva(r.id, effectiveWeek + 2, cicloActual)"));
   assert.ok(!student.includes("sb.updateRutina("), "el flujo del alumno ya no usa updateRutina completo");
   assert.ok(!/entrenador_id\s*:/.test(student), "no se arma entrenador_id");
   const okIdx = student.indexOf('outcome.week.advance === "ok"');
   assert.ok(student.indexOf("onWeekAdvanced(", okIdx) > okIdx, "la rutina local se sincroniza solo tras 'ok'");
   assert.ok(student.includes("weekAdvanceFailed: true"));
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
-  assert.ok(/updateRutinaSemanaActiva: \(rutinaId, nextWeek\) => updateRutinaSemanaActivaLib\(supabase/.test(app));
+  assert.ok(/updateRutinaSemanaActiva: \(rutinaId, nextWeek, expectedCiclo\) => updateRutinaSemanaActivaLib\(supabase, rutinaId, nextWeek, expectedCiclo\)/.test(app));
   assert.ok(app.includes("onWeekAdvanced={function (rutinaId, nextWeek)"));
   const sum = readFileSync(new URL("../components/workout/WorkoutSessionSummary.jsx", import.meta.url), "utf8");
   assert.ok(sum.includes("resumenSesion.weekAdvanceFailed"));

@@ -3,7 +3,7 @@ import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 import { getActiveStudentRoutinePosition } from '../../lib/studentWeeklyProgress.js';
-import { CICLO_CARGAS, readCicloActual, readCicloCargas, rowInCiclo } from '../../lib/rutinaCiclo.js';
+import { CICLO_CARGAS, readCicloBase, readCicloCargas, rowCiclo } from '../../lib/rutinaCiclo.js';
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
 import StudentOrphanSession from './StudentOrphanSession.jsx';
@@ -271,9 +271,9 @@ export default function StudentsSection(props) {
                 };
               });
               const rutSB = isAlumnoActive ? assignedRoutineFor(a.id) : null;
-              // "Reiniciar desde cero": las sugerencias de carga solo parten de los registros del ciclo vigente.
-              const regsAlu = rutSB && readCicloCargas(rutSB.datos) === CICLO_CARGAS.CERO && readCicloActual(rutSB.datos) > 1
-                ? (alumnoProgreso || []).filter(function (reg) { return rowInCiclo(reg, readCicloActual(rutSB.datos)); })
+              // "Reiniciar desde cero": las sugerencias de carga solo parten de los registros del bloque vigente (un reinicio de semana las mantiene).
+              const regsAlu = rutSB && readCicloCargas(rutSB.datos) === CICLO_CARGAS.CERO && readCicloBase(rutSB.datos) > 1
+                ? (alumnoProgreso || []).filter(function (reg) { return rowCiclo(reg) >= readCicloBase(rutSB.datos); })
                 : (alumnoProgreso || []);
               const sugs = rutSB && regsAlu.length >= 2 ? generarSugerenciasAlumno(regsAlu, rutSB.datos, EX) : [];
               const suggestionsOpen = !!sugsOpen[a.id];

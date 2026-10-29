@@ -5,7 +5,7 @@
 
 import { FALLBACK_EXERCISE_NAME } from "../lib/exerciseResolve.js";
 import { selectCurrentRoutine } from "../lib/routineStore.js";
-import { readCicloActual, rowInCiclo } from "../lib/rutinaCiclo.js";
+import { filaActivaEnBloque, readCicloActual, rowInCiclo } from "../lib/rutinaCiclo.js";
 import { irontrackMsg as M, pickExerciseName } from "../lib/irontrackMsg.js";
 
 const DAY_MS = 86400000;
@@ -254,7 +254,7 @@ export function buildLoadSeriesDetailed(rows, opts) {
   (rows || []).forEach(function (rr) {
     if (!rr || String(rr.ejercicio_id) !== String(opts.ejercicioId)) return;
     if (rr.rutina_id != null && rr.rutina_id !== "" && opts.routineId && String(rr.rutina_id) !== String(opts.routineId)) return;
-    if (Object.prototype.hasOwnProperty.call(rr, "ciclo") && !rowInCiclo(rr, opts.ciclo)) return;
+    if (Object.prototype.hasOwnProperty.call(rr, "ciclo") && !(opts.routineDatos ? progressRowActivaEnBloque(rr, opts.routineDatos) : rowInCiclo(rr, opts.ciclo))) return;
     var kgv = parseFloat(rr.kg) || 0;
     if (!(kgv > 0)) return;
     var rowUnknownDay = false;
@@ -307,9 +307,26 @@ function rowSameCiclo(row, ciclo) {
   return !Object.prototype.hasOwnProperty.call(row, "ciclo") || rowInCiclo(row, ciclo);
 }
 
-function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackStartMs, fallbackEndMs, maxSemana, ciclo) {
+/**
+ * Fila de `progreso` (semana 0-based) que pertenece al BLOQUE vigente de la rutina (lib/rutinaCiclo.js): tras reiniciar la semana W, las
+ * semanas < W siguen saliendo del ciclo anterior y la semana W del ciclo nuevo; el intento anterior de W queda fuera (historial).
+ * Sin la clave `ciclo` (select antiguo) no se filtra.
+ */
+function progressRowActivaEnBloque(row, datos) {
+  if (!Object.prototype.hasOwnProperty.call(row, "ciclo")) return true;
+  var w = progressRowWeekIndex(row, 4);
+  return filaActivaEnBloque(datos, row, w == null ? null : w + 1);
+}
+
+/** Igual para `sesiones` (semana 1-based). */
+function sessionActivaEnBloque(ses, datos) {
+  if (!Object.prototype.hasOwnProperty.call(ses, "ciclo")) return true;
+  return filaActivaEnBloque(datos, ses, ses.semana);
+}
+
+function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackStartMs, fallbackEndMs, maxSemana, routineDatos) {
   if (!row) return false;
-  if (!rowSameCiclo(row, ciclo)) return false;
+  if (!progressRowActivaEnBloque(row, routineDatos)) return false;
   if (routineId && row.rutina_id != null && row.rutina_id !== "") {
     return String(row.rutina_id) === String(routineId);
   }
@@ -325,9 +342,9 @@ function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackS
   return t >= fallbackStartMs && t < fallbackEndMs;
 }
 
-function sessionMatchesRoutine(ses, routineId, fallbackStartMs, fallbackEndMs, ciclo) {
+function sessionMatchesRoutine(ses, routineId, fallbackStartMs, fallbackEndMs, routineDatos) {
   if (!ses) return false;
-  if (!rowSameCiclo(ses, ciclo)) return false;
+  if (!sessionActivaEnBloque(ses, routineDatos)) return false;
   if (routineId && ses.rutina_id != null && ses.rutina_id !== "") {
     return String(ses.rutina_id) === String(routineId);
   }
@@ -450,13 +467,14 @@ export function buildCoachProgresoModel(params) {
   var routineForSelectedId = routineForSelected && routineForSelected.id != null ? String(routineForSelected.id) : null;
   var routineExerciseIds = routineExerciseIdSet(routineForSelected);
   var routineCiclo = readCicloActual(routineForSelected && routineForSelected.datos);
+  var routineDatos = routineForSelected && routineForSelected.datos;
   var selectedProgressRows = alumnoSel
     ? (progresoGlobal[alumnoSel] || []).filter(function (row) {
-        return progressRowMatchesRoutine(row, routineForSelectedId, routineExerciseIds, fallbackWeekStartMs, fallbackWeekEndMs, maxSemanaPeriodo, routineCiclo);
+        return progressRowMatchesRoutine(row, routineForSelectedId, routineExerciseIds, fallbackWeekStartMs, fallbackWeekEndMs, maxSemanaPeriodo, routineDatos);
       })
     : [];
   var selectedSessions = (sesionesGlobales || []).filter(function (ses) {
-    return String(ses.alumno_id) === String(alumnoSel) && sessionMatchesRoutine(ses, routineForSelectedId, fallbackWeekStartMs, fallbackWeekEndMs, routineCiclo);
+    return String(ses.alumno_id) === String(alumnoSel) && sessionMatchesRoutine(ses, routineForSelectedId, fallbackWeekStartMs, fallbackWeekEndMs, routineDatos);
   });
   var routineWeekContext = buildRoutineWeekContext(selectedProgressRows, selectedSessions, now);
 
@@ -590,6 +608,7 @@ export function buildCoachProgresoModel(params) {
           ejercicioId: ejercicioSelId,
           routineId: routineForSelectedId,
           ciclo: routineCiclo,
+          routineDatos: routineDatos,
           weekStarts: routineWeekContext.weekStarts.slice(0, LOAD_BLOCK_WEEKS),
           routineDays: routineForSelected && routineForSelected.datos ? routineForSelected.datos.days || [] : [],
           dayIdx: diaIdx,

@@ -120,7 +120,8 @@ await test("1d. ningun flujo de creacion/asignacion queda sin semana_activa (aud
     assert.ok(!/from\(["']rutinas["']\)/.test(src), f + " no escribe rutinas directo");
   });
   assert.match(app, /updateRutina:\s*async \(id, data, options\)[\s\S]*?updateRutinaPreservingOperational\(supabase, id, body, options\)/);
-  assert.equal((app.match(/writeOperationalState:\s*true/g) || []).length, 2, "solo los 2 reinicios explicitos del entrenador escriben estado operativo");
+  // P0: los reinicios ya no reescriben `datos` por el guardado comun (lo hace la RPC atomica it_rutina_reiniciar): ningun guardado escribe estado operativo.
+  assert.equal((app.match(/writeOperationalState/g) || []).length, 0, "ningun guardado del entrenador escribe estado operativo");
 });
 
 // =========================================================================================================================
@@ -350,17 +351,14 @@ await test("10c. si no se puede leer el estado fresco NO se escribe (nunca se pi
   const none = makeClient({});
   assert.deepEqual(await updateRutinaPreservingOperational(none.client, "nada", cleanRutinaWriteBody({ nombre: "x", alumno_id: EVI, datos: {}, entrenador_id: "e" })), []);
 });
-await test("10d. los reinicios EXPLICITOS del entrenador si escriben estado operativo (writeOperationalState)", async () => {
-  // reiniciar semana 2 (App.jsx:2299)
-  const a = makeClient(freshRow({ semana_activa: 4 }));
-  await updateRutinaPreservingOperational(a.client, EVI3, cleanRutinaWriteBody({ nombre: "Evi 3", alumno_id: EVI, entrenador_id: "e", datos: { days: days4(), semana_activa: 2, semana_reiniciada: 2, semana_reiniciada_at: "2026-10-06T00:00:00.000Z" } }), { writeOperationalState: true });
-  assert.deepEqual([a.db[EVI3].datos.semana_activa, a.db[EVI3].datos.semana_reiniciada, a.db[EVI3].datos.semana_reiniciada_at], [2, 2, "2026-10-06T00:00:00.000Z"]);
-  // reinicio total (App.jsx:2519): semana_activa 4 y se eliminan semana_reiniciada*
+await test("10d. P0: ningun guardado del entrenador puede escribir estado operativo (la opcion writeOperationalState ya no existe)", async () => {
+  // Antes: reiniciar semana / reinicio total pasaban writeOperationalState y reescribian `datos` (y borraban historial en App.jsx).
+  // Ahora los reinicios van por la RPC atomica it_rutina_reiniciar (lib/reiniciarRutinaCiclo.js); el guardado siempre fusiona.
   const b = makeClient(freshRow());
   await updateRutinaPreservingOperational(b.client, EVI3, cleanRutinaWriteBody({ nombre: "Evi 3", alumno_id: EVI, entrenador_id: "e", datos: { days: days4(), semana_activa: 4 } }), { writeOperationalState: true });
-  assert.equal(b.db[EVI3].datos.semana_activa, 4);
-  assert.equal("semana_reiniciada" in b.db[EVI3].datos, false);
-  assert.equal(b.calls.selects, 0, "no lee ni fusiona: el entrenador decide");
+  assert.equal(b.db[EVI3].datos.semana_activa, 2, "una copia local no pisa la semana aunque se pase la opcion vieja");
+  assert.equal(b.db[EVI3].datos.semana_reiniciada, OP.semana_reiniciada);
+  assert.equal(b.calls.selects, 1, "siempre lee el estado fresco y fusiona");
 });
 await test("14. el fix de updateRutina no cambia el contrato de retorno de sb.updateRutina (array / [] / null)", async () => {
   const ok = makeClient(freshRow());

@@ -7,7 +7,7 @@ import { CICLO_CARGAS } from '../../lib/rutinaCiclo.js';
  * Confirmacion obligatoria de "Reiniciar rutina" (conserva el historial; abre un ciclo nuevo).
  * onConfirm(cargas) recibe CICLO_CARGAS.MANTENER | CICLO_CARGAS.CERO.
  */
-export default function RoutineRestartModal({ open, alumnoName, loading, errorText, onCancel, onConfirm, M, lang }) {
+export default function RoutineRestartModal({ open, alumnoName, loading, errorText, warningText, onCancel, onConfirm, M, lang }) {
   const [cargas, setCargas] = useState(CICLO_CARGAS.MANTENER);
   const titleId = useId();
   const descId = useId();
@@ -67,9 +67,9 @@ export default function RoutineRestartModal({ open, alumnoName, loading, errorTe
         <p id={descId} style={{ margin: '12px 0 0', fontSize: 14, fontWeight: 500, color: 'rgba(226, 232, 240, 0.82)', lineHeight: 1.5 }}>
           {M(
             lang,
-            'Vuelve a Semana 1, Día 1. El historial de sesiones y sets se conserva.',
-            'Goes back to Week 1, Day 1. Session and set history is kept.',
-            'Volta para a Semana 1, Dia 1. O histórico de sessões e séries é mantido.'
+            'Vuelve a Semana 1, Día 1. No se borra nada: las sesiones, series y récords ya registrados quedan en el historial.',
+            'Goes back to Week 1, Day 1. Nothing is deleted: sessions, sets and records already logged stay in the history.',
+            'Volta para a Semana 1, Dia 1. Nada é apagado: sessões, séries e recordes já registrados ficam no histórico.'
           )}
         </p>
       </div>
@@ -108,6 +108,12 @@ export default function RoutineRestartModal({ open, alumnoName, loading, errorTe
           );
         })}
       </div>
+
+      {warningText ? (
+        <div role="note" style={{ marginTop: 12, padding: '10px 12px', borderRadius: 12, border: '1px solid rgba(245, 158, 11, 0.35)', background: 'rgba(245, 158, 11, 0.10)', fontSize: 13, fontWeight: 600, color: '#fbbf24', lineHeight: 1.45, textAlign: 'left' }}>
+          {warningText}
+        </div>
+      ) : null}
 
       {errorText ? (
         <div role="alert" style={{ marginTop: 12, fontSize: 13, fontWeight: 600, color: '#fca5a5', textAlign: 'center' }}>

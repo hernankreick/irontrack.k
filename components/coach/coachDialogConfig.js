@@ -55,12 +55,14 @@ export function getCoachDialogModalConfig(coachDialog, msg, es) {
     };
   }
   if (c.t === 'resetWeek') {
+    var semana = c.semanaCiclo;
+    var base = es
+      ? 'El alumno vuelve a empezar la Semana ' + semana + ' desde el Día 1. No se borra nada: las sesiones, series y récords ya registrados quedan en el historial, pero no cuentan como días completados de la semana reiniciada.'
+      : 'The athlete starts Week ' + semana + ' again from Day 1. Nothing is deleted: sessions, sets and records already logged stay in the history, but they do not count as completed days of the restarted week.';
     return {
       tone: 'caution',
       title: msg('Reiniciar semana', 'Reset week', 'Redefinir semana'),
-      message: es
-        ? '¿Reiniciar la semana actual? El alumno volverá a Día 1 de la semana ' + c.semanaCiclo + '.'
-        : 'Reset the current week? The athlete will restart at Day 1 of week ' + c.semanaCiclo + '.',
+      message: c.aviso ? base + ' ' + c.aviso : base,
       subjectName: null,
       confirmLabel: msg('Reiniciar', 'Reset', 'Redefinir'),
       useLogoutIcon: false,
@@ -68,24 +70,19 @@ export function getCoachDialogModalConfig(coachDialog, msg, es) {
     };
   }
   if (c.t === 'resetRoutine') {
+    // En la app real la ficha usa RoutineRestartModal (con opcion de cargas); este texto lo usa la demo de la ficha.
     return {
       tone: 'caution',
       title: msg('Reiniciar rutina', 'Reset routine', 'Redefinir rotina'),
       message: msg(
-        '¿Reiniciar la rutina completa? Se borrarán todas las sesiones y el progreso registrado de esta rutina, y el alumno quedará en Semana 4 para continuar entrenando.',
-        'Reset the entire routine? All sessions and recorded progress for this routine will be deleted, and the athlete will be left at Week 4 to keep training.',
-        'Redefinir a rotina completa? Todas as sessões e o progresso registrado desta rotina serão apagados, e o aluno ficará na Semana 4 para continuar treinando.'
+        'Vuelve a Semana 1, Día 1. No se borra nada: las sesiones, series y récords ya registrados quedan en el historial.',
+        'Goes back to Week 1, Day 1. Nothing is deleted: sessions, sets and records already logged stay in the history.',
+        'Volta para a Semana 1, Dia 1. Nada é apagado: sessões, séries e recordes já registrados ficam no histórico.'
       ),
       subjectName: c.a && (c.a.nombre || c.a.email),
       confirmLabel: msg('Reiniciar', 'Reset', 'Redefinir'),
       useLogoutIcon: false,
       loadingLabel: msg('Aplicando…', 'Applying…', 'Aplicando…'),
-      requireAcknowledge: true,
-      acknowledgeLabel: msg(
-        'Entiendo que esta acción no se puede deshacer',
-        'I understand this action cannot be undone',
-        'Entendo que esta ação não pode ser desfeita'
-      ),
     };
   }
   if (c.t === 'editAlum') {

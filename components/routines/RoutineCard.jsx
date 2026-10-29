@@ -11,6 +11,7 @@ import RoutineCardActionMenu from './RoutineCardActionMenu.jsx';
 import RoutineDeleteConfirmModals from './RoutineDeleteConfirmModals.jsx';
 import RoutineCardTitleMeta from './RoutineCardTitleMeta.jsx';
 import RoutineRestartModal from './RoutineRestartModal.jsx';
+import { textoErrorReinicio } from '../../lib/reinicioMensajes.js';
 import './routines-ui.css';
 
 function useIsUnder768() {
@@ -527,22 +528,7 @@ export function RoutineCard({
   }
 
   function restartErrorText(res) {
-    var reason = res && res.reason;
-    if (reason === 'migracion_pendiente') {
-      return M(
-        lang,
-        'Falta actualizar la base de datos (migración de ciclo). Avisá al administrador.',
-        'The database needs the cycle migration first. Contact the administrator.',
-        'Falta atualizar o banco de dados (migração de ciclo). Avise o administrador.'
-      );
-    }
-    if (reason === 'sin_filas') {
-      return M(lang, 'No tenés permiso para reiniciar esta rutina.', 'You do not have permission to restart this routine.', 'Você não tem permissão para reiniciar esta rotina.');
-    }
-    if (reason === 'no_asignada' || reason === 'alumno_distinto' || reason === 'rutina_inexistente') {
-      return M(lang, 'La rutina ya no está asignada a este alumno.', 'The routine is no longer assigned to this athlete.', 'A rotina não está mais atribuída a este aluno.');
-    }
-    return M(lang, 'No se pudo reiniciar la rutina. Probá de nuevo.', 'Could not restart the routine. Please try again.', 'Não foi possível reiniciar a rotina. Tente novamente.');
+    return textoErrorReinicio(res, M, lang);
   }
 
   const confirmRestartRoutine = async function (cargas) {
@@ -553,7 +539,7 @@ export function RoutineCard({
       var res = await onRestartRoutine(r.id, cargas);
       if (res && res.ok) {
         setRestartOpen(false);
-        toast2(M(lang, 'Rutina reiniciada ✓ Semana 1, Día 1', 'Routine restarted ✓ Week 1, Day 1', 'Rotina reiniciada ✓ Semana 1, Dia 1'));
+        toast2(M(lang, 'Rutina reiniciada ✓ Semana 1, Día 1. El historial se conserva.', 'Routine restarted ✓ Week 1, Day 1. History is kept.', 'Rotina reiniciada ✓ Semana 1, Dia 1. O histórico é mantido.'));
       } else {
         var text = restartErrorText(res);
         setRestartError(text);
