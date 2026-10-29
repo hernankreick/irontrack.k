@@ -70,9 +70,6 @@ export default function StudentRoutinePreview({
     <div style={{marginBottom:8,marginTop:8}}>
       <div style={{background:P.surface,border:"1px solid "+P.borderStrong,borderRadius:16,padding:"10px 12px",position:"relative",boxShadow:darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.06)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:8}}>
-          <span aria-hidden="true" style={{width:42,height:42,borderRadius:"50%",background:"#22c55e",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-            <Ic name="dumbbell" size={22} color="#fff"/>
-          </span>
           <div style={{flex:1,minWidth:0}}>
             <div data-qa-text style={{fontSize:18,fontWeight:700,color:textMain,lineHeight:1.2,overflowWrap:"anywhere"}}>{rutinaAsignada.nombre}</div>
             <div style={{fontSize:12.5,color:textMuted,fontWeight:500,marginTop:2,lineHeight:1.3}}>

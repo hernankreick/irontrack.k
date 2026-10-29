@@ -118,6 +118,9 @@ await test("Handlers y calculo intactos: los mismos callbacks se cablean y el ch
   const src = read("components/students/StudentRoutinePreview.jsx");
   for (const cb of ["onSelectDay(di)", "onToggleWarmup", "onToggleMain", "onEditWarmupExercise", "onEditMainExercise", "onAddWarmupExercise", "onAddMainExercise", "onValidateSession={onValidateSession}", "onResetWeek={onResetWeek}", "onResetRoutine={onResetRoutine}", "onEditRoutine={onEditRoutine}", "onRemoveRoutine={onRemoveRoutine}"]) assert.ok(src.includes(cb), cb);
   assert.match(src, /var dayDone = progresoSemanal\.completedDayIndexes\.indexOf\(di\) !== -1;/);
+  // Ajuste final aprobado: sin el icono circular con mancuerna; el titulo queda alineado al padding izquierdo de la tarjeta.
+  assert.doesNotMatch(src, /name="dumbbell"/);
+  assert.match(src, /gap:10,marginBottom:8\}\}>\s*<div style=\{\{flex:1,minWidth:0\}\}>/, "el bloque del titulo es el primer hijo del encabezado");
   const sec = read("components/students/StudentsSection.jsx");
   assert.match(sec, /if\(diasCompletados >= dias\.length\) \{ proxDia = 1; proxSemana = semanaCiclo < 4 \? semanaCiclo \+ 1 : 1; \}/, "regla de proxima sesion sin cambios");
 });
