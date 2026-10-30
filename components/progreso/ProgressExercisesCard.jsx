@@ -126,7 +126,7 @@ export default function ProgressExercisesCard({ ejercicios, onOpenExercise, onOp
           <button
             type="button"
             data-qa="ver-ejercicios"
-            onClick={function () { onOpenList(mode); }}
+            onClick={function () { onOpenList("todos"); }}
             style={{ marginTop: 6, minHeight: 44, border: "1px solid " + P.line, borderRadius: 12, background: "transparent", color: P.accentText, fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
           >
             {M(lang, "Ver y buscar ejercicios (" + list.length + ")", "See and search exercises (" + list.length + ")", "Ver e buscar exercícios (" + list.length + ")")}

@@ -33,7 +33,7 @@ function graph(entry) {
 await test("vite.config: la pagina demo solo entra al build en Preview (o local con IRONTRACK_DEMO=1); Production solo compila index.html", () => {
   const cfg = read("vite.config.js");
   assert.match(cfg, /const includeDemo = vercelEnv === 'preview' \|\| \(!process\.env\.VERCEL && process\.env\.IRONTRACK_DEMO === '1'\)/);
-  assert.match(cfg, /input: includeDemo\s*\? \{ index: [^}]*demoFicha: path\.resolve\(__dirname, 'demo\/ficha-alumno\.html'\) \}\s*: \{ index: path\.resolve\(__dirname, 'index\.html'\) \}/);
+  assert.match(cfg, /input: includeDemo\s*\? \{ index: [^}]*demoFicha: path\.resolve\(__dirname, 'demo\/ficha-alumno\.html'\)[^}]*\}\s*: \{ index: path\.resolve\(__dirname, 'index\.html'\) \}/);
   assert.match(cfg, /plugins: \[envTargetGuardPlugin\(\), react\(\), tailwindcss\(\)\]/, "el guard de entorno (PR #104) sigue activo");
   assert.match(read("demo/ficha-alumno.html"), /src="\/components\/demo\/fichaAlumnoDemoMain\.jsx"/);
   assert.match(read("demo/ficha-alumno.html"), /noindex/);
