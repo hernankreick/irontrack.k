@@ -79,38 +79,40 @@ function modelo(rows, sessions, ciclo, extra) {
 }
 const hoy = new Date();
 const hace = (n) => { const d = new Date(hoy); d.setDate(d.getDate() - n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+// progreso.fecha en produccion es d/m/yyyy (toLocaleDateString es-AR); el volumen (lib/metricas) solo acepta ese formato.
+const haceDMY = (n) => { const d = new Date(hoy); d.setDate(d.getDate() - n); return d.getDate() + "/" + (d.getMonth() + 1) + "/" + d.getFullYear(); };
 const volTotal = (m) => m.volBars.reduce((a, b) => a + (b.v || 0), 0);
 
 test("semana 0 (Semana 1) entra al volumen aunque no sea de la semana calendario actual; antes se descartaba", () => {
   // 100 kg x 8 reps registrados hace 20 dias con semana 0 y sin rutina_id (forma del select de produccion)
-  const m = modelo([row(hace(20), 100, 0)], [ses(hace(20) + "T12:00:00Z", 1)]);
+  const m = modelo([row(haceDMY(20), 100, 0)], [ses(hace(20) + "T12:00:00Z", 1)]);
   assert.equal(volTotal(m), 800);
 });
 test("semana ausente sigue usando el respaldo por fecha (no se confunde con semana 0)", () => {
-  const m = modelo([row(hace(20), 100, null)], []);
+  const m = modelo([row(haceDMY(20), 100, null)], []);
   assert.equal(volTotal(m), 0); // fuera de la semana calendario actual: igual que antes
-  const m2 = modelo([row(hace(1), 100, "")], []);
+  const m2 = modelo([row(haceDMY(1), 100, "")], []);
   assert.equal(volTotal(m2) >= 0, true);
 });
 test("ciclo reiniciado: el volumen y la semana detectada no mezclan el ciclo anterior (filas y sesiones con ciclo)", () => {
-  const rows = [row(hace(40), 100, 0, { ciclo: 1 }), row(hace(33), 100, 3, { ciclo: 1 }), row(hace(2), 50, 0, { ciclo: 2 })];
+  const rows = [row(haceDMY(40), 100, 0, { ciclo: 1 }), row(haceDMY(33), 100, 3, { ciclo: 1 }), row(haceDMY(2), 50, 0, { ciclo: 2 })];
   const sessions = [{ alumno_id: AID, rutina_id: RID, created_at: hace(33) + "T12:00:00Z", semana: 4, ciclo: 1 }];
   const m = modelo(rows, sessions, 2);
   assert.equal(volTotal(m), 400); // solo 50 kg x 8 del ciclo 2
   assert.equal(m.semanaDetectada < 4, true); // la sesion de la semana 4 del ciclo 1 no ancla el ciclo 2
 });
 test("sin columna ciclo (select antiguo): no se filtra por ciclo (limitacion documentada)", () => {
-  const m = modelo([row(hace(20), 100, 0)], [], 2);
+  const m = modelo([row(haceDMY(20), 100, 0)], [], 2);
   assert.equal(volTotal(m), 800);
 });
 test("rutina anterior: filas con otra rutina_id no suman volumen ni aparecen en la serie", () => {
-  const rows = [row(hace(2), 500, 0, { rutina_id: "vieja" }), row(hace(2), 60, 0, { rutina_id: RID })];
+  const rows = [row(haceDMY(2), 500, 0, { rutina_id: "vieja" }), row(haceDMY(2), 60, 0, { rutina_id: RID })];
   const m = modelo(rows, [ses(hace(2) + "T12:00:00Z", 1)]);
   assert.equal(volTotal(m), 480);
   assert.equal(m.chartSeries[0], 60);
 });
 test("semanas salteadas: Semana 1 y Semana 3 registradas, Semana 2 sin registro (no 0)", () => {
-  const m = modelo([row(hace(30), 100, 0), row(hace(2), 120, 2)], [ses(hace(2) + "T12:00:00Z", 3)]);
+  const m = modelo([row(haceDMY(30), 100, 0), row(haceDMY(2), 120, 2)], [ses(hace(2) + "T12:00:00Z", 3)]);
   assert.deepEqual(m.chartSeries, [100, null, 120, null]);
 });
 test("sesiones sin registro de carga: serie vacia (null), sin 0 inventado ni error", () => {

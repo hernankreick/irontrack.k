@@ -1,7 +1,8 @@
 import React, { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, TrendingUp, TrendingDown } from "lucide-react";
-import { parseProgresoDate, rowVolumeKg } from "../coachProgresoMetrics.js";
+import { parseProgresoDate } from "../coachProgresoMetrics.js";
+import { volumenDeSerie } from "../../lib/metricas/index.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
 
 var SWIPE_CLOSE_PX = 90;
@@ -18,7 +19,7 @@ function formatSessionDate(fecha, lang) {
  * por fecha de sesión. Cada fila es 1 serie; el fetch original ordena por created_at desc, así
  * que se revierte el orden dentro de cada sesión para listar los sets en orden de ejecución.
  */
-function buildSessions(rows) {
+function buildSessions(rows, indiceTiempo) {
   var byFecha = {};
   var order = [];
   rows.forEach(function (r) {
@@ -35,7 +36,7 @@ function buildSessions(rows) {
     var topKg = 0;
     sets.forEach(function (r) {
       var kg = parseFloat(r.kg) || 0;
-      vol += rowVolumeKg(r);
+      vol += volumenDeSerie(r, indiceTiempo);
       if (kg > topKg) topKg = kg;
     });
     var d = parseProgresoDate(key);
@@ -52,6 +53,7 @@ export default function EjercicioHistorialCoach({
   ejercicioId,
   ejercicioNombre,
   progresoGlobal,
+  indiceTiempo,
   lang,
   onClose,
 }) {
@@ -65,9 +67,9 @@ export default function EjercicioHistorialCoach({
       var filtered = rows.filter(function (r) {
         return String(r.ejercicio_id) === String(ejercicioId);
       });
-      return buildSessions(filtered);
+      return buildSessions(filtered, indiceTiempo);
     },
-    [progresoGlobal, alumnoId, ejercicioId]
+    [progresoGlobal, alumnoId, ejercicioId, indiceTiempo]
   );
 
   /** Badge de header: top set de la última sesión vs. la sesión anterior (prevKg/deltaKg, mismo criterio que los eventos PR de coachProgresoMetrics.js). */
@@ -243,7 +245,7 @@ export default function EjercicioHistorialCoach({
                       {formatSessionDate(s.fecha, lang)}
                     </span>
                     <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, fontWeight: 600, color: "#93c5fd" }}>
-                      {Math.round(s.vol)} kg {M(lang, "volumen", "volume")}
+                      {s.vol > 0 ? Math.round(s.vol) + " kg " + M(lang, "volumen", "volume") : ""}
                     </span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>

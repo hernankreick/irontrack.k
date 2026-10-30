@@ -21,7 +21,8 @@ import { completedDayIndexesFromRows, validateManualSession } from "../lib/manua
 import { resumirSeriesSinFinalizar } from "../lib/orphanSessions.js";
 import { buildProgressPayload, buildPendingProgressItem, hydrateProgressFromRows, sessionAlreadyExists, buildSessionPayload, removeUndefinedPayloadFields } from "../lib/workoutSession.js";
 import { getWeekCompletionGate } from "../components/student-plan/studentWorkoutState.js";
-import { buildPrEvents, buildLoadSeriesDetailed } from "../components/coachProgresoMetrics.js";
+import { buildLoadSeriesDetailed } from "../components/coachProgresoMetrics.js";
+import { eventosPR } from "../lib/metricas/index.js";
 import { cleanRutinaWriteBody } from "../lib/routineStore.js";
 
 let count = 0;
@@ -124,7 +125,7 @@ function seed(datosExtra) {
 }
 const NOW = new Date(2026, 9, 15, 12).getTime();
 const rutinaDe = (client) => clone(client.db.rutinas.find((r) => r.id === R));
-const prSnapshot = (rows) => ({ events: buildPrEvents(rows), max: Object.fromEntries(Object.entries(hydrateProgressFromRows(rows)).map(([k, v]) => [k, v.max])) });
+const prSnapshot = (rows) => ({ events: eventosPR(rows), max: Object.fromEntries(Object.entries(hydrateProgressFromRows(rows)).map(([k, v]) => [k, v.max])) });
 
 // =========================================================================================================================
 await test("C-1/C-2 estatico: no quedan rutas de reinicio que borren historial en App.jsx", () => {

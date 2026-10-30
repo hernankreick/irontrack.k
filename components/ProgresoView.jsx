@@ -49,8 +49,8 @@ function formatWeeklyVolKgFull(v) {
   );
 }
 
-/** Texto secundario leaderboard: sesiones completadas vs planificadas (misma ventana que el ranking) */
-function rankingSessionsLine(completed, planned, lang) {
+/** Texto secundario leaderboard: sesiones completadas vs planificadas (misma ventana que el ranking); aparte, las validadas por el entrenador. */
+function rankingSessionsLine(completed, planned, lang, validadas) {
   var c = completed != null ? completed : 0;
   var p = planned != null ? planned : 0;
   if (p <= 0) {
@@ -60,7 +60,8 @@ function rankingSessionsLine(completed, planned, lang) {
     c +
     "/" +
     p +
-    M(lang, " sesiones completadas", " sessions completed", " sessões concluídas")
+    M(lang, " sesiones completadas", " sessions completed", " sessões concluídas") +
+    (validadas > 0 ? M(lang, " · " + validadas + " validadas por vos", " · " + validadas + " validated by you", " · " + validadas + " validadas por você") : "")
   );
 }
 
@@ -306,9 +307,10 @@ export default function ProgresoView({
         diaIdx: diaIdx,
         ejercicioSelId: ejercicioSelId,
         lang: lang,
+        historiaCompleta: historiaCompleta,
       });
     },
-    [alumnos, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, allEx, periodo, alumnoSel, diaIdx, ejercicioSelId, lang]
+    [alumnos, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, allEx, periodo, alumnoSel, diaIdx, ejercicioSelId, lang, historiaCompleta]
   );
 
   var exerciseOptKey = useMemo(
@@ -1019,6 +1021,7 @@ export default function ProgresoView({
             ejercicioId={ejercicioDrilldown.ejercicioId}
             ejercicioNombre={ejercicioDrilldown.ejercicioNombre}
             progresoGlobal={progresoGlobal}
+            indiceTiempo={model.indiceTiempo}
             lang={lang}
             onClose={function () {
               setEjercicioDrilldown(null);
