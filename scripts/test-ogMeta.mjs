@@ -1,11 +1,12 @@
-// Vista previa Open Graph: metadatos en el HTML estatico (sin JS), imagen 1200x630 real y
-// favicon / iconos PWA / manifest intactos.
+// Vista previa Open Graph: metadatos en el HTML estatico (sin JS), imagen 1200x630 real con el
+// isotipo sin baldosa, y favicon / iconos PWA / manifest intactos.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
+import zlib from "node:zlib";
 
 const SITE = "https://irontrack-k.vercel.app";
-const IMG = SITE + "/og-image.png?v=1";
+const IMG = SITE + "/og-image.png?v=2";
 const DESC = "Planificá, registrá y seguí tus entrenamientos";
 
 const html = fs.readFileSync("index.html", "utf8");
@@ -53,6 +54,41 @@ assert.equal(png.toString("ascii", 12, 16), "IHDR");
 assert.equal(png.readUInt32BE(16), 1200, "ancho 1200");
 assert.equal(png.readUInt32BE(20), 630, "alto 630");
 assert.ok(png.length < 300 * 1024, "og-image.png < 300 KB (" + png.length + " B)");
+
+// Sin baldosa: alrededor del isotipo (y donde estaba la baldosa 288x288 en x 456-743, y 64-351)
+// solo hay fondo #0A0F1A. Se decodifica el PNG (RGB 8 bits) y se recorre el marco entre la caja
+// del simbolo (alfa > 0 de isotipo-onboarding.png escalado: x 468-737, y 71-348, +2 px de antialiasing) y un margen exterior.
+// Tolerancia 2 niveles: el brillo azul inferior del diseno empieza en y~351 (+1/+2); la baldosa difiere >= 10.
+function decodeRgb(buf) {
+  let pos = 8, w = 0, h = 0, idat = [];
+  while (pos < buf.length) {
+    const len = buf.readUInt32BE(pos), type = buf.toString("ascii", pos + 4, pos + 8), data = buf.subarray(pos + 8, pos + 8 + len);
+    if (type === "IHDR") { w = data.readUInt32BE(0); h = data.readUInt32BE(4); assert.equal(data[8], 8); assert.equal(data[9], 2, "PNG RGB"); assert.equal(data[12], 0); }
+    if (type === "IDAT") idat.push(data);
+    pos += 12 + len;
+  }
+  const raw = zlib.inflateSync(Buffer.concat(idat)), stride = w * 3, out = Buffer.alloc(stride * h);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)], line = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
+    for (let x = 0; x < stride; x++) {
+      const a = x >= 3 ? out[y * stride + x - 3] : 0, b = y ? out[(y - 1) * stride + x] : 0, c = x >= 3 && y ? out[(y - 1) * stride + x - 3] : 0;
+      const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+      const pred = [0, a, b, (a + b) >> 1, pa <= pb && pa <= pc ? a : pb <= pc ? b : c][f];
+      out[y * stride + x] = (line[x] + pred) & 255;
+    }
+  }
+  return { w, px: (x, y) => [...out.subarray((y * w + x) * 3, (y * w + x) * 3 + 3)] };
+}
+const og = decodeRgb(png);
+let frame = 0, off = [];
+for (let y = 30; y < 352; y++) for (let x = 420; x < 780; x++) {
+  if (x >= 466 && x <= 739 && y >= 69 && y <= 350) continue;
+  frame++;
+  const [r, g, b] = og.px(x, y);
+  if (Math.max(Math.abs(r - 10), Math.abs(g - 15), Math.abs(b - 26)) > 2) off.push(x + "," + y + "=" + [r, g, b]);
+}
+assert.equal(frame, 360 * 322 - 274 * 282, "marco completo recorrido");
+assert.deepEqual(off.slice(0, 5), [], "sin contorno ni tono de baldosa alrededor del isotipo (" + off.length + " px distintos de #0A0F1A)");
 
 const hash = (f) => crypto.createHash("sha256").update(fs.readFileSync(f)).digest("hex");
 const intact = {
