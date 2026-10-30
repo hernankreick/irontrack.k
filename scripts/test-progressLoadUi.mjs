@@ -179,24 +179,26 @@ test("selectores: sin rutina o sin dias se mantiene el emptyBox", () => {
   assert.match(controls({ diasRutina: [] }), /no tiene una rutina con días cargados/);
 });
 
-test("hoja inferior: dialog modal con nombre, cierre 44x44, safe-area, dvh y scroll interno", () => {
-  const v = read("components/ProgresoView.jsx");
-  assert.match(v, /role="dialog"\s+aria-modal="true"\s+aria-label=\{sheetAriaLabel\}/);
-  assert.match(v, /aria-label=\{M\(lang, "Cerrar", "Close", "Fechar"\)\}/);
-  assert.match(v, /width: 44,\s+height: 44,/);
-  assert.match(v, /env\(safe-area-inset-bottom, 0px\)/);
-  assert.match(v, /className="coach-sheet"/);
-  assert.match(v, /data-sheet-body="1"/);
-  assert.match(v, /overscrollBehavior: "contain"/);
-  assert.doesNotMatch(v, /maxHeight: "80vh"/);
+test("hojas (ProgressSheet): dialog modal con nombre, cierre 44x44, Escape, safe-area, dvh y scroll interno", () => {
+  const sh = read("components/progreso/ProgressSheet.jsx");
+  assert.match(sh, /role="dialog"\s+aria-modal="true"\s+aria-label=\{subtitle \? title \+ " · " \+ subtitle : title\}/);
+  assert.match(sh, /aria-label=\{closeLabel\}/);
+  assert.match(sh, /width: 44,\s+height: 44,/);
+  assert.match(sh, /env\(safe-area-inset-bottom, 0px\)/);
+  assert.match(sh, /className="coach-sheet"/);
+  assert.match(sh, /data-sheet-body="1"/);
+  assert.match(sh, /overscrollBehavior: "contain"/);
+  assert.match(sh, /e\.key === "Escape"/);
+  assert.doesNotMatch(sh, /maxHeight: "80vh"/);
   const css = read("components/layout/AppGlobalStyles.jsx");
   assert.match(css, /\.coach-sheet\{max-height:85vh;max-height:85dvh/);
+  const v = read("components/ProgresoView.jsx");
+  assert.match(v, /closeLabel=\{M\(lang, "Cerrar", "Close", "Fechar"\)\}/);
 });
 
-test("hoja inferior: misma apertura/cierre, y el resto de hojas siguen en el mismo contenedor", () => {
+test("hojas: alumnos, lista de ejercicios e historial comparten el mismo contenedor; el gráfico de carga sigue cableado igual", () => {
   const v = read("components/ProgresoView.jsx");
-  for (const id of ["prs", "vol", "carga", "adherencia", "ranking"]) assert.match(v, new RegExp('activeSheet === "' + id + '"'));
-  assert.match(v, /onClick=\{function \(\) \{ setActiveSheet\(null\); \}\}\s+style=\{\{\s+position: "fixed"/);
+  for (const id of ["alumnos", "ejercicios", "historial"]) assert.match(v, new RegExp('sheet\\.type === "' + id + '" \\? \\(\\s*<ProgressSheet'));
   assert.match(v, /currentRoutineWeekIndex=\{model\.currentRoutineWeekIndex\}/);
   assert.match(v, /compact=\{isUnder768\}/);
 });

@@ -16,11 +16,16 @@ import {
   diaLocal,
   enRango,
   eventosPR,
+  historialPorDia,
   indiceEjerciciosPorTiempo,
+  ORIGEN_VALIDADA,
   parseFechaDMY,
+  tipoDeCarga,
+  TIPO_CARGA,
   volumenDeSerie,
   volumenEnRango,
 } from "../lib/metricas/index.js";
+import { isCompletedSession } from "../lib/studentWeeklyProgress.js";
 
 const DAY_MS = 86400000;
 /** Máximo de PRs en «PRs recientes». Único punto de verdad: lo usan el modelo y la vista. */
@@ -549,6 +554,7 @@ export function buildCoachProgresoModel(params) {
   }
 
   var stalled = 0;
+  var stalledIds = [];
   alumnos.forEach(function (a) {
     var rut = getRoutineForAlumno(rutinasSBEntrenador, a.id);
     if (!rut) return;
@@ -558,7 +564,10 @@ export function buildCoachProgresoModel(params) {
       return enRango(parseFechaDMY(r && r.fecha), null, stallDesde - 1);
     });
     if (volumenEnRango(previoAVentana, { indiceTiempo: indiceTiempo }).series === 0) return;
-    if (contarPRs(eventosPR(regs, { indiceTiempo: indiceTiempo }), stallDesde, hoy) === 0) stalled++;
+    if (contarPRs(eventosPR(regs, { indiceTiempo: indiceTiempo }), stallDesde, hoy) === 0) {
+      stalled++;
+      stalledIds.push(a.id);
+    }
   });
 
   /** Evolución de carga: semanas de la rutina activa del alumno seleccionado. */
@@ -600,6 +609,14 @@ export function buildCoachProgresoModel(params) {
     return d.toLocaleDateString(l, { day: "2-digit", month: "short" });
   }
 
+  /** Fecha corta ("27 oct") de un número de día de calendario. */
+  function fmtDia(dia, loc) {
+    var u = new Date(dia * DAY_MS);
+    var d = new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate());
+    var l = loc === "es" ? "es-AR" : loc === "pt" ? "pt-BR" : "en-US";
+    return d.toLocaleDateString(l, { day: "numeric", month: "short" });
+  }
+
   var prsRecientes = prEvents.slice(0, RECENT_PRS_LIMIT).map(function (ev) {
     var alum = alumnos.find(function (x) {
       return String(x.id) === String(ev.alumno_id);
@@ -619,6 +636,11 @@ export function buildCoachProgresoModel(params) {
       delta: "+" + Math.round(ev.diferencia * 10) / 10 + " kg",
       date: fmtRel(ev.dia, lang),
       color: col,
+      ejercicio_id: ev.ejercicio_id,
+      kg: ev.kg,
+      kgAnterior: ev.kgAnterior,
+      diferencia: ev.diferencia,
+      dia: ev.dia,
     };
   });
 
@@ -714,6 +736,10 @@ export function buildCoachProgresoModel(params) {
     previo_con_pocos_dias: M(lang, "Pocos datos en el período anterior", "Too little data in the previous period", "Poucos dados no período anterior"),
     actual_con_pocos_dias: M(lang, "Pocos datos en este período", "Too little data in this period", "Poucos dados neste período"),
   };
+  /** Tono de presentación de una comparación ya calculada: sube = good, baja = `down`, sin cambio = neutral. */
+  function deltaTone(n, down) {
+    return n > 0 ? "good" : n < 0 ? down : "neutral";
+  }
   function deltaArrow(n) {
     return (n >= 0 ? "↑ " : "↓ ") + Math.abs(n);
   }
@@ -735,6 +761,7 @@ export function buildCoachProgresoModel(params) {
               ? sinPrevioPlan
               : deltaArrow(adherDeltaPct) + "% " + vsPrev,
       deltaColor: adherDeltaPct == null || sesionesIncompletas ? "#71717a" : adherDeltaPct >= 0 ? "#22c55e" : "#ef4444",
+      tone: adherN === 0 || adherDeltaPct == null || sesionesIncompletas ? "neutral" : deltaTone(adherDeltaPct, "bad"),
     },
     {
       key: "teamStalled",
@@ -749,6 +776,7 @@ export function buildCoachProgresoModel(params) {
         "Sem melhora (PR) em 3 sem. · com rotina"
       ),
       deltaColor: stalled > 0 ? "#ef4444" : "#71717a",
+      tone: stalled > 0 ? "warn" : "neutral",
     },
   ];
 
@@ -780,6 +808,10 @@ export function buildCoachProgresoModel(params) {
           ? M(lang, "Sin rutina asignada", "No routine assigned", "Sem rotina atribuída")
           : noData,
       deltaColor: selAdDelta == null || sesionesIncompletas ? "#71717a" : selAdDelta >= 0 ? "#22c55e" : "#ef4444",
+      tone: !selHasAd || selAdDelta == null || sesionesIncompletas ? "neutral" : deltaTone(selAdDelta, "bad"),
+      completed: selAd ? selAd.completadas : 0,
+      planned: selAd ? selAd.planificadas : 0,
+      validadas: selAd ? selAd.validadas : 0,
     },
     {
       key: "alumnoPrs",
@@ -793,6 +825,7 @@ export function buildCoachProgresoModel(params) {
           ? deltaArrow(prDelta) + " " + vsPrev
           : noData,
       deltaColor: progresoIncompleto ? "#71717a" : prDelta >= 0 ? "#22c55e" : "#eab308",
+      tone: progresoIncompleto || !(prsPrev > 0 || prsPeriod > 0) ? "neutral" : deltaTone(prDelta, "warn"),
     },
     {
       key: "alumnoVolume",
@@ -807,8 +840,71 @@ export function buildCoachProgresoModel(params) {
             ? deltaArrow(Math.round(volPct)) + "% " + M(lang, "vs ant. (mismos ejercicios)", "vs prev. (same exercises)", "vs ant. (mesmos exercícios)")
             : VOL_MOTIVO[volMotivo] || noData,
       deltaColor: volPct == null ? "#71717a" : volPct >= 0 ? "#22c55e" : "#ef4444",
+      tone: volPeriod <= 0 || volPct == null ? "neutral" : deltaTone(Math.round(volPct), "bad"),
     },
   ];
+
+  /** Última sesión completada del alumno (realizada o validada por el entrenador): solo una consulta de fecha, no una métrica. */
+  var ultimaSesion = null;
+  (sesionesGlobales || []).forEach(function (ses) {
+    if (!ses || !alumnoSel || String(ses.alumno_id) !== String(alumnoSel) || !isCompletedSession(ses)) return;
+    var d = diaDeSesion(ses);
+    if (d == null || d > hoy) return;
+    var validada = ses.origen === ORIGEN_VALIDADA;
+    // el mismo día, una realizada gana a una validada
+    if (ultimaSesion && (d < ultimaSesion.dia || (d === ultimaSesion.dia && (validada || !ultimaSesion.validada)))) return;
+    var di = ses.dia_idx == null || ses.dia_idx === "" ? NaN : Number(ses.dia_idx);
+    ultimaSesion = { dia: d, diasAtras: hoy - d, diaIdx: Number.isInteger(di) && di >= 0 ? di : null, validada: validada };
+  });
+  if (ultimaSesion) ultimaSesion.fecha = fmtDia(ultimaSesion.dia, lang);
+
+  /**
+   * Ejercicios que el alumno registró alguna vez (historial completo), con su última sesión. La clase (PR / iguala / primera marca)
+   * sale de historialPorDia (lib/metricas/pr.js); los ejercicios por tiempo muestran su último tiempo y no tienen récord de carga.
+   */
+  var porEjercicio = {};
+  alumnoAllRows.forEach(function (r) {
+    if (!r || r.ejercicio_id == null) return;
+    var d = parseFechaDMY(r.fecha);
+    if (d == null) return;
+    var id = String(r.ejercicio_id);
+    var cur = porEjercicio[id];
+    if (!cur || d > cur.dia) porEjercicio[id] = { dia: d, rows: [r] };
+    else if (d === cur.dia) cur.rows.push(r);
+  });
+  var enRutina = {};
+  ((routineForSelected && routineForSelected.datos && routineForSelected.datos.days) || []).forEach(function (day) {
+    [].concat((day && day.warmup) || [], (day && day.exercises) || []).forEach(function (ex) {
+      if (ex && ex.id != null) enRutina[String(ex.id)] = true;
+    });
+  });
+  var ejerciciosRegistrados = Object.keys(porEjercicio).map(function (id) {
+    var ult = porEjercicio[id];
+    var esTiempo = tipoDeCarga(id, indiceTiempo) === TIPO_CARGA.TIEMPO;
+    var hist = esTiempo ? [] : historialPorDia(alumnoAllRows, id, { indiceTiempo: indiceTiempo });
+    var last = hist.length ? hist[hist.length - 1] : null;
+    var ultimaSegundos = null;
+    if (esTiempo) {
+      ult.rows.forEach(function (r) {
+        var sec = parseInt(r.reps, 10);
+        if (sec > 0 && (ultimaSegundos == null || sec > ultimaSegundos)) ultimaSegundos = sec;
+      });
+    }
+    return {
+      id: id,
+      name: exName(exMap, id, lang),
+      enRutina: !!enRutina[id],
+      esTiempo: esTiempo,
+      ultimoDia: ult.dia,
+      ultimaFecha: fmtDia(ult.dia, lang),
+      ultimaKg: last && last.dia === ult.dia ? last.kg : null,
+      ultimaReps: last && last.dia === ult.dia ? last.reps : null,
+      ultimaSegundos: ultimaSegundos,
+      ultimaClase: last && last.dia === ult.dia ? last.clase : null,
+    };
+  }).sort(function (a, b) {
+    return b.ultimoDia - a.ultimoDia || a.name.localeCompare(b.name);
+  });
 
   var exerciseOptions = exercisesForRoutineDay(rutinasSBEntrenador, alumnoSel, diaIdx, exMap, lang);
 
@@ -840,6 +936,11 @@ export function buildCoachProgresoModel(params) {
     prsPrev: prsPrev,
     volSemPromKg: volSemPromKg,
     volPct: volPct,
+    stalledIds: stalledIds,
+    ultimaSesion: ultimaSesion,
+    ejerciciosRegistrados: ejerciciosRegistrados,
+    rutinaNombre: routineForSelected ? String(routineForSelected.nombre || routineForSelected.name || "") : "",
+    tieneRutina: !!routineForSelected,
     volMotivo: volMotivo,
     indiceTiempo: indiceTiempo,
     chartSeries: series,

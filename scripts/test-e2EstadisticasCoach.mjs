@@ -27,7 +27,10 @@ await build({
       'import CoachDashboard from "./components/CoachDashboard.jsx";' +
       'import { buildCoachProgresoModel } from "./components/coachProgresoMetrics.js";' +
       'import * as Metricas from "./lib/metricas/index.js";' +
-      "export { React, renderToStaticMarkup, ProgresoView, CoachDashboard, buildCoachProgresoModel, Metricas };",
+      'import ProgressTeamSection from "./components/progreso/ProgressTeamSection.jsx";' +
+      'import { progresoTone } from "./components/progreso/progresoTone.js";' +
+      'import { coachThemePalette } from "./components/coachThemePalette.js";' +
+      "export { React, renderToStaticMarkup, ProgresoView, CoachDashboard, buildCoachProgresoModel, Metricas, ProgressTeamSection, progresoTone, coachThemePalette };",
     resolveDir: ROOT, sourcefile: "e2-entry.jsx", loader: "jsx",
   },
   bundle: true, format: "esm", platform: "node", outfile, logLevel: "silent",
@@ -35,7 +38,7 @@ await build({
   define: { "process.env.NODE_ENV": '"production"', "import.meta.env": "{}" },
   banner: { js: 'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);' },
 });
-const { React, renderToStaticMarkup, ProgresoView, CoachDashboard, buildCoachProgresoModel, Metricas } = await import(pathToFileURL(outfile).href);
+const { React, renderToStaticMarkup, ProgresoView, CoachDashboard, buildCoachProgresoModel, Metricas, ProgressTeamSection, progresoTone, coachThemePalette } = await import(pathToFileURL(outfile).href);
 const h = React.createElement;
 
 let count = 0;
@@ -146,15 +149,31 @@ await test("historial incompleto (E0): los deltas no se informan como si fueran 
 });
 
 // ======================================================================= pantallas reales
-await test("ProgresoView (SSR): ranking con validadas por el entrenador y equipo calculados por el nucleo; aviso de historial incompleto", () => {
+await test("ProgresoView (SSR): tarjetas del alumno y Equipo (colapsado) muestran lo que calcula el nucleo; aviso de historial incompleto", () => {
   const html = renderToStaticMarkup(h(ProgresoView, { alumnos, sesionesGlobales, progresoGlobal, rutinasSBEntrenador: rutinas, allEx, historiaCompleta: { sesiones: true, progreso: false } }));
+  // Ana (primera A-Z) seleccionada desde el primer render
+  assert.match(html, /Cambiar alumno\. Seleccionado: Ana/);
+  assert.match(html, /data-qa="resumen-adherencia"[\s\S]*?25%[\s\S]*?3 de 12 sesiones · 1 validadas por vos/);
+  assert.match(html, /data-qa="resumen-prs"[\s\S]*?>1<[\s\S]*?Historial incompleto: sin comparación/);
+  assert.match(html, /data-qa="resumen-volumen"[\s\S]*?Historial incompleto: sin comparación/);
+  // Equipo colapsado por defecto: resumen con la adherencia promedio; el ranking no se renderiza hasta abrirlo
+  assert.match(html, /aria-expanded="false"[^>]*data-qa="equipo-toggle"/);
+  assert.match(html, /Adherencia 38% · /);
+  assert.doesNotMatch(html, /sesiones completadas/);
+  assert.match(html, /data-qa="historial-incompleto"/);
+  const ok = renderToStaticMarkup(h(ProgresoView, { alumnos, sesionesGlobales, progresoGlobal, rutinasSBEntrenador: rutinas, allEx }));
+  assert.doesNotMatch(ok, /historial-incompleto/);
+  assert.match(ok, /↑ 25% vs período anterior/, "adherencia de Ana: 0% -> 25%");
+});
+
+await test("Equipo abierto (SSR): ranking con validadas por el entrenador y adherencia promedio del nucleo", () => {
+  const C = coachThemePalette(true);
+  const html = renderToStaticMarkup(h(ProgressTeamSection, { teamChips: m.teamChips, ranking: m.ranking, defaultOpen: true, lang: "es", C, P: progresoTone(C, true), rankingSessionsLine: (c, p, l, v) => c + "/" + p + " sesiones completadas" + (v > 0 ? " · " + v + " validadas por vos" : "") }));
+  assert.match(html, /aria-expanded="true"/);
   assert.match(html, /3\/12 sesiones completadas · 1 validadas por vos/);
   assert.match(html, /1\/2 sesiones completadas/);
   assert.match(html, /38%/);
   assert.match(html, /↑ 25% vs período anterior/);
-  assert.match(html, /data-qa="historial-incompleto"/);
-  const ok = renderToStaticMarkup(h(ProgresoView, { alumnos, sesionesGlobales, progresoGlobal, rutinasSBEntrenador: rutinas, allEx }));
-  assert.doesNotMatch(ok, /historial-incompleto/);
 });
 
 await test("CoachDashboard (SSR): «Racha actual» sintetica reemplazada por «Alumnos activos esta semana» (sesiones completadas reales)", () => {

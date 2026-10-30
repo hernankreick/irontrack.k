@@ -1,86 +1,75 @@
 import React from "react";
-import { Star } from "lucide-react";
-import { coachType as _T, coachSpace as _S, coachTypeMobile, coachSpaceMobile } from "../coachUiScale.js";
+import { ChevronRight } from "lucide-react";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
-import { recentPrsSubtitle, recentPrsLimitLabel } from "./progressCopy.js";
+import { fmtKg } from "./progresoTone.js";
 
-export default function ProgressRecentPrsCard({ prs, alumnoName, limit, C, lang, emptyBox, isUnder768 }) {
-  const T = isUnder768 ? coachTypeMobile : _T;
-  const S = isUnder768 ? coachSpaceMobile : _S;
-  /** El modelo ya entrega los PRs del alumno seleccionado, acotados a `limit`. */
-  var visiblePrs = prs || [];
+/** Filas tocables (≥ 60 px) que abren el historial del ejercicio. Los eventos y su límite vienen del modelo (eventosPR, E1). */
+export function rowButtonStyle(C) {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+    minHeight: 60,
+    padding: "8px 0",
+    border: "none",
+    borderTop: "1px solid " + C.brd,
+    background: "transparent",
+    color: C.t,
+    textAlign: "left",
+    cursor: "pointer",
+    fontFamily: "inherit",
+  };
+}
 
+export default function ProgressRecentPrsCard({ prs, onOpenExercise, lang, C, P }) {
+  var list = prs || [];
   return (
-    <div
-      style={{
-        background: C.card,
-        border: "1px solid " + C.brd,
-        borderRadius: 12,
-        padding: S.cardPadding,
-        minWidth: 0,
-      }}
+    <section
+      aria-labelledby="progreso-prs-titulo"
+      data-qa="prs-recientes"
+      style={{ background: C.card, border: "1px solid " + C.brd, borderRadius: 16, padding: "8px 16px", display: "flex", flexDirection: "column", minWidth: 0 }}
     >
-      <div style={{ marginBottom: S.blockGap }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Star size={16} color={C.yel} strokeWidth={2} />
-          <span style={{ ...T.cardTitle, color: C.t }}>
-            {M(lang, "PRs recientes", "Recent PRs")}
-          </span>
-          {limit ? (
-            <span style={{ ...T.meta, color: C.t2, marginLeft: "auto" }}>{recentPrsLimitLabel(lang, limit)}</span>
-          ) : null}
-        </div>
-        {alumnoName ? (
-          <p style={{ ...T.subtitle, color: C.t2, margin: "6px 0 0 0", paddingLeft: 26 }}>
-            {recentPrsSubtitle(lang, alumnoName)}
-          </p>
-        ) : null}
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "10px 0 8px" }}>
+        <h2 id="progreso-prs-titulo" style={{ margin: 0, fontSize: 17, fontWeight: 700, letterSpacing: -0.2, color: C.t }}>
+          {M(lang, "PRs recientes", "Recent PRs", "PRs recentes")}
+        </h2>
+        <span style={{ fontSize: 13, fontWeight: 500, color: P.muted }}>{M(lang, "Récords sobre todo el historial", "Records over the whole history", "Recordes sobre todo o histórico")}</span>
       </div>
-      {visiblePrs.length === 0 ? (
-        emptyBox(lang, M(lang, "Todavía no hay PRs registrados", "No PRs logged yet", "Ainda não há PRs registrados"), C)
+      {list.length === 0 ? (
+        <p style={{ margin: "0 0 12px", padding: 12, fontSize: 13, lineHeight: 1.45, color: P.muted, border: "1px dashed " + P.line, borderRadius: 12 }}>
+          {M(
+            lang,
+            "Sin PRs todavía. La primera marca de cada ejercicio es la base: un PR es superarla.",
+            "No PRs yet. Each exercise's first mark is the baseline: a PR means beating it.",
+            "Sem PRs ainda. A primeira marca de cada exercício é a base: um PR é superá-la."
+          )}
+        </p>
       ) : (
-        visiblePrs.map(function (row, idx) {
+        list.map(function (p, i) {
           return (
-            <div
-              key={row.initials + row.ex + row.date + idx}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "11px 0",
-                borderBottom: idx < visiblePrs.length - 1 ? "1px solid #1e1e2e44" : "none",
-              }}
+            <button
+              key={"pr-" + i}
+              type="button"
+              onClick={function () { onOpenExercise(p.ejercicio_id, p.ex); }}
+              aria-label={p.ex + ": " + fmtKg(p.kg, lang) + ", " + p.date + ". " + M(lang, "Ver historial", "See history", "Ver histórico")}
+              style={rowButtonStyle(C)}
             >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  background: row.color + "22",
-                  color: row.color,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  flexShrink: 0,
-                }}
-              >
-                {row.initials}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ ...T.bodySemibold, color: C.t }}>{row.n}</div>
-                <div style={{ ...T.subtitle, color: C.t2, marginTop: 2 }}>{row.ex}</div>
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ ...T.numberStatSm, color: C.green }}>{row.val}</div>
-                <div style={{ ...T.subtitle, color: C.green, marginTop: 2 }}>{row.delta}</div>
-                <div style={{ ...T.subtitle, color: C.t2, marginTop: 2 }}>{row.date}</div>
-              </div>
-            </div>
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 15, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.ex}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: P.muted }}>
+                  {p.date + " · " + M(lang, "récord anterior ", "previous record ", "recorde anterior ") + fmtKg(p.kgAnterior, lang)}
+                </span>
+              </span>
+              <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flex: "none" }}>
+                <span style={{ fontSize: 15, fontWeight: 800 }}>{fmtKg(p.kg, lang)}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: P.good }}>{"+" + fmtKg(p.diferencia, lang)}</span>
+              </span>
+              <ChevronRight size={16} color={P.muted} aria-hidden="true" style={{ flex: "none" }} />
+            </button>
           );
         })
       )}
-    </div>
+    </section>
   );
 }
