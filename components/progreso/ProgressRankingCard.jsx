@@ -157,7 +157,7 @@ export default function ProgressRankingCard({
                       {row.n}
                     </div>
                     <div style={{ fontSize: 12, color: C.t2, marginTop: 4, lineHeight: 1.35 }}>
-                      {rankingSessionsLine(row.completed, row.planned, lang)}
+                      {rankingSessionsLine(row.completed, row.planned, lang, row.validadas)}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>

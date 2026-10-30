@@ -2,6 +2,7 @@
 //   - teamChips / adherenciaRows / ranking: globales, NO dependen de alumnoSel.
 //   - alumnoChips / prsRecientes / volumen: solo del alumno seleccionado.
 //   - volumen = kg x reps (reps <= 0 aporta 0), series reales sin colapsar.
+//   - volumen, PR y adherencia salen de lib/metricas (E2): el primer registro no es PR, la adherencia es a la rutina asignada.
 // Sin React/esbuild. Fecha fija (Date mockeada): miercoles 7/10/2026 12:00 local.
 //
 //   node scripts/test-coachProgresoMetrics.mjs
@@ -10,11 +11,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   buildCoachProgresoModel,
-  buildPrEvents,
-  rowVolumeKg,
-  getPeriodBounds,
+  getPeriodDays,
   RECENT_PRS_LIMIT,
 } from "../components/coachProgresoMetrics.js";
+import { volumenDeSerie, dayNum } from "../lib/metricas/index.js";
+const rowVolumeKg = (r) => volumenDeSerie(r && Object.assign({ fecha: "1/1/2026", ejercicio_id: "x" }, r));
 import { patternWindowLabel, patternEmptyLabel, recentPrsSubtitle } from "../components/progreso/progressCopy.js";
 
 const src = (rel) => readFileSync(new URL("../components/" + rel, import.meta.url), "utf8");
@@ -67,17 +68,17 @@ const sesionesGlobales = [].concat(sesEvi, sesJul, sesMar);
 
 const progresoGlobal = {
   [EVI]: [
-    row("r-evi", "sq", "20/8/2026", "40", "10"),   // periodo anterior: PR (primer registro)
-    row("r-evi", "sq", "1/10/2026", "50", "15"),   // PR
+    row("r-evi", "sq", "20/8/2026", "40", "10"),   // periodo anterior: primer registro (NO es PR)
+    row("r-evi", "sq", "1/10/2026", "50", "15"),   // PR (supera 40)
     row("r-evi", "sq", "1/10/2026", "50", "15"),   // serie real repetida (no PR)
     row("r-evi", "sq", "1/10/2026", "50", "15"),   // serie real repetida (no PR)
-    row("r-evi", "sq", "2/10/2026", "60", "0"),    // PR, pero volumen 0 (reps 0)
-    row("r-evi", "bp", "2/10/2026", "20", "10"),   // PR (primer registro), vol 200
+    row("r-evi", "sq", "2/10/2026", "60", "0"),    // reps 0: serie invalida, ni PR ni volumen
+    row("r-evi", "bp", "2/10/2026", "20", "10"),   // primer registro (NO es PR), vol 200
   ],
   [JUL]: [
-    row("r-jul", "sq", "3/10/2026", "100", "5"),   // PR
-    row("r-jul", "sq", "4/10/2026", "100", "5"),   // no PR
-    row("r-jul", "dl", "5/10/2026", "120", "3"),   // PR
+    row("r-jul", "sq", "3/10/2026", "100", "5"),   // primer registro
+    row("r-jul", "sq", "4/10/2026", "100", "5"),   // iguala: no PR
+    row("r-jul", "dl", "5/10/2026", "120", "3"),   // primer registro
   ],
   [MAR]: [
     row("r-mar", "bp", "15/8/2026", "30", "8"),
@@ -93,18 +94,18 @@ const chip = (chips, key) => chips.find((c) => c.key === key);
 
 const mEvi = build(EVI), mJul = build(JUL), mNone = build(null);
 
-// ---- valores globales protegidos (capturados con el codigo anterior al refactor) ----
+// ---- valores globales protegidos (mismos que antes de E2: la adherencia de este fixture no cambia) ----
 const GLOBAL_ADHER_AVG = 50;   // (50 + 75 + 25) / 3
 const GLOBAL_STALLED = 1;      // solo Marta
 const GLOBAL_ADHERENCIA_ROWS = [
-  { id: JUL, n: "Julieta", p: 75, color: "#22c55e", tienePlan: true, completed: 12, planned: 16 },
-  { id: EVI, n: "Evi", p: 50, color: "#eab308", tienePlan: true, completed: 6, planned: 12 },
-  { id: MAR, n: "Marta", p: 25, color: "#ef4444", tienePlan: true, completed: 2, planned: 8 },
+  { id: JUL, n: "Julieta", p: 75, color: "#22c55e", tienePlan: true, completed: 12, planned: 16, validadas: 0 },
+  { id: EVI, n: "Evi", p: 50, color: "#eab308", tienePlan: true, completed: 6, planned: 12, validadas: 0 },
+  { id: MAR, n: "Marta", p: 25, color: "#ef4444", tienePlan: true, completed: 2, planned: 8, validadas: 0 },
 ];
 const GLOBAL_RANKING = [
-  { id: JUL, initials: "JU", n: "Julieta", p: 75, color: "#22c55e", completed: 12, planned: 16 },
-  { id: EVI, initials: "EV", n: "Evi", p: 50, color: "#eab308", completed: 6, planned: 12 },
-  { id: MAR, initials: "MA", n: "Marta", p: 25, color: "#ef4444", completed: 2, planned: 8 },
+  { id: JUL, initials: "JU", n: "Julieta", p: 75, color: "#22c55e", completed: 12, planned: 16, validadas: 0 },
+  { id: EVI, initials: "EV", n: "Evi", p: 50, color: "#eab308", completed: 6, planned: 12, validadas: 0 },
+  { id: MAR, initials: "MA", n: "Marta", p: 25, color: "#ef4444", completed: 2, planned: 8, validadas: 0 },
 ];
 
 test("A: Evi seleccionada -> alumnoChips solo usa Evi", () => {
@@ -113,7 +114,7 @@ test("A: Evi seleccionada -> alumnoChips solo usa Evi", () => {
   assert.equal(ad.val, "50%");
   assert.match(ad.label, /Evi/);
   assert.doesNotMatch(ad.label, /Julieta/);
-  assert.equal(chip(mEvi.alumnoChips, "alumnoPrs").value, 3); // sq50, sq60, bp20 (Julieta tiene 2 mas: no suman)
+  assert.equal(chip(mEvi.alumnoChips, "alumnoPrs").value, 1); // solo sq 50 > 40 (primeros registros y reps 0 no son PR)
   assert.equal(chip(mEvi.alumnoChips, "alumnoVolume").value, 612.5); // 2450 kg / 4 semanas
   assert.equal(chip(mEvi.alumnoChips, "alumnoVolume").val, "613 kg");
   assert.equal(mEvi.alumnoChips.length, 3);
@@ -124,7 +125,7 @@ test("B: Julieta seleccionada -> alumnoChips cambia a Julieta", () => {
   const ad = chip(mJul.alumnoChips, "alumnoAdherence");
   assert.equal(ad.value, 75);
   assert.match(ad.label, /Julieta/);
-  assert.equal(chip(mJul.alumnoChips, "alumnoPrs").value, 2);
+  assert.equal(chip(mJul.alumnoChips, "alumnoPrs").value, 0); // solo primeros registros e igualaciones
   assert.equal(chip(mJul.alumnoChips, "alumnoVolume").value, 340); // 1360 kg / 4
   assert.notDeepEqual(mJul.alumnoChips, mEvi.alumnoChips);
 });
@@ -142,20 +143,22 @@ test("C: teamChips identico con Evi, Julieta o sin seleccion", () => {
 });
 
 test("D: un PR de Julieta no suma para Evi (PRs del periodo)", () => {
-  assert.equal(mEvi.prsPeriod, 3);
-  assert.equal(mJul.prsPeriod, 2);
+  assert.equal(mEvi.prsPeriod, 1);
+  assert.equal(mJul.prsPeriod, 0);
   const sinJul = build(EVI, { progresoGlobal: { [EVI]: progresoGlobal[EVI], [MAR]: progresoGlobal[MAR] } });
   assert.equal(sinJul.prsPeriod, mEvi.prsPeriod);
-  const conMasJul = build(EVI, { progresoGlobal: Object.assign({}, progresoGlobal, { [JUL]: progresoGlobal[JUL].concat([row("r-jul", "bp", "6/10/2026", "90", "5")]) }) });
+  const conMasJul = build(EVI, { progresoGlobal: Object.assign({}, progresoGlobal, { [JUL]: progresoGlobal[JUL].concat([row("r-jul", "sq", "6/10/2026", "110", "5")]) }) });
   assert.equal(conMasJul.prsPeriod, mEvi.prsPeriod);
+  const pgMas = Object.assign({}, progresoGlobal, { [JUL]: progresoGlobal[JUL].concat([row("r-jul", "sq", "6/10/2026", "110", "5")]) });
+  assert.equal(build(JUL, { progresoGlobal: pgMas }).prsPeriod, 1, "el PR real de Julieta si cuenta para Julieta");
 });
 
 test("E: prsRecientes con Evi no contiene eventos de Julieta", () => {
-  assert.equal(mEvi.prsRecientes.length, 4); // 3 del periodo + 1 anterior, todos de Evi
+  assert.equal(mEvi.prsRecientes.length, 1);
+  assert.deepEqual([mEvi.prsRecientes[0].ex, mEvi.prsRecientes[0].val, mEvi.prsRecientes[0].delta], ["Sentadilla", "50 kg", "+10 kg"]);
   assert.ok(mEvi.prsRecientes.every((p) => p.n === "Evi" && p.initials === "EV"));
   assert.ok(!mEvi.prsRecientes.some((p) => p.ex === "Peso muerto"), "peso muerto es solo de Julieta");
-  assert.ok(mJul.prsRecientes.every((p) => p.n === "Julieta"));
-  assert.equal(mJul.prsRecientes.length, 2);
+  assert.equal(mJul.prsRecientes.length, 0, "primeros registros no son PR");
   assert.deepEqual(mNone.prsRecientes, [], "sin alumno no hay PRs recientes");
 });
 
@@ -183,7 +186,7 @@ test("G: 3 x (50 x 15) = 2250 kg (no 750)", () => {
   const m = soloTres();
   assert.equal(m.volBars[3].v, 2250);
   assert.equal(m.volSemPromKg, 562.5);
-  assert.equal(m.volKgDelta, 562.5);
+  assert.deepEqual([m.volPct, m.volMotivo], [null, "sin_ejercicios_comunes"], "sin periodo anterior no hay porcentaje");
   assert.equal(m.patronPatterns.find((p) => p.key === "rodilla").vol, 2250);
   assert.equal(m.patronTotalVol, 2250);
 });
@@ -224,40 +227,37 @@ test("J: ranking y adherenciaRows son globales e iguales al cambiar alumnoSel", 
   assert.deepEqual(mNone.ranking, mEvi.ranking);
 });
 
-test("K: periodo de 4 semanas y periodo anterior", () => {
-  const b = getPeriodBounds("semanas4");
-  assert.equal(b.durDays, 28);
-  assert.equal(b.end, NOW_MS);
-  assert.equal(b.start, NOW_MS - 28 * 86400000);
-  assert.equal(b.prevEnd, b.start);
-  assert.equal(b.prevStart, b.start - 28 * 86400000);
-  // Evi: PRs 3 vs 1 anterior; volumen 2450 vs 400 kg -> /4 semanas
-  assert.equal(mEvi.prsPrev, 1);
-  assert.match(chip(mEvi.alumnoChips, "alumnoPrs").delta, /^↑ 2 /);
-  assert.equal(mEvi.volKgDelta, (2450 - 400) / 4);
-  assert.match(chip(mEvi.alumnoChips, "alumnoVolume").delta, /^↑ 513 kg/);
+test("K: periodo de 4 semanas y periodo anterior (dias de calendario)", () => {
+  const p = getPeriodDays("semanas4");
+  const hoy = dayNum(2026, 10, 7);
+  assert.deepEqual([p.durDays, p.hoy], [28, hoy]);
+  assert.deepEqual(p.actual, { desde: hoy - 27, hasta: hoy });
+  assert.deepEqual(p.previo, { desde: hoy - 55, hasta: hoy - 28 });
+  // Evi: 1 PR vs 0 en el anterior
+  assert.equal(mEvi.prsPrev, 0);
+  assert.match(chip(mEvi.alumnoChips, "alumnoPrs").delta, /^↑ 1 /);
+  // volumen: sq en ambos periodos pero un solo dia en cada uno => sin porcentaje (no 2450 vs 400 = +512%)
+  assert.equal(mEvi.volPct, null);
+  assert.equal(mEvi.volMotivo, "previo_con_pocos_dias");
+  assert.equal(chip(mEvi.alumnoChips, "alumnoVolume").delta, "Pocos datos en el período anterior");
   // adherencia individual del periodo anterior: Evi 3/12 = 25% -> delta +25
   assert.match(chip(mEvi.alumnoChips, "alumnoAdherence").delta, /^↑ 25%/);
-  // Julieta: 0 PRs / 0 volumen en el anterior
   assert.equal(mJul.prsPrev, 0);
   assert.match(chip(mJul.alumnoChips, "alumnoAdherence").delta, /^↑ 50%/);
-  // 8 semanas incluye lo que en 4 semanas era "anterior"
-  assert.equal(build(EVI, { periodId: "semanas8" }).prsPeriod, 4);
+  assert.equal(build(EVI, { periodId: "semanas8" }).prsPeriod, 1);
 });
 
-test("PRs: semantica historica (primer registro = PR, varios PR el mismo dia) y usa historial completo", () => {
-  const ev = buildPrEvents([
-    { ejercicio_id: "x", kg: "10", reps: "5", fecha: "1/10/2026" },
-    { ejercicio_id: "x", kg: "20", reps: "5", fecha: "2/10/2026" },
-    { ejercicio_id: "x", kg: "30", reps: "5", fecha: "2/10/2026" },
-    { ejercicio_id: "x", kg: "30", reps: "5", fecha: "3/10/2026" },
-    { ejercicio_id: "y", kg: "0", reps: "5", fecha: "3/10/2026" },
-  ]);
-  assert.equal(ev.length, 3);
-  assert.deepEqual(ev.map((e) => e.kg).sort((a, b) => a - b), [10, 20, 30]);
-  assert.equal(ev.filter((e) => e.prevKg == null).length, 1);
-  assert.equal(ev[ev.length - 1].kg, 10, "mas recientes primero");
-  assert.deepEqual(buildPrEvents(null), []);
+test("PRs del modelo: primer registro no es PR, varias series el mismo dia = un PR, historial completo", () => {
+  const rows = [
+    row("r-evi", "x", "1/10/2026", "10", "5"),
+    row("r-evi", "x", "2/10/2026", "20", "5"),
+    row("r-evi", "x", "2/10/2026", "30", "5"),
+    row("r-evi", "x", "3/10/2026", "30", "5"),
+  ];
+  const m = build(EVI, { progresoGlobal: { [EVI]: rows } });
+  assert.equal(m.prsPeriod, 1);
+  assert.equal(m.prsRecientes[0].delta, "+20 kg");
+  assert.ok(!m.prsRecientes.some((p) => /Nuevo PR/.test(p.delta)));
 });
 
 test("C2: summaryChips y la semantica en toneladas ya no existen en el modelo", () => {
@@ -268,11 +268,14 @@ test("C2: summaryChips y la semantica en toneladas ya no existen en el modelo", 
   }
 });
 
-test("F2: volumen en kg (valor y texto), delta tambien en kg, nunca toneladas", () => {
+test("F2: volumen en kg; la comparacion es un % like-for-like o un motivo, nunca toneladas", () => {
   const v = chip(mEvi.alumnoChips, "alumnoVolume");
   assert.match(v.val, /^\d+ kg$/);
-  assert.match(v.delta, / kg /);
   assert.doesNotMatch(v.val + v.delta, /\dt\b/);
+  const dosDias = (d1, d2, kg) => [row("r-evi", "sq", d1, kg, "10"), row("r-evi", "sq", d2, kg, "10")];
+  const m = build(EVI, { progresoGlobal: { [EVI]: dosDias("1/9/2026", "3/9/2026", "50").concat(dosDias("1/10/2026", "3/10/2026", "55")) } });
+  assert.equal(Math.round(m.volPct), 10);
+  assert.match(chip(m.alumnoChips, "alumnoVolume").delta, /^↑ 10% vs ant\. \(mismos ejercicios\)$/);
 });
 
 test("D2/E: PRs recientes del alumno y limite unico modelo/vista", () => {
@@ -289,9 +292,10 @@ test("D2/E: PRs recientes del alumno y limite unico modelo/vista", () => {
   assert.match(recentPrsSubtitle("es", "Evi"), /Evi/);
 });
 
-test("G2: reps 0 = 0 tambien en el drill-down (EjercicioHistorialCoach usa rowVolumeKg)", () => {
+test("G2: reps 0 = 0 tambien en el drill-down (EjercicioHistorialCoach usa volumenDeSerie de lib/metricas)", () => {
   const h = src("coach/EjercicioHistorialCoach.jsx");
-  assert.match(h, /rowVolumeKg/);
+  assert.match(h, /volumenDeSerie\(r, indiceTiempo\)/);
+  assert.doesNotMatch(h, /rowVolumeKg/);
   assert.doesNotMatch(h, /Math\.max\(1, *reps\)/);
   assert.doesNotMatch(src("coachProgresoMetrics.js"), /Math\.max\(1, *reps\)/);
   assert.equal(rowVolumeKg({ kg: "50", reps: "0" }), 0);

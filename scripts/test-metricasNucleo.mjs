@@ -182,7 +182,7 @@ await test("pureza: las funciones no mutan sus entradas", () => {
   M.adherencia({ rutina: Object.freeze(rutina), sesiones, desde: D(1, 10), hasta: D(7, 10) });
   M.rachaSemanal(sesiones, { hoy: D(28, 10) });
 });
-await test("alcance E1: el nucleo no usa red, Supabase, React ni localStorage, y ninguna pantalla lo importa todavia (E2)", () => {
+await test("alcance: el nucleo no usa red, Supabase, React ni localStorage; App.jsx (alumno) no lo importa", () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const dir = path.join(root, "lib/metricas");
   for (const file of readdirSync(dir)) {
@@ -191,8 +191,7 @@ await test("alcance E1: el nucleo no usa red, Supabase, React ni localStorage, y
   }
   const app = readFileSync(path.join(root, "App.jsx"), "utf8");
   assert.ok(!/lib\/metricas/.test(app));
-  const comps = ["components/ProgresoView.jsx", "components/coachProgresoMetrics.js", "components/CoachDashboard.jsx"];
-  comps.forEach((c) => assert.ok(!/lib\/metricas/.test(readFileSync(path.join(root, c), "utf8")), c));
+  // las pantallas del entrenador que lo consumen (E2) se verifican en scripts/test-e2EstadisticasCoach.mjs
 });
 
 console.log("\n" + count + " pruebas OK");

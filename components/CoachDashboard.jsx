@@ -22,6 +22,7 @@ import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 import { getStudentRoutine, getStudentWeeklyProgress } from "../lib/studentWeeklyProgress.js";
 import { isCoachValidatedSession } from "../lib/orphanSessions.js";
+import { diaLocal, rachaSemanal } from "../lib/metricas/index.js";
 
 /** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
 export const NAV_ITEM_PAD = "10px 12px";
@@ -711,7 +712,11 @@ export default function CoachDashboard({
   var buenosCount = coachActiveRows.filter(function (r) { return r.cat === "activo" && r.pct >= 70; }).length;
   var rendimientoScore = alumnos.length > 0 ? Math.round(pctSemana * 0.7 + (buenosCount / alumnos.length) * 30) : 0;
   var rendimientoDeltaPts = Math.round(deltaSemana * 0.4);
-  var rachaActual = sesionesCompletadas > 0 ? Math.min(7, Math.max(1, Math.ceil(sesionesCompletadas / Math.max(1, alumnos.length)))) : 0;
+  /** Alumnos con al menos una sesión completada en la semana de calendario actual (lib/metricas/racha.js; incluye validadas). */
+  var hoyDia = diaLocal();
+  var alumnosActivosSemana = (alumnos || []).filter(function (a) {
+    return rachaSemanal(sesionesGlobales, { hoy: hoyDia, alumnoId: a.id }).incluyeSemanaActual;
+  }).length;
   var dashboardInterpretacion = pctSemana >= objetivoSemanalPct
     ? M(lang, "Semana en objetivo", "Week on target", "Semana no objetivo")
     : pctSemana >= 55
@@ -1121,7 +1126,7 @@ export default function CoachDashboard({
               metrics: [
                 { label: M(lang, "Sesiones esta semana", "Sessions this week", "Sessões esta semana"), value: sesionesTotales },
                 { label: M(lang, "Sesiones completadas", "Completed sessions", "Sessões concluídas"), value: sesionesCompletadas },
-                { label: M(lang, "Racha actual", "Current streak", "Sequência atual"), value: rachaActual + " " + M(lang, "días", "days", "dias") },
+                { label: M(lang, "Alumnos activos esta semana", "Active athletes this week", "Alunos ativos esta semana"), value: alumnosActivosSemana + " / " + (alumnos || []).length },
               ],
               colors: C,
               type: T,
