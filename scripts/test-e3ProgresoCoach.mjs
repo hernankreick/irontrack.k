@@ -31,11 +31,13 @@ await build({
       'import ProgressTeamSection from "./components/progreso/ProgressTeamSection.jsx";' +
       'import ProgressAlumnoPicker from "./components/progreso/ProgressAlumnoPicker.jsx";' +
       'import ProgressHeader from "./components/progreso/ProgressHeader.jsx";' +
+      'import { PeriodButton, PeriodSheetContent, periodLabel, validateCustomRange, dayToIso, isoToDay, PERIOD_IDS } from "./components/progreso/ProgressPeriodPicker.jsx";' +
+      'import { getPeriodDays } from "./components/coachProgresoMetrics.js";' +
       'import ProgressSheet from "./components/progreso/ProgressSheet.jsx";' +
       'import { progresoTone } from "./components/progreso/progresoTone.js";' +
       'import { coachThemePalette } from "./components/coachThemePalette.js";' +
       'import * as Metricas from "./lib/metricas/index.js";' +
-      "export { React, renderToStaticMarkup, ProgresoView, buildCoachProgresoModel, EjercicioHistorialCoach, buildExerciseSessions, ProgressExercisesCard, ProgressExerciseList, filterExercises, exerciseLastLine, ProgressWeeklyVolumeCard, volumeWeekStates, ProgressTeamSection, ProgressAlumnoPicker, ProgressHeader, ProgressSheet, progresoTone, coachThemePalette, Metricas };",
+      "export { React, renderToStaticMarkup, ProgresoView, buildCoachProgresoModel, EjercicioHistorialCoach, buildExerciseSessions, ProgressExercisesCard, ProgressExerciseList, filterExercises, exerciseLastLine, ProgressWeeklyVolumeCard, volumeWeekStates, ProgressTeamSection, ProgressAlumnoPicker, ProgressHeader, ProgressSheet, progresoTone, coachThemePalette, Metricas, PeriodButton, PeriodSheetContent, periodLabel, validateCustomRange, dayToIso, isoToDay, PERIOD_IDS, getPeriodDays };",
     resolveDir: ROOT, sourcefile: "e3-entry.jsx", loader: "jsx",
   },
   bundle: true, format: "esm", platform: "node", outfile, logLevel: "silent",
@@ -216,16 +218,94 @@ await test("selector de alumnos: estancados primero, adherencia del período o �
   assert.match(html, /<label for="progreso-buscar-alumno"/);
 });
 
-await test("encabezado compacto: alumno y período (select de 3 opciones, 16 px para no hacer zoom en iOS)", () => {
-  const opts = [{ id: "semanas4", label: "4 semanas", short: "4 sem" }, { id: "semanas8", label: "8 semanas", short: "8 sem" }, { id: "meses3", label: "3 meses", short: "3 meses" }];
-  const html = renderToStaticMarkup(h(X.ProgressHeader, { compact: true, lang: "es", C, P, alumnoName: "Ana", alumnoInitials: "AD", alumnoSub: "Fuerza · Semana 2 de 4", periodOpts: opts, periodo: "semanas8", setPeriodo() {}, onOpenAlumnos() {}, isUnder768: true }));
+await test("encabezado: alumno y período en una fila; la barra compacta muestra «4 sem» y abre el mismo selector", () => {
+  const html = renderToStaticMarkup(h(X.ProgressHeader, { compact: true, lang: "es", C, P, alumnoName: "Ana", alumnoInitials: "AD", alumnoSub: "Fuerza · Semana 2 de 4", periodo: { id: "semanas8" }, onOpenPeriodo() {}, onOpenAlumnos() {}, isUnder768: true }));
   assert.match(html, /data-qa="progreso-header-compacto"/);
-  assert.equal((html.match(/<option /g) || []).length, 3);
-  assert.match(html, /<option value="semanas8" selected="">8 sem/);
-  assert.match(html, /font-size:16px/);
-  const full = renderToStaticMarkup(h(X.ProgressHeader, { compact: false, lang: "es", C, P, alumnoName: "Ana", alumnoInitials: "AD", alumnoSub: "x", periodOpts: opts, periodo: "semanas4", setPeriodo() {}, onOpenAlumnos() {}, isUnder768: true }));
-  assert.match(full, /role="group" aria-label="Período"/);
-  assert.equal((full.match(/aria-pressed="true"/g) || []).length, 1);
+  assert.match(html, /data-qa="periodo-btn-compacto"[^>]*>.*?8 sem/);
+  assert.match(html, /aria-haspopup="dialog" aria-label="Período: 8 semanas\. Cambiar"/);
+  assert.doesNotMatch(html, /<select/);
+  const full = renderToStaticMarkup(h(X.ProgressHeader, { compact: false, lang: "es", C, P, alumnoName: "Ana", alumnoInitials: "AD", alumnoSub: "x", periodo: { id: "semanas4" }, onOpenPeriodo() {}, onOpenAlumnos() {}, isUnder768: true }));
+  assert.match(full, /data-qa="periodo-btn"[^>]*>[\s\S]*?4 sem</, "móvil: etiqueta corta para no cortar el nombre del alumno");
+  const desk = renderToStaticMarkup(h(X.ProgressHeader, { compact: false, lang: "es", C, P, alumnoName: "Ana", alumnoInitials: "AD", alumnoSub: "x", periodo: { id: "semanas4" }, onOpenPeriodo() {}, onOpenAlumnos() {}, isUnder768: false }));
+  assert.match(desk, /data-qa="periodo-btn"[^>]*>[\s\S]*?4 semanas</);
+  assert.doesNotMatch(full, /role="group" aria-label="Período"/, "sin los tres botones anteriores");
+  assert.doesNotMatch(full, /flex-wrap:wrap/, "alumno y período en una sola fila");
+});
+
+// ======================================================================= selector de período
+await test("períodos: getPeriodDays para 4/8 semanas, 3 y 6 meses, todo el historial y personalizado", () => {
+  const hoy = Metricas.dayNum(2026, 10, 30);
+  const g = (id, c) => X.getPeriodDays(id, hoy, c);
+  assert.deepEqual([g("semanas4").durDays, g("semanas8").durDays, g("meses3").durDays, g("meses6").durDays], [28, 56, 90, 180]);
+  assert.deepEqual(g("meses6").previo, { desde: hoy - 359, hasta: hoy - 180 });
+  assert.deepEqual(g("todo"), { id: "todo", actual: { desde: null, hasta: hoy }, previo: null, durDays: null, hoy });
+  const c = g("custom", { desde: hoy - 9, hasta: hoy - 5 });
+  assert.deepEqual([c.actual, c.previo, c.durDays], [{ desde: hoy - 9, hasta: hoy - 5 }, { desde: hoy - 14, hasta: hoy - 10 }, 5]);
+  assert.equal(g("custom", { desde: hoy, hasta: hoy - 1 }).id, "semanas4", "rango inválido: vuelve a 4 semanas");
+  assert.equal(g("desconocido").id, "semanas4");
+});
+
+await test("períodos: el modelo usa el núcleo con el rango elegido; «Todo el historial» no compara contra nada", () => {
+  const todo = X.buildCoachProgresoModel(params({ periodId: "todo" }));
+  const ev = Metricas.eventosPR(rows, { indiceTiempo: m.indiceTiempo });
+  assert.equal(todo.prsPeriod, ev.length, "todos los PRs del historial");
+  for (const ch of todo.alumnoChips) {
+    if (ch.key !== "alumnoAdherence" || ch.value != null) assert.match(ch.delta, /sin período anterior/, ch.key);
+    assert.equal(ch.tone, "neutral", ch.key);
+  }
+  assert.match(todo.teamChips.find((c) => c.key === "teamAdherence").delta, /sin período anterior|Sin datos/);
+  assert.deepEqual([todo.periodo.id, todo.periodo.tienePrevio, todo.volPct, todo.volMotivo], ["todo", false, null, "sin_periodo_anterior"]);
+  // volumen total del historial / semanas desde la primera serie
+  const total = Metricas.volumenEnRango(rows, { indiceTiempo: m.indiceTiempo }).total;
+  assert.ok(Math.abs(todo.volSemPromKg - total / ((Metricas.diaLocal() - Metricas.parseFechaDMY(dmy(70)) + 1) / 7)) < 1e-6);
+  // personalizado: mismos criterios en el rango pedido
+  const hoy = Metricas.diaLocal();
+  const cu = X.buildCoachProgresoModel(params({ periodId: "custom", periodCustom: { desde: hoy - 10, hasta: hoy } }));
+  assert.equal(cu.prsPeriod, Metricas.contarPRs(ev, hoy - 10, hoy));
+  assert.deepEqual([cu.periodo.desde, cu.periodo.hasta, cu.periodo.tienePrevio], [hoy - 10, hoy, true]);
+  // sin datos suficientes en 6 meses no inventa comparaciones
+  const vacio = X.buildCoachProgresoModel(params({ periodId: "meses6", progresoGlobal: {} }));
+  assert.equal(vacio.alumnoChips.find((c) => c.key === "alumnoVolume").val, "—");
+  // historial incompleto: aunque el período sea largo, ninguna comparación se presenta como real
+  const inc = X.buildCoachProgresoModel(params({ periodId: "meses6", historiaCompleta: { sesiones: true, progreso: false } }));
+  assert.match(inc.alumnoChips.find((c) => c.key === "alumnoPrs").delta, /Historial incompleto/);
+});
+
+await test("período personalizado: validación (inicio <= fin, sin fechas futuras) y conversión de fechas", () => {
+  const hoy = Metricas.dayNum(2026, 10, 30);
+  assert.equal(X.isoToDay("2026-10-30"), hoy);
+  assert.equal(X.dayToIso(hoy), "2026-10-30");
+  assert.equal(X.isoToDay("2026-02-30"), null, "fecha inexistente");
+  assert.deepEqual(X.validateCustomRange("2026-10-01", "2026-10-30", "es", hoy), { ok: true, desde: hoy - 29, hasta: hoy });
+  assert.deepEqual(X.validateCustomRange("2026-10-10", "2026-10-10", "es", hoy), { ok: true, desde: hoy - 20, hasta: hoy - 20 }, "un solo día es válido");
+  assert.match(X.validateCustomRange("2026-10-20", "2026-10-10", "es", hoy).error, /anterior o igual/);
+  assert.match(X.validateCustomRange("2026-10-20", "2026-11-02", "es", hoy).error, /posterior a hoy/);
+  assert.match(X.validateCustomRange("", "2026-10-10", "es", hoy).error, /Elegí/);
+});
+
+await test("hoja «Período»: seis opciones (radio), la elegida marcada, fechas nativas al elegir Personalizado, aviso si falta historial", () => {
+  assert.deepEqual(X.PERIOD_IDS, ["semanas4", "semanas8", "meses3", "meses6", "todo", "custom"]);
+  const html = renderToStaticMarkup(h(X.PeriodSheetContent, { periodo: { id: "meses6" }, onSelect() {}, lang: "es", C, P }));
+  assert.match(html, /role="radiogroup"/);
+  assert.equal((html.match(/role="radio"/g) || []).length, 6);
+  assert.match(html, /aria-checked="true"[^>]*data-qa="periodo-op-meses6"/);
+  for (const t of ["4 semanas", "8 semanas", "3 meses", "6 meses", "Todo el historial", "Personalizado"]) assert.match(html, new RegExp(">" + t + "<"));
+  assert.doesNotMatch(html, /type="date"/, "las fechas aparecen al elegir Personalizado");
+  const cu = renderToStaticMarkup(h(X.PeriodSheetContent, { periodo: { id: "custom", desde: Metricas.diaLocal() - 6, hasta: Metricas.diaLocal() }, onSelect() {}, historiaIncompleta: true, lang: "es", C, P }));
+  assert.equal((cu.match(/type="date"/g) || []).length, 2);
+  assert.match(cu, /font-size:16px/, "16 px: iOS no hace zoom al enfocar");
+  assert.match(cu, /Aplicar período/);
+  assert.equal((cu.match(/Puede faltar historial antiguo/g) || []).length, 3, "6 meses, todo y personalizado");
+  assert.equal(X.periodLabel({ id: "todo" }, "es", true), "Todo");
+  assert.match(X.periodLabel({ id: "custom", desde: Metricas.dayNum(2026, 9, 12), hasta: Metricas.dayNum(2026, 10, 30) }, "es"), /^12 sept? – 30 oct$/);
+});
+
+await test("el período no se reinicia al cambiar de alumno (estado propio de la vista, fuera del efecto de cambio de alumno)", () => {
+  const v = read("components/ProgresoView.jsx");
+  assert.match(v, /useState\(\{ id: "semanas4" \}\)/, "4 semanas al entrar");
+  const ini = v.indexOf("Nada del alumno anterior debe quedar visible");
+  const efecto = v.slice(ini, v.indexOf("[alumnoSel]", ini));
+  assert.ok(efecto.length > 0 && !/setPeriodo/.test(efecto), "el cambio de alumno no toca el período");
 });
 
 // ======================================================================= modo claro / oscuro y accesibilidad

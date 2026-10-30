@@ -13,6 +13,7 @@ import ProgressExercisesCard, { ProgressExerciseList } from "./progreso/Progress
 import ProgressTeamSection from "./progreso/ProgressTeamSection.jsx";
 import ProgressAlumnoPicker from "./progreso/ProgressAlumnoPicker.jsx";
 import ProgressSheet from "./progreso/ProgressSheet.jsx";
+import { PeriodSheetContent, periodLabel } from "./progreso/ProgressPeriodPicker.jsx";
 import { progresoTone } from "./progreso/progresoTone.js";
 import EjercicioHistorialCoach from "./coach/EjercicioHistorialCoach.jsx";
 import { useIronTrackI18n } from "../contexts/IronTrackI18nContext.jsx";
@@ -126,7 +127,8 @@ export default function ProgresoView({
   const isUnder768 = useIsUnder768();
   // Movil: margen lateral de 16 px, igual que el resto de pantallas del coach (antes 20 px).
   const S = isUnder768 ? Object.assign({}, S0, { pagePadding: 16, headerPadding: "16px 16px" }) : S0;
-  const [periodo, setPeriodo] = useState("semanas4");
+  /** Período elegido: { id } o { id: "custom", desde, hasta } (números de día). 4 semanas al entrar; no cambia al cambiar de alumno. */
+  const [periodo, setPeriodo] = useState({ id: "semanas4" });
 
   var C = useMemo(
     function () {
@@ -158,16 +160,6 @@ export default function ProgresoView({
     [C, P]
   );
 
-  var periodOpts = useMemo(
-    function () {
-      return [
-        { id: "semanas4", label: M(lang, "4 semanas", "4 weeks", "4 semanas"), short: M(lang, "4 sem", "4 wk", "4 sem") },
-        { id: "semanas8", label: M(lang, "8 semanas", "8 weeks", "8 semanas"), short: M(lang, "8 sem", "8 wk", "8 sem") },
-        { id: "meses3", label: M(lang, "3 meses", "3 months", "3 meses"), short: M(lang, "3 meses", "3 mo", "3 meses") },
-      ];
-    },
-    [lang]
-  );
   // Primer alumno (A–Z) desde el primer render: sin un cuadro intermedio de «sin alumno».
   const [alumnoSel, setAlumnoSel] = useState(function () {
     var first = (alumnos || []).slice().sort(function (a, b) {
@@ -336,7 +328,8 @@ export default function ProgresoView({
         progresoGlobal: progresoGlobal,
         rutinasSBEntrenador: rutinasSBEntrenador,
         allEx: allEx,
-        periodId: periodo,
+        periodId: periodo.id,
+        periodCustom: periodo.id === "custom" ? { desde: periodo.desde, hasta: periodo.hasta } : null,
         alumnoSel: alumnoSel,
         diaIdx: diaIdx,
         ejercicioSelId: ejercicioSelId,
@@ -470,7 +463,14 @@ export default function ProgresoView({
   }
 
   var incompleto = historiaCompleta && (!historiaCompleta.sesiones || !historiaCompleta.progreso);
-  var periodoLabel = (periodOpts.find(function (o) { return o.id === periodo; }) || periodOpts[0]).label;
+  var periodoLabel = periodLabel(periodo, lang, false);
+  var periodoSub = !model.periodo || model.periodo.tienePrevio
+    ? M(lang, "Todo el historial · comparado con el período anterior", "Whole history · compared with the previous period", "Todo o histórico · comparado com o período anterior")
+    : M(lang, "Desde el primer registro · sin período anterior para comparar", "Since the first record · no previous period to compare", "Desde o primeiro registro · sem período anterior para comparar");
+  if (incompleto) periodoSub += M(lang, " · puede faltar historial antiguo", " · older history may be missing", " · pode faltar histórico antigo");
+  function openPeriodo() {
+    setSheet({ type: "periodo" });
+  }
 
   var loadHasChartScope = rutinaActiva && diasRutina.length > 0 && (model.exerciseOptions || []).length > 0;
   var loadBody = (
@@ -531,9 +531,8 @@ export default function ProgresoView({
         alumnoName={alumnoName}
         alumnoInitials={alumnoInitials}
         alumnoSub={alumnoSub}
-        periodOpts={periodOpts}
         periodo={periodo}
-        setPeriodo={setPeriodo}
+        onOpenPeriodo={openPeriodo}
         onOpenAlumnos={function () { setSheet({ type: "alumnos" }); }}
         isUnder768={isUnder768}
       />
@@ -552,9 +551,8 @@ export default function ProgresoView({
           alumnoName={alumnoName}
           alumnoInitials={alumnoInitials}
           alumnoSub={alumnoSub}
-          periodOpts={periodOpts}
           periodo={periodo}
-          setPeriodo={setPeriodo}
+          onOpenPeriodo={openPeriodo}
           onOpenAlumnos={function () { setSheet({ type: "alumnos" }); }}
           isUnder768={isUnder768}
         />
@@ -593,7 +591,7 @@ export default function ProgresoView({
             {blockHeading(
               "progreso-periodo",
               M(lang, "Período · ", "Period · ", "Período · ") + periodoLabel,
-              M(lang, "Todo el historial · comparado con el período anterior", "Whole history · compared with the previous period", "Todo o histórico · comparado com o período anterior"),
+              periodoSub,
               P
             )}
             <ProgressSummaryCards chips={model.alumnoChips} ultimaSesion={model.ultimaSesion} lang={lang} C={C} P={P} isUnder768={isUnder768} />
@@ -668,6 +666,27 @@ export default function ProgresoView({
         <ProgressTeamSection teamChips={model.teamChips} ranking={model.ranking} rankingSessionsLine={rankingSessionsLine} lang={lang} C={C} P={P} />
       </main>
 
+      {sheet && sheet.type === "periodo" ? (
+        <ProgressSheet
+          title={M(lang, "Período", "Period", "Período")}
+          subtitle={periodLabel(periodo, lang, false)}
+          onClose={function () { setSheet(null); }}
+          closeLabel={M(lang, "Cerrar", "Close", "Fechar")}
+          C={C}
+          P={P}
+          isUnder768={isUnder768}
+          qa="periodo"
+        >
+          <PeriodSheetContent
+            periodo={periodo}
+            historiaIncompleta={!!incompleto}
+            onSelect={function (p) { setPeriodo(p); setSheet(null); }}
+            lang={lang}
+            C={C}
+            P={P}
+          />
+        </ProgressSheet>
+      ) : null}
       {sheet && sheet.type === "alumnos" ? (
         <ProgressSheet
           title={M(lang, "Elegir alumno", "Choose athlete", "Escolher aluno")}

@@ -1,6 +1,7 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
+import { PeriodButton } from "./ProgressPeriodPicker.jsx";
 
 function Avatar({ initials, size, P }) {
   return (
@@ -29,9 +30,9 @@ function Avatar({ initials, size, P }) {
  * Encabezado de Progreso: título, selector de alumno (abre la hoja de alumnos) y período.
  * `compact` = barra de 64 px que reemplaza visualmente al encabezado completo al desplazarse (ProgresoView decide cuándo);
  * `safeTop`: está pegada al borde superior de la pantalla (agrega el área segura).
+ * El período (objeto { id, desde?, hasta? }) se muestra en un botón que abre la hoja «Período» (onOpenPeriodo).
  */
-export default function ProgressHeader({ compact, safeTop, lang, C, P, alumnoName, alumnoInitials, alumnoSub, periodOpts, periodo, setPeriodo, onOpenAlumnos, isUnder768 }) {
-  var periodLabel = M(lang, "Período", "Period", "Período");
+export default function ProgressHeader({ compact, safeTop, lang, C, P, alumnoName, alumnoInitials, alumnoSub, periodo, onOpenPeriodo, onOpenAlumnos, isUnder768 }) {
   var changeAlumno = M(lang, "Cambiar alumno. Seleccionado: ", "Change athlete. Selected: ", "Trocar aluno. Selecionado: ") + alumnoName;
 
   if (compact) {
@@ -63,32 +64,7 @@ export default function ProgressHeader({ compact, safeTop, lang, C, P, alumnoNam
           </span>
           <ChevronDown size={16} color={P.muted} aria-hidden="true" style={{ flex: "none" }} />
         </button>
-        <label style={{ flex: "none", position: "relative", display: "inline-flex" }}>
-          <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" }}>{periodLabel}</span>
-          <select
-            value={periodo}
-            onChange={function (e) { setPeriodo(e.target.value); }}
-            style={{
-              appearance: "none",
-              WebkitAppearance: "none",
-              minHeight: 44,
-              padding: "0 34px 0 14px",
-              background: C.card,
-              border: "1px solid " + P.line,
-              borderRadius: 22,
-              color: C.t,
-              fontSize: 16,
-              fontWeight: 700,
-              fontFamily: "inherit",
-              cursor: "pointer",
-            }}
-          >
-            {periodOpts.map(function (o) {
-              return <option key={o.id} value={o.id}>{o.short}</option>;
-            })}
-          </select>
-          <ChevronDown size={14} color={P.muted} aria-hidden="true" style={{ position: "absolute", right: 14, top: 15, pointerEvents: "none" }} />
-        </label>
+        <PeriodButton periodo={periodo} onOpen={onOpenPeriodo} compact={true} lang={lang} C={C} P={P} />
       </div>
     );
   }
@@ -107,14 +83,15 @@ export default function ProgressHeader({ compact, safeTop, lang, C, P, alumnoNam
       <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.2, color: C.t }}>
         {M(lang, "Progreso", "Progress", "Progresso")}
       </h1>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "stretch" }}>
+      {/* alumno y período en una sola fila (56 px): el período ocupa solo su texto, el alumno el resto */}
+      <div style={{ display: "flex", gap: 8, alignItems: "stretch", maxWidth: isUnder768 ? "none" : 640 }}>
         <button
           type="button"
           onClick={onOpenAlumnos}
           aria-label={changeAlumno}
           data-qa="progreso-alumno-btn"
           style={{
-            flex: isUnder768 ? "1 1 100%" : "1 1 320px",
+            flex: "1 1 0",
             maxWidth: isUnder768 ? "none" : 420,
             minWidth: 0,
             display: "flex",
@@ -139,47 +116,7 @@ export default function ProgressHeader({ compact, safeTop, lang, C, P, alumnoNam
           </span>
           <ChevronDown size={20} color={P.muted} aria-hidden="true" style={{ flex: "none" }} />
         </button>
-        <div
-          role="group"
-          aria-label={periodLabel}
-          style={{
-            flex: isUnder768 ? "1 1 100%" : "0 1 360px",
-            display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: 4,
-            padding: 4,
-            background: C.card,
-            border: "1px solid " + C.brd,
-            borderRadius: 12,
-            boxSizing: "border-box",
-          }}
-        >
-          {periodOpts.map(function (opt) {
-            var active = periodo === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                aria-pressed={active}
-                onClick={function () { setPeriodo(opt.id); }}
-                style={{
-                  minHeight: 44,
-                  border: "none",
-                  borderRadius: 9,
-                  background: active ? C.blue : "transparent",
-                  color: active ? "#ffffff" : P.text2,
-                  fontSize: 14,
-                  fontWeight: active ? 700 : 600,
-                  fontFamily: "inherit",
-                  cursor: "pointer",
-                  padding: "0 6px",
-                }}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+        <PeriodButton periodo={periodo} onOpen={onOpenPeriodo} compact={false} short={isUnder768} lang={lang} C={C} P={P} />
       </div>
     </header>
   );

@@ -13,7 +13,11 @@ import { buildProgresoDemoData } from './progresoCoachDemoData.js';
  */
 export default function ProgresoCoachDemo() {
   const [darkMode, setDarkMode] = React.useState(true);
-  const data = React.useMemo(buildProgresoDemoData, []);
+  // ?incompleto=1 en la URL simula un historial que no se cargó completo (solo lectura de la URL; no se guarda nada).
+  const incompleto = React.useMemo(function () {
+    try { return new URLSearchParams(window.location.search).get('incompleto') === '1'; } catch (e) { return false; }
+  }, []);
+  const data = React.useMemo(function () { return buildProgresoDemoData({ incompleto: incompleto }); }, [incompleto]);
   const T = getAppThemeTokens(darkMode);
   const bannerText = darkMode ? '#fde68a' : '#78350f';
 
@@ -31,7 +35,7 @@ export default function ProgresoCoachDemo() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px 6px 16px', minHeight: 56, boxSizing: 'border-box' }}>
             <span style={{ flex: 'none', fontSize: 12, fontWeight: 800, letterSpacing: 0.6, color: '#0f172a', background: '#f59e0b', borderRadius: 6, padding: '2px 8px' }}>DEMO</span>
             <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: bannerText, lineHeight: 1.3 }}>
-              Progreso del entrenador · datos ficticios · no se guarda nada
+              Progreso del entrenador · datos ficticios · no se guarda nada{incompleto ? ' · historial incompleto simulado' : ''}
             </span>
             <button
               type="button"

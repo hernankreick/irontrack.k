@@ -3,7 +3,7 @@
 // (sesiones: fecha d/m/yyyy, semana 1-based, dia_idx, ciclo, origen; progreso: fecha d/m/yyyy, semana 0-based, rutina_id, ciclo).
 //
 // Alumnos (A–Z):
-//   Abril Méndez  activa · 2 rutinas (Base -> Fuerza) · 2 ciclos de Fuerza · PRs · ejercicio personalizado y por tiempo · 1 validada
+//   Abril Méndez  activa · 3 rutinas (Inicial hace ~7 meses -> Base -> Fuerza) · 2 ciclos de Fuerza · PRs · ejercicio personalizado y por tiempo · 1 validada
 //   Carla Sosa    inactiva (última sesión hace 23 días)
 //   Diego Lima    rutina asignada hace 5 días · solo primeras marcas (0 PRs)
 //   Julián Paz    estancado: récord hace más de 3 semanas, entrena pero sin superarlo (iguala)
@@ -49,7 +49,8 @@ const ex = (id, reps) => (reps ? { id, reps } : { id });
 const dias = (...listas) => listas.map((l, i) => ({ label: "Día " + (i + 1), warmup: l.warmup || [], exercises: l.exercises || l }));
 
 /** Construye rutinas, sesiones y series en memoria. Llamar en cada carga de la página (fechas relativas a hoy). */
-export function buildProgresoDemoData() {
+export function buildProgresoDemoData(opts) {
+  const o = opts || {};
   const rutinas = [
     { id: "demo-r-abril-base", alumno_id: "demo-abril", nombre: "Base", created_at: iso(110), datos: { days: dias([ex("demo-sq"), ex("demo-bp"), ex("demo-row")]) } },
     {
@@ -104,7 +105,10 @@ export function buildProgresoDemoData() {
   }
   const tres = (kg, reps) => [[kg - 5, reps], [kg - 2.5, reps], [kg, reps]];
 
-  // ---- Abril: rutina Base (6 semanas) -> Fuerza ciclo 1 (4 semanas) -> Fuerza ciclo 2 (semana 3 en curso)
+  // ---- Abril: rutina Inicial (hace ~7 meses, ya no existe) -> Base (6 semanas) -> Fuerza ciclo 1 (4 semanas) -> Fuerza ciclo 2 (semana 3)
+  [[215, 50, 30], [208, 52.5, 32.5], [201, 55, 32.5], [194, 55, 35]].forEach(([n, sq, bp], i) => {
+    sesion("demo-abril", "demo-r-abril-inicial", "Inicial", n, i + 1, 0, 1, { "demo-sq": tres(sq, 8), "demo-bp": tres(bp, 8) });
+  });
   [[100, 60, 40, 40], [93, 65, 42.5, 42.5], [86, 67.5, 42.5, 45], [79, 70, 45, 45], [72, 72.5, 45, 47.5], [65, 75, 47.5, 50]].forEach(([n, sq, bp, row], i) => {
     sesion("demo-abril", "demo-r-abril-base", "Base", n, (i % 4) + 1, 0, 1, { "demo-sq": tres(sq, 5), "demo-bp": tres(bp, 8), "demo-row": tres(row, 8) });
   });
@@ -173,6 +177,7 @@ export function buildProgresoDemoData() {
     sesionesGlobales: sesiones,
     progresoGlobal: progresoGlobal,
     allEx: DEMO_CATALOGO,
-    historiaCompleta: { sesiones: true, progreso: true },
+    // `incompleto`: simula que el historial no se pudo cargar completo (para probar los avisos), sin tocar los datos.
+    historiaCompleta: o.incompleto ? { sesiones: true, progreso: false } : { sesiones: true, progreso: true },
   };
 }

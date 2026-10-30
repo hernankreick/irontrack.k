@@ -3,7 +3,8 @@
 //   Sin --dist compila Preview simulado (backend .invalid) y ADEMÁS Production, para verificar que la demo no se genera allí.
 // Verifica: la demo existe en Preview y NO en Production; ningún pedido a otro host que el servidor local (se registran y se abortan;
 // cualquier host de Supabase o *.invalid falla); sin escrituras en localStorage/sessionStorage; sin overflow horizontal ni controles
-// < 44 px; y las interacciones reales: período, punto del gráfico de carga, barra compacta al desplazarse, hoja de alumnos, Equipo,
+// < 44 px; y las interacciones reales: selector de período (6 opciones, personalizado con validación, se conserva al cambiar
+// de alumno, también desde la barra compacta, historial incompleto con ?incompleto=1), punto del gráfico de carga, barra compacta al desplazarse, hoja de alumnos, Equipo,
 // buscador de ejercicios, historial (Escape cierra) y modo claro/oscuro. Escribe capturas y summary.json en --out.
 import fs from "node:fs";
 import os from "node:os";
@@ -111,10 +112,46 @@ async function main() {
     const m0 = await page.evaluate(MEASURE);
     await shot("01_inicio");
     await page.screenshot({ path: path.join(o.out, width + "_00_completa.png"), fullPage: true });
-    // período
-    await page.getByRole("button", { name: "8 semanas", exact: true }).first().click(); await wait(300);
-    f.periodo = (await page.getByRole("button", { name: "8 semanas", exact: true }).first().getAttribute("aria-pressed")) === "true" && /Período · 8 semanas/i.test(await text());
-    await page.getByRole("button", { name: "4 semanas", exact: true }).first().click(); await wait(300);
+    // período: 4 semanas al entrar; cada opción cambia las tarjetas; personalizado valida; se conserva al cambiar de alumno
+    const headingPeriodo = () => page.locator("#progreso-periodo").innerText();
+    const cards = () => page.locator('[data-qa="seccion-periodo"]').innerText();
+    f.periodoInicial = /4 semanas/i.test(await headingPeriodo());
+    const abrirPeriodo = async () => { await page.locator('[data-qa="periodo-btn"]').click(); await wait(300); return page.locator('[data-qa-sheet="periodo"]').isVisible(); };
+    f.periodoAbre = await abrirPeriodo();
+    f.periodoOpciones = (await page.locator('[data-qa-sheet="periodo"] [role="radio"]').count()) === 6;
+    await shot("01b_periodo");
+    await page.keyboard.press("Escape"); await wait(250);
+    f.periodoCierra = !(await page.locator('[data-qa-sheet="periodo"]').count());
+    const vistos = {};
+    for (const [id, re] of [["semanas8", /8 semanas/i], ["meses3", /3 meses/i], ["meses6", /6 meses/i], ["todo", /todo el historial/i], ["semanas4", /4 semanas/i]]) {
+      await abrirPeriodo();
+      await page.locator('[data-qa="periodo-op-' + id + '"]').click(); await wait(350);
+      const ok = re.test(await headingPeriodo()) && !(await page.locator('[data-qa-sheet="periodo"]').count());
+      vistos[id] = await cards();
+      if (!ok) f["periodo_" + id] = false;
+    }
+    f.periodoCambiaTarjetas = vistos.semanas4 !== vistos.meses6 && /sin período anterior/i.test(vistos.todo);
+    // personalizado: rango inválido muestra error; uno válido se aplica
+    await abrirPeriodo();
+    await page.locator('[data-qa="periodo-op-custom"]').click(); await wait(250);
+    const fechas = page.locator('[data-qa-sheet="periodo"] input[type="date"]');
+    f.fechasNativas = (await fechas.count()) === 2 && (await fechas.first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize) >= 16 && e.getBoundingClientRect().height >= 44));
+    const iso = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+    await fechas.nth(0).fill(iso(10)); await fechas.nth(1).fill(iso(20));
+    await page.locator('[data-qa="periodo-aplicar"]').click(); await wait(250);
+    f.personalizadoInvalido = /anterior o igual/.test(await page.locator('[data-qa-sheet="periodo"] [role="alert"]').innerText().catch(() => ""));
+    await shot("01c_personalizado_error");
+    await fechas.nth(0).fill(iso(40)); await fechas.nth(1).fill(iso(10));
+    await page.locator('[data-qa="periodo-aplicar"]').click(); await wait(350);
+    f.personalizadoAplicado = !(await page.locator('[data-qa-sheet="periodo"]').count()) && / – /.test(await headingPeriodo());
+    // cambio de alumno conserva el período
+    await page.locator('[data-qa="progreso-alumno-btn"]').click(); await wait(300);
+    await page.locator('[data-qa-sheet="alumnos"] button', { hasText: "Tomás Ruiz" }).first().click(); await wait(400);
+    f.periodoSeConservaAlCambiarAlumno = / – /.test(await headingPeriodo());
+    await page.locator('[data-qa="progreso-alumno-btn"]').click(); await wait(300);
+    await page.locator('[data-qa-sheet="alumnos"] button', { hasText: "Abril Méndez" }).first().click(); await wait(400);
+    await abrirPeriodo();
+    await page.locator('[data-qa="periodo-op-semanas4"]').click(); await wait(350);
     // gráfico de carga: tocar un punto con dato lo selecciona
     const pts = page.locator("[data-qa-load-point]");
     f.puntosGrafico = await pts.count();
@@ -128,6 +165,10 @@ async function main() {
       return getComputedStyle(c.parentElement).visibility === "visible" && Math.abs(c.getBoundingClientRect().top - b.bottom) <= 1;
     });
     await shot("02_compacta");
+    f.compactaPeriodo = /4 sem/.test(await page.locator('[data-qa="periodo-btn-compacto"]').innerText());
+    await page.locator('[data-qa="periodo-btn-compacto"]').click(); await wait(300);
+    f.compactaAbreSelector = await page.locator('[data-qa-sheet="periodo"]').isVisible();
+    await page.keyboard.press("Escape"); await wait(250);
     await page.evaluate(() => window.scrollTo(0, 0)); await wait(300);
     // hoja de alumnos -> Julián (estancado)
     await page.locator('[data-qa="progreso-alumno-btn"]').click(); await wait(300);
@@ -167,12 +208,27 @@ async function main() {
     const m1 = await page.evaluate(MEASURE);
     await page.evaluate(() => window.scrollTo(0, 0)); await wait(200);
     await shot("07_claro");
+    await page.locator('[data-qa="periodo-btn"]').click(); await wait(300);
+    await page.locator('[data-qa="periodo-op-custom"]').click(); await wait(250);
+    f.selectorClaro = await page.locator('[data-qa-sheet="periodo"]').isVisible();
+    await shot("07b_claro_periodo");
+    m1.small = m1.small.concat((await page.evaluate(MEASURE)).small);
+    await page.keyboard.press("Escape"); await wait(200);
     await page.screenshot({ path: path.join(o.out, width + "_08_claro_completa.png"), fullPage: true });
+    // historial incompleto simulado: aviso en la página y en las opciones largas del selector, sin comparaciones
+    await page.goto("http://127.0.0.1:" + port + "/" + DEMO + "?incompleto=1", { waitUntil: "load" });
+    await page.waitForSelector('[data-qa="historial-incompleto"]', { timeout: 15000 }).catch(() => null);
+    f.incompletoAviso = (await page.locator('[data-qa="historial-incompleto"]').count()) === 1 && /puede faltar historial/i.test(await page.locator("#progreso-periodo").locator("..").innerText());
+    await page.locator('[data-qa="periodo-btn"]').click(); await wait(300);
+    f.incompletoEnSelector = (await page.locator('[data-qa-sheet="periodo"]').innerText()).match(/Puede faltar historial antiguo/g)?.length === 3;
+    await shot("09_incompleto_selector");
+    await page.keyboard.press("Escape"); await wait(200);
+    f.incompletoSinComparar = /Historial incompleto: sin comparación/.test(await page.locator('[data-qa="seccion-periodo"]').innerText());
     const writes = await page.evaluate(() => window.__storageWrites);
     const badHosts = external.filter((e) => /supabase|\.invalid/i.test(e));
     const r = { id, flujos: f, small: m0.small.concat(m1.small), overflow: m0.overflow || m1.overflow, externos: [...new Set(external)], escrituras: writes, errores: errors };
     results.push(r);
-    for (const [k, v] of Object.entries(f)) if (v === false || v === 0) failures.push(id + ": flujo " + k);
+    for (const [k, v] of Object.entries(f)) if (v === false || v === 0 || v === undefined) failures.push(id + ": flujo " + k);
     if (r.small.length) failures.push(id + ": controles < 44 px " + JSON.stringify(r.small));
     if (r.overflow) failures.push(id + ": overflow horizontal");
     if (badHosts.length) failures.push(id + ": pedidos a Supabase/backend " + badHosts.join(", "));
