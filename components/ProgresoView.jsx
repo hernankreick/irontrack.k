@@ -107,6 +107,7 @@ function emptyBox(lang, title, palette) {
  *  progresoGlobal?: object,
  *  rutinasSBEntrenador?: array,
  *  allEx?: array,
+ *  historiaCompleta?: { sesiones: boolean, progreso: boolean } | null,  // false => historial truncado (lib/coachHistoryLoader.js)
  *  es?: boolean,
  *  darkMode?: boolean,
  * }} props
@@ -118,6 +119,7 @@ export default function ProgresoView({
   rutinasSBEntrenador = [],
   allEx = [],
   darkMode = true,
+  historiaCompleta = null,
 }) {
   const { lang } = useIronTrackI18n();
   const isUnder768 = useIsUnder768();
@@ -722,6 +724,20 @@ export default function ProgresoView({
           gap: S.pageGap,
         }}
       >
+        {historiaCompleta && (!historiaCompleta.sesiones || !historiaCompleta.progreso) ? (
+          <div
+            role="status"
+            data-qa="historial-incompleto"
+            style={{ ...T.meta, color: C.yel, background: C.cardDark, border: "1px solid " + C.brd, borderRadius: 10, padding: "10px 12px", lineHeight: 1.45 }}
+          >
+            {M(
+              lang,
+              "No se pudo cargar todo el historial de tus alumnos. Algunas estadísticas pueden estar incompletas; se reintentará automáticamente.",
+              "Your athletes' full history could not be loaded. Some statistics may be incomplete; it will retry automatically.",
+              "Não foi possível carregar todo o histórico dos seus alunos. Algumas estatísticas podem estar incompletas; será tentado novamente."
+            )}
+          </div>
+        ) : null}
         {/* ===== ALUMNO SELECCIONADO: todo lo de esta sección depende de alumnoSel ===== */}
         <section data-section="alumno" style={{ display: "flex", flexDirection: "column", gap: S.pageGap, minWidth: 0 }}>
           {sectionTitle(M(lang, "Alumno seleccionado", "Selected athlete", "Aluno selecionado"))}

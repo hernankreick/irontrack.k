@@ -139,15 +139,18 @@ test("fetchAllPages: error en la 1a pagina => null (reintento); error posterior 
   const r = await fetchAllPages(async () => pages.shift(), { pageSize: 10 });
   assert.equal(r.length, 10);
 });
-test("App.jsx: progreso paginado (orden estable created_at,id), ciclo sin rutina_id y reintento sin ciclo", async () => {
+test("App.jsx + lib/coachHistoryLoader.js: progreso paginado (orden estable created_at,id), ciclo sin rutina_id y reintento sin ciclo", async () => {
   const { readFileSync } = await import("node:fs");
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
-  assert.match(app, /PROGRESO_COLS = 'alumno_id,ejercicio_id,kg,reps,fecha,semana'/);
-  assert.match(app, /PROGRESO_COLS_CICLO = PROGRESO_COLS \+ ',ciclo'/);
-  assert.match(app, /order=created_at\.desc,id\.desc&limit=' \+ size \+ '&offset=' \+ offset/);
-  assert.match(app, /fetchAllPages\(progresoPage\(idsStr, PROGRESO_COLS_CICLO\)\)/);
-  assert.match(app, /results\[1\] = await fetchAllPages\(progresoPage\(idsStr, PROGRESO_COLS\)\)/);
+  const lib = readFileSync(new URL("../lib/coachHistoryLoader.js", import.meta.url), "utf8");
+  // E0: las columnas viven en el loader; `id` y `created_at` permiten el refresco incremental sin duplicar
+  assert.match(lib, /PROGRESO_COLS = "id,alumno_id,ejercicio_id,kg,reps,fecha,semana,created_at"/);
+  assert.match(lib, /PROGRESO_COLS_CICLO = PROGRESO_COLS \+ ",ciclo"/);
+  assert.match(lib, /if \(fP\.failedFirst\) \{[\s\S]*?cols = PROGRESO_COLS;/, "reintento sin la columna ciclo");
+  assert.match(app, /'&order=created_at\.desc,id\.desc&limit=' \+ size \+ '&offset=' \+ offset/);
+  assert.match(app, /syncCoachHistory\(\{/);
   assert.doesNotMatch(app, /progreso\?alumno_id=in[^\n]*rutina_id/);
+  assert.doesNotMatch(app, /sesiones\?alumno_id=in\.\([^\n]*limit=500/, "sin el tope de 500 sesiones del roster");
 });
 
 // ---- Mismo ejercicio en varios dias de la rutina (caso Catalina: Hip thrust "hip" en Dia 1 y Dia 3, ciclo 2) ----
