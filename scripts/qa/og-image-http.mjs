@@ -37,7 +37,7 @@ const results = [];
 const check = (name, ok, detail = "") => { results.push(ok); console.log((ok ? "OK   " : "FAIL ") + name + (detail ? "  " + detail : "")); };
 
 try {
-  const img = await fetch(base + "/og-image.png?v=1", { redirect: "manual", headers: { "User-Agent": "WhatsApp/2.23 A" } });
+  const img = await fetch(base + "/og-image.png?v=2", { redirect: "manual", headers: { "User-Agent": "WhatsApp/2.23 A" } });
   const buf = Buffer.from(await img.arrayBuffer());
   const ct = img.headers.get("content-type") || "";
   check("/og-image.png responde HTTP 200", img.status === 200, "status " + img.status);
@@ -48,7 +48,7 @@ try {
   const page = await fetch(base + "/", { redirect: "manual", headers: { "User-Agent": "facebookexternalhit/1.1" } });
   const html = await page.text();
   check("/ responde HTTP 200", page.status === 200, "status " + page.status);
-  for (const tag of ['property="og:image" content="https://irontrack-k.vercel.app/og-image.png?v=1"', 'property="og:title" content="IronTrack"', 'property="og:url"', 'property="og:description"', 'name="twitter:card" content="summary_large_image"']) {
+  for (const tag of ['property="og:image" content="https://irontrack-k.vercel.app/og-image.png?v=2"', 'property="og:title" content="IronTrack"', 'property="og:url"', 'property="og:description"', 'name="twitter:card" content="summary_large_image"']) {
     check("HTML inicial trae " + tag.split(" ")[0], html.includes(tag));
   }
 } catch (e) {
