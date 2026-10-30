@@ -590,6 +590,7 @@ export default function CoachDashboard({
   sesionesGlobales = [],
   mensajesEntrenadorPendientes = [],
   progresoGlobal = {},
+  historiaCompleta = null,
   rutinasSBEntrenador = [],
   allEx = [],
   lang = "es",
@@ -746,6 +747,7 @@ export default function CoachDashboard({
         alumnos={alumnos}
         sesionesGlobales={sesionesGlobales}
         progresoGlobal={progresoGlobal}
+        historiaCompleta={historiaCompleta}
         rutinasSBEntrenador={rutinasSBEntrenador}
         allEx={allEx}
         darkMode={darkMode}

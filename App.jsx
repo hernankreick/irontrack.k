@@ -27,7 +27,7 @@ import {
   isValidUuid,
 } from './lib/appHelpers.js';
 import { alumnosIdsKey } from './lib/coachAlumnosLoad.js';
-import { fetchAllPages } from './lib/progressPaging.js';
+import { syncCoachHistory, groupByAlumno } from './lib/coachHistoryLoader.js';
 import { getYTVideoId } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
 import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVideoUrl, isValidHttpUrlString, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from './lib/exerciseResolve.js';
@@ -335,13 +335,13 @@ const sbFetchStrict = async (path) => {
   return text ? JSON.parse(text) : [];
 };
 
-// Progreso de todos los alumnos paginado de a 1000 filas (tope por defecto de PostgREST): una sola consulta con limit=3000 se truncaba
-// y descartaba primero las semanas mas antiguas. Orden estable (created_at, id) para que las paginas no se solapen.
-const PROGRESO_COLS = 'alumno_id,ejercicio_id,kg,reps,fecha,semana';
-const PROGRESO_COLS_CICLO = PROGRESO_COLS + ',ciclo';
-const progresoPage = function(idsStr, cols) {
+// Historial del roster del entrenador (sesiones y progreso) paginado de a 1000 filas (tope por defecto de PostgREST), orden estable
+// (created_at, id). sinceIso (opcional): solo filas con created_at >= sinceIso (refresco incremental). Ver lib/coachHistoryLoader.js.
+const coachHistoryPage = function(table, idsStr, cols, sinceIso) {
   return function(offset, size) {
-    return sbFetch('progreso?alumno_id=in.(' + idsStr + ')&select=' + cols + '&order=created_at.desc,id.desc&limit=' + size + '&offset=' + offset);
+    return sbFetch(table + '?alumno_id=in.(' + idsStr + ')&select=' + cols +
+      (sinceIso ? '&created_at=gte.' + encodeURIComponent(sinceIso) : '') +
+      '&order=created_at.desc,id.desc&limit=' + size + '&offset=' + offset);
   };
 };
 
@@ -825,33 +825,56 @@ function GymApp() {
     return out;
   }, [progresoGlobal, alumnosActivosIds]);
 
-  const cargarSesionesGlobales = React.useCallback(async function(alumnosActuales) {
+  // Historial COMPLETO del roster para Progreso y Estadisticas (lib/coachHistoryLoader.js): carga completa paginada al cambiar los
+  // alumnos, despues de cada accion (llamada sin opciones) y cada 5 min; el tick de 30 s pide solo lo nuevo (opts.incremental).
+  // coachHistoriaCompleta: { sesiones, progreso } = false si el historial quedo truncado o una pagina fallo (Progreso lo avisa).
+  const coachHistoryRef = React.useRef({ sesiones: null, progreso: null, state: {}, seq: 0, fullSeq: 0, inFlight: 0 });
+  const [coachHistoriaCompleta, setCoachHistoriaCompleta] = useState(null);
+  const cargarSesionesGlobales = React.useCallback(async function(alumnosActuales, opts) {
+    var o = opts || {};
     var lista = alumnosActuales || alumnosActivosLimpios;
     // La lista de alumnos la carga solo cargarAlumnos; aca no se reconsulta (sin segundo escritor).
     if(!lista || lista.length === 0) return;
+    var H = coachHistoryRef.current;
+    // un tick incremental no se apila sobre otra carga en vuelo
+    if(o.incremental && H.inFlight > 0) return;
+    var my = ++H.seq;
+    var forceFull = !o.incremental;
+    if(forceFull) H.fullSeq = my;
+    H.inFlight++;
     try {
       lista = cleanActiveCoachAlumnos(lista, ENTRENADOR_ID);
       var ids = lista.map(function(a){return a.id}).filter(function(id){return id && typeof id === 'string'});
       if(ids.length === 0) return;
       var idsStr = ids.join(',');
       var results = await Promise.all([
-        sbFetch('sesiones?alumno_id=in.(' + idsStr + ')&select=*&order=created_at.desc&limit=500'),
-        fetchAllPages(progresoPage(idsStr, PROGRESO_COLS_CICLO)),
+        syncCoachHistory({
+          pageSesiones: function(sinceIso) { return coachHistoryPage('sesiones', idsStr, '*', sinceIso); },
+          pageProgreso: function(cols, sinceIso) { return coachHistoryPage('progreso', idsStr, cols, sinceIso); },
+          prev: { sesiones: H.sesiones, progreso: H.progreso, state: H.state },
+          rosterKey: ids.slice().sort().join(','),
+          forceFull: forceFull,
+          now: Date.now(),
+        }),
         sbFetch('mensajes?alumno_id=in.(' + idsStr + ')&de_entrenador=eq.false&or=(leido.is.null,leido.eq.false)&select=*&order=created_at.desc&limit=200'),
       ]);
-      // `ciclo` separa los ciclos de una rutina reiniciada. Si la columna no existiera (400), se reintenta sin ella.
-      if(!Array.isArray(results[1])) results[1] = await fetchAllPages(progresoPage(idsStr, PROGRESO_COLS));
-      if(results[0] && Array.isArray(results[0])) setSesionesGlobales(results[0]);
-      if(results[1] && Array.isArray(results[1])) {
-        var idx2 = {};
-        results[1].forEach(function(reg) {
-          if(!idx2[reg.alumno_id]) idx2[reg.alumno_id] = [];
-          idx2[reg.alumno_id].push(reg);
-        });
-        setProgresoGlobal(idx2);
+      var sync = results[0];
+      // Una carga completa iniciada despues invalida este resultado (evita que un resultado viejo pise uno nuevo); un cierre de sesion
+      // en el medio reemplaza la referencia y tambien lo invalida (no se aplican datos del entrenador anterior).
+      var superseded = coachHistoryRef.current !== H || (forceFull ? H.fullSeq !== my : H.fullSeq > my);
+      if(!superseded) {
+        H.state = sync.state;
+        if(sync.ok) {
+          H.sesiones = sync.sesiones;
+          H.progreso = sync.progreso;
+          setSesionesGlobales(sync.sesiones);
+          setProgresoGlobal(groupByAlumno(sync.progreso));
+        }
+        if(sync.state && sync.state.complete) setCoachHistoriaCompleta(Object.assign({}, sync.state.complete));
       }
-      if(results[2] && Array.isArray(results[2])) setMensajesEntrenadorPendientes(results[2]);
+      if(results[1] && Array.isArray(results[1])) setMensajesEntrenadorPendientes(results[1]);
     } catch(e) { console.error('[cargarSesionesGlobales]', e); }
+    finally { H.inFlight--; }
   }, [alumnosActivosLimpios, ENTRENADOR_ID]);
 
   // Refs para que el intervalo use siempre la version vigente (sin cierres obsoletos).
@@ -880,7 +903,7 @@ function GymApp() {
     if(!sessionData || sessionData.role!=='entrenador') return;
     var intervalo = setInterval(function() {
       refrescarAlumnos();
-      if(cargarSesionesGlobalesRef.current) cargarSesionesGlobalesRef.current();
+      if(cargarSesionesGlobalesRef.current) cargarSesionesGlobalesRef.current(null, { incremental: true });
     }, 30000);
     return function() { clearInterval(intervalo); };
   }, [sessionData?.role, sessionData?.entrenadorId, refrescarAlumnos]);
@@ -1294,6 +1317,8 @@ function GymApp() {
     setAlumnoProgreso([]);
     setSesionesGlobales([]);
     setProgresoGlobal({});
+    coachHistoryRef.current = { sesiones: null, progreso: null, state: {}, seq: 0, fullSeq: 0, inFlight: 0 };
+    setCoachHistoriaCompleta(null);
     setMensajesEntrenadorPendientes([]);
     setRutinasSBEntrenador([]);
     setRutinasSB([]);
@@ -2452,10 +2477,8 @@ function GymApp() {
         var freshSes = await sb.getSesiones(aid);
         var freshProg = await sb.getProgreso(aid);
         if (Array.isArray(freshSes) && alumnoActivo && String(alumnoActivo.id) === aid) setAlumnoSesiones(freshSes);
-        if (Array.isArray(freshProg)) {
-          if (alumnoActivo && String(alumnoActivo.id) === aid) setAlumnoProgreso(freshProg);
-          setProgresoGlobal(function (prev) { var next = Object.assign({}, prev || {}); next[aid] = freshProg; return next; });
-        }
+        // progresoGlobal ya quedo completo con cargarSesionesGlobales(); getProgreso no pagina y no debe reemplazarlo.
+        if (Array.isArray(freshProg) && alumnoActivo && String(alumnoActivo.id) === aid) setAlumnoProgreso(freshProg);
       }
     } catch (e) {
       // El reinicio YA quedo guardado; si falla el refresco, la UI se corrige al recargar.
@@ -3165,6 +3188,7 @@ function GymApp() {
         sesionesGlobales: sesionesGlobalesLimpias,
         mensajesEntrenadorPendientes: mensajesEntrenadorPendientes,
         progresoGlobal: progresoGlobalLimpio,
+        historiaCompleta: coachHistoriaCompleta,
         rutinasSBEntrenador: rutinasSBEntrenadorLimpias,
         allEx: allEx,
         lang: lang,

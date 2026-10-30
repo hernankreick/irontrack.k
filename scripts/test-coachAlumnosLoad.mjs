@@ -248,7 +248,8 @@ await test("17. cableado: el hook no lee it_session; login actual intacto; un so
 });
 
 await test("18. cableado de efectos: intervalo de 30 s sin cierres obsoletos, reset por identidad, sin ciclos", () => {
-  assert.ok(/cargarSesionesGlobalesRef\.current\(\)/.test(app), "el intervalo usa la version vigente via ref");
+  // E0: el tick de 30 s es incremental (lib/coachHistoryLoader.js); sigue usando la version vigente via ref
+  assert.ok(/cargarSesionesGlobalesRef\.current\(null, \{ incremental: true \}\)/.test(app), "el intervalo usa la version vigente via ref");
   assert.ok(/refrescarAlumnos\(\);/.test(app) && /30000\)/.test(app));
   assert.ok(/return function\(\) \{ resetAlumnos\(\); \}/.test(app), "reset al cambiar identidad / cerrar sesion");
   assert.ok(/\[sessionData\?\.role, alumnosIdsClave\]/.test(app), "sesiones/rutinas dependen de la clave de ids, no del array");
