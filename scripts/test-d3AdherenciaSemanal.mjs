@@ -207,33 +207,42 @@ function renderDash(over) {
   }).coachAlumnoCategoria;
   return strip(renderToStaticMarkup(h(CoachDashboard, Object.assign({ getAlumnoCategoria: cat }, props))));
 }
+/** D5: la fila del alumno en «Actividad reciente» -> { cuando, pct (null si no se informa), texto }. */
 function filaTabla(t, nombre) {
-  const i = t.indexOf(" " + nombre + " ", t.indexOf("ALUMNO ADHERENCIA (SEMANA)"));
-  assert.ok(i >= 0, nombre);
-  return t.slice(i, t.indexOf("Mensaje", i));
+  const m = t.match(new RegExp(" " + nombre + " (Hoy|Ayer|Hace \\d+ días)(?: · (\\d+)% esta semana)?([^]*?)(?= [A-Z] [A-ZÁÉÍÓÚ]|Acciones rápidas|$)"));
+  assert.ok(m, "fila reciente de " + nombre);
+  return { cuando: m[1], pct: m[2] == null ? null : Number(m[2]), texto: m[0] };
+}
+/** Texto de una estadistica del resumen «Esta semana» del Dashboard D5. */
+function statTxt(t, etiqueta) {
+  const m = t.match(new RegExp(etiqueta + " ([^]*?)(?= (?:Alumnos|Entrenaron|Adherencia|Seguimiento) |Requieren seguimiento| Cargando datos)"));
+  assert.ok(m, etiqueta);
+  return m[1];
 }
 
 await test("SSR: rutina recien asignada (misma lista para categoria y metricas) -> 'Rutina nueva', no 'Sin datos' ni 'Sin rutina'", () => {
   const t = renderDash();
   const k = filaTabla(t, "Kim");
-  assert.match(k, /Rutina nueva/);
-  assert.doesNotMatch(k, /Sin datos|Sin rutina/);
-  assert.match(filaTabla(t, "Beto"), /Sin rutina/);
+  assert.match(k.texto, /Rutina nueva/);
+  assert.doesNotMatch(k.texto, /Sin datos|Sin rutina/);
+  assert.match(t, /Sin rutina Beto 1/, "Beto (sin rutina) esta en Requieren seguimiento");
 });
 
-await test("SSR: periodo de referencia visible, delta 'vs semana pasada (lun–<hoy>)' y estados por alumno", () => {
+await test("SSR: periodo de referencia visible, delta 'pts vs sem. pasada' o 'Sin comparación', y estados por alumno", () => {
   const t = renderDash();
-  assert.match(t, /Adherencia semanal/);
-  assert.match(t, /sesiones completadas · lun \d+\/\d+ – hoy/);
-  assert.match(t, /vs semana pasada \(lun–(lun|mar|mié|jue|vie|sáb|dom)\)|Sin comparación/);
-  assert.match(filaTabla(t, "Caro"), /\b0%/, "Caro entreno hace 10 dias: 0 % esta semana");
-  assert.doesNotMatch(t, /Buen cumplimiento|Cumplimiento semanal|CUMPLIMIENTO/);
+  assert.match(t, /Esta semana lun \d+\/\d+ – hoy/);
+  assert.match(statTxt(t, "Adherencia"), /\d+% (?:[+-]?\d+ pts vs sem\. pasada|Sin comparación)/);
+  const caro = filaTabla(t, "Caro");
+  assert.equal(caro.pct, 0, "Caro entreno hace 10 dias: 0 % esta semana");
+  assert.equal(caro.cuando, "Hace 10 días");
+  assert.doesNotMatch(t, /Buen cumplimiento|Cumplimiento semanal|CUMPLIMIENTO|vs semana pasada \(/);
 });
 
-await test("SSR: historial de sesiones incompleto -> 'Sin comparación' (sin porcentaje de variacion)", () => {
+await test("SSR: historial de sesiones incompleto -> 'Sin comparación (historial incompleto)' (sin delta) y aviso", () => {
   const t = renderDash({ historiaCompleta: { sesiones: false, progreso: true } });
-  assert.match(t, /Sin comparación/);
-  assert.doesNotMatch(t, /[+-]\d+% vs semana pasada/);
+  assert.match(t, /Sin comparación \(historial incompleto\)/);
+  assert.match(t, /Historial incompleto: puede faltar actividad antigua/);
+  assert.doesNotMatch(t, /pts vs|[+-]\d+% vs semana pasada/);
 });
 
 // ======================================================================= coherencia con Progreso
@@ -245,9 +254,9 @@ await test("coherencia: el % del Dashboard es el mismo que Progreso calcula para
   });
   const t = renderDash();
   const team = m.teamChips.find((c) => c.key === "teamAdherence");
-  assert.match(t, new RegExp("Adherencia semanal \\d+ / \\d+ " + team.value + "%"), "promedio de equipo = Progreso (" + team.value + "%)");
+  assert.match(statTxt(t, "Adherencia"), new RegExp("^" + team.value + "% "), "promedio de equipo = Progreso (" + team.value + "%)");
   for (const r of m.adherenciaRows) {
-    assert.match(filaTabla(t, r.n), new RegExp("\\b" + r.p + "%"), r.n + " = " + r.p + "% en Progreso");
+    assert.equal(filaTabla(t, r.n).pct, r.p, r.n + " = " + r.p + "% en Progreso");
   }
   assert.equal(m.adherenciaRows.length, 3, "Ana, Caro y Kim tienen plan; Beto no");
 });
@@ -265,28 +274,24 @@ function alumnosYSesiones(spec) {
   });
   return { alumnos: als, rutinasSBEntrenador: ruts, sesionesGlobales: ss };
 }
-const visibleTxt = (t) => t.split("Alertas inteligentes")[0];
 
-await test("objetivo: promedio 88 % (1/1, 1/1, 1/1, 5/10) -> 'en objetivo' y SIN 'faltan N sesiones' (antes: 'Te faltan 3 sesiones')", () => {
-  const t = visibleTxt(renderDash(alumnosYSesiones([[1, 1], [1, 1], [1, 1], [5, 10]])));
-  assert.match(t, /Adherencia semanal 8 \/ 13 88%/);
-  assert.match(t, /Semana en objetivo/);
-  assert.match(t, /Objetivo semanal alcanzado: adherencia promedio 88%/);
-  assert.match(t, /3 de 4 alumnos con plan en el 80% o más/);
-  assert.doesNotMatch(t, /Te faltan|sesiones para llegar|sesiones para el objetivo/);
+await test("promedio 88 % (1/1, 1/1, 1/1, 5/10): se informa el promedio de porcentajes y NO hay objetivo ni 'faltan N sesiones' (antes: 'Te faltan 3 sesiones')", () => {
+  const t = renderDash(alumnosYSesiones([[1, 1], [1, 1], [1, 1], [5, 10]]));
+  assert.match(statTxt(t, "Adherencia"), /^88% /);
+  assert.doesNotMatch(t, /Te faltan|sesiones para llegar|sesiones para el objetivo|Semana en objetivo|Objetivo semanal|80%|\b8 \/ 13\b/);
 });
 
-await test("objetivo: promedio 45 % (9/10, 0/1) -> NO 'Objetivo semanal alcanzado' (antes: alcanzado por totales 9/11)", () => {
-  const t = visibleTxt(renderDash(alumnosYSesiones([[9, 10], [0, 1]])));
-  assert.match(t, /Adherencia semanal 9 \/ 11 45%/);
-  assert.match(t, /Adherencia promedio 45% · objetivo 80%/);
-  assert.match(t, /1 de 2 alumnos con plan en el 80% o más/);
-  assert.doesNotMatch(t, /Objetivo semanal alcanzado|Semana en objetivo|Te faltan/);
+await test("promedio 45 % (9/10, 0/1): el promedio no es el cociente de los totales (9/11 = 82 %) y no hay 'Objetivo semanal alcanzado'", () => {
+  const t = renderDash(alumnosYSesiones([[9, 10], [0, 1]]));
+  assert.match(statTxt(t, "Adherencia"), /^45% /);
+  assert.doesNotMatch(t, /Objetivo semanal alcanzado|Semana en objetivo|Te faltan|80%|\b9 \/ 11\b/);
 });
 
-await test("objetivo: el codigo ya no calcula sesiones faltantes con los totales", () => {
-  const src = read("components/CoachDashboard.jsx");
-  assert.doesNotMatch(src, /faltanObjetivo|objetivoSesiones|Math\.ceil\(\(sesionesTotales/);
+await test("objetivo: el codigo ya no calcula sesiones faltantes con los totales ni fija un objetivo del 80 %", () => {
+  for (const f of ["components/CoachDashboard.jsx", "components/coach/CoachDashboardD5.jsx", "components/coach/coachDashboardModelo.js"]) {
+    const src = read(f);
+    assert.doesNotMatch(src, /faltanObjetivo|objetivoSesiones|Math\.ceil\(\(sesionesTotales|objetivoSemanalPct/, f);
+  }
 });
 
 // ======================================================================= H8: una sola fuente de rutinas (App.jsx)
@@ -347,7 +352,7 @@ await test("H8: rutina que solo esta en la ficha (asignada en otro dispositivo):
     coachAlumnosSearch: "", coachAlumnosFilter: "todos", nowMs: Date.now(),
   }).coachAlumnoCategoria;
   assert.notEqual(cat({ id: "kim" }), "sin_rutina", "Alumnos: Kim tiene rutina");
-  assert.match(filaTabla(renderDash(), "Kim"), /Rutina nueva/, "Dashboard: rutina nueva, no 'Sin datos'");
+  assert.match(filaTabla(renderDash(), "Kim").texto, /Rutina nueva/, "Dashboard: rutina nueva, no 'Sin datos'");
   const m = X.buildCoachProgresoModel({ alumnos, sesionesGlobales: sesiones, progresoGlobal: {}, rutinasSBEntrenador: unificadas, allEx: [], periodId: "semanas4", alumnoSel: "kim", lang: "es" });
   assert.ok(m.adherenciaRows.some((r) => r.id === "kim"), "Progreso: Kim tiene plan");
 });

@@ -58,7 +58,7 @@ export default function CoachSectionRenderer({
       {(tab === "plan" || tab === "progress") && isCoach && (
         // El Dashboard ya trae su propio margen lateral (16 px en movil): sin el del contenedor no se suma a 36 px.
         // Progreso pinta su propio fondo: con los 16 px superiores quedaba una franja del fondo de la app bajo la barra.
-        <div style={isUnder768 ? { ...mobilePad, paddingLeft: 0, paddingRight: 0, ...(tab === "progress" && showMobileBar ? { paddingTop: 0 } : {}) } : mobilePad}>
+        <div style={isUnder768 ? { ...mobilePad, paddingLeft: 0, paddingRight: 0, ...((tab === "progress" || tab === "plan") && showMobileBar ? { paddingTop: 0 } : {}) } : mobilePad}>
           <CoachDashboardMain
             activeNav={tab === "progress" ? "progreso" : "dashboard"}
             {...dashboardProps}

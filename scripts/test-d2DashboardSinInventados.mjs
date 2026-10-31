@@ -76,140 +76,126 @@ function render(over) {
   }, over || {})));
 }
 const strip = (html) => html.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
-/** Texto de la fila de un alumno en la tabla de escritorio (desde su nombre hasta el siguiente "Mensaje"). */
-function fila(text, nombre) {
-  const tabla = text.indexOf("ALUMNO ADHERENCIA");
-  assert.ok(tabla >= 0, "tabla de alumnos");
-  const i = text.indexOf(" " + nombre + " ", tabla);
-  assert.ok(i >= 0, "fila de " + nombre);
-  return text.slice(i, text.indexOf("Mensaje", i));
-}
-/** Texto del bloque visible (antes del bloque oculto de alertas). */
-const visible = (html) => strip(html.split('display:none')[0]);
+/** Texto de la fila de «Actividad reciente» de un alumno (desde su nombre hasta el siguiente alumno / fin de la tarjeta). */
+const reciente = (html, nombre) => {
+  const m = html.match(new RegExp('<button[^>]*data-qa="d5-reciente"[^>]*>(?:(?!</button>)[\\s\\S])*?>' + nombre + '<(?:(?!</button>)[\\s\\S])*</button>'));
+  assert.ok(m, "fila reciente de " + nombre);
+  return strip(m[0]);
+};
+/** Texto de una estadistica del resumen «Esta semana» (etiqueta + valor + subtitulo). */
+const stat = (html, qa) => {
+  const m = html.match(new RegExp('data-qa="d5-stat-' + qa + '"[^>]*>([\\s\\S]*?)</(?:div|button)>'));
+  assert.ok(m, "estadistica " + qa);
+  return strip(m[1]).trim();
+};
+const grupo = (html, k) => { const m = html.match(new RegExp('data-qa="d5-grupo-' + k + '"[^>]*>([\\s\\S]*?)</button>')); return m ? strip(m[1]).trim() : null; };
 
 // ======================================================================= datos validos + sin rutina + rutina sin dias
 const html = render();
-const txt = visible(html);
 const todo = strip(html);
 
-await test("H2: rutina sin dias validos -> '—' y 'Sin plan' (antes 71-100 % inventado aunque entreno hoy)", () => {
-  const f = fila(todo, "Beto");
-  assert.match(f, /—/);
+await test("H2: rutina sin dias validos -> sin porcentaje inventado ni clasificacion («Sin plan», aunque entreno hoy)", () => {
+  const f = reciente(html, "Beto");
+  assert.match(f, /Hoy/);
   assert.match(f, /Sin plan/);
   assert.doesNotMatch(f, /\d+%/, "ningun porcentaje para Beto");
-  assert.doesNotMatch(f, /Buen cumplimiento|Baja actividad/, "sin porcentaje no se clasifica como bueno ni malo");
+  assert.doesNotMatch(f, /Al día|Baja actividad/, "sin porcentaje no se clasifica como bueno ni malo");
+  assert.doesNotMatch(strip(html.slice(html.indexOf('data-qa="d5-seguimiento"'), html.indexOf('data-qa="d5-recientes"'))), /Beto/, "Beto no aparece en seguimiento");
 });
 
-await test("H2: alumno sin rutina -> '—' y 'Sin rutina' (antes 0 %)", () => {
-  const f = fila(todo, "Caro");
-  assert.match(f, /—/);
-  assert.match(f, /Sin rutina/);
-  assert.doesNotMatch(f, /\d+%/);
+await test("H2: alumno sin rutina -> en «Sin rutina» (seguimiento), sin 0 % inventado", () => {
+  assert.match(grupo(html, "sin_rutina"), /Sin rutina\s+Caro\s+1/);
+  assert.doesNotMatch(todo, /Caro[^.]{0,40}\d+%/, "ningun porcentaje para Caro");
 });
 
 await test("datos validos: rutina valida -> porcentaje real (adherencia de la semana de calendario desde D3)", () => {
-  assert.match(fila(todo, "Ana"), /67%[\s\S]*Al día/);
-  assert.match(fila(todo, "Eva"), /25%[\s\S]*Baja actividad/);
+  assert.match(reciente(html, "Ana"), /67% esta semana[\s\S]*Al día/);
+  assert.match(reciente(html, "Eva"), /25% esta semana[\s\S]*Baja actividad/);
 });
 
-await test("historial vacio con rutina valida -> 0 % real (no el 5-40 % inventado) y 'Sin actividad'", () => {
-  const f = fila(todo, "Dani");
-  assert.match(f, /\b0%/);
-  assert.match(f, /Sin actividad/);
-  assert.doesNotMatch(f, /\b(5|[1-3]\d|4[0-2])%/, "ningun porcentaje de la formula fija de inactivos");
+await test("historial vacio con rutina valida -> 'Inactivos' real (no el 5-40 % inventado); el alumno inactivo no aparece con porcentaje", () => {
+  assert.match(grupo(html, "inactivos"), /Inactivos\s+Más de 21 días · Dani\s+1/);
+  assert.doesNotMatch(todo, /Dani[^.]{0,40}\b(5|[1-3]\d|4[0-2])%/, "ningun porcentaje de la formula fija de inactivos");
 });
 
-await test("H6: objetivo semanal = suma de los dias de rutinas VALIDAS (3+2+4 = 9), completadas solo de esas (2+1 = 3)", () => {
+await test("H6: la adherencia es el promedio real de los alumnos con plan (67, 25 y 0 = 31 %); sin objetivo semanal inventado", () => {
   // D3: el % es la «Adherencia promedio» de Progreso (promedio de 67, 25 y 0 = 31), no el cociente de los totales (3/9 = 33).
-  assert.match(txt, /Adherencia semanal 3 \/ 9 31%/);
-  assert.match(txt, /Sesiones planificadas 9/);
-  assert.match(txt, /Sesiones completadas 3/);
-  // D3: el objetivo del 80 % se expresa sobre la adherencia promedio (sin "faltan N sesiones" calculado con los totales)
-  assert.match(txt, /Adherencia promedio 31% · objetivo 80%/);
-  assert.doesNotMatch(txt, /Te faltan/);
+  assert.match(stat(html, "adherencia"), /^Adherencia 31% /);
+  assert.match(stat(html, "entrenaron"), /^Entrenaron 3 \/ 5 /); // Ana, Beto, Eva (lib/metricas/racha.js)
+  assert.doesNotMatch(todo, /Te faltan|objetivo|Objetivo|80%/);
+  assert.doesNotMatch(todo, /Sesiones planificadas|Sesiones completadas/, "sin totales de sesiones que contradigan el promedio");
 });
 
-await test("H3: sin 'Rendimiento /100', sin puntaje ni delta en puntos; la tarjeta usa solo datos verificables", () => {
-  assert.doesNotMatch(todo, /\/100|Tu rendimiento|Rendimiento|pts vs/);
-  assert.match(txt, /Resumen de la semana/);
-  assert.match(txt, /Alumnos activos esta semana 3 \/ 5/); // Ana, Beto, Eva (lib/metricas/racha.js)
-  const src = read("components/CoachDashboard.jsx");
-  assert.doesNotMatch(src, /rendimientoScore|rendimientoDeltaPts|buenosCount/);
-  assert.doesNotMatch(src, /suffix: "\/100"/);
+await test("H3: sin 'Rendimiento /100', sin puntaje ni delta en puntos inventado; solo datos verificables", () => {
+  assert.doesNotMatch(todo, /\/100|Tu rendimiento|Rendimiento/);
+  // el unico delta es el de D3 (resumenAdherenciaEquipo): «±N pts vs sem. pasada», o «Sin comparación» cuando no hay periodo comparable
+  assert.match(stat(html, "adherencia"), /^Adherencia 31% [+-]?\d+ pts vs sem\. pasada$/);
+  assert.match(stat(render({ historiaCompleta: { sesiones: false, progreso: true } }), "adherencia"), /Sin comparación \(historial incompleto\)/);
+  for (const f of ["components/CoachDashboard.jsx", "components/coach/CoachDashboardD5.jsx", "components/coach/coachDashboardModelo.js"]) {
+    const src = read(f);
+    assert.doesNotMatch(src, /rendimientoScore|rendimientoDeltaPts|buenosCount/, f);
+    assert.doesNotMatch(src, /suffix: "\/100"/, f);
+  }
 });
 
 await test("H2/H6: el codigo ya no contiene las formulas fijas ni el supuesto de 3 dias por rutina", () => {
-  const src = read("components/CoachDashboard.jsx");
-  assert.doesNotMatch(src, /computeCompliancePct|weeklyTargetFromRutinas/);
-  assert.doesNotMatch(src, /Math\.max\(71|40 - Math\.min\(35|days \|\| 3|Math\.max\(sesionesCompletadas, alumnos\.length\)/);
+  for (const f of ["components/CoachDashboard.jsx", "components/coach/CoachDashboardD5.jsx", "components/coach/coachDashboardModelo.js"]) {
+    const src = read(f);
+    assert.doesNotMatch(src, /computeCompliancePct|weeklyTargetFromRutinas/, f);
+    assert.doesNotMatch(src, /Math\.max\(71|40 - Math\.min\(35|days \|\| 3|Math\.max\(sesionesCompletadas, alumnos\.length\)/, f);
+  }
 });
 
-await test("coherencia: Atencion hoy, recomendacion y lista cuentan lo mismo", () => {
-  const filasTabla = ["Ana", "Beto", "Caro", "Dani", "Eva"].map((n) => fila(todo, n));
-  const n = (re) => filasTabla.filter((f) => re.test(f)).length;
-  assert.match(txt, new RegExp(n(/Sin rutina/) + " alumnos sin rutina"));
-  assert.match(txt, new RegExp(n(/Sin actividad/) + " alumnos inactivos"));
-  assert.match(txt, new RegExp(n(/Baja actividad/) + " alumnos con baja actividad"));
-  assert.deepEqual([n(/Sin rutina/), n(/Sin actividad/), n(/Baja actividad/)], [1, 1, 1]);
-  // la recomendacion sale de los mismos contadores: hay un alumno sin rutina
-  assert.match(txt, /RECOMENDACIÓN PRINCIPAL Asignar rutinas pendientes/);
+await test("coherencia: el contador «Seguimiento», los grupos y los nombres cuentan lo mismo", () => {
+  assert.match(stat(html, "seguimiento"), /^Seguimiento 3 requieren atención$/);
+  assert.match(grupo(html, "sin_rutina"), /^Sin rutina\s+Caro\s+1$/);
+  assert.match(grupo(html, "inactivos"), /^Inactivos\s+Más de 21 días · Dani\s+1$/);
+  assert.match(grupo(html, "baja"), /^Baja actividad\s+Eva\s+1$/);
 });
 
 // ======================================================================= sin plan verificable
 await test("sin plan: ningun alumno con rutina con dias -> '—' y 'Sin plan semanal', sin objetivo ni porcentaje", () => {
-  const t = visible(render({ alumnos: alumnos.filter((a) => a.id === "beto" || a.id === "caro") }));
-  assert.match(t, /Adherencia semanal — — Sin plan semanal/);
-  assert.doesNotMatch(t, /\d+ \/ \d+ \d+%|\d+% vs semana pasada|Te faltan|Objetivo semanal alcanzado/);
-  assert.match(t, /Sesiones planificadas Sin plan/);
-  assert.match(t, /IMPACTO ESTIMADO Sin plan semanal/);
-  assert.match(t, /Ningún alumno tiene una rutina con días/);
+  const out = render({ alumnos: alumnos.filter((a) => a.id === "beto" || a.id === "caro") });
+  assert.equal(stat(out, "adherencia"), "Adherencia — Sin plan semanal");
+  assert.doesNotMatch(strip(out), /\d+% vs|pts vs|Te faltan|Objetivo semanal alcanzado/);
 });
 
 // ======================================================================= cargando
-await test("cargando alumnos: sin contadores en 0 ni objetivos; 'Cargando…'", () => {
+await test("cargando alumnos: sin contadores en 0 ni objetivos; '—' y 'Cargando…'", () => {
   const out = render({ alumnos: [], alumnosStatus: "loading", sesionesGlobales: [], historiaCompleta: null });
-  const t = visible(out);
-  assert.match(t, /— alumnos sin rutina Cargando…/);
-  assert.match(t, /— alumnos inactivos Cargando…/);
-  assert.doesNotMatch(t, /\b0 alumnos|Al día|\d+ \/ \d+|\d+%/);
-  assert.match(strip(out), /Mis alumnos Ver todos → Cargando alumnos…/);
+  for (const k of ["total", "entrenaron", "adherencia", "seguimiento"]) assert.match(stat(out, k), /—/, k);
+  assert.match(stat(out, "seguimiento"), /Cargando…/);
+  const t = strip(out);
+  assert.doesNotMatch(t, /\b0 alumnos|Al día|\d+ \/ \d+|\d+%|Todavía no tenés alumnos|Nadie requiere/);
+  assert.match(t, /Cargando datos del equipo…/);
 });
 
 await test("cargando historial (alumnos listos, historiaCompleta null, sin datos): nadie aparece inactivo ni con 0 %", () => {
   const out = render({ sesionesGlobales: [], progresoGlobal: {}, historiaCompleta: null });
   const t = strip(out);
-  for (const n of ["Ana", "Dani", "Eva"]) {
-    const f = fila(t, n);
-    assert.match(f, /Cargando…/, n + " en carga");
-    assert.doesNotMatch(f, /\d+%|Sin actividad|Baja actividad/, n + " sin estado inventado");
-  }
-  assert.match(visible(out), /— alumnos inactivos Cargando…/);
-  assert.match(visible(out), /Adherencia semanal — — Cargando…/);
-  // las alertas tampoco inventan inactividad mientras carga
-  assert.doesNotMatch(t, /Sin actividad reciente|Poca actividad/);
+  for (const k of ["total", "entrenaron", "adherencia", "seguimiento"]) assert.match(stat(out, k), /^[A-Za-z]+ —/, k);
+  assert.doesNotMatch(t, /\d+%|Sin actividad|Baja actividad|Inactivos|Nadie requiere/);
+  assert.match(t, /Cargando datos del equipo…/);
+  assert.equal(grupo(out, "inactivos"), null);
 });
 
-await test("historial cargado y vacio (historiaCompleta completa, sin sesiones): ya no es 'cargando'; el plan real da 0 / 9", () => {
-  const t = visible(render({ sesionesGlobales: [], progresoGlobal: {} }));
-  assert.doesNotMatch(t, /Cargando…/);
-  assert.match(t, /Adherencia semanal 0 \/ 9 0%/);
-  assert.match(t, /Alumnos activos esta semana 0 \/ 5/);
+await test("historial cargado y vacio (historiaCompleta completa, sin sesiones): ya no es 'cargando'; el plan real da 0 %", () => {
+  const out = render({ sesionesGlobales: [], progresoGlobal: {} });
+  assert.doesNotMatch(strip(out), /Cargando/);
+  assert.match(stat(out, "adherencia"), /^Adherencia 0% /);
+  assert.match(stat(out, "entrenaron"), /^Entrenaron 0 \/ 5 /);
 });
 
-await test("sin alumnos (carga terminada): 'Todavía no tenés alumnos', sin objetivo", () => {
-  const t = visible(render({ alumnos: [], sesionesGlobales: [] }));
-  assert.match(t, /Todavía no tenés alumnos/);
-  assert.match(t, /Adherencia semanal — — Sin alumnos/);
+await test("sin alumnos (carga terminada): 'Todavía no tenés alumnos' con «Agregar alumno»; sin resumen ni objetivo", () => {
+  const out = render({ alumnos: [], sesionesGlobales: [] });
+  assert.match(strip(out), /Todavía no tenés alumnos/);
+  assert.match(out, /data-qa="d5-agregar-alumno"/);
+  assert.doesNotMatch(out, /data-qa="d5-resumen"/);
 });
 
 // ======================================================================= tarjetas moviles (props que arma el Dashboard)
-await test("moviles: 'Esta semana' y 'Activos esta semana' usan los mismos valores y no hay '/100'", () => {
-  const src = read("components/CoachDashboard.jsx");
-  const m = src.slice(src.indexOf("mobileWeekKpiProps={{"), src.indexOf("desktopWeeklyProps={{"));
-  assert.match(m, /value: hayPlan \? sesionesCompletadas \+ "\/" \+ sesionesTotales : "—"/);
-  assert.match(m, /label: M\(lang, "Activos esta semana"/);
-  assert.match(m, /value: activosSemanaText/);
-  assert.doesNotMatch(m, /\/100|rendimiento/i);
+await test("moviles: la tarjeta KPI sin progreso no pinta barra ni '/100' (componente intacto; el Dashboard D5 ya no la usa)", () => {
+  assert.doesNotMatch(read("components/coach/CoachDashboardD5.jsx"), /\/100|rendimiento/i);
   const C = coachThemePalette(true);
   const kpi = renderToStaticMarkup(h(CoachMobileKpiCard, { label: "Esta semana", value: "—", subtitle: "Sin plan semanal", progress: null, accent: "#2563EB", colors: C, type: coachType, blockGap: 8 }));
   assert.match(kpi, /—/);
