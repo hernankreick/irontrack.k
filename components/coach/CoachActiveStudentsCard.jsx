@@ -159,7 +159,7 @@ export default function CoachActiveStudentsCard({
                   >
                     <div
                       style={{
-                        width: row.pct + "%",
+                        width: (row.pct || 0) + "%",
                         height: "100%",
                         background: row.percentColor,
                         borderRadius: 2,
@@ -178,7 +178,7 @@ export default function CoachActiveStudentsCard({
                     flexShrink: 0,
                   }}
                 >
-                  {row.pct}%
+                  {row.pctText}
                 </div>
               </div>
             );
@@ -259,7 +259,7 @@ export default function CoachActiveStudentsCard({
                   </span>
                 </div>
                 <div>
-                  <div style={{ ...T.bodySemibold, color: row.percentColor, fontWeight: 700 }}>{row.pct}%</div>
+                  <div style={{ ...T.bodySemibold, color: row.percentColor, fontWeight: 700 }}>{row.pctText}</div>
                   <div
                     style={{
                       height: 7,
@@ -271,7 +271,7 @@ export default function CoachActiveStudentsCard({
                   >
                     <div
                       style={{
-                        width: row.pct + "%",
+                        width: (row.pct || 0) + "%",
                         height: "100%",
                         background: row.percentColor,
                         borderRadius: 3,

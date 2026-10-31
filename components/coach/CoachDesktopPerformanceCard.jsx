@@ -31,6 +31,8 @@ export default function CoachDesktopPerformanceCard({
         <Info size={16} color={C.t2} strokeWidth={2} />
         <span style={{ ...T.cardTitleSemibold, color: C.t }}>{title}</span>
       </div>
+      {/* Puntaje opcional: sin `score` solo se muestran las metricas (no hay puntaje sintetico). */}
+      {score != null ? (
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
@@ -84,7 +86,8 @@ export default function CoachDesktopPerformanceCard({
           </div>
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, marginTop: 18, borderTop: "1px solid " + C.rowDivider, paddingTop: 12 }}>
+      ) : null}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8, ...(score != null ? { marginTop: 18, borderTop: "1px solid " + C.rowDivider, paddingTop: 12 } : {}) }}>
         {metrics.map(function (m) {
           return (
             <div key={m.label} style={{ display: "flex", justifyContent: "space-between", gap: 10, ...T.body, color: C.t }}>

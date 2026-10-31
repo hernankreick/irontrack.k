@@ -11,6 +11,7 @@ export default function CoachDashboardAttentionCard({
   colors,
   type,
   okLabel,
+  loadingLabel,
 }) {
   return (
     <div
@@ -37,12 +38,15 @@ export default function CoachDashboardAttentionCard({
         {items.map(function (item) {
           var Icon = item.Icon;
           // Cuenta 0: estado "al dia" atenuado, sin boton de accion (no hay nada que hacer).
-          var isClear = Number(item.count) === 0;
+          // Cuenta null: datos cargando (sin numero ni accion; no se muestra un 0 ni un total que todavia no se conoce).
+          var isLoading = item.count == null;
+          var isClear = !isLoading && Number(item.count) === 0;
+          var isMuted = isClear || isLoading;
           return (
             <div
               key={item.key}
               className="cd-attention-block"
-              data-state={isClear ? "clear" : "pending"}
+              data-state={isLoading ? "loading" : isClear ? "clear" : "pending"}
               style={{
                 display: "grid",
                 gridTemplateColumns: "44px minmax(0, 1fr)",
@@ -67,19 +71,19 @@ export default function CoachDashboardAttentionCard({
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
-                  opacity: isClear ? 0.55 : 1,
+                  opacity: isMuted ? 0.55 : 1,
                 }}
               >
                 <Icon size={20} color={item.color} strokeWidth={2.25} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ ...type.bodyLg, color: isClear ? dashMuted : colors.t, fontWeight: 800 }}>
-                  {item.count} {item.title}
+                <div style={{ ...type.bodyLg, color: isMuted ? dashMuted : colors.t, fontWeight: 800 }}>
+                  {isLoading ? "—" : item.count} {item.title}
                 </div>
                 <div style={{ ...type.body, color: dashMuted, marginTop: 3 }}>
-                  {isClear ? okLabel : item.sub}
+                  {isLoading ? loadingLabel : isClear ? okLabel : item.sub}
                 </div>
-                {!isClear && (
+                {!isMuted && (
                 <button
                   type="button"
                   className="cd-btn"
