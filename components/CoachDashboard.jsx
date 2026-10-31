@@ -22,7 +22,7 @@ import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 import { getStudentRoutine, getStudentWeeklyProgress } from "../lib/studentWeeklyProgress.js";
 import { isCoachValidatedSession } from "../lib/orphanSessions.js";
-import { diaLocal, rachaSemanal } from "../lib/metricas/index.js";
+import { adherencia, diaLocal, lunesDe, rachaSemanal } from "../lib/metricas/index.js";
 
 /** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
 export const NAV_ITEM_PAD = "10px 12px";
@@ -108,17 +108,19 @@ function rowStatusConfig(row, lang, C) {
       primary: false,
     };
   }
-  if (row.pct == null) {
-    // rutina sin dias validos o no disponible en los datos cargados: no hay porcentaje con que clasificar
+  if (row.pct == null || row.seguimiento === "rutina_nueva") {
+    // sin dias validos, rutina no disponible o rutina nueva (semana pasada no medible): no hay con que clasificar
     return {
-      label: row.planState === "sin_datos_rutina" ? M(lang, "Sin datos", "No data", "Sem dados") : M(lang, "Sin plan", "No plan", "Sem plano"),
+      label: row.seguimiento === "rutina_nueva"
+        ? M(lang, "Rutina nueva", "New routine", "Rotina nova")
+        : row.planState === "sin_datos_rutina" ? M(lang, "Sin datos", "No data", "Sem dados") : M(lang, "Sin plan", "No plan", "Sem plano"),
       color: C.t2,
       bg: neutralBg,
       action: M(lang, "Ver perfil", "View profile", "Ver perfil"),
       primary: false,
     };
   }
-  if (row.pct < 30) {
+  if (row.seguimiento === "baja") {
     return {
       label: M(lang, "Baja actividad", "Low activity", "Baixa atividade"),
       color: C.yel,
@@ -128,7 +130,7 @@ function rowStatusConfig(row, lang, C) {
     };
   }
   return {
-    label: M(lang, "Buen cumplimiento", "Good compliance", "Bom cumprimento"),
+    label: M(lang, "Al día", "On track", "Em dia"),
     color: C.green,
     bg: C.greenDim,
     action: M(lang, "Ver perfil", "View profile", "Ver perfil"),
@@ -248,28 +250,84 @@ function formatUltimaSesion(lastMs, lang, sinRutina) {
   return M(lang, "Sin actividad", "No activity", "Sem atividade");
 }
 
+/** Umbral de "Baja actividad": el mismo 30 % que ya usaba el Dashboard (no es un umbral nuevo). */
+var BAJA_ACTIVIDAD_PCT = 30;
+
 /**
- * Cumplimiento de la semana de la rutina (getStudentWeeklyProgress), SOLO con datos reales. Si no hay un plan verificable devuelve
- * pct null y el motivo; nunca un porcentaje estimado.
- *   planState: "cargando" | "sin_rutina" | "sin_datos_rutina" (la rutina no esta en los datos cargados) | "sin_dias" | "ok"
+ * Semanas de calendario (lunes-domingo, numeros de dia de lib/metricas/fechas.js) que usa el Dashboard:
+ *   actual         lunes de esta semana .. hoy                    (adherencia de la semana en curso)
+ *   previaMismo    lunes anterior .. mismo dia de la semana pasada (comparacion "vs semana pasada": mismo tramo)
+ *   previaCompleta lunes .. domingo de la semana pasada           (seguimiento: semana terminada, sin el sesgo de una semana recien empezada)
  */
-function complianceFromWeekly(cat, rutina, weekly, cargando) {
-  if (cargando) return { pct: null, planState: "cargando" };
-  if (cat === "sin_rutina") return { pct: null, planState: "sin_rutina" };
-  if (!rutina) return { pct: null, planState: "sin_datos_rutina" };
-  if (!(weekly && weekly.totalDays > 0)) return { pct: null, planState: "sin_dias" };
-  return { pct: weekly.pct, planState: "ok" };
+export function semanasDashboard(hoy) {
+  var lunes = lunesDe(hoy);
+  return {
+    hoy: hoy,
+    diaSemana: hoy - lunes + 1,
+    actual: { desde: lunes, hasta: hoy },
+    previaMismo: { desde: lunes - 7, hasta: hoy - 7 },
+    previaCompleta: { desde: lunes - 7, hasta: lunes - 1 },
+  };
 }
 
-function isCompletedSession(s) {
-  return !(s && (s.estado === "pendiente" || s.completada === false));
+/**
+ * Adherencia semanal de UN alumno con la definicion de Progreso (lib/metricas/adherencia.js, sin cambios) y su estado:
+ *   planState: "cargando" | "sin_rutina" | "sin_datos_rutina" | "sin_dias" | "rutina_nueva" | "ok"
+ *   seguimiento (solo con plan): "baja" | "rutina_nueva" | "al_dia"
+ *     baja         = con actividad en los ultimos 21 dias (categoria "activo"), adherencia < 30 % en la semana pasada COMPLETA
+ *                    (rutina asignada antes de ese lunes) y < 30 % en lo que va de esta semana. Un 0 % al empezar la semana no basta.
+ *     rutina_nueva = la semana pasada no se puede medir completa (rutina asignada despues de su lunes): todavia no se juzga.
+ */
+export function adherenciaSemanalAlumno(a, cat, rutina, sesiones, semanas, cargando) {
+  if (cargando) return { pct: null, planState: "cargando", seguimiento: null };
+  if (cat === "sin_rutina") return { pct: null, planState: "sin_rutina", seguimiento: null };
+  if (!rutina) return { pct: null, planState: "sin_datos_rutina", seguimiento: null };
+  function adh(rango) {
+    return adherencia({ rutina: rutina, sesiones: sesiones, alumnoId: a.id, desde: rango.desde, hasta: rango.hasta });
+  }
+  var actual = adh(semanas.actual);
+  if (actual.motivo === "rutina_sin_dias") return { pct: null, planState: "sin_dias", seguimiento: null, actual: actual };
+  if (actual.pct == null) return { pct: null, planState: "rutina_nueva", seguimiento: "rutina_nueva", actual: actual };
+  var previaMismo = adh(semanas.previaMismo);
+  var previaCompleta = adh(semanas.previaCompleta);
+  var previaMedible = previaCompleta.pct != null && previaCompleta.desdeEfectivo === semanas.previaCompleta.desde;
+  var seguimiento = !previaMedible
+    ? "rutina_nueva"
+    : cat === "activo" && previaCompleta.pct < BAJA_ACTIVIDAD_PCT && actual.pct < BAJA_ACTIVIDAD_PCT
+      ? "baja"
+      : "al_dia";
+  return { pct: actual.pct, planState: "ok", seguimiento: seguimiento, actual: actual, previaMismo: previaMismo, previaCompleta: previaCompleta };
 }
 
-function sesionesBetween(sesionesGlobales, fromMs, toMs) {
-  return (sesionesGlobales || []).filter(function (s) {
-    var t = parseDateMs(s.created_at || s.fecha);
-    return t != null && t >= fromMs && t < toMs && isCompletedSession(s);
-  }).length;
+/**
+ * Resumen del equipo con la regla de Progreso (coachProgresoMetrics.js, «Adherencia promedio»): promedio de los % de los alumnos
+ * con plan; la variacion compara SOLO alumnos con plan en ambos periodos y no se informa con el historial de sesiones incompleto.
+ */
+export function resumenAdherenciaEquipo(filas, historiaCompleta) {
+  var conPlan = (filas || []).filter(function (r) { return r.planState === "ok"; });
+  var sum = 0, pairCur = 0, pairPrev = 0, pairN = 0, completadas = 0, planificadas = 0, validadas = 0;
+  conPlan.forEach(function (r) {
+    sum += r.pct;
+    completadas += r.adh.actual.completadas;
+    planificadas += r.adh.actual.planificadas;
+    validadas += r.adh.actual.validadas;
+    if (r.adh.previaMismo && r.adh.previaMismo.pct != null) {
+      pairCur += r.pct;
+      pairPrev += r.adh.previaMismo.pct;
+      pairN++;
+    }
+  });
+  var sesionesIncompletas = !!(historiaCompleta && historiaCompleta.sesiones === false);
+  var delta = pairN > 0 && !sesionesIncompletas ? Math.round(pairCur / pairN) - Math.round(pairPrev / pairN) : null;
+  return {
+    alumnosConPlan: conPlan.length,
+    pct: conPlan.length > 0 ? Math.round(sum / conPlan.length) : null,
+    completadas: completadas,
+    planificadas: planificadas,
+    validadas: validadas,
+    delta: delta,
+    motivoSinDelta: delta != null ? null : sesionesIncompletas ? "historial_incompleto" : "sin_periodo_comparable",
+  };
 }
 
 /**
@@ -533,19 +591,14 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
   return out.slice(0, 12);
 }
 
-function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, cargando) {
+function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, cargando, semanas) {
   if (!Array.isArray(alumnos) || alumnos.length === 0) return [];
   return alumnos
     .map(function (a) {
       var cat = catFn(a);
       var rutina = getStudentRoutine(rutinasSBEntrenador, a);
-      var weekly = getStudentWeeklyProgress({
-        alumno: a,
-        rutina: rutina,
-        sesiones: sesionesGlobales,
-        progreso: progresoGlobal,
-      });
-      var comp = complianceFromWeekly(cat, rutina, weekly, cargando);
+      // Adherencia de la semana de CALENDARIO (no el avance de la semana de la rutina: ese solo se usa en las alertas de rutina).
+      var comp = adherenciaSemanalAlumno(a, cat, rutina, sesionesGlobales, semanas, cargando);
       var lastMs = getLastActivityMs(a, sesionesGlobales, progresoGlobal);
       var ult = cargando ? "—" : formatUltimaSesion(lastMs, lang, cat === "sin_rutina");
       return {
@@ -554,9 +607,10 @@ function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, 
         name: coachDisplayName(a) || M(lang, "Alumno", "Athlete", "Aluno"),
         pct: comp.pct,
         planState: comp.planState,
+        seguimiento: comp.seguimiento,
+        adh: comp,
         ult: ult,
         cat: cat,
-        weekly: weekly,
       };
     })
     .filter(function (row) {
@@ -564,12 +618,13 @@ function buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, 
     })
     .sort(function (a, b) {
       function pr(row) {
-        if (row.planState === "cargando") return 5;
+        if (row.planState === "cargando") return 6;
         if (row.cat === "sin_rutina") return 0;
         if (row.cat === "inactivo") return 1;
+        if (row.seguimiento === "baja") return 2;
         if (row.pct == null) return 3;
-        if (row.pct < 30) return 2;
-        return 4;
+        if (row.seguimiento === "rutina_nueva") return 4;
+        return 5;
       }
       var pa = pr(a);
       var pb = pr(b);
@@ -652,7 +707,7 @@ export default function CoachDashboard({
 
   var coachActiveRows = React.useMemo(
     function () {
-      return buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, cargando);
+      return buildCoachActiveRows(alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, cargando, semanasDashboard(diaLocal()));
     },
     [alumnos, catFn, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, lang, cargando]
   );
@@ -690,32 +745,40 @@ export default function CoachDashboard({
     [lang, coachName]
   );
 
-  /** Resumen de stats derivado del estado actual del dashboard. */
-  var nowMs = Date.now();
-  var weekStartMs = nowMs - 7 * 86400000;
-  var prevWeekStartMs = nowMs - 14 * 86400000;
   /**
-   * Resumen semanal: SOLO alumnos con un plan verificable (rutina con dias validos). Sin plan no hay objetivo ni porcentaje.
-   *   weeklyState: "cargando" | "sin_alumnos" | "sin_plan" | "ok"
+   * Resumen semanal = ADHERENCIA de la semana de calendario en curso (lunes .. hoy), con la definicion y la regla de equipo de Progreso.
+   * Solo alumnos con plan verificable (rutina con dias validos). weeklyState: "cargando" | "sin_alumnos" | "sin_plan" | "ok"
    */
-  var filasConPlan = coachActiveRows.filter(function (r) { return r.planState === "ok"; });
-  var sesionesCompletadas = filasConPlan.reduce(function (sum, r) { return sum + (r.weekly.completedDays || 0); }, 0);
-  var sesionesTotales = filasConPlan.reduce(function (sum, r) { return sum + (r.weekly.totalDays || 0); }, 0);
-  var weeklyState = cargando ? "cargando" : (alumnos || []).length === 0 ? "sin_alumnos" : sesionesTotales > 0 ? "ok" : "sin_plan";
+  var hoyDia = diaLocal();
+  var semanas = semanasDashboard(hoyDia);
+  var equipo = resumenAdherenciaEquipo(coachActiveRows, historiaCompleta);
+  var sesionesCompletadas = equipo.completadas;
+  var sesionesTotales = equipo.planificadas;
+  var weeklyState = cargando ? "cargando" : (alumnos || []).length === 0 ? "sin_alumnos" : equipo.alumnosConPlan > 0 && sesionesTotales > 0 ? "ok" : "sin_plan";
   var hayPlan = weeklyState === "ok";
-  var sesionesPrevias = hayPlan ? sesionesBetween(sesionesGlobales, prevWeekStartMs, weekStartMs) : 0;
-  var pctSemana = hayPlan ? Math.min(100, Math.round((sesionesCompletadas / sesionesTotales) * 100)) : null;
-  var pctSemanaPrevia = hayPlan ? Math.min(100, Math.round((sesionesPrevias / sesionesTotales) * 100)) : null;
-  var deltaSemana = hayPlan ? pctSemana - pctSemanaPrevia : null;
+  var pctSemana = hayPlan ? equipo.pct : null;
+  var deltaSemana = hayPlan ? equipo.delta : null;
   var objetivoSemanalPct = 80;
   var objetivoSesiones = hayPlan ? Math.ceil((sesionesTotales * objetivoSemanalPct) / 100) : null;
   var faltanObjetivo = hayPlan ? Math.max(0, objetivoSesiones - sesionesCompletadas) : null;
+  var semanaEnCurso = semanas.diaSemana < 7;
+  function fechaCorta(dia) {
+    var d = new Date(dia * 86400000);
+    return d.getUTCDate() + "/" + (d.getUTCMonth() + 1);
+  }
+  var diasCortos = lang === "en" ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] : lang === "pt" ? ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"] : ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"];
+  /** Periodo de referencia visible: "lun 26/10 – hoy". */
+  var periodoSemanaTexto = diasCortos[0] + " " + fechaCorta(semanas.actual.desde) + " – " + M(lang, "hoy", "today", "hoje");
+  var deltaSemanaTexto = !hayPlan
+    ? null
+    : deltaSemana == null
+      ? M(lang, "Sin comparación", "No comparison", "Sem comparação")
+      : (deltaSemana >= 0 ? "+" : "") + deltaSemana + "% " + M(lang, "vs semana pasada (", "vs last week (", "vs semana passada (") + diasCortos[0] + "–" + diasCortos[semanas.diaSemana - 1] + ")";
   var filasConDatos = cargando ? [] : coachActiveRows;
   var sinRutinaCount = cargando ? null : filasConDatos.filter(function (r) { return r.cat === "sin_rutina"; }).length;
   var inactivosCount = cargando ? null : filasConDatos.filter(function (r) { return r.cat === "inactivo"; }).length;
-  var bajaActividadCount = cargando ? null : filasConDatos.filter(function (r) { return r.cat !== "sin_rutina" && r.cat !== "inactivo" && r.pct != null && r.pct < 30; }).length;
+  var bajaActividadCount = cargando ? null : filasConDatos.filter(function (r) { return r.cat !== "sin_rutina" && r.cat !== "inactivo" && r.seguimiento === "baja"; }).length;
   /** Alumnos con al menos una sesión completada en la semana de calendario actual (lib/metricas/racha.js; incluye validadas). */
-  var hoyDia = diaLocal();
   var alumnosActivosSemana = cargando ? null : (alumnos || []).filter(function (a) {
     return rachaSemanal(sesionesGlobales, { hoy: hoyDia, alumnoId: a.id }).incluyeSemanaActual;
   }).length;
@@ -730,11 +793,14 @@ export default function CoachDashboard({
         ? M(lang, "Ningún alumno tiene una rutina con días: no hay objetivo semanal", "No athlete has a routine with days: no weekly target", "Nenhum aluno tem rotina com dias: sem objetivo semanal")
         : pctSemana >= objetivoSemanalPct
           ? M(lang, "Semana en objetivo", "Week on target", "Semana no objetivo")
-          : pctSemana >= 55
+          : semanaEnCurso
+            // semana sin terminar: el plan es el de la semana completa, asi que todavia no se juzga (sin umbral nuevo)
+            ? M(lang, "Semana en curso · día " + semanas.diaSemana + " de 7", "Week in progress · day " + semanas.diaSemana + " of 7", "Semana em curso · dia " + semanas.diaSemana + " de 7")
+            : pctSemana >= 55
             ? M(lang, "Vas bien, pero podés mejorar", "You're doing well, but can improve", "Você vai bem, mas pode melhorar")
             : M(lang, "Necesita atención esta semana", "Needs attention this week", "Precisa de atenção esta semana");
   var semanaSubtitulo = weeklyState === "ok"
-    ? M(lang, "sesiones completadas", "sessions completed", "sessões concluídas")
+    ? M(lang, "sesiones completadas · ", "sessions completed · ", "sessões concluídas · ") + periodoSemanaTexto
     : weeklyState === "cargando"
       ? cargandoTexto
       : weeklyState === "sin_alumnos"
@@ -853,7 +919,7 @@ export default function CoachDashboard({
       cta: M(lang, "Ver alumnos", "View athletes", "Ver alunos"),
       onClick: onRevisarAlumnos,
       title: M(lang, "alumnos con baja actividad", "athletes with low activity", "alunos com baixa atividade"),
-      sub: M(lang, "Menos del 30% de cumplimiento", "Under 30% compliance", "Menos de 30% de cumprimento"),
+      sub: M(lang, "Menos del 30% de adherencia la semana pasada y en esta", "Under 30% adherence last week and this week", "Menos de 30% de aderência na semana passada e nesta"),
     },
   ];
   var activeStudentsMobileRows = coachActiveRows.map(function (row, idx) {
@@ -938,7 +1004,7 @@ export default function CoachDashboard({
   });
   var activeStudentsHeaders = [
     M(lang, "ALUMNO", "ATHLETE", "ALUNO"),
-    M(lang, "CUMPLIMIENTO", "COMPLIANCE", "CUMPRIMENTO"),
+    M(lang, "ADHERENCIA (SEMANA)", "ADHERENCE (WEEK)", "ADERÊNCIA (SEMANA)"),
     M(lang, "ÚLTIMA SESIÓN", "LAST SESSION", "ÚLTIMA SESSÃO"),
     M(lang, "ESTADO", "STATUS", "ESTADO"),
     M(lang, "ACCIÓN", "ACTION", "AÇÃO"),
@@ -1115,13 +1181,13 @@ export default function CoachDashboard({
               blockGap: S.blockGap,
             }}
             desktopWeeklyProps={{
-              title: M(lang, "Cumplimiento semanal", "Weekly completion", "Cumprimento semanal"),
+              title: M(lang, "Adherencia semanal", "Weekly adherence", "Aderência semanal"),
               completedText: hayPlan ? sesionesCompletadas + " / " + sesionesTotales : "—",
               pctText: hayPlan ? pctSemana + "%" : "—",
               subtitle: semanaSubtitulo,
-              deltaText: hayPlan ? (deltaSemana >= 0 ? "+" : "") + deltaSemana + "% " + M(lang, "vs semana pasada", "vs last week", "vs semana passada") : null,
-              deltaBg: deltaSemana >= 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
-              deltaColor: deltaSemana >= 0 ? C.green : C.red,
+              deltaText: deltaSemanaTexto,
+              deltaBg: deltaSemana == null ? "rgba(148,163,184,0.14)" : deltaSemana >= 0 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+              deltaColor: deltaSemana == null ? C.t2 : deltaSemana >= 0 ? C.green : C.red,
               progressPct: pctSemana || 0,
               trackBg: darkMode ? "rgba(148,163,184,0.14)" : C.brd,
               insightTitle: M(lang, "Insight del día", "Today's insight", "Insight do dia"),
