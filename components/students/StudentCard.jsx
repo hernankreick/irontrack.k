@@ -56,13 +56,13 @@ export default function StudentCard({
   var nombre = a.nombre || a.email || "";
 
   return (
-    <div data-qa-alumno-card={isActive ? "open" : "closed"} data-alumno-id={alumno && alumno.id != null ? String(alumno.id) : undefined} style={{position:"relative",marginBottom:isActive?14:10,scrollMarginTop:72}}>
+    <div data-qa-alumno-card={isActive ? "open" : "closed"} data-alumno-id={alumno && alumno.id != null ? String(alumno.id) : undefined} style={{position:"relative",marginBottom:12,scrollMarginTop:72}}>
     <div
       style={{
         position: "relative",
         background: P.surface,
         borderRadius: 16,
-        padding: "8px 8px 8px 12px",
+        padding: "10px 8px 10px 14px",
         border: "1px solid " + (isActive ? P.borderStrong : P.border),
         boxShadow: darkMode ? "none" : "0 1px 3px rgba(15,23,42,0.08)",
       }}
@@ -85,7 +85,7 @@ export default function StudentCard({
               <span className="coach-stu-name" style={{fontSize:17,fontWeight:700,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"}}>{a.nombre}</span>
               <Ic name="chevron-right" size={15} color={textMuted} style={{flexShrink:0,transform:isActive?"rotate(-90deg)":"rotate(90deg)",transition:"transform .2s"}}/>
             </span>
-            <span style={{display:"block",fontSize:12.5,color:textMuted,lineHeight:1.3,marginTop:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</span>
+            <span style={{display:"block",fontSize:13,color:textMuted,lineHeight:1.3,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</span>
             <span style={{display:"inline-block",maxWidth:"100%",marginTop:5,fontSize:11.5,fontWeight:600,padding:"2px 9px",borderRadius:7,background:badgeCfg.bg,color:badgeCfg.color,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",verticalAlign:"top",boxSizing:"border-box"}}>{badgeCfg.t}</span>
           </span>
         </button>

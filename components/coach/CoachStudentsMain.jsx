@@ -1,5 +1,6 @@
 import React from 'react';
 import StudentsSection from '../students/StudentsSection.jsx';
+import { alumnosPaleta } from '../students/alumnosPaleta.js';
 
 export default function CoachStudentsMain({
   allEx,
@@ -13,14 +14,6 @@ export default function CoachStudentsMain({
   cargarAlumnos,
   alumnosStatus,
   cleanActiveCoachAlumnos,
-  coachAluBorderSoft,
-  coachAluDropdown,
-  coachAluDropdownShadow,
-  coachAluGhostBtn,
-  coachAluShell,
-  coachAluSubtle,
-  coachAluSurface,
-  coachAluTrack,
   coachAlumnosCounts,
   coachAlumnosFilter,
   coachAlumnosListaFiltrada,
@@ -87,6 +80,8 @@ export default function CoachStudentsMain({
   textMuted,
   toast2,
 }) {
+  // Presentacion: la paleta de Alumnos (base D5, bordes neutros) reemplaza a los coachAlu* que llegan de App.
+  const pal = alumnosPaleta(darkMode);
   return (
     <StudentsSection
       allEx={allEx}
@@ -100,14 +95,14 @@ export default function CoachStudentsMain({
       cargarAlumnos={cargarAlumnos}
       alumnosStatus={alumnosStatus}
       cleanActiveCoachAlumnos={cleanActiveCoachAlumnos}
-      coachAluBorderSoft={coachAluBorderSoft}
-      coachAluDropdown={coachAluDropdown}
-      coachAluDropdownShadow={coachAluDropdownShadow}
-      coachAluGhostBtn={coachAluGhostBtn}
-      coachAluShell={coachAluShell}
-      coachAluSubtle={coachAluSubtle}
-      coachAluSurface={coachAluSurface}
-      coachAluTrack={coachAluTrack}
+      coachAluBorderSoft={pal.coachAluBorderSoft}
+      coachAluDropdown={pal.coachAluDropdown}
+      coachAluDropdownShadow={pal.coachAluDropdownShadow}
+      coachAluGhostBtn={pal.coachAluGhostBtn}
+      coachAluShell={pal.coachAluShell}
+      coachAluSubtle={pal.coachAluSubtle}
+      coachAluSurface={pal.coachAluSurface}
+      coachAluTrack={pal.coachAluTrack}
       coachAlumnosCounts={coachAlumnosCounts}
       coachAlumnosFilter={coachAlumnosFilter}
       coachAlumnosListaFiltrada={coachAlumnosListaFiltrada}
