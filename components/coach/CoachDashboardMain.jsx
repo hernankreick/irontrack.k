@@ -18,6 +18,10 @@ export default function CoachDashboardMain({
   onEnviarMensaje,
   onCrearRutina,
   onRevisarAlumnos,
+  onVerInactivos,
+  onVerSinRutina,
+  onVerBajaActividad,
+  onAsignarRutina,
   onRevisar,
   onVerPerfil,
   onNuevoAlumno,
@@ -49,6 +53,10 @@ export default function CoachDashboardMain({
       onEnviarMensaje={onEnviarMensaje}
       onCrearRutina={onCrearRutina}
       onRevisarAlumnos={onRevisarAlumnos}
+      onVerInactivos={onVerInactivos}
+      onVerSinRutina={onVerSinRutina}
+      onVerBajaActividad={onVerBajaActividad}
+      onAsignarRutina={onAsignarRutina}
       onRevisar={onRevisar}
       onVerPerfil={onVerPerfil}
       onNuevoAlumno={onNuevoAlumno}

@@ -300,6 +300,25 @@ export function adherenciaSemanalAlumno(a, cat, rutina, sesiones, semanas, carga
 }
 
 /**
+ * Ids de los alumnos con seguimiento "baja" (regla de D3, adherenciaSemanalAlumno). Lo usa App.jsx para el filtro «Baja actividad» de
+ * Alumnos, asi el filtro y el contador del Dashboard salen de la MISMA funcion y de las mismas entradas (rutinas, categoria, sesiones).
+ * @returns {Object<string, true>}
+ */
+export function bajaActividadIds(p) {
+  var o = p || {};
+  var semanas = semanasDashboard(o.hoy != null ? o.hoy : diaLocal());
+  var out = {};
+  (o.alumnos || []).forEach(function (a) {
+    if (!a || a.id == null) return;
+    var cat = typeof o.catFn === "function" ? o.catFn(a) : null;
+    if (cat === "sin_rutina" || cat === "inactivo") return;
+    var r = adherenciaSemanalAlumno(a, cat, getStudentRoutine(o.rutinas, a), o.sesiones, semanas, !!o.cargando);
+    if (r.seguimiento === "baja") out[String(a.id)] = true;
+  });
+  return out;
+}
+
+/**
  * Resumen del equipo con la regla de Progreso (coachProgresoMetrics.js, «Adherencia promedio»): promedio de los % de los alumnos
  * con plan; la variacion compara SOLO alumnos con plan en ambos periodos y no se informa con el historial de sesiones incompleto.
  */
@@ -654,6 +673,12 @@ export default function CoachDashboard({
   onEnviarMensaje,
   onCrearRutina,
   onRevisarAlumnos,
+  /** D4: Alumnos con el filtro correspondiente (sin filtros heredados). Si no se pasan, se usa onRevisarAlumnos. */
+  onVerInactivos,
+  onVerSinRutina,
+  onVerBajaActividad,
+  /** D4: abre la ficha del alumno y el flujo existente de asignacion de rutina (solo alumnos sin rutina). */
+  onAsignarRutina,
   onRevisar,
   onVerPerfil,
   onNuevoAlumno,
@@ -878,21 +903,32 @@ export default function CoachDashboard({
         : bajaActividadCount > 0
           ? M(lang, "Revisar alumnos con baja actividad", "Review low-activity athletes", "Revisar alunos com baixa atividade")
           : M(lang, "Revisar progreso del equipo", "Review team progress", "Revisar progresso da equipe");
-  // El boton describe a donde lleva el handler (Rutinas o Alumnos con filtro), no el titulo de la recomendacion.
+  // D4: cada destino abre Alumnos con SU filtro (sin filtros heredados); sin el handler especifico, la lista completa.
+  var irSinRutina = typeof onVerSinRutina === "function" ? onVerSinRutina : onRevisarAlumnos;
+  var irInactivos = typeof onVerInactivos === "function" ? onVerInactivos : onRevisarAlumnos;
+  var irBaja = typeof onVerBajaActividad === "function" ? onVerBajaActividad : onRevisarAlumnos;
+  var verSinRutinaTxt = M(lang, "Ver alumnos sin rutina", "View athletes without routine", "Ver alunos sem rotina");
+  var verInactivosTxt = M(lang, "Ver alumnos inactivos", "View inactive athletes", "Ver alunos inativos");
+  var verBajaTxt = M(lang, "Ver alumnos con baja actividad", "View low-activity athletes", "Ver alunos com baixa atividade");
+  // El boton describe a donde lleva el handler (Alumnos con filtro), no el titulo de la recomendacion.
   var accionCtaLabel = cargando
     ? M(lang, "Ver alumnos", "View athletes", "Ver alunos")
     : sinRutinaCount > 0
-      ? M(lang, "Ir a Rutinas", "Go to Routines", "Ir para Rotinas")
+      ? verSinRutinaTxt
       : inactivosCount > 0
-        ? M(lang, "Ver alumnos inactivos", "View inactive athletes", "Ver alunos inativos")
-        : M(lang, "Ver alumnos", "View athletes", "Ver alunos");
+        ? verInactivosTxt
+        : bajaActividadCount > 0
+          ? verBajaTxt
+          : M(lang, "Ver alumnos", "View athletes", "Ver alunos");
   var accionPrincipalHandler = cargando
     ? onRevisarAlumnos
     : sinRutinaCount > 0
-      ? onCrearRutina
+      ? irSinRutina
       : inactivosCount > 0
-        ? onEnviarMensaje
-        : onRevisarAlumnos;
+        ? irInactivos
+        : bajaActividadCount > 0
+          ? irBaja
+          : onRevisarAlumnos;
   var dashBg = darkMode ? "#0A0F1A" : C.bg;
   var dashCard = darkMode ? "#0D1424" : C.card;
   var dashCardSoft = darkMode ? "#101A2D" : C.cardDark;
@@ -904,8 +940,8 @@ export default function CoachDashboard({
       Icon: Target,
       count: sinRutinaCount,
       color: C.red,
-      cta: M(lang, "Ir a Rutinas", "Go to Routines", "Ir para Rotinas"),
-      onClick: onCrearRutina,
+      cta: verSinRutinaTxt,
+      onClick: irSinRutina,
       title: M(lang, "alumnos sin rutina", "athletes without routine", "alunos sem rotina"),
       sub: M(lang, "Asignales una rutina para que comiencen", "Assign routines so they can start", "Atribua rotinas para começarem"),
     },
@@ -914,8 +950,8 @@ export default function CoachDashboard({
       Icon: Clock3,
       count: inactivosCount,
       color: C.yel,
-      cta: M(lang, "Ver alumnos inactivos", "View inactive athletes", "Ver alunos inativos"),
-      onClick: onEnviarMensaje,
+      cta: verInactivosTxt,
+      onClick: irInactivos,
       title: M(lang, "alumnos inactivos", "inactive athletes", "alunos inativos"),
       sub: M(lang, "Hace más de 21 días sin actividad", "No activity in over 21 days", "Mais de 21 dias sem atividade"),
     },
@@ -924,8 +960,8 @@ export default function CoachDashboard({
       Icon: AlertCircle,
       count: bajaActividadCount,
       color: C.yel,
-      cta: M(lang, "Ver alumnos", "View athletes", "Ver alunos"),
-      onClick: onRevisarAlumnos,
+      cta: verBajaTxt,
+      onClick: irBaja,
       title: M(lang, "alumnos con baja actividad", "athletes with low activity", "alunos com baixa atividade"),
       sub: M(lang, "Menos del 30% de adherencia la semana pasada y en esta", "Under 30% adherence last week and this week", "Menos de 30% de aderência na semana passada e nesta"),
     },
@@ -976,17 +1012,19 @@ export default function CoachDashboard({
       onClick: function () {
         if (typeof onVerPerfil === "function") onVerPerfil(row.id);
       },
-      actions: [
+      // D4: «Asignar rutina» solo para alumnos SIN rutina (con rutina, el cambio se hace desde la ficha: «Cambiar rutina»).
+      actions: [].concat(row.cat === "sin_rutina" && typeof onAsignarRutina === "function" ? [
         {
           key: "assign",
-          label: M(lang, "Asignar", "Assign", "Atribuir"),
-          primary: status.primary,
-          enabled: typeof onRevisar === "function",
+          label: M(lang, "Asignar rutina", "Assign routine", "Atribuir rotina"),
+          primary: true,
+          enabled: true,
           onClick: function (ev) {
             ev.stopPropagation();
-            if (typeof onRevisar === "function") onRevisar(row.id);
+            onAsignarRutina(row.id);
           },
         },
+      ] : [], [
         {
           key: "profile",
           label: M(lang, "Perfil", "Profile", "Perfil"),
@@ -1007,7 +1045,7 @@ export default function CoachDashboard({
             if (typeof onAbrirChatAlumno === "function") onAbrirChatAlumno(row.id);
           },
         },
-      ],
+      ]),
     };
   });
   var activeStudentsHeaders = [
@@ -1431,7 +1469,7 @@ export default function CoachDashboard({
             </div>
           )}
           <CoachActiveStudentsCard
-            title={M(lang, "Alumnos activos", "Active athletes", "Alunos ativos")}
+            title={M(lang, "Mis alumnos", "My athletes", "Meus alunos")}
             seeAllLabel={M(lang, "Ver todos →", "See all →", "Ver todos →")}
             onSeeAll={onRevisarAlumnos}
             emptyText={
