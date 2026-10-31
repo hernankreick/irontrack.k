@@ -8,6 +8,7 @@ export default function CoachDashboardMain({
   sesionesGlobales,
   mensajesEntrenadorPendientes,
   progresoGlobal,
+  historiaCompleta,
   rutinasSBEntrenador,
   allEx,
   lang,
@@ -38,6 +39,7 @@ export default function CoachDashboardMain({
       sesionesGlobales={sesionesGlobales}
       mensajesEntrenadorPendientes={mensajesEntrenadorPendientes}
       progresoGlobal={progresoGlobal}
+      historiaCompleta={historiaCompleta}
       rutinasSBEntrenador={rutinasSBEntrenador}
       allEx={allEx}
       lang={lang}
