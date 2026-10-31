@@ -213,3 +213,7 @@ body {
 @media (max-width: 767px), (max-height: 520px) { .onb-hide-short { display: none !important; } }
 /* Foco visible por teclado en las tarjetas seleccionables del onboarding (tienen outline:none inline). */
 [data-onb-root] [role="button"]:focus-visible { outline: 2px solid #60A5FA !important; outline-offset: 2px; }
+
+/* Mis alumnos (Alumnos del entrenador): relleno lateral comun de titulo, botones, busqueda, chips y tarjetas. */
+.alu-pad{padding:0 20px 28px}
+@media (min-width:768px){.alu-pad{padding:24px 24px 32px}}

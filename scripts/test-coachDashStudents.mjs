@@ -129,8 +129,8 @@ await test("Alumnos: en escritorio los estilos inline coinciden con main; lo mov
   assert.match(card, /className="coach-stu-name" style=\{\{fontSize:17,fontWeight:700,color:textMain,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"\}\}/);
   assert.doesNotMatch(card, /WebkitLineClamp|overflowWrap/);
   const sec = read("components/students/StudentsSection.jsx");
-  assert.match(sec, /borderRadius:12,padding:"10px 12px",boxShadow/);
-  assert.match(sec, /fontFamily:"inherit",minWidth:0\}\}/);
+  assert.match(sec, /borderRadius:12,minHeight:48,padding:"0 14px",boxShadow/);
+  assert.match(sec, /fontFamily:"inherit",minWidth:0,minHeight:44\}\}/);
   assert.doesNotMatch(sec, /padding:"11px 0"/);
   const css = read("components/layout/AppGlobalStyles.jsx");
   const media = css.slice(css.indexOf("@media (max-width:767px)"));

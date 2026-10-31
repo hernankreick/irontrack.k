@@ -80,7 +80,9 @@ export default function CoachSectionRenderer({
       )}
 
       {tab === "alumnos" && sessionData?.role === "entrenador" && (
-        <div style={mobilePad}>
+        // Fondo de la paleta de Alumnos a todo el alto: sin corte con la barra superior ni con el Dashboard.
+        // El relleno lateral (20 px; 24 px en >= 768) lo pone StudentsSection (.alu-pad), por eso aqui va en 0.
+        <div className="alu-page" style={{ ...mobilePad, ...(isUnder768 && showMobileBar ? { paddingTop: 20 } : {}), paddingLeft: 0, paddingRight: 0, minHeight: "100dvh", boxSizing: "border-box", background: studentsProps?.darkMode ? "#0A0F1A" : "#F1F5F9" }}>
           <CoachStudentsMain {...studentsProps} />
         </div>
       )}

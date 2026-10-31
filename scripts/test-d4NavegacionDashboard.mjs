@@ -246,7 +246,8 @@ await test("pasos intermedios: CoachDashboardMain y CoachStudentsMain reenvian t
   const enviados = [...app.match(/studentsProps:\s*\{([\s\S]*?)\n\s{6}\},/)[1].matchAll(/^\s+(\w+):/gm)].map((m) => m[1]);
   const ss = read("components/students/StudentsSection.jsx");
   const usados = enviados.filter((k) => new RegExp("\\b" + k + "\\b").test(ss.slice(0, ss.indexOf("} = props;"))));
-  const perdidos = usados.filter((k) => !new RegExp("\\b" + k + "=\\{" + k + "\\}").test(stuMain));
+  // Los coachAlu* de color los sustituye CoachStudentsMain por alumnosPaleta(darkMode) (mejora visual de «Mis alumnos»): se reenvian como pal.<token>.
+  const perdidos = usados.filter((k) => !new RegExp("\\b" + k + "=\\{" + (/^coachAlu(BorderSoft|Dropdown|DropdownShadow|GhostBtn|Shell|Subtle|Surface|Track)$/.test(k) ? "pal\\." : "") + k + "\\}").test(stuMain));
   assert.deepEqual(perdidos, []);
 });
 

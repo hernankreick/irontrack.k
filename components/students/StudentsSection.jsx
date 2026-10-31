@@ -105,24 +105,26 @@ export default function StudentsSection(props) {
 
   return (
 
-          <div className="min-w-0 max-w-full" style={{background:coachAluShell,marginLeft:showCoachDesktopShell?0:-4,marginRight:showCoachDesktopShell?0:-4,padding:"8px 0 20px",borderRadius:12}}>
-            <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:8}}>
-              <div style={{fontSize:22,fontWeight:800,letterSpacing:1,color:textMain,minWidth:0,flex:"1 1 12rem"}}><Ic name="users" size={18} color={textMain}/> {msg("MIS ALUMNOS", "MY ATHLETES")}</div>
+          <div className="alu-pad min-w-0 max-w-full" style={{background:coachAluShell,boxSizing:"border-box"}}>
+            <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:16}}>
+              <h1 style={{margin:0,fontSize:22,fontWeight:750,letterSpacing:0,color:textMain,minWidth:0,flex:"1 1 10rem",display:"flex",alignItems:"center",gap:8}}><Ic name="users" size={20} color={textMain}/> {msg("Mis alumnos", "My athletes")}</h1>
               <div style={{display:"flex",gap:8,flexWrap:"wrap",flexShrink:0}}>
-                <button className="hov coach-tap" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={msg("Datos de pago", "Payment info")}><Ic name="share" size={16}/></button>
-                <button className="hov coach-tap" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:8,padding:"8px 8px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={msg("Actualizar", "Refresh")}><Ic name="refresh-cw" size={16}/></button>
-                <button className="hov coach-tap" style={{background:"#2563EB",color:"#fff",border:"none",borderRadius:8,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {msg("Nuevo", "New")}</button>
+                <button className="hov coach-tap" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:10,minWidth:44,minHeight:44,padding:"8px 10px",fontSize:13,cursor:"pointer"}} onClick={()=>setAliasModal(true)} aria-label={msg("Datos de pago", "Payment info")}><Ic name="share" size={16}/></button>
+                <button className="hov coach-tap" style={{background:coachAluGhostBtn,color:textMuted,border:"1px solid "+coachAluBorderSoft,borderRadius:10,minWidth:44,minHeight:44,padding:"8px 10px",fontSize:13,cursor:"pointer"}} onClick={cargarAlumnos} aria-label={msg("Actualizar", "Refresh")}><Ic name="refresh-cw" size={16}/></button>
+                <button className="hov coach-tap" style={{background:darkMode?"#3B82F6":"#2563EB",color:darkMode?"#06101F":"#fff",border:"none",borderRadius:10,minHeight:44,padding:"8px 16px",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>setNewAlumnoForm(true)}>+ {msg("Nuevo", "New")}</button>
               </div>
             </div>
 
             {routines.length>0&&(
-              <div style={{marginBottom:12,padding:"12px 14px",background:bgSub,borderRadius:12,border:"1px solid "+border}}>
-                <div style={{fontSize:11,fontWeight:800,letterSpacing:0.8,color:"#2563EB",marginBottom:8}}>{msg("RUTINA QUE SE ASIGNA AL TOCAR «ASIGNAR»", "ROUTINE USED WHEN YOU TAP «ASSIGN»")}</div>
+              <div title={msg("Creá o editá rutinas en RUTINAS. Con varias listas, elegí cuál mandar acá.", "Create or edit routines under ROUTINES. If you have several, pick which one to send.")} style={{position:"relative",display:"flex",alignItems:"center",flexWrap:"wrap",gap:"6px 12px",marginBottom:16,padding:"6px 12px",minHeight:56,boxSizing:"border-box",background:coachAluSurface,borderRadius:12,border:"1px solid "+coachAluBorderSoft}}>
+                <span id="alu-rutina-label" style={{fontSize:13,fontWeight:600,color:textMuted,flexShrink:0}}>{msg("Rutina a asignar", "Routine to assign")}</span>
                 {routines.length===1 ? (
-                  <div style={{fontSize:16,fontWeight:700,color:textMain}}>{routines[0].name}</div>
+                  <span aria-describedby="alu-rutina-ayuda" style={{flex:"1 1 8rem",minWidth:0,fontSize:15,fontWeight:700,color:textMain,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{routines[0].name}</span>
                 ) : (
                   <select
-                    style={{width:"100%",background:bgCard,color:textMain,border:"1px solid "+border,borderRadius:10,padding:"10px 12px",fontSize:15,fontWeight:600,fontFamily:"inherit",cursor:"pointer",outline:"none"}}
+                    aria-labelledby="alu-rutina-label"
+                    aria-describedby="alu-rutina-ayuda"
+                    style={{flex:"1 1 10rem",minWidth:0,minHeight:44,background:coachAluSubtle,color:textMain,border:"1px solid "+coachAluBorderSoft,borderRadius:10,padding:"8px 12px",fontSize:15,fontWeight:600,fontFamily:"inherit",cursor:"pointer",outline:"none"}}
                     value={routineForAssign?.id||""}
                     onChange={function(e){setAssignRoutineId(e.target.value);}}>
                     {routines.map(function(r){
@@ -130,12 +132,12 @@ export default function StudentsSection(props) {
                     })}
                   </select>
                 )}
-                <div style={{fontSize:12,color:textMuted,marginTop:6}}>{msg("Creá o editá rutinas en RUTINAS. Con varias listas, elegí cuál mandar acá.", "Create or edit routines under ROUTINES. If you have several, pick which one to send.")}</div>
+                <span id="alu-rutina-ayuda" style={{position:"absolute",width:1,height:1,overflow:"hidden",clip:"rect(0 0 0 0)",whiteSpace:"nowrap"}}>{msg("Creá o editá rutinas en RUTINAS. Con varias listas, elegí cuál mandar acá.", "Create or edit routines under ROUTINES. If you have several, pick which one to send.")}</span>
               </div>
             )}
 
-            <div style={{marginBottom:12}}>
-              <div className="coach-field-tap coach-stu-search" style={{display:"flex",alignItems:"center",gap:10,background:coachAluSurface,border:"1px solid "+coachAluBorderSoft,borderRadius:12,padding:"10px 12px",boxShadow:darkMode ? "none" : "0 1px 2px rgba(15,23,42,0.06)"}}>
+            <div style={{marginBottom:16}}>
+              <div className="coach-field-tap coach-stu-search" style={{display:"flex",alignItems:"center",gap:10,background:coachAluSurface,border:"1px solid "+coachAluBorderSoft,borderRadius:12,minHeight:48,padding:"0 14px",boxShadow:darkMode ? "none" : "0 1px 2px rgba(15,23,42,0.06)"}}>
                 <Ic name="search" size={18} color={textMuted}/>
                 <input
                   type="search"
@@ -144,10 +146,10 @@ export default function StudentsSection(props) {
                   value={coachAlumnosSearch}
                   onChange={function (e) { setCoachAlumnosSearch(e.target.value); }}
                   placeholder={msg("Buscar alumno...", "Search athlete...")}
-                  style={{flex:1,background:"transparent",border:"none",outline:"none",color:textMain,fontSize:15,fontFamily:"inherit",minWidth:0}}
+                  style={{flex:1,background:"transparent",border:"none",outline:"none",color:textMain,fontSize:16,fontFamily:"inherit",minWidth:0,minHeight:44}}
                 />
               </div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:12}}>
                 {[
                   { k: "todos", es: "Todos", en: "All", n: coachAlumnosCounts.todos },
                   { k: "activos", es: "Activos", en: "Active", n: coachAlumnosCounts.activos },
@@ -165,15 +167,16 @@ export default function StudentsSection(props) {
                       aria-pressed={sel}
                       onClick={function () { setCoachAlumnosFilter(chip.k); }}
                       style={{
-                        padding: "6px 12px",
+                        minHeight: 44,
+                        padding: "0 14px",
                         borderRadius: 999,
                         fontSize: 13,
                         fontWeight: 700,
                         cursor: "pointer",
                         fontFamily: "inherit",
-                        border: sel ? "1px solid #2563eb" : "1px solid "+coachAluBorderSoft,
+                        border: sel ? "1px solid "+(darkMode ? "#3B82F6" : "#2563EB") : "1px solid "+coachAluBorderSoft,
                         background: sel ? (darkMode ? "rgba(59,130,246,0.2)" : "rgba(37,99,235,0.1)") : coachAluSurface,
-                        color: sel ? "#2563eb" : textMuted,
+                        color: sel ? (darkMode ? "#93C5FD" : "#1D4ED8") : textMuted,
                       }}
                     >
                       {es ? chip.es : chip.en} ({chip.n})

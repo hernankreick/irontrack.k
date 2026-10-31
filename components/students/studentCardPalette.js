@@ -3,14 +3,15 @@
 export function studentCardPalette({ darkMode, coachAluSurface, coachAluBorderSoft, coachAluSubtle }) {
   if (darkMode) {
     return {
-      surface: "#0d1830",
-      inner: "#0a1426",
-      border: "rgba(59,130,246,0.24)",
+      // Bordes y superficies neutros (tokens de la paleta de Alumnos); el azul queda solo para seleccion / acciones.
+      surface: coachAluSurface || "#0D1424",
+      inner: coachAluSubtle || "#101A2D",
+      border: coachAluBorderSoft || "rgba(148,163,184,0.18)",
       borderStrong: "rgba(59,130,246,0.55)",
       blueSoft: "rgba(37,99,235,0.14)",
       blueBorder: "rgba(59,130,246,0.5)",
       blueText: "#60a5fa",
-      track: "#1b2a45",
+      track: "rgba(148,163,184,0.16)",
     };
   }
   return {
