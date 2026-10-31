@@ -2,8 +2,9 @@
 //
 //   node scripts/test-d4NavegacionDashboard.mjs
 //
-// 1) SSR del CoachDashboard real con las tarjetas reemplazadas por "capturadores" (alias de esbuild): se obtienen los props reales que el
-//    Dashboard pasa a «Mis alumnos», «Atencion hoy» y las tarjetas de resumen, y se ejecutan sus onClick con handlers espia.
+// 1) SSR del CoachDashboard real con el Dashboard D5 "capturado" (plugin de esbuild que registra los props que CoachDashboard le pasa y
+//    delega en el componente real): se obtienen los props reales, se expande el arbol de D5 (scripts/qa/arbolReact.mjs) y se ejecutan los
+//    onClick de sus controles (Requieren seguimiento, Actividad reciente, Acciones rapidas) con handlers espia.
 // 2) Cableado estatico: App.jsx (handlers que fijan el filtro y limpian lo heredado), CoachDashboardMain / CoachStudentsMain (no pierden
 //    props) y StudentsSection (chip «Baja actividad» y pedido del Dashboard con el flujo existente de asignacion).
 // La navegacion real (Dashboard <-> Alumnos, 375/390/430/1280 px) la verifica scripts/qa/dashboard-nav.mjs sobre la app compilada.
@@ -14,12 +15,12 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
+import { expandir, porQa } from "./qa/arbolReact.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (f) => readFileSync(path.join(ROOT, f), "utf8");
 const outfile = path.join(mkdtempSync(path.join(os.tmpdir(), "irontrack-d4-")), "bundle.mjs");
 const { build } = await import("esbuild");
-const CAPTURAR = /\/coach\/(CoachActiveStudentsCard|CoachDashboardAttentionCard|CoachDashboardSummaryGrid)\.jsx$/;
 await build({
   stdin: {
     contents:
@@ -35,12 +36,14 @@ await build({
   define: { "process.env.NODE_ENV": '"production"', "import.meta.env": "{}" },
   banner: { js: 'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);' },
   plugins: [{
-    name: "capturar-tarjetas",
+    name: "capturar-d5",
     setup(b) {
-      b.onLoad({ filter: CAPTURAR }, (args) => {
-        const nombre = args.path.match(CAPTURAR)[1];
-        return { loader: "js", contents: "export default function " + nombre + "(props) { (globalThis.__capt = globalThis.__capt || {})['" + nombre + "'] = props; return null; }" };
-      });
+      // Solo el import que hace CoachDashboard.jsx; el resto (la prueba y D5 mismo) usan el componente real.
+      b.onResolve({ filter: /CoachDashboardD5\.jsx$/ }, (args) => (args.importer.endsWith("CoachDashboard.jsx") ? { path: "d5-captura", namespace: "captura" } : null));
+      b.onLoad({ filter: /.*/, namespace: "captura" }, () => ({
+        loader: "js", resolveDir: ROOT,
+        contents: "import Real from " + JSON.stringify(path.join(ROOT, "components/coach/CoachDashboardD5.jsx")) + "; export default function Captura(p) { var t = Real(p); globalThis.__capt = { props: p, arbol: t }; return t; }",
+      }));
     },
   }],
 });
@@ -85,104 +88,94 @@ function render(extra) {
     alumnos, sesionesGlobales: sesiones, progresoGlobal: {}, historiaCompleta: { sesiones: true, progreso: true },
     rutinasSBEntrenador: rutinas, getAlumnoCategoria: catFn, lang: "es",
   }, s.props, extra || {})));
-  return { capt: globalThis.__capt, calls: s.calls };
+  const capt = globalThis.__capt;
+  const qa = porQa(expandir(capt.arbol));
+  return { capt, calls: s.calls, qa, get: (k) => qa.find((n) => n.qa === k), todos: (k) => qa.filter((n) => n.qa === k) };
 }
-const ev = { stopPropagation() {} };
-const fila = (rows, id) => rows.find((r) => String(r.id) === id);
 
-// ======================================================================= H10
-await test("H10: la lista se titula «Mis alumnos» y contiene a TODOS (inactivos, sin rutina, baja actividad y al dia) con su estado", () => {
-  const { capt } = render();
-  const card = capt.CoachActiveStudentsCard;
-  assert.equal(card.title, "Mis alumnos");
-  assert.deepEqual(card.desktopRows.map((r) => r.id).sort(), ["ana", "beto", "cami", "dora"]);
-  assert.deepEqual(card.mobileRows.map((r) => r.id).sort(), ["ana", "beto", "cami", "dora"]);
-  const estado = (id) => fila(card.desktopRows, id).statusLabel;
-  assert.deepEqual([estado("ana"), estado("beto"), estado("cami"), estado("dora")], ["Sin actividad", "Baja actividad", "Sin rutina", "Al día"]);
-  assert.equal(fila(card.desktopRows, "dora").pctText, "100%", "adherencia de D3 intacta");
-  assert.doesNotMatch(read("components/CoachDashboard.jsx"), /title=\{M\(lang, "Alumnos activos"/);
+// ======================================================================= H10 (D5: la lista «Mis alumnos» se reemplazo por Seguimiento + Actividad reciente)
+await test("H10: cada estado queda visible con su alumno (inactivo, sin rutina, baja actividad en Seguimiento; al dia en Actividad reciente)", () => {
+  const r = render();
+  assert.equal(r.get("d5-grupo-inactivos").texto, "Inactivos Más de 21 días · Ana 1");
+  assert.equal(r.get("d5-grupo-baja").texto, "Baja actividad Beto 1");
+  assert.equal(r.get("d5-grupo-sin_rutina").texto, "Sin rutina Cami 1");
+  assert.deepEqual(r.todos("d5-reciente").map((f) => f.props["data-alumno-id"]), ["dora"]);
+  assert.match(r.get("d5-reciente").texto, /Dora Hoy · 100% esta semana Al día/, "adherencia de D3 intacta");
+  const src = read("components/CoachDashboard.jsx");
+  assert.doesNotMatch(src, /title=\{M\(lang, "Alumnos activos"/);
+  assert.doesNotMatch(src, /CoachActiveStudentsCard/, "la tabla «Mis alumnos» ya no esta en el Dashboard");
 });
 
 // ======================================================================= H11
-await test("H11: «Perfil» y la fila abren la ficha del alumno seleccionado (escritorio y movil)", () => {
-  const { capt, calls } = render();
-  const card = capt.CoachActiveStudentsCard;
-  fila(card.desktopRows, "beto").actions.find((a) => a.key === "profile").onClick(ev);
-  fila(card.desktopRows, "dora").onClick();
-  fila(card.mobileRows, "ana").onClick();
-  assert.deepEqual(calls, [["onVerPerfil", "beto"], ["onVerPerfil", "dora"], ["onVerPerfil", "ana"]]);
+await test("H11: la fila de «Actividad reciente» abre la ficha del alumno seleccionado", () => {
+  const r = render();
+  r.get("d5-reciente").props.onClick();
+  assert.deepEqual(r.calls, [["onVerPerfil", "dora"]]);
+  assert.equal(typeof r.capt.props.onVerPerfil, "function", "D5 recibe onVerPerfil de App");
 });
 
-await test("H11: «Asignar rutina» solo para alumnos SIN rutina y llama al flujo de asignacion con ese alumno; con rutina no se muestra", () => {
-  const { capt, calls } = render();
-  const rows = capt.CoachActiveStudentsCard.desktopRows;
-  const tieneAsignar = (id) => fila(rows, id).actions.some((a) => a.key === "assign");
-  assert.deepEqual(["ana", "beto", "cami", "dora"].map(tieneAsignar), [false, false, true, false]);
-  const asignar = fila(rows, "cami").actions.find((a) => a.key === "assign");
-  assert.equal(asignar.label, "Asignar rutina");
-  asignar.onClick(ev);
-  assert.deepEqual(calls, [["onAsignarRutina", "cami"]]);
-  assert.ok(!rows.some((r) => r.actions.some((a) => a.label === "Asignar")), "sin la etiqueta ambigua «Asignar»");
+await test("H11 (decision D5): el Dashboard ya no tiene «Asignar rutina» por fila; se asigna desde Seguimiento «Sin rutina» -> Alumnos filtrado -> ficha", () => {
+  const r = render();
+  assert.ok(!r.qa.some((n) => /Asignar/.test(n.texto)), "ningun control «Asignar» en el Dashboard");
+  r.get("d5-grupo-sin_rutina").props.onClick();
+  assert.deepEqual(r.calls, [["onVerSinRutina"]]);
+  assert.equal(r.capt.props.onAsignarRutina, undefined, "D5 no usa onAsignarRutina");
+  // CoachDashboard conserva el prop en su firma (App.jsx lo sigue pasando); el flujo existente de asignacion esta cubierto al final de este archivo
+  assert.match(read("components/CoachDashboard.jsx"), /\n\s+onAsignarRutina,\n/);
 });
 
-await test("H11: sin handler de asignacion no se muestra un boton que no hace nada", () => {
-  const { capt } = render({ onAsignarRutina: undefined });
-  assert.ok(!capt.CoachActiveStudentsCard.desktopRows.some((r) => r.actions.some((a) => a.key === "assign")));
-});
-
-await test("«Mensaje» abre el chat del alumno correcto", () => {
-  const { capt, calls } = render();
-  fila(capt.CoachActiveStudentsCard.desktopRows, "ana").actions.find((a) => a.key === "message").onClick(ev);
-  assert.deepEqual(calls, [["onAbrirChatAlumno", "ana"]]);
+await test("«Mensaje»: el chat de un alumno se abre desde la campana real (onAbrirChatAlumno) y desde Mensajes; no desde el Dashboard", () => {
+  const r = render();
+  const campana = r.capt.props.campana;
+  assert.equal(typeof campana.props.onAbrirChatAlumno, "function");
+  campana.props.onAbrirChatAlumno("ana");
+  assert.deepEqual(r.calls, [["onAbrirChatAlumno", "ana"]]);
+  assert.ok(!r.qa.some((n) => /Contactar|Mensaje/.test(n.texto)));
 });
 
 // ======================================================================= H12
-await test("H12: Atencion hoy lleva a Alumnos con SU filtro (inactivos, sin rutina, baja actividad)", () => {
-  const { capt, calls } = render();
-  const items = capt.CoachDashboardAttentionCard.items;
-  const item = (k) => items.find((i) => i.key === k);
-  assert.deepEqual(items.map((i) => [i.key, i.count]), [["sin-rutina", 1], ["inactivos", 1], ["baja", 1]]);
-  assert.equal(item("sin-rutina").cta, "Ver alumnos sin rutina");
-  assert.equal(item("inactivos").cta, "Ver alumnos inactivos");
-  assert.equal(item("baja").cta, "Ver alumnos con baja actividad");
-  item("sin-rutina").onClick();
-  item("inactivos").onClick();
-  item("baja").onClick();
-  assert.deepEqual(calls, [["onVerSinRutina"], ["onVerInactivos"], ["onVerBajaActividad"]]);
-  assert.ok(!calls.some((c) => c[0] === "onCrearRutina" || c[0] === "onEnviarMensaje"), "ya no va a Rutinas ni usa el CTA de mensajes");
+await test("H12: Requieren seguimiento lleva a Alumnos con SU filtro (sin sesion/rutina -> inactivos, sin rutina, baja actividad)", () => {
+  const r = render();
+  assert.deepEqual(["d5-grupo-sin_rutina", "d5-grupo-inactivos", "d5-grupo-baja"].map((k) => r.get(k).texto.match(/(\d+)$/)[1]), ["1", "1", "1"]);
+  r.get("d5-grupo-sin_rutina").props.onClick();
+  r.get("d5-grupo-inactivos").props.onClick();
+  r.get("d5-grupo-baja").props.onClick();
+  assert.deepEqual(r.calls, [["onVerSinRutina"], ["onVerInactivos"], ["onVerBajaActividad"]]);
+  assert.ok(!r.calls.some((c) => c[0] === "onNuevaRutina" || c[0] === "onEnviarMensaje" || c[0] === "onCrearRutina"), "ya no va a Rutinas ni usa el CTA de mensajes");
 });
 
-await test("H12: la recomendacion principal usa el mismo destino que su contador (sin rutina > inactivos > baja > todos)", () => {
-  let r = render();
-  r.capt.CoachDashboardSummaryGrid.recommendationProps.onAction();
-  assert.equal(r.capt.CoachDashboardSummaryGrid.recommendationProps.ctaLabel, "Ver alumnos sin rutina");
-  assert.deepEqual(r.calls, [["onVerSinRutina"]]);
-  r = render({ alumnos: alumnos.filter((a) => a.id !== "cami") });
-  r.capt.CoachDashboardSummaryGrid.recommendationProps.onAction();
+await test("H12: cada fila usa el mismo destino que su contador; sin handler especifico, la lista completa; sin casos no hay filas", () => {
+  let r = render({ alumnos: alumnos.filter((a) => a.id !== "cami") });
+  assert.equal(r.todos("d5-grupo-sin_rutina").length, 0);
+  r.get("d5-grupo-inactivos").props.onClick();
   assert.deepEqual(r.calls, [["onVerInactivos"]]);
   r = render({ alumnos: alumnos.filter((a) => a.id === "beto" || a.id === "dora") });
-  assert.equal(r.capt.CoachDashboardSummaryGrid.recommendationProps.ctaLabel, "Ver alumnos con baja actividad");
-  r.capt.CoachDashboardSummaryGrid.recommendationProps.onAction();
+  assert.equal(r.todos("d5-grupo-inactivos").length, 0);
+  r.get("d5-grupo-baja").props.onClick();
   assert.deepEqual(r.calls, [["onVerBajaActividad"]]);
   r = render({ alumnos: alumnos.filter((a) => a.id === "dora") });
-  r.capt.CoachDashboardSummaryGrid.recommendationProps.onAction();
-  assert.deepEqual(r.calls, [["onRevisarAlumnos"]]);
+  assert.equal(r.qa.filter((n) => /^d5-grupo-/.test(n.qa)).length, 0);
+  assert.match(r.get("d5-todo-al-dia").texto, /Nadie requiere seguimiento esta semana\./);
+  r = render({ onVerSinRutina: undefined, onVerInactivos: undefined, onVerBajaActividad: undefined });
+  ["d5-grupo-sin_rutina", "d5-grupo-inactivos", "d5-grupo-baja"].forEach((k) => r.get(k).props.onClick());
+  assert.deepEqual(r.calls, [["onRevisarAlumnos"], ["onRevisarAlumnos"], ["onRevisarAlumnos"]]);
 });
 
-await test("H12: «Ver equipo» y «Ver todos →» van a la lista completa (onRevisarAlumnos)", () => {
-  const { capt, calls } = render();
-  capt.CoachDashboardSummaryGrid.desktopWeeklyProps.onSecondary();
-  capt.CoachActiveStudentsCard.onSeeAll();
+await test("H12: «Ver alumnos» (Actividad reciente y Acciones rapidas) va a la lista completa (onRevisarAlumnos)", () => {
+  const { qa, calls, get } = render();
+  get("d5-ver-alumnos").props.onClick();
+  get("d5-accion-alumnos").props.onClick();
   assert.deepEqual(calls, [["onRevisarAlumnos"], ["onRevisarAlumnos"]]);
+  assert.equal(qa.find((n) => n.qa === "d5-accion-alumnos").texto, "Ver alumnos");
 });
 
 await test("H12: el filtro «Baja actividad» usa la regla de D3: mismos alumnos que el contador y los estados del Dashboard", () => {
-  const { capt } = render();
+  const r = render();
   const ids = X.bajaActividadIds({ alumnos, catFn, rutinas, sesiones });
   assert.deepEqual(Object.keys(ids), ["beto"]);
-  const conEstado = capt.CoachActiveStudentsCard.desktopRows.filter((r) => r.statusLabel === "Baja actividad").map((r) => String(r.id));
-  assert.deepEqual(conEstado, Object.keys(ids));
-  assert.equal(capt.CoachDashboardAttentionCard.items.find((i) => i.key === "baja").count, Object.keys(ids).length);
+  assert.deepEqual(r.capt.props.modelo.seguimiento.baja.map((a) => String(a.id)), Object.keys(ids));
+  assert.equal(r.get("d5-grupo-baja").texto, "Baja actividad Beto " + Object.keys(ids).length);
+  assert.equal(r.get("d5-stat-seguimiento").texto, "Seguimiento 3 requieren atención");
   assert.ok(!ids.ana, "inactivo (21 dias) no es baja actividad");
 });
 

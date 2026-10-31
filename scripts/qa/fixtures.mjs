@@ -69,7 +69,12 @@ const dmyHace = (n) => { const d = new Date(); d.setDate(d.getDate() - n); retur
 export function dashNavSesiones() {
   const b = ALUMNOS[1];
   const t = new Date(); t.setDate(t.getDate() - 15); t.setHours(15, 0, 0, 0);
-  return [{ id: "ses-nav-1", alumno_id: b.id, rutina_id: "rr-" + b.id.slice(-2), rutina_nombre: "Rutina " + b.nombre, dia_idx: 0, dia_label: "Dia 1", semana: 1, fecha: dmyHace(15), hora: "15:00", ejercicios: "", created_at: t.toISOString() }];
+  // D5: Cami (sin rutina) tiene una sesion de HOY sin rutina asignada: sigue «Sin rutina» pero aparece en «Actividad reciente» (14 dias),
+  // que es desde donde el QA abre su ficha (Beto, hace 15 dias, queda fuera de esa ventana).
+  const c = ALUMNOS[2];
+  const hoy = new Date(); hoy.setHours(10, 0, 0, 0);
+  const hoySes = { id: "ses-nav-2", alumno_id: c.id, rutina_id: null, rutina_nombre: "", dia_idx: 0, dia_label: "Dia 1", semana: 1, fecha: dmyHace(0), hora: "10:00", ejercicios: "", created_at: hoy.toISOString() };
+  return [hoySes, { id: "ses-nav-1", alumno_id: b.id, rutina_id: "rr-" + b.id.slice(-2), rutina_nombre: "Rutina " + b.nombre, dia_idx: 0, dia_label: "Dia 1", semana: 1, fecha: dmyHace(15), hora: "15:00", ejercicios: "", created_at: t.toISOString() }];
 }
 
 export function alumnosRows() {

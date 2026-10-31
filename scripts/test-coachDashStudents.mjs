@@ -57,15 +57,16 @@ await test("Atencion hoy: el subtitulo usa el gris legible (dashMuted), no t2 (#
 });
 
 await test("Textos de botones describen la accion real (Dashboard)", () => {
-  const src = read("components/CoachDashboard.jsx");
+  // D5: «Atencion hoy» se reemplazo por «Requieren seguimiento» (CoachDashboardD5); cada fila lleva a Alumnos con SU filtro.
+  const src = read("components/coach/CoachDashboardD5.jsx") + read("components/CoachDashboard.jsx");
   assert.doesNotMatch(src, /cta: M\(lang, "Enviar mensaje"/, "'Enviar mensaje' navega a Alumnos con filtro");
   assert.doesNotMatch(src, /cta: M\(lang, "Asignar ahora"/, "'Asignar ahora' solo navega a Rutinas");
-  // D4: cada CTA de Atencion hoy lleva a Alumnos con SU filtro (antes «Ir a Rutinas» no mostraba quienes estaban sin rutina).
-  assert.match(src, /cta: verInactivosTxt,\s*onClick: irInactivos,/);
-  assert.match(src, /cta: verSinRutinaTxt,\s*onClick: irSinRutina,/);
-  assert.match(src, /cta: verBajaTxt,\s*onClick: irBaja,/);
-  assert.match(src, /var verSinRutinaTxt = M\(lang, "Ver alumnos sin rutina"/);
-  assert.match(src, /ctaLabel: accionCtaLabel/);
+  const d5 = read("components/coach/CoachDashboardD5.jsx");
+  assert.match(d5, /t: "Sin rutina", lista: seg\.sinRutina, on: irSinRutina/);
+  assert.match(d5, /t: "Inactivos", pre: "Más de 21 días · ", lista: seg\.inactivos, on: irInactivos/);
+  assert.match(d5, /t: "Baja actividad", lista: seg\.baja, on: irBaja/);
+  assert.match(d5, /var irSinRutina = typeof props\.onVerSinRutina === "function" \? props\.onVerSinRutina : props\.onRevisarAlumnos;/);
+  assert.match(d5, /onClick=\{props\.onRevisarAlumnos\} data-qa="d5-ver-alumnos"[\s\S]*?>Ver alumnos</, "el boton dice a donde lleva");
   assert.doesNotMatch(src, /ctaLabel: accionRecomendada/, "titulo y boton de la recomendacion no comparten cadena");
 });
 

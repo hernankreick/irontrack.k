@@ -176,14 +176,13 @@ await test("Equipo abierto (SSR): ranking con validadas por el entrenador y adhe
   assert.match(html, /↑ 25% vs período anterior/);
 });
 
-await test("CoachDashboard (SSR): «Racha actual» sintetica reemplazada por «Alumnos activos esta semana» (sesiones completadas reales)", () => {
+await test("CoachDashboard (SSR, D5): «Racha actual» sintetica reemplazada por «Entrenaron» esta semana (sesiones completadas reales, rachaSemanal)", () => {
   const hoyS = [s(A, "r1", 0, 0, { origen: "validada_coach" }), s(B, "r2", 0, 1), s(B, "r2", 0, 0), s(CA, null, 0, 0, { estado: "pendiente" })];
   const html = renderToStaticMarkup(h(CoachDashboard, { alumnos, sesionesGlobales: hoyS, progresoGlobal: {}, rutinasSBEntrenador: rutinas, allEx, lang: "es" }));
   assert.doesNotMatch(html, /Racha actual/);
-  assert.match(html, /Alumnos activos esta semana/);
-  assert.match(html, /2 \/ 3/, "Ana (validada) y Beto; Caro solo tiene una pendiente");
+  assert.match(html, /Entrenaron<\/span><span[^>]*>2 \/ 3</, "Ana (validada) y Beto; Caro solo tiene una pendiente");
   const nadie = renderToStaticMarkup(h(CoachDashboard, { alumnos, sesionesGlobales: [s(A, "r1", 400, 0)], progresoGlobal: {}, rutinasSBEntrenador: rutinas, allEx, lang: "es" }));
-  assert.match(nadie, /0 \/ 3/, "sesiones viejas no cuentan");
+  assert.match(nadie, /Entrenaron<\/span><span[^>]*>0 \/ 3</, "sesiones viejas no cuentan");
 });
 
 // ======================================================================= alcance
@@ -192,8 +191,10 @@ await test("alcance: pantallas del entrenador importan lib/metricas; calculos an
   assert.match(metrics, /from "\.\.\/lib\/metricas\/index\.js"/);
   assert.doesNotMatch(metrics, /export function (buildPrEvents|rowVolumeKg|getPeriodBounds)/);
   assert.doesNotMatch(metrics, /Nuevo PR/);
-  assert.match(read("components/CoachDashboard.jsx"), /rachaSemanal\(/);
+  // D5: «Entrenaron» se calcula en el modelo del Dashboard con la misma funcion del nucleo.
+  assert.match(read("components/coach/coachDashboardModelo.js"), /rachaSemanal\(/);
   assert.doesNotMatch(read("components/CoachDashboard.jsx"), /var rachaActual/);
+  assert.doesNotMatch(read("components/coach/coachDashboardModelo.js"), /var rachaActual/);
   assert.match(read("components/coach/EjercicioHistorialCoach.jsx"), /lib\/metricas/);
   assert.match(read("components/ProgresoView.jsx"), /historiaCompleta: historiaCompleta/);
   assert.match(read("components/ProgresoView.jsx"), /indiceTiempo=\{model\.indiceTiempo\}/);

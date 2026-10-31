@@ -1,9 +1,10 @@
 // QA de la demostracion del Dashboard del entrenador (demo/dashboard-coach.html, datos ficticios, solo Preview).
 // Uso:  node scripts/qa/demo-dashboard.mjs [--dist <dir compilado con IRONTRACK_DEMO=1>] [--widths 375,390,430,1280] [--out <carpeta>]
 // Verifica en Chromium, sin sesion de IronTrack y con TODA la red externa bloqueada (se registra y se aborta):
-//   Atencion hoy -> Alumnos con el filtro correcto (inactivos / sin rutina / baja actividad), «Ver todos» limpia filtro y busqueda,
-//   tocar un alumno en «Mis alumnos» abre su ficha, «Asignar rutina» (escritorio) abre el dialogo existente, sin errores de pagina,
-//   sin red y sin escribir la sesion de IronTrack en el almacenamiento.
+//   Dashboard D5: las filas de «Requieren seguimiento» -> Alumnos con el filtro correcto (inactivos / sin rutina / baja actividad),
+//   «Ver alumnos» limpia filtro y busqueda, tocar un alumno en «Actividad reciente» (Dora) abre su ficha, Seguimiento «Sin rutina» -> ficha
+//   de Cami -> «Asignar rutina» de la ficha abre el dialogo existente, sin errores de pagina, sin red y sin escribir la sesion de
+//   IronTrack en el almacenamiento.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -72,15 +73,19 @@ for (const width of o.widths) {
   await page.waitForTimeout(1500);
 
   const inicio = await page.evaluate(() => document.body.innerText);
-  check(/DEMO/.test(inicio) && /Mis alumnos/.test(inicio), tag + " abre el Dashboard demo sin login");
-  for (const t of ["1 alumnos sin rutina", "1 alumnos inactivos", "1 alumnos con baja actividad"]) check(inicio.includes(t), tag + " Atencion hoy: " + t);
+  check(/DEMO/.test(inicio) && /Requieren seguimiento/.test(inicio) && /Actividad reciente/.test(inicio), tag + " abre el Dashboard demo sin login");
+  for (const t of ["Sin rutina", "Inactivos", "Baja actividad"]) check(inicio.includes(t), tag + " Requieren seguimiento: " + t);
   if (o.out) await page.screenshot({ path: path.join(o.out, "dashboard_" + width + ".png"), fullPage: false });
 
-  for (const [cta, chip, esperado] of [["Ver alumnos inactivos", "Inactivos", "Ana Inactiva"], ["Ver alumnos sin rutina", "Sin rutina", "Cami Nueva"], ["Ver alumnos con baja actividad", "Baja actividad", "Beto Baja"]]) {
+  for (const [cta, chip, esperado] of [["Inactivos", "Inactivos", "Ana Inactiva"], ["Sin rutina", "Sin rutina", "Cami Nueva"], ["Baja actividad", "Baja actividad", "Beto Baja"]]) {
     await irDashboard(page);
-    const r = await clickText(page, cta, ".cd-card");
-    check(!!r, tag + " CTA " + cta);
-    if (r && mobile) check(r.h >= 43.5, tag + " CTA " + cta + " >= 44 px");
+    const r = await page.evaluate((cta) => {
+      const el = [...document.querySelectorAll('[data-qa="d5-seguimiento"] button')].find((b) => (b.innerText || "").trim().startsWith(cta));
+      if (!el) return null;
+      const q = el.getBoundingClientRect(); el.click(); return { h: q.height };
+    }, cta);
+    check(!!r, tag + " fila " + cta);
+    if (r && mobile) check(r.h >= 43.5, tag + " fila " + cta + " >= 44 px");
     await page.waitForTimeout(700);
     const st = await alumnos(page);
     check(st.chip.startsWith(chip), tag + " " + cta + " -> filtro " + chip + " (" + st.chip + ")");
@@ -90,17 +95,17 @@ for (const width of o.widths) {
 
   await page.fill('input[aria-label="Buscar alumno"]', "zzz");
   await irDashboard(page);
-  check(!!(await clickText(page, "Ver todos →")), tag + " Ver todos");
+  check(await page.evaluate(() => { const b = document.querySelector('[data-qa="d5-ver-alumnos"]'); if (!b) return false; b.click(); return true; }), tag + " Ver alumnos");
   await page.waitForTimeout(700);
   let st = await alumnos(page);
-  check(st.chip.startsWith("Todos") && st.search === "" && st.cards.length === 5, tag + " Ver todos -> Todos, sin busqueda, 5 alumnos (" + st.chip + "/'" + st.search + "'/" + st.cards.length + ")");
+  check(st.chip.startsWith("Todos") && st.search === "" && st.cards.length === 5, tag + " Ver alumnos -> Todos, sin busqueda, 5 alumnos (" + st.chip + "/'" + st.search + "'/" + st.cards.length + ")");
 
   await irDashboard(page);
   const tocado = await page.evaluate(() => {
-    const row = [...document.querySelectorAll("[role=button]")].find((e) => (e.innerText || "").includes("Dora Constante"));
+    const row = [...document.querySelectorAll('[data-qa="d5-reciente"]')].find((e) => (e.innerText || "").includes("Dora Constante"));
     if (!row) return false; row.click(); return true;
   });
-  check(tocado, tag + " fila de Dora en Mis alumnos");
+  check(tocado, tag + " fila de Dora en Actividad reciente");
   await page.waitForTimeout(1200);
   st = await alumnos(page);
   const dora = st.cards.find((c) => c.n === "Dora Constante");
@@ -108,18 +113,20 @@ for (const width of o.widths) {
   check(!!(dora && dora.top >= -2 && dora.top < st.vh), tag + " ficha de Dora a la vista");
   if (o.out) await page.screenshot({ path: path.join(o.out, "ficha_" + width + ".png") });
 
-  if (!mobile) {
-    await irDashboard(page);
-    await page.evaluate(() => {
-      const row = [...document.querySelectorAll("[role=button]")].find((e) => (e.innerText || "").includes("Cami Nueva") && /Perfil/.test(e.innerText || ""));
-      const b = row && [...row.querySelectorAll("button")].find((x) => x.innerText.trim() === "Asignar rutina");
-      if (b) b.click();
-    });
-    await page.waitForTimeout(1200);
-    const dlg = await page.evaluate(() => document.body.innerText.includes("Asignar rutina: Rutina inicial (demo) a Cami Nueva"));
-    check(dlg, tag + " Asignar rutina abre el dialogo existente para Cami");
-    await clickText(page, "Cancelar");
+  // Asignacion: Seguimiento «Sin rutina» -> Alumnos filtrado -> ficha de Cami -> «Asignar rutina» de la ficha (ya no hay boton por fila en el Dashboard)
+  await irDashboard(page);
+  await page.evaluate(() => { const el = [...document.querySelectorAll('[data-qa="d5-seguimiento"] button')].find((b) => (b.innerText || "").trim().startsWith("Sin rutina")); if (el) el.click(); });
+  await page.waitForTimeout(900);
+  st = await alumnos(page);
+  if (!st.cards.find((c) => c.n === "Cami Nueva" && c.open)) {
+    await page.evaluate(() => { const t = document.querySelector("[data-alumno-id] [data-qa-alumno-toggle]"); if (t) t.click(); });
+    await page.waitForTimeout(900);
   }
+  check(!!(await clickText(page, "Asignar rutina")), tag + " la ficha de Cami tiene 'Asignar rutina'");
+  await page.waitForTimeout(1200);
+  const dlg = await page.evaluate(() => document.body.innerText.includes("Asignar rutina: Rutina inicial (demo) a Cami Nueva"));
+  check(dlg, tag + " Asignar rutina de la ficha abre el dialogo existente para Cami");
+  await clickText(page, "Cancelar");
 
   const storage = await page.evaluate(() => Object.keys(localStorage));
   check(!storage.includes("it_session") && !storage.some((k) => /^sb-.*-auth-token$/.test(k)), tag + " sin sesion de IronTrack en el almacenamiento: " + storage.join(","));

@@ -47,8 +47,8 @@ await test("vite.config: la demo del Dashboard solo entra al build en Preview (o
 
 await test("la demo usa los componentes y la navegacion REALES y no alcanza App.jsx, el cliente de Supabase ni supabase-js", () => {
   const g = graph("components/demo/dashboardCoachDemoMain.jsx");
-  for (const real of ["components/coach/CoachDashboardMain.jsx", "components/CoachDashboard.jsx", "components/coach/CoachActiveStudentsCard.jsx",
-    "components/coach/CoachDashboardAttentionCard.jsx", "components/students/StudentsSection.jsx", "components/students/StudentCard.jsx",
+  for (const real of ["components/coach/CoachDashboardMain.jsx", "components/CoachDashboard.jsx", "components/coach/CoachDashboardD5.jsx",
+    "components/coach/coachDashboardModelo.js", "components/students/StudentsSection.jsx", "components/students/StudentCard.jsx",
     "components/coach/coachDashboardNav.js", "components/coach/CoachConfirmDialog.jsx", "lib/coachStudentListSelectors.js"]) {
     assert.ok(g.files.includes(real), "usa " + real);
   }
