@@ -68,8 +68,8 @@ await test("Textos de botones describen la accion real (Dashboard)", () => {
 
 await test("Delta movil: signo correcto (sin '+' cuando es negativo) y flecha/color acordes", () => {
   const src = read("components/CoachDashboard.jsx");
-  assert.match(src, /deltaText: \(rendimientoDeltaPts >= 0 \? "\+" : ""\) \+ rendimientoDeltaPts/);
-  assert.doesNotMatch(src, /deltaText: "\+" \+ rendimientoDeltaPts/);
+  // D2: el puntaje sintetico "Rendimiento /100" y su delta se eliminaron (no hay delta inventado que mostrar).
+  assert.doesNotMatch(src, /rendimientoDeltaPts|rendimientoScore/);
   const kpi = (d) => renderToStaticMarkup(h(CoachMobileKpiCard, { label: "R", value: 50, suffix: "/100", deltaText: d, progress: 50, accent: "#22C55E", colors: C, type: coachType, blockGap: 8 }));
   assert.match(kpi("-3 pts"), /color:#ef4444/); assert.match(kpi("-3 pts"), /lucide-arrow-down/);
   assert.match(kpi("+3 pts"), /color:#22C55E/); assert.match(kpi("+3 pts"), /lucide-arrow-up/);

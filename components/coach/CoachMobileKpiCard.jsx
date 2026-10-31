@@ -76,7 +76,7 @@ export default function CoachMobileKpiCard({
       >
         <div
           style={{
-            width: progress + "%",
+            width: (progress || 0) + "%",
             height: "100%",
             background: accent,
             borderRadius: 3,

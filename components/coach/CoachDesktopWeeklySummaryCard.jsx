@@ -51,6 +51,7 @@ export default function CoachDesktopWeeklySummaryCard({
         <div style={{ fontSize: 34, lineHeight: 1, fontWeight: 850, color: C.t }}>{pctText}</div>
       </div>
       <div style={{ ...T.subtitle, color: C.t2, marginTop: 6 }}>{subtitle}</div>
+      {deltaText ? (
       <div
         style={{
           marginTop: blockGap,
@@ -64,6 +65,7 @@ export default function CoachDesktopWeeklySummaryCard({
       >
         {deltaText}
       </div>
+      ) : null}
       <div
         style={{
           display: "flex",
@@ -74,7 +76,7 @@ export default function CoachDesktopWeeklySummaryCard({
       >
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ height: 10, background: trackBg, borderRadius: 999, overflow: "hidden", marginBottom: 14 }}>
-            <div className="cd-progress-fill" style={{ width: progressPct + "%", height: "100%", background: C.blue, borderRadius: 999 }} />
+            <div className="cd-progress-fill" style={{ width: (progressPct || 0) + "%", height: "100%", background: C.blue, borderRadius: 999 }} />
           </div>
           <div style={{ background: dashCardSoft, border: "1px solid " + dashBorder, borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
             <div style={{ ...T.sectionEyebrow, color: dashMuted, marginBottom: 8, letterSpacing: 1.4 }}>{insightTitle}</div>
