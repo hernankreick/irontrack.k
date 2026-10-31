@@ -287,7 +287,7 @@ test("D2/E: PRs recientes del alumno y limite unico modelo/vista", () => {
   assert.ok(m.prsRecientes.every((p) => p.n === "Evi"));
   const card = src("progreso/ProgressRecentPrsCard.jsx");
   assert.doesNotMatch(card, /slice\(0, *\d+\)/, "la card no aplica un limite propio");
-  assert.match(src("ProgresoView.jsx"), /model\.recentPrsLimit/);
+  assert.match(src("ProgresoView.jsx"), /prs=\{model\.prsRecientes\}/, "la vista muestra exactamente la lista ya limitada por el modelo");
   assert.doesNotMatch(src("ProgresoView.jsx"), /PRs registrados|PRs logged/, "el limite no se muestra como metrica");
   assert.match(recentPrsSubtitle("es", "Evi"), /Evi/);
 });
@@ -322,7 +322,7 @@ test("I: ProgressLoadControls ya no tiene selector de alumno (solo Dia y Ejercic
   assert.doesNotMatch(c, /alumnoSel|setAlumnoSel|alumnosSorted/);
   assert.doesNotMatch(c, /"Alumno", "Athlete"/);
   const v = src("ProgresoView.jsx");
-  assert.equal((v.match(/setAlumnoSel\(e\.target\.value/g) || []).length, 1, "un unico selector de alumno");
+  assert.equal((v.match(/<ProgressAlumnoPicker/g) || []).length, 1, "un unico selector de alumno (hoja «Elegir alumno»)");
   assert.doesNotMatch(v, /<ProgressLoadControls[^>]*alumnoSel/);
 });
 
@@ -334,28 +334,22 @@ test("J/K: ProgresoView consume alumnoChips y teamChips, no summaryChips", () =>
   assert.doesNotMatch(src("coachProgresoMetrics.js"), /summaryChips/);
 });
 
-test("L: tarjetas Equipo separadas de las del alumno", () => {
+test("L: tarjetas Equipo separadas de las del alumno (Equipo al final, en su propio componente)", () => {
   const v = src("ProgresoView.jsx");
   const iAlu = v.indexOf('data-section="alumno"');
-  const iEq = v.indexOf('data-section="equipo"');
+  const iEq = v.indexOf("<ProgressTeamSection");
   assert.ok(iAlu > 0 && iEq > iAlu);
   const alu = v.slice(iAlu, iEq);
-  const rest = v.slice(iEq);
-  const eqEnd = rest.indexOf("</section>");
-  const eq = rest.slice(0, eqEnd);
-  for (const tag of ["{prsCard(", "{volumeCard(", "{patternCard}", "{loadBody}"]) {
+  for (const tag of ["<ProgressSummaryCards", "<ProgressRecentPrsCard", "<ProgressWeeklyVolumeCard", "<ProgressMovementPatternVolumeCard", "{loadBody}", "model.alumnoChips"]) {
     assert.ok(alu.includes(tag), "alumno incluye " + tag);
-    assert.ok(!eq.includes(tag), "equipo no incluye " + tag);
   }
-  for (const tag of ["{adherenceCard}", "{rankingCard(", "model.teamChips"]) {
-    assert.ok(eq.includes(tag), "equipo incluye " + tag);
-    assert.ok(!alu.includes(tag), "alumno no incluye " + tag);
-  }
-  assert.ok(alu.includes("model.alumnoChips"));
+  assert.ok(!alu.includes("model.teamChips") && !alu.includes("model.ranking"), "nada del equipo en la seccion del alumno");
+  assert.match(v.slice(iEq), /teamChips=\{model\.teamChips\} ranking=\{model\.ranking\}/);
+  assert.match(src("progreso/ProgressTeamSection.jsx"), /data-section="equipo"/);
 });
 
 test("M: no hay formato en toneladas en la cadena de Progreso del entrenador", () => {
-  const files = ["coachProgresoMetrics.js", "ProgresoView.jsx", "coach/EjercicioHistorialCoach.jsx", "progreso/ProgressWeeklyVolumeCard.jsx", "progreso/ProgressMovementPatternVolumeCard.jsx", "progreso/ProgressMovementPatternRow.jsx", "progreso/ProgressWeeklyVolumeBar.jsx"];
+  const files = ["coachProgresoMetrics.js", "ProgresoView.jsx", "coach/EjercicioHistorialCoach.jsx", "progreso/ProgressWeeklyVolumeCard.jsx", "progreso/ProgressMovementPatternVolumeCard.jsx", "progreso/ProgressMovementPatternRow.jsx", "progreso/ProgressSummaryCards.jsx"];
   for (const f of files) {
     const t = src(f);
     assert.doesNotMatch(t, /tonelad|volSemPromTon|volTonDelta|\+ *"t"|\+ *"t "|\/ *1000\)\.toFixed/i, f);

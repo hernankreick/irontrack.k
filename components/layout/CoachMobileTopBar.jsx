@@ -21,6 +21,7 @@ export default function CoachMobileTopBar({ tab, darkMode, msg, menuOpen, onOpen
   const icon = darkMode ? '#CBD5E1' : '#475569';
   return (
     <header
+      data-coach-topbar="1"
       style={{
         position: 'sticky',
         top: 0,

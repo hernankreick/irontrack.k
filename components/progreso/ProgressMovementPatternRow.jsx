@@ -40,6 +40,7 @@ export default function ProgressMovementPatternRow({
         onClick={onToggle}
         style={{
           width: "100%",
+          minHeight: 44,
           margin: 0,
           padding: 0,
           border: "none",

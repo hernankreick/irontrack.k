@@ -84,30 +84,12 @@ const MEASURE = `(() => {
   };
 })()`;
 
-async function openLoad(page, width) {
-  if (width < 768) {
-    const ok = await page.evaluate(() => {
-      const title = [...document.querySelectorAll("span")].find((s) => /^(Evolución de carga|Load progression)$/.test((s.textContent || "").trim()));
-      const card = title && title.parentElement && title.parentElement.parentElement;
-      if (!card) return false;
-      card.click();
-      return true;
-    });
-    if (!ok) return false;
-    await page.waitForTimeout(500);
-    return page.evaluate(() => {
-      const ov = [...document.querySelectorAll("div")].find((d) => getComputedStyle(d).position === "fixed" && d.style.zIndex === "1000");
-      const sheet = ov && ov.firstElementChild;
-      if (!sheet) return false;
-      sheet.setAttribute("data-qa-load-root", "1");
-      return true;
-    });
-  }
+// E3: «Evolución de carga» es una tarjeta del bloque actual en la página, a cualquier ancho (ya no hay mini-tarjeta ni hoja).
+async function openLoad(page) {
   return page.evaluate(() => {
-    const t = [...document.querySelectorAll("span")].find((s) => /^(Evolución de carga|Load progression)$/.test((s.textContent || "").trim()));
-    let el = t;
-    while (el && !(getComputedStyle(el).borderTopWidth !== "0px" && el.style.borderRadius)) el = el.parentElement;
+    const el = document.querySelector('[data-qa="bloque-carga"]');
     if (!el) return false;
+    el.scrollIntoView({ block: "start" });
     el.setAttribute("data-qa-load-root", "1");
     return true;
   });

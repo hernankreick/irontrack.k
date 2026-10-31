@@ -93,8 +93,9 @@ await test("Progreso: margen movil 16 px, tarjetas apiladas (sin carrusel cortad
   assert.match(p, /pagePadding: 16, headerPadding: "16px 16px"/);
   assert.doesNotMatch(p, /overflowX: "auto"/, "ya no hay carrusel horizontal");
   assert.doesNotMatch(p, /scrollSnapType/);
-  assert.match(p, /gridTemplateColumns: "repeat\(2, minmax\(0, 1fr\)\)", gap: 10/, "KPIs en 2 columnas en movil");
-  assert.match(p, /minHeight: isUnder768 \? 44 : undefined/);
+  assert.match(read("components/progreso/ProgressSummaryCards.jsx"), /isUnder768 \? "repeat\(2, minmax\(0, 1fr\)\)"/, "KPIs en 2 columnas en movil");
+  assert.match(p, /padding: isUnder768 \? "20px 16px 32px"/, "16 px laterales en movil");
+  assert.match(read("components/progreso/ProgressPeriodPicker.jsx"), /minHeight: compact \? 44 : 56,\s+minWidth: 44,/, "periodo >= 44 px (completo y compacto)");
   const r = read("components/coach/CoachSectionRenderer.jsx");
   assert.match(r, /tab === "progress" && showMobileBar \? \{ paddingTop: 0 \}/, "sin franja bajo la barra superior");
 });

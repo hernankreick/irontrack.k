@@ -16,11 +16,16 @@ import {
   diaLocal,
   enRango,
   eventosPR,
+  historialPorDia,
   indiceEjerciciosPorTiempo,
+  ORIGEN_VALIDADA,
   parseFechaDMY,
+  tipoDeCarga,
+  TIPO_CARGA,
   volumenDeSerie,
   volumenEnRango,
 } from "../lib/metricas/index.js";
+import { isCompletedSession } from "../lib/studentWeeklyProgress.js";
 
 const DAY_MS = 86400000;
 /** Máximo de PRs en «PRs recientes». Único punto de verdad: lo usan el modelo y la vista. */
@@ -39,22 +44,40 @@ var MOVEMENT_PATTERN_DEF = [
   { key: "core", labelEs: "CORE", labelEn: "CORE", color: "#eab308" },
 ];
 
+/** Períodos fijos (días hasta hoy inclusive). "todo" y "custom" se resuelven en getPeriodDays. */
+export var PERIOD_DAYS = { semanas4: 28, semanas8: 56, meses3: 90, meses6: 180 };
+
 function periodDurationDays(periodId) {
-  if (periodId === "semanas4") return 28;
-  if (periodId === "semanas8") return 56;
-  if (periodId === "meses3") return 90;
-  return 28;
+  return PERIOD_DAYS[periodId] || 28;
 }
 
 /**
  * Período actual y anterior en números de día de calendario local (lib/metricas/fechas.js), extremos inclusivos.
- * actual = los últimos durDays días hasta hoy; previo = los durDays días inmediatamente anteriores.
- * @returns {{ actual:{desde:number,hasta:number}, previo:{desde:number,hasta:number}, durDays:number, hoy:number }}
+ *  - fijos (PERIOD_DAYS): actual = los últimos durDays días hasta hoy; previo = los durDays días inmediatamente anteriores.
+ *  - "custom" con custom = { desde, hasta } (números de día, desde <= hasta): mismo criterio, previo = el tramo de igual largo
+ *    inmediatamente anterior a `desde`.
+ *  - "todo": actual = sin límite inferior hasta hoy; previo = null (no hay período anterior con el que comparar).
+ * Solo arma rangos: adherencia, volumen y PR siguen saliendo de lib/metricas con su definición de E1.
+ * @returns {{ id:string, actual:{desde:(number|null),hasta:number}, previo:({desde:number,hasta:number}|null), durDays:(number|null), hoy:number }}
  */
-export function getPeriodDays(periodId, hoy) {
-  var durDays = periodDurationDays(periodId);
+export function getPeriodDays(periodId, hoy, custom) {
   var h = hoy != null ? hoy : diaLocal();
+  if (periodId === "todo") {
+    return { id: "todo", actual: { desde: null, hasta: h }, previo: null, durDays: null, hoy: h };
+  }
+  if (periodId === "custom" && custom && custom.desde != null && custom.hasta != null && custom.desde <= custom.hasta) {
+    var dur = custom.hasta - custom.desde + 1;
+    return {
+      id: "custom",
+      actual: { desde: custom.desde, hasta: custom.hasta },
+      previo: { desde: custom.desde - dur, hasta: custom.desde - 1 },
+      durDays: dur,
+      hoy: h,
+    };
+  }
+  var durDays = periodDurationDays(periodId);
   return {
+    id: PERIOD_DAYS[periodId] ? periodId : "semanas4",
     actual: { desde: h - durDays + 1, hasta: h },
     previo: { desde: h - 2 * durDays + 1, hasta: h - durDays },
     durDays: durDays,
@@ -418,14 +441,14 @@ export function buildCoachProgresoModel(params) {
     if (ex && ex.id != null) exMap[ex.id] = ex;
   }
 
-  var period = getPeriodDays(periodId, params.hoy);
+  var period = getPeriodDays(periodId, params.hoy, params.periodCustom);
   var actual = period.actual;
   var previo = period.previo;
   var hoy = period.hoy;
   var now = new Date();
   var fallbackWeekStartMs = weekKeyMon(now);
   var fallbackWeekEndMs = fallbackWeekStartMs + 7 * DAY_MS;
-  var maxSemanaPeriodo = Math.max(1, Math.ceil(period.durDays / 7));
+  var maxSemanaPeriodo = period.durDays == null ? Infinity : Math.max(1, Math.ceil(period.durDays / 7));
   /** Historial incompleto (lib/coachHistoryLoader.js): los deltas contra el período anterior no son confiables. */
   var hc = params.historiaCompleta || null;
   var sesionesIncompletas = !!(hc && hc.sesiones === false);
@@ -459,6 +482,8 @@ export function buildCoachProgresoModel(params) {
 
   /** Adherencia (lib/metricas/adherencia.js) a la rutina vigente del alumno en un rango de días. pct null = sin plan en ese rango. */
   function adherenceForAlumno(aid, rango) {
+    // sin período anterior («Todo el historial»): no hay adherencia previa que comparar
+    if (!rango) return { pct: null, completadas: 0, planificadas: 0, validadas: 0, motivo: "sin_periodo" };
     return adherencia({
       rutina: getRoutineForAlumno(rutinasSBEntrenador, aid),
       sesiones: sesionesGlobales,
@@ -498,12 +523,25 @@ export function buildCoachProgresoModel(params) {
   /** PRs del alumno seleccionado (historial completo de ese alumno, nunca el de otros). */
   var alumnoPrEvents = alumnoSel ? eventosPR(alumnoAllRows, { indiceTiempo: indiceTiempo }) : [];
   var prsPeriod = contarPRs(alumnoPrEvents, actual.desde, actual.hasta);
-  var prsPrev = contarPRs(alumnoPrEvents, previo.desde, previo.hasta);
+  var prsPrev = previo ? contarPRs(alumnoPrEvents, previo.desde, previo.hasta) : 0;
   var prDelta = prsPeriod - prsPrev;
 
   /** Volumen del período (historial completo, sin filtrar rutina ni ciclo) y comparación like-for-like con el anterior. */
-  var volCmp = compararVolumen(alumnoAllRows, actual, previo, { indiceTiempo: indiceTiempo });
-  var semanasPeriodo = Math.max(1, period.durDays / 7);
+  var volCmp = previo
+    ? compararVolumen(alumnoAllRows, actual, previo, { indiceTiempo: indiceTiempo })
+    : { actualTotal: volumenEnRango(alumnoAllRows, { desde: actual.desde, hasta: actual.hasta, indiceTiempo: indiceTiempo }).total, pct: null, motivo: "sin_periodo_anterior" };
+  /** Semanas del período para el promedio semanal; en «Todo el historial», desde el primer día con series del alumno. */
+  var semanasPeriodo;
+  if (period.durDays != null) {
+    semanasPeriodo = Math.max(1, period.durDays / 7);
+  } else {
+    var primerDia = null;
+    alumnoAllRows.forEach(function (r) {
+      var d0 = parseFechaDMY(r && r.fecha);
+      if (d0 != null && d0 <= hoy && (primerDia == null || d0 < primerDia)) primerDia = d0;
+    });
+    semanasPeriodo = primerDia == null ? 1 : Math.max(1, (hoy - primerDia + 1) / 7);
+  }
   var volPeriod = volCmp.actualTotal;
   var volSemPromKg = volPeriod / semanasPeriodo;
   var volPct = progresoIncompleto ? null : volCmp.pct;
@@ -549,6 +587,7 @@ export function buildCoachProgresoModel(params) {
   }
 
   var stalled = 0;
+  var stalledIds = [];
   alumnos.forEach(function (a) {
     var rut = getRoutineForAlumno(rutinasSBEntrenador, a.id);
     if (!rut) return;
@@ -558,7 +597,10 @@ export function buildCoachProgresoModel(params) {
       return enRango(parseFechaDMY(r && r.fecha), null, stallDesde - 1);
     });
     if (volumenEnRango(previoAVentana, { indiceTiempo: indiceTiempo }).series === 0) return;
-    if (contarPRs(eventosPR(regs, { indiceTiempo: indiceTiempo }), stallDesde, hoy) === 0) stalled++;
+    if (contarPRs(eventosPR(regs, { indiceTiempo: indiceTiempo }), stallDesde, hoy) === 0) {
+      stalled++;
+      stalledIds.push(a.id);
+    }
   });
 
   /** Evolución de carga: semanas de la rutina activa del alumno seleccionado. */
@@ -600,6 +642,14 @@ export function buildCoachProgresoModel(params) {
     return d.toLocaleDateString(l, { day: "2-digit", month: "short" });
   }
 
+  /** Fecha corta ("27 oct") de un número de día de calendario. */
+  function fmtDia(dia, loc) {
+    var u = new Date(dia * DAY_MS);
+    var d = new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate());
+    var l = loc === "es" ? "es-AR" : loc === "pt" ? "pt-BR" : "en-US";
+    return d.toLocaleDateString(l, { day: "numeric", month: "short" });
+  }
+
   var prsRecientes = prEvents.slice(0, RECENT_PRS_LIMIT).map(function (ev) {
     var alum = alumnos.find(function (x) {
       return String(x.id) === String(ev.alumno_id);
@@ -619,6 +669,11 @@ export function buildCoachProgresoModel(params) {
       delta: "+" + Math.round(ev.diferencia * 10) / 10 + " kg",
       date: fmtRel(ev.dia, lang),
       color: col,
+      ejercicio_id: ev.ejercicio_id,
+      kg: ev.kg,
+      kgAnterior: ev.kgAnterior,
+      diferencia: ev.diferencia,
+      dia: ev.dia,
     };
   });
 
@@ -708,12 +763,18 @@ export function buildCoachProgresoModel(params) {
   var vsPrev = M(lang, "vs período anterior", "vs prev. period", "vs período anterior");
   var incompleto = M(lang, "Historial incompleto: sin comparación", "Incomplete history: no comparison", "Histórico incompleto: sem comparação");
   var sinPrevioPlan = M(lang, "Sin plan en el período anterior", "No plan in the previous period", "Sem plano no período anterior");
+  var sinPeriodoAnterior = M(lang, "Todo el historial: sin período anterior", "Whole history: no previous period", "Todo o histórico: sem período anterior");
   var VOL_MOTIVO = {
     historial_incompleto: incompleto,
+    sin_periodo_anterior: sinPeriodoAnterior,
     sin_ejercicios_comunes: M(lang, "Sin ejercicios comparables con el período anterior", "No exercises comparable with the previous period", "Sem exercícios comparáveis com o período anterior"),
     previo_con_pocos_dias: M(lang, "Pocos datos en el período anterior", "Too little data in the previous period", "Poucos dados no período anterior"),
     actual_con_pocos_dias: M(lang, "Pocos datos en este período", "Too little data in this period", "Poucos dados neste período"),
   };
+  /** Tono de presentación de una comparación ya calculada: sube = good, baja = `down`, sin cambio = neutral. */
+  function deltaTone(n, down) {
+    return n > 0 ? "good" : n < 0 ? down : "neutral";
+  }
   function deltaArrow(n) {
     return (n >= 0 ? "↑ " : "↓ ") + Math.abs(n);
   }
@@ -731,10 +792,13 @@ export function buildCoachProgresoModel(params) {
           ? noData
           : sesionesIncompletas
             ? incompleto
-            : adherDeltaPct == null
-              ? sinPrevioPlan
-              : deltaArrow(adherDeltaPct) + "% " + vsPrev,
+            : !previo
+              ? sinPeriodoAnterior
+              : adherDeltaPct == null
+                ? sinPrevioPlan
+                : deltaArrow(adherDeltaPct) + "% " + vsPrev,
       deltaColor: adherDeltaPct == null || sesionesIncompletas ? "#71717a" : adherDeltaPct >= 0 ? "#22c55e" : "#ef4444",
+      tone: adherN === 0 || adherDeltaPct == null || sesionesIncompletas ? "neutral" : deltaTone(adherDeltaPct, "bad"),
     },
     {
       key: "teamStalled",
@@ -749,6 +813,7 @@ export function buildCoachProgresoModel(params) {
         "Sem melhora (PR) em 3 sem. · com rotina"
       ),
       deltaColor: stalled > 0 ? "#ef4444" : "#71717a",
+      tone: stalled > 0 ? "warn" : "neutral",
     },
   ];
 
@@ -773,13 +838,19 @@ export function buildCoachProgresoModel(params) {
       delta: selHasAd
         ? sesionesIncompletas
           ? incompleto
-          : selAdDelta == null
-            ? sinPrevioPlan
-            : deltaArrow(selAdDelta) + "% " + vsPrev
+          : !previo
+            ? sinPeriodoAnterior
+            : selAdDelta == null
+              ? sinPrevioPlan
+              : deltaArrow(selAdDelta) + "% " + vsPrev
         : alumnoSel
           ? M(lang, "Sin rutina asignada", "No routine assigned", "Sem rotina atribuída")
           : noData,
       deltaColor: selAdDelta == null || sesionesIncompletas ? "#71717a" : selAdDelta >= 0 ? "#22c55e" : "#ef4444",
+      tone: !selHasAd || selAdDelta == null || sesionesIncompletas ? "neutral" : deltaTone(selAdDelta, "bad"),
+      completed: selAd ? selAd.completadas : 0,
+      planned: selAd ? selAd.planificadas : 0,
+      validadas: selAd ? selAd.validadas : 0,
     },
     {
       key: "alumnoPrs",
@@ -789,10 +860,13 @@ export function buildCoachProgresoModel(params) {
       label: M(lang, "PRs en el período", "PRs in the period", "PRs no período"),
       delta: progresoIncompleto
         ? incompleto
-        : prsPrev > 0 || prsPeriod > 0
-          ? deltaArrow(prDelta) + " " + vsPrev
-          : noData,
-      deltaColor: progresoIncompleto ? "#71717a" : prDelta >= 0 ? "#22c55e" : "#eab308",
+        : !previo
+          ? sinPeriodoAnterior
+          : prsPrev > 0 || prsPeriod > 0
+            ? deltaArrow(prDelta) + " " + vsPrev
+            : noData,
+      deltaColor: progresoIncompleto || !previo ? "#71717a" : prDelta >= 0 ? "#22c55e" : "#eab308",
+      tone: progresoIncompleto || !previo || !(prsPrev > 0 || prsPeriod > 0) ? "neutral" : deltaTone(prDelta, "warn"),
     },
     {
       key: "alumnoVolume",
@@ -807,8 +881,71 @@ export function buildCoachProgresoModel(params) {
             ? deltaArrow(Math.round(volPct)) + "% " + M(lang, "vs ant. (mismos ejercicios)", "vs prev. (same exercises)", "vs ant. (mesmos exercícios)")
             : VOL_MOTIVO[volMotivo] || noData,
       deltaColor: volPct == null ? "#71717a" : volPct >= 0 ? "#22c55e" : "#ef4444",
+      tone: volPeriod <= 0 || volPct == null ? "neutral" : deltaTone(Math.round(volPct), "bad"),
     },
   ];
+
+  /** Última sesión completada del alumno (realizada o validada por el entrenador): solo una consulta de fecha, no una métrica. */
+  var ultimaSesion = null;
+  (sesionesGlobales || []).forEach(function (ses) {
+    if (!ses || !alumnoSel || String(ses.alumno_id) !== String(alumnoSel) || !isCompletedSession(ses)) return;
+    var d = diaDeSesion(ses);
+    if (d == null || d > hoy) return;
+    var validada = ses.origen === ORIGEN_VALIDADA;
+    // el mismo día, una realizada gana a una validada
+    if (ultimaSesion && (d < ultimaSesion.dia || (d === ultimaSesion.dia && (validada || !ultimaSesion.validada)))) return;
+    var di = ses.dia_idx == null || ses.dia_idx === "" ? NaN : Number(ses.dia_idx);
+    ultimaSesion = { dia: d, diasAtras: hoy - d, diaIdx: Number.isInteger(di) && di >= 0 ? di : null, validada: validada };
+  });
+  if (ultimaSesion) ultimaSesion.fecha = fmtDia(ultimaSesion.dia, lang);
+
+  /**
+   * Ejercicios que el alumno registró alguna vez (historial completo), con su última sesión. La clase (PR / iguala / primera marca)
+   * sale de historialPorDia (lib/metricas/pr.js); los ejercicios por tiempo muestran su último tiempo y no tienen récord de carga.
+   */
+  var porEjercicio = {};
+  alumnoAllRows.forEach(function (r) {
+    if (!r || r.ejercicio_id == null) return;
+    var d = parseFechaDMY(r.fecha);
+    if (d == null) return;
+    var id = String(r.ejercicio_id);
+    var cur = porEjercicio[id];
+    if (!cur || d > cur.dia) porEjercicio[id] = { dia: d, rows: [r] };
+    else if (d === cur.dia) cur.rows.push(r);
+  });
+  var enRutina = {};
+  ((routineForSelected && routineForSelected.datos && routineForSelected.datos.days) || []).forEach(function (day) {
+    [].concat((day && day.warmup) || [], (day && day.exercises) || []).forEach(function (ex) {
+      if (ex && ex.id != null) enRutina[String(ex.id)] = true;
+    });
+  });
+  var ejerciciosRegistrados = Object.keys(porEjercicio).map(function (id) {
+    var ult = porEjercicio[id];
+    var esTiempo = tipoDeCarga(id, indiceTiempo) === TIPO_CARGA.TIEMPO;
+    var hist = esTiempo ? [] : historialPorDia(alumnoAllRows, id, { indiceTiempo: indiceTiempo });
+    var last = hist.length ? hist[hist.length - 1] : null;
+    var ultimaSegundos = null;
+    if (esTiempo) {
+      ult.rows.forEach(function (r) {
+        var sec = parseInt(r.reps, 10);
+        if (sec > 0 && (ultimaSegundos == null || sec > ultimaSegundos)) ultimaSegundos = sec;
+      });
+    }
+    return {
+      id: id,
+      name: exName(exMap, id, lang),
+      enRutina: !!enRutina[id],
+      esTiempo: esTiempo,
+      ultimoDia: ult.dia,
+      ultimaFecha: fmtDia(ult.dia, lang),
+      ultimaKg: last && last.dia === ult.dia ? last.kg : null,
+      ultimaReps: last && last.dia === ult.dia ? last.reps : null,
+      ultimaSegundos: ultimaSegundos,
+      ultimaClase: last && last.dia === ult.dia ? last.clase : null,
+    };
+  }).sort(function (a, b) {
+    return b.ultimoDia - a.ultimoDia || a.name.localeCompare(b.name);
+  });
 
   var exerciseOptions = exercisesForRoutineDay(rutinasSBEntrenador, alumnoSel, diaIdx, exMap, lang);
 
@@ -840,6 +977,12 @@ export function buildCoachProgresoModel(params) {
     prsPrev: prsPrev,
     volSemPromKg: volSemPromKg,
     volPct: volPct,
+    stalledIds: stalledIds,
+    periodo: { id: period.id, desde: actual.desde, hasta: actual.hasta, tienePrevio: !!previo, durDays: period.durDays },
+    ultimaSesion: ultimaSesion,
+    ejerciciosRegistrados: ejerciciosRegistrados,
+    rutinaNombre: routineForSelected ? String(routineForSelected.nombre || routineForSelected.name || "") : "",
+    tieneRutina: !!routineForSelected,
     volMotivo: volMotivo,
     indiceTiempo: indiceTiempo,
     chartSeries: series,
