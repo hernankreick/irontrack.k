@@ -56,7 +56,7 @@ export default function StudentCard({
   var nombre = a.nombre || a.email || "";
 
   return (
-    <div data-qa-alumno-card={isActive ? "open" : "closed"} style={{position:"relative",marginBottom:isActive?14:10}}>
+    <div data-qa-alumno-card={isActive ? "open" : "closed"} data-alumno-id={alumno && alumno.id != null ? String(alumno.id) : undefined} style={{position:"relative",marginBottom:isActive?14:10,scrollMarginTop:72}}>
     <div
       style={{
         position: "relative",

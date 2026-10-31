@@ -73,6 +73,7 @@ import CoachConfirmDialog from './components/coach/CoachConfirmDialog.jsx';
 import { getCoachDialogModalConfig } from './components/coach/coachDialogConfig.js';
 import CoachEditStudentModal from './components/coach/CoachEditStudentModal.jsx';
 import CoachSectionRenderer from './components/coach/CoachSectionRenderer.jsx';
+import { bajaActividadIds } from './components/CoachDashboard.jsx';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import AppShellModals from './components/AppShellModals.jsx';
@@ -644,6 +645,8 @@ function GymApp() {
   /** Flags de diagnóstico (lectura única; recargar tras editar localStorage). */
   const planScrollDiag = useMemo(function () { return readPlanScrollDiag(); }, []);
   const [tab, setTab] = useState("plan");
+  /** D4: accion pedida desde el Dashboard al abrir un alumno en Alumnos ({ alumnoId, accion: "perfil" | "asignar" }); la consume StudentsSection. */
+  const [coachDashIntent, setCoachDashIntent] = useState(null);
   const [tabMain, setTabMain] = useState("entrenador"); // entrenador | alumno
       const [onboardStep, setOnboardStep] = useState(0);
   const [onboardDone, setOnboardDone] = useState(()=>{ try{return !!localStorage.getItem('it_onboard_done');}catch(e){return false;} });
@@ -1978,6 +1981,19 @@ function GymApp() {
     });
   }, [alumnosActivosLimpios, rutinasUnificadas, sesionesGlobalesLimpias, progresoGlobalLimpio, coachAlumnosSearch, coachAlumnosFilter]);
 
+  // D4: filtro «Baja actividad» de Alumnos con la MISMA regla y entradas que el Dashboard (bajaActividadIds de D3); no es una categoria
+  // nueva: el selector devuelve la lista buscada sin filtrar para "baja" y aca se acota a esos ids.
+  const coachBajaActividadIds = React.useMemo(function () {
+    return bajaActividadIds({ alumnos: alumnosActivosLimpios, catFn: coachAlumnoCategoria, rutinas: rutinasUnificadas, sesiones: sesionesGlobalesLimpias });
+  }, [alumnosActivosLimpios, coachAlumnoCategoria, rutinasUnificadas, sesionesGlobalesLimpias]);
+  const coachAlumnosCountsVista = React.useMemo(function () {
+    return Object.assign({}, coachAlumnosCounts, { baja: Object.keys(coachBajaActividadIds).length });
+  }, [coachAlumnosCounts, coachBajaActividadIds]);
+  const coachAlumnosListaVista = React.useMemo(function () {
+    if (coachAlumnosFilter !== "baja") return coachAlumnosListaFiltrada;
+    return coachAlumnosListaFiltrada.filter(function (a) { return !!coachBajaActividadIds[String(a.id)]; });
+  }, [coachAlumnosFilter, coachAlumnosListaFiltrada, coachBajaActividadIds]);
+
   React.useEffect(function () {
     setCoachRoutineDiaIdx(0);
     setCoachDiaSecsOpen({ warmup: true, main: true });
@@ -3095,16 +3111,37 @@ function GymApp() {
   const handleCoachDashboardCrearRutina = function () {
     setTab("routines");
   };
-  const handleCoachDashboardRevisarAlumnos = function () {
+  // D4: Alumnos con un filtro explicito; nunca conserva un filtro, una busqueda ni una ficha abierta de antes.
+  const irAlumnosConFiltroDesdeDashboard = function (filtro) {
+    setCoachAlumnosSearch("");
+    setCoachAlumnosFilter(filtro);
+    setAlumnoActivo(null);
+    setCoachDashIntent(null);
     setTab("alumnos");
   };
-  const handleCoachDashboardOpenAlumno = async function (alumnoId, logLabel) {
+  const handleCoachDashboardRevisarAlumnos = function () {
+    irAlumnosConFiltroDesdeDashboard("todos");
+  };
+  const handleCoachDashboardVerInactivos = function () {
+    irAlumnosConFiltroDesdeDashboard("inactivos");
+  };
+  const handleCoachDashboardVerSinRutina = function () {
+    irAlumnosConFiltroDesdeDashboard("sin_rutina");
+  };
+  const handleCoachDashboardVerBajaActividad = function () {
+    irAlumnosConFiltroDesdeDashboard("baja");
+  };
+  const handleCoachDashboardOpenAlumno = async function (alumnoId, logLabel, accion) {
     var alum = (alumnosActivosLimpios || []).find(function (x) {
       return String(x.id) === String(alumnoId);
     });
     if (!alum) {
       return;
     }
+    // D4: sin filtro ni busqueda heredados (si no, la ficha abierta puede quedar fuera de la lista filtrada).
+    setCoachAlumnosSearch("");
+    setCoachAlumnosFilter("todos");
+    setCoachDashIntent({ alumnoId: alum.id, accion: accion || "perfil" });
     setAlumnoActivo(alum);
     setTab("alumnos");
     setLoadingSB(true);
@@ -3123,6 +3160,10 @@ function GymApp() {
   };
   const handleCoachDashboardVerPerfil = function (alumnoId) {
     return handleCoachDashboardOpenAlumno(alumnoId, "[CoachDashboard onVerPerfil]");
+  };
+  // D4: abre la ficha y el flujo EXISTENTE de asignacion de esa ficha (StudentsSection, mismo dialogo que «Asignar rutina»).
+  const handleCoachDashboardAsignarRutina = function (alumnoId) {
+    return handleCoachDashboardOpenAlumno(alumnoId, "[CoachDashboard onAsignarRutina]", "asignar");
   };
   const handleCoachDashboardNuevoAlumno = function () {
     setTab("alumnos");
@@ -3199,6 +3240,10 @@ function GymApp() {
         onEnviarMensaje: handleCoachDashboardEnviarMensaje,
         onCrearRutina: handleCoachDashboardCrearRutina,
         onRevisarAlumnos: handleCoachDashboardRevisarAlumnos,
+        onVerInactivos: handleCoachDashboardVerInactivos,
+        onVerSinRutina: handleCoachDashboardVerSinRutina,
+        onVerBajaActividad: handleCoachDashboardVerBajaActividad,
+        onAsignarRutina: handleCoachDashboardAsignarRutina,
         onRevisar: handleCoachDashboardRevisar,
         onVerPerfil: handleCoachDashboardVerPerfil,
         onNuevoAlumno: handleCoachDashboardNuevoAlumno,
@@ -3273,9 +3318,11 @@ function GymApp() {
         coachAluSubtle: coachAluSubtle,
         coachAluSurface: coachAluSurface,
         coachAluTrack: coachAluTrack,
-        coachAlumnosCounts: coachAlumnosCounts,
+        coachAlumnosCounts: coachAlumnosCountsVista,
         coachAlumnosFilter: coachAlumnosFilter,
-        coachAlumnosListaFiltrada: coachAlumnosListaFiltrada,
+        coachAlumnosListaFiltrada: coachAlumnosListaVista,
+        coachDashIntent: coachDashIntent,
+        setCoachDashIntent: setCoachDashIntent,
         coachAlumnosSearch: coachAlumnosSearch,
         coachCardMenuId: coachCardMenuId,
         coachDiaSecsOpen: coachDiaSecsOpen,

@@ -62,6 +62,16 @@ export function sesionesRows() {
   if (!ALUMNO_CARD_SCENARIO()) return [];
   return ALUMNOS.flatMap((a) => [0, 1].map((dia) => ({ id: "ses-" + a.id.slice(-2) + "-" + dia, alumno_id: a.id, rutina_id: "rr-" + a.id.slice(-2), rutina_nombre: alumnoCardRutina(a).nombre, dia_idx: dia, dia_label: "Día " + (dia + 1), semana: 2, fecha: "20/10/2026", hora: "18:00", ejercicios: "", created_at: "2026-10-20T18:00:0" + dia })));
 }
+// Escenario opt-in de navegacion del Dashboard (QA_DASH_NAV=1, scripts/qa/dashboard-nav.mjs): Ana inactiva (sin sesiones), Beto con
+// baja actividad (entreno hace 15 dias: antes de la semana pasada con cualquier dia de hoy, dentro de los 21 dias) y Cami sin rutina; hay una rutina local para el flujo de asignacion. Sin la variable, nada cambia.
+export const DASH_NAV_SCENARIO = () => process.env.QA_DASH_NAV === "1";
+const dmyHace = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.getDate() + "/" + (d.getMonth() + 1) + "/" + d.getFullYear(); };
+export function dashNavSesiones() {
+  const b = ALUMNOS[1];
+  const t = new Date(); t.setDate(t.getDate() - 15); t.setHours(15, 0, 0, 0);
+  return [{ id: "ses-nav-1", alumno_id: b.id, rutina_id: "rr-" + b.id.slice(-2), rutina_nombre: "Rutina " + b.nombre, dia_idx: 0, dia_label: "Dia 1", semana: 1, fecha: dmyHace(15), hora: "15:00", ejercicios: "", created_at: t.toISOString() }];
+}
+
 export function alumnosRows() {
   if (ALUMNO_CARD_SCENARIO() !== "largo") return ALUMNOS;
   return ALUMNOS.map((a, i) => i ? a : { ...a, nombre: "Maria Fernanda de los Angeles Gonzalez Etcheverry", email: "maria.fernanda.gonzalez.etcheverry.entrenamiento@example.invalid" });
@@ -102,7 +112,7 @@ export function sessionSeed(role) {
     return ls;
   }
   ls.it_session = JSON.stringify({ role: "entrenador", name: "Entrenador Prueba", email: "coach@example.invalid", entrenadorId: EID });
-  ls.it_rt = "[]";
+  ls.it_rt = DASH_NAV_SCENARIO() ? JSON.stringify([{ id: "rt-local-nav", name: "Rutina local QA", days: [{ label: "Dia 1", warmup: [], exercises: [{ name: "Sentadilla", sets: 3, reps: "8" }] }], saved: true }]) : "[]";
   const exp = Math.floor(Date.now() / 1000) + 86400 * 30;
   const jwt = "eyJhbGciOiJIUzI1NiJ9." + Buffer.from(JSON.stringify({ sub: EID, exp })).toString("base64url") + ".sig";
   ls["sb-" + MOCK_HOST.split(".")[0] + "-auth-token"] = JSON.stringify({
@@ -131,6 +141,7 @@ export function respond({ method, table, search }) {
   if (table.startsWith("rutinas")) {
     const aq = search.get("alumno_id");
     let rows = ALUMNOS.map(rutinaDe);
+    if (DASH_NAV_SCENARIO()) rows = rows.filter((r) => r.alumno_id !== ALUMNOS[2].id);
     if (aq && aq.startsWith("eq.")) rows = rows.filter((r) => r.alumno_id === aq.slice(3));
     return { status: 200, body: rows };
   }
@@ -140,6 +151,10 @@ export function respond({ method, table, search }) {
   }
   if (table.startsWith("progreso") && PROGRESO_SCENARIO()) {
     return { status: 200, body: ALUMNOS.flatMap((a) => progresoRows(a.id)) };
+  }
+  if (table.startsWith("sesiones") && DASH_NAV_SCENARIO()) {
+    const v = search.get("alumno_id");
+    return { status: 200, body: dashNavSesiones().filter((r) => !(v && v.startsWith("eq.")) || r.alumno_id === v.slice(3)) };
   }
   if (table.startsWith("sesiones") && ALUMNO_CARD_SCENARIO()) {
     const eq = (k) => { const v = search.get(k); return v && v.startsWith("eq.") ? v.slice(3) : null; };

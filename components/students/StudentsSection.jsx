@@ -15,7 +15,7 @@ export default function StudentsSection(props) {
   const {
     allEx = [], alumnoActivo, alumnoProgreso = [], alumnoSesiones = [], alumnos = [], bgCard, bgSub, border, cargarAlumnos, alumnosStatus, cleanActiveCoachAlumnos,
     coachAluBorderSoft, coachAluDropdown, coachAluDropdownShadow, coachAluGhostBtn, coachAluShell, coachAluSubtle, coachAluSurface, coachAluTrack,
-    coachAlumnosCounts = { todos: 0, activos: 0, inactivos: 0, sin_rutina: 0 }, coachAlumnosFilter, coachAlumnosListaFiltrada = [], coachAlumnosSearch, coachCardMenuId, coachDiaSecsOpen = {}, coachRoutineDiaIdx, coachRutinaMenuOpen,
+    coachAlumnosCounts = { todos: 0, activos: 0, inactivos: 0, sin_rutina: 0 }, coachAlumnosFilter, coachAlumnosListaFiltrada = [], coachAlumnosSearch, coachDashIntent = null, setCoachDashIntent, coachCardMenuId, coachDiaSecsOpen = {}, coachRoutineDiaIdx, coachRutinaMenuOpen,
     completedDays = [], currentWeek, darkMode, ENTRENADOR_ID, es, EX = [], generarSugerenciasAlumno, getRutinaAsignadaAlumno, loadingSB, mergeRutinasAsignadas, msg,
     newAlumnoData = { nombre: "", email: "", pass: "" }, newAlumnoErrors = {}, newAlumnoForm, notaDiaInput, routineForAssign, routines = [], rutinasLoaded, sb,
     setAddExModal, setAddExMuscle, setAddExPat, setAddExSearch, setAddExSelectedIds, setAliasModal, setAlumnoActivo, setAlumnoProgreso, setAlumnoSesiones, setAlumnos, setAssignRoutineId,
@@ -60,6 +60,48 @@ export default function StudentsSection(props) {
       return true;
     });
   }, [sesionesGlobales, alumnoSesiones, alumnoActivo]);
+
+  // Flujo EXISTENTE de asignacion de la ficha (boton «Asignar / Cambiar rutina»); D4 lo reutiliza para el pedido del Dashboard.
+  function abrirAsignacionRutina(a) {
+    const rutinaLocal = routineForAssign;
+    if (!rutinaLocal) {
+      toast2(msg('Creá una rutina en RUTINAS', 'Create a routine in ROUTINES', 'Crie uma rotina em ROTINAS'));
+      return;
+    }
+    const ex0 = assignedRoutineFor(a.id);
+    const rutinaParaAsignar = rutinaLocal.datos
+      ? rutinaLocal
+      : {
+          nombre: rutinaLocal.nombre || rutinaLocal.name || 'Rutina',
+          datos: {
+            days: rutinaLocal.days || [],
+            note: rutinaLocal.note || '',
+          },
+        };
+    const rutinaNombre = rutinaParaAsignar.nombre || 'Rutina';
+    var assignMsg0 = ex0
+      ? es
+        ? 'Ya tiene: ' + ex0.nombre + '\n¿Reemplazar por: ' + rutinaNombre + '?'
+        : 'Has: ' + ex0.nombre + '\nReplace with: ' + rutinaNombre + '?'
+      : es
+        ? '¿Asignar rutina: ' + rutinaNombre + ' a ' + a.nombre + '?'
+        : 'Assign routine: ' + rutinaNombre + ' to ' + a.nombre + '?';
+    setCoachDialog({ t: 'assignRut', a: a, ex: ex0 || null, rutinaLocal: rutinaParaAsignar, assignMsg: assignMsg0 });
+  }
+
+  // D4: pedido del Dashboard al abrir un alumno: llevar su ficha a la vista y, con «Asignar rutina», abrir el mismo dialogo de asignacion
+  // (solo si sigue sin rutina). Se consume una sola vez, cuando la ficha de ESE alumno ya termino de cargar.
+  React.useEffect(function () {
+    if (!coachDashIntent || !alumnoActivo || loadingSB) return;
+    if (String(alumnoActivo.id) !== String(coachDashIntent.alumnoId)) return;
+    var accion = coachDashIntent.accion;
+    if (typeof setCoachDashIntent === "function") setCoachDashIntent(null);
+    if (typeof document !== "undefined") {
+      var el = document.querySelector('[data-alumno-id="' + String(alumnoActivo.id).replace(/"/g, "") + '"]');
+      if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+    if (accion === "asignar" && !assignedRoutineFor(alumnoActivo.id)) abrirAsignacionRutina(alumnoActivo);
+  }, [coachDashIntent, alumnoActivo, loadingSB]);
 
   return (
 
@@ -111,6 +153,8 @@ export default function StudentsSection(props) {
                   { k: "activos", es: "Activos", en: "Active", n: coachAlumnosCounts.activos },
                   { k: "inactivos", es: "Inactivos", en: "Inactive", n: coachAlumnosCounts.inactivos },
                   { k: "sin_rutina", es: "Sin rutina", en: "No routine", n: coachAlumnosCounts.sin_rutina },
+                  // D4: mismo criterio que «Baja actividad» del Dashboard (D3); el contador lo calcula App.jsx con esa regla.
+                  { k: "baja", es: "Baja actividad", en: "Low activity", n: coachAlumnosCounts.baja || 0 },
                 ].map(function (chip) {
                   var sel = coachAlumnosFilter === chip.k;
                   return (
@@ -419,32 +463,7 @@ export default function StudentsSection(props) {
                       setCoachDialog({ t: 'goRoutines', rutinaActiva: rutinaActiva, a: a, rutina: rut });
                     }}
                     onRemoveRoutine={function () { setCoachDialog({ t: 'quitarRut', rutinaActiva: rutinaActiva, a: a }); }}
-                    onAssignRoutine={function () {
-                      const rutinaLocal = routineForAssign;
-                      if (!rutinaLocal) {
-                        toast2(msg('Creá una rutina en RUTINAS', 'Create a routine in ROUTINES', 'Crie uma rotina em ROTINAS'));
-                        return;
-                      }
-                      const ex0 = assignedRoutineFor(a.id);
-                      const rutinaParaAsignar = rutinaLocal.datos
-                        ? rutinaLocal
-                        : {
-                            nombre: rutinaLocal.nombre || rutinaLocal.name || 'Rutina',
-                            datos: {
-                              days: rutinaLocal.days || [],
-                              note: rutinaLocal.note || '',
-                            },
-                          };
-                      const rutinaNombre = rutinaParaAsignar.nombre || 'Rutina';
-                      var assignMsg0 = ex0
-                        ? es
-                          ? 'Ya tiene: ' + ex0.nombre + '\n¿Reemplazar por: ' + rutinaNombre + '?'
-                          : 'Has: ' + ex0.nombre + '\nReplace with: ' + rutinaNombre + '?'
-                        : es
-                          ? '¿Asignar rutina: ' + rutinaNombre + ' a ' + a.nombre + '?'
-                          : 'Assign routine: ' + rutinaNombre + ' to ' + a.nombre + '?';
-                      setCoachDialog({ t: 'assignRut', a: a, ex: ex0 || null, rutinaLocal: rutinaParaAsignar, assignMsg: assignMsg0 });
-                    }}
+                    onAssignRoutine={function () { abrirAsignacionRutina(a); }}
                     onToggleSuggestions={function(){ setSugsOpen(function(prev){ return {...prev, [a.id]: !prev[a.id]}; }); }}
                     onApplySuggestion={function(sug){
                       var exConSug = {...sug.exData};

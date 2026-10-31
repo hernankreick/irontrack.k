@@ -172,7 +172,7 @@ await test("cargando alumnos: sin contadores en 0 ni objetivos; 'Cargando…'", 
   assert.match(t, /— alumnos sin rutina Cargando…/);
   assert.match(t, /— alumnos inactivos Cargando…/);
   assert.doesNotMatch(t, /\b0 alumnos|Al día|\d+ \/ \d+|\d+%/);
-  assert.match(strip(out), /Alumnos activos Ver todos → Cargando alumnos…/);
+  assert.match(strip(out), /Mis alumnos Ver todos → Cargando alumnos…/);
 });
 
 await test("cargando historial (alumnos listos, historiaCompleta null, sin datos): nadie aparece inactivo ni con 0 %", () => {

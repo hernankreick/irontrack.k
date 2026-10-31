@@ -60,8 +60,11 @@ await test("Textos de botones describen la accion real (Dashboard)", () => {
   const src = read("components/CoachDashboard.jsx");
   assert.doesNotMatch(src, /cta: M\(lang, "Enviar mensaje"/, "'Enviar mensaje' navega a Alumnos con filtro");
   assert.doesNotMatch(src, /cta: M\(lang, "Asignar ahora"/, "'Asignar ahora' solo navega a Rutinas");
-  assert.match(src, /cta: M\(lang, "Ver alumnos inactivos"/);
-  assert.match(src, /cta: M\(lang, "Ir a Rutinas"/);
+  // D4: cada CTA de Atencion hoy lleva a Alumnos con SU filtro (antes «Ir a Rutinas» no mostraba quienes estaban sin rutina).
+  assert.match(src, /cta: verInactivosTxt,\s*onClick: irInactivos,/);
+  assert.match(src, /cta: verSinRutinaTxt,\s*onClick: irSinRutina,/);
+  assert.match(src, /cta: verBajaTxt,\s*onClick: irBaja,/);
+  assert.match(src, /var verSinRutinaTxt = M\(lang, "Ver alumnos sin rutina"/);
   assert.match(src, /ctaLabel: accionCtaLabel/);
   assert.doesNotMatch(src, /ctaLabel: accionRecomendada/, "titulo y boton de la recomendacion no comparten cadena");
 });

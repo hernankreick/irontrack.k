@@ -24,6 +24,8 @@ export default function CoachStudentsMain({
   coachAlumnosCounts,
   coachAlumnosFilter,
   coachAlumnosListaFiltrada,
+  coachDashIntent,
+  setCoachDashIntent,
   coachAlumnosSearch,
   coachCardMenuId,
   coachDiaSecsOpen,
@@ -109,6 +111,8 @@ export default function CoachStudentsMain({
       coachAlumnosCounts={coachAlumnosCounts}
       coachAlumnosFilter={coachAlumnosFilter}
       coachAlumnosListaFiltrada={coachAlumnosListaFiltrada}
+      coachDashIntent={coachDashIntent}
+      setCoachDashIntent={setCoachDashIntent}
       coachAlumnosSearch={coachAlumnosSearch}
       coachCardMenuId={coachCardMenuId}
       coachDiaSecsOpen={coachDiaSecsOpen}
