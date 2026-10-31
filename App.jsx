@@ -3189,7 +3189,8 @@ function GymApp() {
         mensajesEntrenadorPendientes: mensajesEntrenadorPendientes,
         progresoGlobal: progresoGlobalLimpio,
         historiaCompleta: coachHistoriaCompleta,
-        rutinasSBEntrenador: rutinasSBEntrenadorLimpias,
+        // Misma lista que coachAlumnoCategoria (Alumnos): rutina vigente y metricas salen de una sola fuente en Dashboard y Progreso (D3, H8).
+        rutinasSBEntrenador: rutinasUnificadas,
         allEx: allEx,
         lang: lang,
         darkMode: darkMode,

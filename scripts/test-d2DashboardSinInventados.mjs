@@ -124,8 +124,9 @@ await test("H6: objetivo semanal = suma de los dias de rutinas VALIDAS (3+2+4 = 
   assert.match(txt, /Adherencia semanal 3 \/ 9 31%/);
   assert.match(txt, /Sesiones planificadas 9/);
   assert.match(txt, /Sesiones completadas 3/);
-  // objetivo 80 % de 9 = ceil(7.2) = 8 -> faltan 5
-  assert.match(txt, /Te faltan 5 sesiones para el objetivo/);
+  // D3: el objetivo del 80 % se expresa sobre la adherencia promedio (sin "faltan N sesiones" calculado con los totales)
+  assert.match(txt, /Adherencia promedio 31% · objetivo 80%/);
+  assert.doesNotMatch(txt, /Te faltan/);
 });
 
 await test("H3: sin 'Rendimiento /100', sin puntaje ni delta en puntos; la tarjeta usa solo datos verificables", () => {

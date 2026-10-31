@@ -1,4 +1,4 @@
-// D3 — metricas semanales del Dashboard del entrenador unificadas con E1/E2 (hallazgos H4, H5 y H7 de la auditoria D0).
+// D3 — metricas semanales del Dashboard del entrenador unificadas con E1/E2 (hallazgos H4, H5, H7 y H8 de la auditoria D0).
 //
 //   node scripts/test-d3AdherenciaSemanal.mjs
 //
@@ -9,7 +9,8 @@
 //   "vs semana pasada" = misma metrica sobre el MISMO tramo de la semana anterior (lunes .. mismo dia).
 //   Baja actividad     = activo (21 dias) + < 30 % la semana pasada COMPLETA (rutina asignada antes de su lunes) + < 30 % en esta.
 //   Avance de rutina   = lib/studentWeeklyProgress.js: solo para las alertas de rutina (terminada / falta 1), no como adherencia.
-//   H8 (fuente unica de rutinas en App.jsx) queda pendiente de autorizacion: check:scope no permite tocar App.jsx.
+//   H8: Dashboard y Progreso reciben rutinasUnificadas (la misma lista que la categoria de Alumnos).
+//   Objetivo 80 % = sobre la adherencia PROMEDIO; no se informan "sesiones faltantes" (no hay un numero unico para un promedio).
 //
 // Funciones puras con un "hoy" fijo + SSR del CoachDashboard real y del modelo de Progreso con datos FICTICIOS. Sin red ni Supabase.
 process.env.TZ = "America/Argentina/Buenos_Aires";
@@ -34,8 +35,9 @@ await build({
       'import { getStudentWeeklyProgress } from "./lib/studentWeeklyProgress.js";' +
       'import { selectCoachStudentListState } from "./lib/coachStudentListSelectors.js";' +
       'import { mergeRutinasAsignadas } from "./lib/routineStore.js";' +
+      'import { getStudentRoutine } from "./lib/studentWeeklyProgress.js";' +
       'import * as Metricas from "./lib/metricas/index.js";' +
-      "export { React, renderToStaticMarkup, CoachDashboard, semanasDashboard, adherenciaSemanalAlumno, resumenAdherenciaEquipo, buildCoachProgresoModel, getStudentWeeklyProgress, selectCoachStudentListState, mergeRutinasAsignadas, Metricas };",
+      "export { React, renderToStaticMarkup, CoachDashboard, semanasDashboard, adherenciaSemanalAlumno, resumenAdherenciaEquipo, buildCoachProgresoModel, getStudentWeeklyProgress, selectCoachStudentListState, mergeRutinasAsignadas, getStudentRoutine, Metricas };",
     resolveDir: ROOT, sourcefile: "d3-entry.jsx", loader: "jsx",
   },
   bundle: true, format: "esm", platform: "node", outfile, logLevel: "silent",
@@ -248,6 +250,106 @@ await test("coherencia: el % del Dashboard es el mismo que Progreso calcula para
     assert.match(filaTabla(t, r.n), new RegExp("\\b" + r.p + "%"), r.n + " = " + r.p + "% en Progreso");
   }
   assert.equal(m.adherenciaRows.length, 3, "Ana, Caro y Kim tienen plan; Beto no");
+});
+
+
+// ======================================================================= objetivo del 80 % coherente con el promedio
+function alumnosYSesiones(spec) {
+  // spec: [[completadas, diasRutina], ...] todas en el lunes de esta semana (dia_idx distintos: cuentan por separado)
+  const als = [], ruts = [], ss = [];
+  spec.forEach(([c, n], i) => {
+    const id = "o" + i;
+    als.push({ id, nombre: "Obj" + i });
+    ruts.push(rut("ro" + i, id, n, HOY - 60));
+    for (let k = 0; k < c; k++) ss.push(ses(id, "ro" + i, S.actual.desde, k));
+  });
+  return { alumnos: als, rutinasSBEntrenador: ruts, sesionesGlobales: ss };
+}
+const visibleTxt = (t) => t.split("Alertas inteligentes")[0];
+
+await test("objetivo: promedio 88 % (1/1, 1/1, 1/1, 5/10) -> 'en objetivo' y SIN 'faltan N sesiones' (antes: 'Te faltan 3 sesiones')", () => {
+  const t = visibleTxt(renderDash(alumnosYSesiones([[1, 1], [1, 1], [1, 1], [5, 10]])));
+  assert.match(t, /Adherencia semanal 8 \/ 13 88%/);
+  assert.match(t, /Semana en objetivo/);
+  assert.match(t, /Objetivo semanal alcanzado: adherencia promedio 88%/);
+  assert.match(t, /3 de 4 alumnos con plan en el 80% o más/);
+  assert.doesNotMatch(t, /Te faltan|sesiones para llegar|sesiones para el objetivo/);
+});
+
+await test("objetivo: promedio 45 % (9/10, 0/1) -> NO 'Objetivo semanal alcanzado' (antes: alcanzado por totales 9/11)", () => {
+  const t = visibleTxt(renderDash(alumnosYSesiones([[9, 10], [0, 1]])));
+  assert.match(t, /Adherencia semanal 9 \/ 11 45%/);
+  assert.match(t, /Adherencia promedio 45% · objetivo 80%/);
+  assert.match(t, /1 de 2 alumnos con plan en el 80% o más/);
+  assert.doesNotMatch(t, /Objetivo semanal alcanzado|Semana en objetivo|Te faltan/);
+});
+
+await test("objetivo: el codigo ya no calcula sesiones faltantes con los totales", () => {
+  const src = read("components/CoachDashboard.jsx");
+  assert.doesNotMatch(src, /faltanObjetivo|objetivoSesiones|Math\.ceil\(\(sesionesTotales/);
+});
+
+// ======================================================================= H8: una sola fuente de rutinas (App.jsx)
+await test("H8: App pasa al Dashboard (y a Progreso) rutinasUnificadas, la misma lista que la categoria de Alumnos", () => {
+  const app = read("App.jsx");
+  const bloque = app.match(/dashboardProps:\s*\{([\s\S]*?)\n\s{6}\},/)[1];
+  assert.match(bloque, /rutinasSBEntrenador: rutinasUnificadas,/);
+  assert.match(bloque, /getAlumnoCategoria: coachAlumnoCategoria,/);
+  assert.match(app, /selectCoachStudentListState\(\{\s*alumnosActivosLimpios: alumnosActivosLimpios,\s*rutinasUnificadas: rutinasUnificadas,/);
+  assert.match(app, /const rutinasUnificadas = useMemo\(function \(\) \{\s*return mergeRutinasAsignadas\(rutinasSBEntrenadorLimpias, rutinasSB, alumnosActivosIds\);/);
+});
+
+const ACT = { ana: true, kim: true };
+await test("H8: la lista unificada no duplica rutinas (mismo id en ambas listas -> una sola; gana la del entrenador)", () => {
+  const enEntrenador = rut("r1", "ana", 3, HOY - 60, { semana_activa: 2 });
+  const enFicha = rut("r1", "ana", 3, HOY - 60, { semana_activa: 2 });
+  const u = X.mergeRutinasAsignadas([enEntrenador], [enFicha], ACT);
+  assert.equal(u.length, 1);
+  assert.equal(u[0], enEntrenador);
+});
+
+await test("H8: respeta la rutina vigente (la mas reciente) y no activa rutinas antiguas ni plantillas", () => {
+  const vieja = rut("r0", "ana", 2, HOY - 120);
+  const actual = rut("r1", "ana", 3, HOY - 60);
+  const plantilla = Object.assign(rut("tpl", "ana", 4, HOY), { es_plantilla: true });
+  const u = X.mergeRutinasAsignadas([actual], [vieja, plantilla], ACT);
+  assert.equal(selectVigente(u, "ana").id, "r1", "una rutina vieja de la ficha no reemplaza a la vigente");
+  const reasignada = rut("r2", "ana", 3, HOY);
+  assert.equal(selectVigente(X.mergeRutinasAsignadas([actual], [reasignada], ACT), "ana").id, "r2", "la asignada despues (otro dispositivo) es la vigente");
+  const otro = rut("rx", "zoe", 3, HOY);
+  assert.ok(!X.mergeRutinasAsignadas([actual], [otro], ACT).some((r) => r.id === "rx"), "rutinas de alumnos fuera del roster activo no entran");
+});
+function selectVigente(rutinas, aid) {
+  return X.getStudentRoutine(rutinas, { id: aid });
+}
+
+await test("H8: ciclos e historial: el ciclo sale de la misma fila y las metricas no cambian cuando la ficha no agrega rutinas", () => {
+  const r = rut("r1", "ana", 3, HOY - 60, { ciclo_actual: 2 });
+  const u = X.mergeRutinasAsignadas([r], [rut("r1", "ana", 3, HOY - 60, { ciclo_actual: 2 })], ACT);
+  assert.equal(selectVigente(u, "ana").datos.ciclo_actual, 2);
+  const ss = [ses("ana", "r1", S.actual.desde, 0), ses("ana", "r1", S.actual.desde, 1, { ciclo: 2 })];
+  const a1 = Metricas.adherencia({ rutina: selectVigente([r], "ana"), sesiones: ss, alumnoId: "ana", desde: S.actual.desde, hasta: S.actual.hasta });
+  const a2 = Metricas.adherencia({ rutina: selectVigente(u, "ana"), sesiones: ss, alumnoId: "ana", desde: S.actual.desde, hasta: S.actual.hasta });
+  assert.deepEqual(a2, a1);
+});
+
+await test("H8: Progreso sin regresiones: mismo modelo con la lista del entrenador o la unificada cuando la ficha no agrega rutinas", () => {
+  const base = { alumnos, sesionesGlobales: sesiones, progresoGlobal: {}, allEx: [{ id: "sq", name: "Sentadilla" }], periodId: "semanas4", alumnoSel: "ana", lang: "es", historiaCompleta: { sesiones: true, progreso: true } };
+  const ficha = limpias.map((r) => Object.assign({}, r)); // copias frescas de las MISMAS rutinas
+  const m1 = X.buildCoachProgresoModel(Object.assign({ rutinasSBEntrenador: limpias }, base));
+  const m2 = X.buildCoachProgresoModel(Object.assign({ rutinasSBEntrenador: X.mergeRutinasAsignadas(limpias, ficha, { ana: true, beto: true, caro: true, kim: true }) }, base));
+  for (const k of ["adherenciaRows", "teamChips", "alumnoChips", "prsPeriod", "volSemPromKg", "volPct"]) assert.deepEqual(m2[k], m1[k], k);
+});
+
+await test("H8: rutina que solo esta en la ficha (asignada en otro dispositivo): Dashboard, Progreso y Alumnos coinciden", () => {
+  const cat = X.selectCoachStudentListState({
+    alumnosActivosLimpios: alumnos, rutinasUnificadas: unificadas, sesionesGlobalesLimpias: sesiones, progresoGlobalLimpio: {},
+    coachAlumnosSearch: "", coachAlumnosFilter: "todos", nowMs: Date.now(),
+  }).coachAlumnoCategoria;
+  assert.notEqual(cat({ id: "kim" }), "sin_rutina", "Alumnos: Kim tiene rutina");
+  assert.match(filaTabla(renderDash(), "Kim"), /Rutina nueva/, "Dashboard: rutina nueva, no 'Sin datos'");
+  const m = X.buildCoachProgresoModel({ alumnos, sesionesGlobales: sesiones, progresoGlobal: {}, rutinasSBEntrenador: unificadas, allEx: [], periodId: "semanas4", alumnoSel: "kim", lang: "es" });
+  assert.ok(m.adherenciaRows.some((r) => r.id === "kim"), "Progreso: Kim tiene plan");
 });
 
 console.log("\n" + count + " pruebas OK");

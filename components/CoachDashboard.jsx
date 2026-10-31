@@ -758,9 +758,14 @@ export default function CoachDashboard({
   var hayPlan = weeklyState === "ok";
   var pctSemana = hayPlan ? equipo.pct : null;
   var deltaSemana = hayPlan ? equipo.delta : null;
+  /**
+   * Objetivo del 80 % sobre la MISMA metrica que se muestra (adherencia promedio). No se informa "faltan N sesiones": con un promedio de
+   * porcentajes no existe un numero unico (cada sesion mueve el promedio distinto segun el alumno), y calcularlo con los totales
+   * contradecia el diagnostico. Se informa lo verificable: el promedio frente al 80 % y cuantos alumnos con plan ya lo alcanzan.
+   */
   var objetivoSemanalPct = 80;
-  var objetivoSesiones = hayPlan ? Math.ceil((sesionesTotales * objetivoSemanalPct) / 100) : null;
-  var faltanObjetivo = hayPlan ? Math.max(0, objetivoSesiones - sesionesCompletadas) : null;
+  var objetivoAlcanzado = hayPlan && pctSemana >= objetivoSemanalPct;
+  var alumnosEnObjetivo = hayPlan ? coachActiveRows.filter(function (r) { return r.planState === "ok" && r.pct >= objetivoSemanalPct; }).length : null;
   var semanaEnCurso = semanas.diaSemana < 7;
   function fechaCorta(dia) {
     var d = new Date(dia * 86400000);
@@ -853,14 +858,17 @@ export default function CoachDashboard({
   var diagnosticoPrincipal = dashboardInterpretacion;
   var impactoEstimado = !hayPlan
     ? (weeklyState === "cargando" ? cargandoTexto : weeklyState === "sin_alumnos" ? M(lang, "Sin alumnos", "No athletes", "Sem alunos") : sinPlanTexto)
-    : faltanObjetivo > 0
-      ? M(
-          lang,
-          faltanObjetivo + " sesiones para llegar al objetivo semanal",
-          faltanObjetivo + " sessions to reach the weekly target",
-          faltanObjetivo + " sessões para chegar ao objetivo semanal"
-        )
-      : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcançado");
+    : objetivoAlcanzado
+      ? M(lang, "Objetivo semanal alcanzado: adherencia promedio " + pctSemana + "%", "Weekly target reached: average adherence " + pctSemana + "%", "Objetivo semanal alcançado: aderência média " + pctSemana + "%")
+      : M(lang, "Adherencia promedio " + pctSemana + "% · objetivo 80%", "Average adherence " + pctSemana + "% · target 80%", "Aderência média " + pctSemana + "% · objetivo 80%");
+  var alumnosEnObjetivoTexto = hayPlan
+    ? M(
+        lang,
+        alumnosEnObjetivo + " de " + equipo.alumnosConPlan + " alumnos con plan en el 80% o más",
+        alumnosEnObjetivo + " of " + equipo.alumnosConPlan + " athletes with a plan at 80% or more",
+        alumnosEnObjetivo + " de " + equipo.alumnosConPlan + " alunos com plano em 80% ou mais"
+      )
+    : null;
   var accionRecomendada = cargando
     ? cargandoTexto
     : sinRutinaCount > 0
@@ -1192,12 +1200,8 @@ export default function CoachDashboard({
               trackBg: darkMode ? "rgba(148,163,184,0.14)" : C.brd,
               insightTitle: M(lang, "Insight del día", "Today's insight", "Insight do dia"),
               insightText: diagnosticoPrincipal,
-              insightColor: !hayPlan ? C.t2 : pctSemana >= objetivoSemanalPct ? C.green : C.yel,
-              goalText: !hayPlan
-                ? impactoEstimado
-                : faltanObjetivo > 0
-                ? M(lang, "Te faltan " + faltanObjetivo + " sesiones para el objetivo", faltanObjetivo + " sessions left for the target", "Faltam " + faltanObjetivo + " sessões para o objetivo")
-                : M(lang, "Objetivo semanal alcanzado", "Weekly target reached", "Objetivo semanal alcançado"),
+              insightColor: !hayPlan ? C.t2 : objetivoAlcanzado ? C.green : C.yel,
+              goalText: !hayPlan ? impactoEstimado : alumnosEnObjetivoTexto,
               primaryLabel: M(lang, "Acción recomendada", "Recommended action", "Ação recomendada"),
               secondaryLabel: M(lang, "Ver equipo", "View team", "Ver equipe"),
               onPrimary: accionPrincipalHandler,
