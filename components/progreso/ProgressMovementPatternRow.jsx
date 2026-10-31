@@ -100,7 +100,8 @@ export default function ProgressMovementPatternRow({
               style={{
                 ...T.bodySemibold,
                 fontWeight: 700,
-                color: pattern.color,
+                // el color del patrón (leyenda) queda en la barra; el número usa el texto de alto contraste
+                color: C.t,
                 minWidth: 44,
                 textAlign: "right",
               }}
@@ -112,11 +113,10 @@ export default function ProgressMovementPatternRow({
         <div
           style={{
             height: 10,
-            background: "#15151f",
+            background: C.track,
             borderRadius: 6,
             overflow: "hidden",
-            border: "1px solid #252536",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+            border: "1px solid " + C.brd,
           }}
         >
           <div
@@ -162,7 +162,7 @@ export default function ProgressMovementPatternRow({
                     margin: 0,
                     padding: "6px 0",
                     border: "none",
-                    borderBottom: exi < exList.length - 1 ? "1px solid #1e1e2e44" : "none",
+                    borderBottom: exi < exList.length - 1 ? "1px solid " + C.brd : "none",
                     background: "transparent",
                     fontFamily: "inherit",
                     textAlign: "left",

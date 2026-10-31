@@ -19,6 +19,7 @@ import EjercicioHistorialCoach from "./coach/EjercicioHistorialCoach.jsx";
 import { useIronTrackI18n } from "../contexts/IronTrackI18nContext.jsx";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
+import { alumnosPaleta } from "./students/alumnosPaleta.js";
 
 /** Volumen en kg abreviado tipo SaaS: 12400 → "12.4k kg", 850 → "850 kg" */
 function formatWeeklyVolKgAbbrev(v) {
@@ -132,13 +133,15 @@ export default function ProgresoView({
 
   var C = useMemo(
     function () {
-      return coachThemePalette(darkMode);
+      // Superficies de «Mis alumnos» / Dashboard D5 (alumnosPaleta); el resto de tokens (texto, azul, estados) sigue siendo coachThemePalette.
+      var A = alumnosPaleta(darkMode);
+      return Object.assign({}, coachThemePalette(darkMode), { bg: A.coachAluShell, card: A.coachAluSurface, cardDark: A.coachAluSubtle, brd: A.coachAluBorderSoft, track: A.coachAluTrack });
     },
     [darkMode]
   );
   var P = useMemo(function () { return progresoTone(C, darkMode); }, [C, darkMode]);
-  /** Paleta para los componentes reutilizados: el gris secundario legible (4,5:1) en lugar de C.t2. */
-  var Cx = useMemo(function () { return Object.assign({}, C, { t2: P.muted }); }, [C, P]);
+  /** Paleta para los componentes reutilizados: el gris secundario legible (4,5:1) en lugar de C.t2 y verde/rojo legibles como texto (flechas del gráfico). */
+  var Cx = useMemo(function () { return Object.assign({}, C, { t2: P.muted, green: P.good, red: P.bad }); }, [C, P]);
 
   var selectBaseStyle = useMemo(
     function () {
