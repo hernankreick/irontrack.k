@@ -177,9 +177,10 @@ await test("drawer: los textos pendientes llegan a >= 4.5:1 en oscuro y claro (a
 await test("Dashboard movil: el margen lateral se aplica una sola vez (16 px en lugar de 16 + 20) y escritorio/tablet no cambian", () => {
   const r = read("components/coach/CoachSectionRenderer.jsx");
   assert.match(r, /isUnder768 \? \{ \.\.\.mobilePad, paddingLeft: 0, paddingRight: 0 \} : mobilePad/);
-  const d = read("components/CoachDashboard.jsx");
-  assert.match(d, /padding: isPhone \? "16px 16px" : S\.headerPadding/);
-  assert.match(d, /padding: isPhone \? 16 : S\.pagePadding/);
+  // D5: un solo contenedor con 16 px laterales en movil (< 1024) y 28 px en escritorio; ya no hay encabezado + cuerpo con padding propio.
+  const d = read("components/coach/CoachDashboardD5.jsx");
+  assert.match(d, /padding: desk \? "24px 28px 40px" : "16px 16px 32px"/);
+  assert.doesNotMatch(read("components/CoachDashboard.jsx"), /S\.pagePadding|S\.headerPadding/);
   assert.match(read("components/coachUiScale.js"), /pagePadding: 20/);
 });
 
@@ -189,7 +190,7 @@ await test("campana y buscador del Dashboard: la campana llega a 44 px solo en m
   assert.ok(m && /\.coach-bell\{min-width:44px!important;min-height:44px!important\}/.test(m[0]), "regla coach-bell dentro de la media query");
   assert.ok(/\.coach-search-wrap>div\{min-width:0!important\}/.test(m[0]), "regla del buscador dentro de la media query");
   assert.match(read("components/CoachNotificationCenter.jsx"), /className="hov coach-tap coach-bell"/);
-  assert.match(read("components/CoachDashboard.jsx"), /className="coach-search-wrap"/);
+  assert.match(read("components/coach/CoachDashboardD5.jsx"), /className="coach-search-wrap"/);
   const st = read("components/students/StudentsSection.jsx");
   assert.equal((st.match(/className="hov coach-tap" style/g) || []).length, 3, "Datos de pago, Actualizar y + Nuevo");
 });

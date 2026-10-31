@@ -97,7 +97,7 @@ await test("Progreso: margen movil 16 px, tarjetas apiladas (sin carrusel cortad
   assert.match(p, /padding: isUnder768 \? "20px 16px 32px"/, "16 px laterales en movil");
   assert.match(read("components/progreso/ProgressPeriodPicker.jsx"), /minHeight: compact \? 44 : 56,\s+minWidth: 44,/, "periodo >= 44 px (completo y compacto)");
   const r = read("components/coach/CoachSectionRenderer.jsx");
-  assert.match(r, /tab === "progress" && showMobileBar \? \{ paddingTop: 0 \}/, "sin franja bajo la barra superior");
+  assert.match(r, /\(tab === "progress" \|\| tab === "plan"\) && showMobileBar \? \{ paddingTop: 0 \}/, "sin franja bajo la barra superior (Progreso y, desde D5, el Dashboard)");
 });
 
 await test("Rutinas: margen lateral unico de 16 px en movil (sin sumar el del contenedor ni los 4 px de la cabecera)", () => {
@@ -120,7 +120,8 @@ await test("Drawer: el item activo usa un azul con contraste >= 4,5:1 sobre el f
 await test("Dashboard: la accion rapida 'message' dice lo que hace (abre Alumnos) y el buscador acorta el placeholder en movil", () => {
   const q = buildQuickActions("es", true).find((a) => a.action === "message");
   assert.equal(q.title, "Contactar alumnos"); assert.doesNotMatch(q.title + q.sub, /Enviar mensaje|equipo/);
-  assert.match(read("components/CoachDashboard.jsx"), /placeholder=\{isMobile \? M\(lang, "Buscar…"/);
+  // D5: el buscador vive en el encabezado del Dashboard nuevo; en movil (< 1024) el placeholder sigue acortado.
+  assert.match(read("components/coach/CoachDashboardD5.jsx"), /placeholder=\{desk \? "Buscar alumno, rutina, ejercicio\.\.\." : "Buscar…"\}/);
 });
 
 console.log(count + " pruebas ok");
