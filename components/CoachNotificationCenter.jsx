@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Bell, Check, MessageSquare, Target, Trophy, Zap } from "lucide-react";
 import { irontrackMsg as M } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
+import { unirLeidos } from "./coach/alertasEpisodio.js";
 
 const LS_READ_LEGACY = "it_coach_notif_read_v1";
 const LS_READ_PREFIX = "irontrack_coach_notif_read_v2";
@@ -10,7 +11,7 @@ const REMOTE_READS_TABLE = "coach_notification_reads";
 
 /** @typedef {{ key: string, alumnoId?: string, name: string, badge: string, desc: string, severity: number }} CoachAlertRow */
 
-function buildReadStorageKey(entrenadorId) {
+export function buildReadStorageKey(entrenadorId) {
   try {
     if (entrenadorId != null && String(entrenadorId).trim()) {
       return LS_READ_PREFIX + "_coach_id_" + encodeURIComponent(String(entrenadorId).trim());
@@ -34,7 +35,7 @@ function buildReadStorageKey(entrenadorId) {
   }
 }
 
-function normalizeReadIds(ids) {
+export function normalizeReadIds(ids) {
   var seen = {};
   var out = [];
   (ids || []).forEach(function (id) {
@@ -46,7 +47,7 @@ function normalizeReadIds(ids) {
   return out;
 }
 
-function mergeReadIds(a, b) {
+export function mergeReadIds(a, b) {
   return normalizeReadIds([].concat(a || [], b || []));
 }
 
@@ -70,7 +71,7 @@ function legacyReadStorageKeys(canonicalKey) {
   });
 }
 
-function loadReadIds(storageKey) {
+export function loadReadIds(storageKey) {
   try {
     var raw = localStorage.getItem(storageKey);
     if (!raw) {
@@ -90,7 +91,7 @@ function loadReadIds(storageKey) {
   }
 }
 
-function saveReadIds(storageKey, ids) {
+export function saveReadIds(storageKey, ids) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(normalizeReadIds(ids)));
   } catch (e) {}
@@ -147,7 +148,7 @@ function formatRelative(atMs, lang) {
   return M(lang, "Hace " + d + " días", d + "d ago", "Há " + d + " dias");
 }
 
-function mapAlertsToNotifications(alertRows) {
+export function mapAlertsToNotifications(alertRows) {
   if (!Array.isArray(alertRows)) return [];
   return alertRows.map(function (a) {
     var important = a.severity <= 1;
@@ -358,10 +359,11 @@ export default function CoachNotificationCenter({
   }
 
   function markAllRead() {
-    setReadIds(function () {
-      var next = allItems.map(function (x) {
+    // D6.1: une con las lecturas anteriores (antes las reemplazaba por solo las visibles y se perdian del estado local).
+    setReadIds(function (prev) {
+      var next = unirLeidos(prev, allItems.map(function (x) {
         return x.id;
-      });
+      }));
       persistReadIds(next);
       return next;
     });
