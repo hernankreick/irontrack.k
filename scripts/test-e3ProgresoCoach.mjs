@@ -328,9 +328,10 @@ await test("contraste >= 4,5:1 del texto chico sobre las tarjetas, en modo oscur
   }
 });
 
-await test("ProgresoView (SSR) en modo claro: usa la paleta clara existente y ningún gris ilegible", () => {
+await test("ProgresoView (SSR) en modo claro: usa la paleta clara de «Mis alumnos» y ningún gris ilegible", () => {
   const html = renderToStaticMarkup(h(X.ProgresoView, { alumnos, sesionesGlobales: sesiones, progresoGlobal: { [A]: rows }, rutinasSBEntrenador: rutinas, allEx, darkMode: false }));
-  assert.match(html, /background:#ffffff/);
+  assert.match(html, /background:#FFFFFF/i);
+  assert.match(html, /background:#F1F5F9/i, "fondo continuo claro de la paleta de Mis alumnos");
   assert.doesNotMatch(html, /#71717a/, "el gris de la paleta (3,9:1) no se usa para texto");
   assert.doesNotMatch(html, /#0a0a0f;color/, "sin fondo oscuro en modo claro");
   const dark = renderToStaticMarkup(h(X.ProgresoView, { alumnos, sesionesGlobales: sesiones, progresoGlobal: { [A]: rows }, rutinasSBEntrenador: rutinas, allEx, darkMode: true }));
