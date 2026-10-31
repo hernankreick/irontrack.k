@@ -105,8 +105,9 @@ test("I: llamadores del ENTRENADOR no pasan completedDays (it_cd) como evidencia
     callBlocks(search, "getStudentWeeklyProgress"),
     callBlocks(dash, "getStudentWeeklyProgress")
   );
-  // D2: el Dashboard reutiliza el `weekly` de cada fila (antes recalculaba en el resumen y en el % estimado): 2 llamadas menos.
-  assert.ok(blocks.length >= 5, "se inspeccionaron los call-sites del entrenador: " + blocks.length);
+  // D2: el Dashboard reutiliza el `weekly` de cada fila (2 llamadas menos). D3: las filas usan la adherencia de calendario
+  // (lib/metricas/adherencia.js); getStudentWeeklyProgress queda solo en las alertas de avance de rutina (1 llamada menos).
+  assert.ok(blocks.length >= 4, "se inspeccionaron los call-sites del entrenador: " + blocks.length);
   for (const b of blocks) assert.ok(!/completedDays/.test(b), "no debe pasar completedDays:\n" + b);
 });
 test("I (compat alumno): el residual de it_cd del ALUMNO no cambio (sin sesiones, sin progreso)", () => {

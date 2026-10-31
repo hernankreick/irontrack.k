@@ -78,7 +78,7 @@ function render(over) {
 const strip = (html) => html.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ");
 /** Texto de la fila de un alumno en la tabla de escritorio (desde su nombre hasta el siguiente "Mensaje"). */
 function fila(text, nombre) {
-  const tabla = text.indexOf("ALUMNO CUMPLIMIENTO");
+  const tabla = text.indexOf("ALUMNO ADHERENCIA");
   assert.ok(tabla >= 0, "tabla de alumnos");
   const i = text.indexOf(" " + nombre + " ", tabla);
   assert.ok(i >= 0, "fila de " + nombre);
@@ -107,8 +107,8 @@ await test("H2: alumno sin rutina -> '—' y 'Sin rutina' (antes 0 %)", () => {
   assert.doesNotMatch(f, /\d+%/);
 });
 
-await test("datos validos: rutina valida -> porcentaje real de la semana de la rutina", () => {
-  assert.match(fila(todo, "Ana"), /67%[\s\S]*Buen cumplimiento/);
+await test("datos validos: rutina valida -> porcentaje real (adherencia de la semana de calendario desde D3)", () => {
+  assert.match(fila(todo, "Ana"), /67%[\s\S]*Al día/);
   assert.match(fila(todo, "Eva"), /25%[\s\S]*Baja actividad/);
 });
 
@@ -120,11 +120,13 @@ await test("historial vacio con rutina valida -> 0 % real (no el 5-40 % inventad
 });
 
 await test("H6: objetivo semanal = suma de los dias de rutinas VALIDAS (3+2+4 = 9), completadas solo de esas (2+1 = 3)", () => {
-  assert.match(txt, /Cumplimiento semanal 3 \/ 9 33%/);
+  // D3: el % es la «Adherencia promedio» de Progreso (promedio de 67, 25 y 0 = 31), no el cociente de los totales (3/9 = 33).
+  assert.match(txt, /Adherencia semanal 3 \/ 9 31%/);
   assert.match(txt, /Sesiones planificadas 9/);
   assert.match(txt, /Sesiones completadas 3/);
-  // objetivo 80 % de 9 = ceil(7.2) = 8 -> faltan 5
-  assert.match(txt, /Te faltan 5 sesiones para el objetivo/);
+  // D3: el objetivo del 80 % se expresa sobre la adherencia promedio (sin "faltan N sesiones" calculado con los totales)
+  assert.match(txt, /Adherencia promedio 31% · objetivo 80%/);
+  assert.doesNotMatch(txt, /Te faltan/);
 });
 
 await test("H3: sin 'Rendimiento /100', sin puntaje ni delta en puntos; la tarjeta usa solo datos verificables", () => {
@@ -156,7 +158,7 @@ await test("coherencia: Atencion hoy, recomendacion y lista cuentan lo mismo", (
 // ======================================================================= sin plan verificable
 await test("sin plan: ningun alumno con rutina con dias -> '—' y 'Sin plan semanal', sin objetivo ni porcentaje", () => {
   const t = visible(render({ alumnos: alumnos.filter((a) => a.id === "beto" || a.id === "caro") }));
-  assert.match(t, /Cumplimiento semanal — — Sin plan semanal/);
+  assert.match(t, /Adherencia semanal — — Sin plan semanal/);
   assert.doesNotMatch(t, /\d+ \/ \d+ \d+%|\d+% vs semana pasada|Te faltan|Objetivo semanal alcanzado/);
   assert.match(t, /Sesiones planificadas Sin plan/);
   assert.match(t, /IMPACTO ESTIMADO Sin plan semanal/);
@@ -182,7 +184,7 @@ await test("cargando historial (alumnos listos, historiaCompleta null, sin datos
     assert.doesNotMatch(f, /\d+%|Sin actividad|Baja actividad/, n + " sin estado inventado");
   }
   assert.match(visible(out), /— alumnos inactivos Cargando…/);
-  assert.match(visible(out), /Cumplimiento semanal — — Cargando…/);
+  assert.match(visible(out), /Adherencia semanal — — Cargando…/);
   // las alertas tampoco inventan inactividad mientras carga
   assert.doesNotMatch(t, /Sin actividad reciente|Poca actividad/);
 });
@@ -190,14 +192,14 @@ await test("cargando historial (alumnos listos, historiaCompleta null, sin datos
 await test("historial cargado y vacio (historiaCompleta completa, sin sesiones): ya no es 'cargando'; el plan real da 0 / 9", () => {
   const t = visible(render({ sesionesGlobales: [], progresoGlobal: {} }));
   assert.doesNotMatch(t, /Cargando…/);
-  assert.match(t, /Cumplimiento semanal 0 \/ 9 0%/);
+  assert.match(t, /Adherencia semanal 0 \/ 9 0%/);
   assert.match(t, /Alumnos activos esta semana 0 \/ 5/);
 });
 
 await test("sin alumnos (carga terminada): 'Todavía no tenés alumnos', sin objetivo", () => {
   const t = visible(render({ alumnos: [], sesionesGlobales: [] }));
   assert.match(t, /Todavía no tenés alumnos/);
-  assert.match(t, /Cumplimiento semanal — — Sin alumnos/);
+  assert.match(t, /Adherencia semanal — — Sin alumnos/);
 });
 
 // ======================================================================= tarjetas moviles (props que arma el Dashboard)
