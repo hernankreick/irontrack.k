@@ -188,26 +188,52 @@ await test("H12: el filtro «Baja actividad» usa la regla de D3: mismos alumnos
 
 // ======================================================================= cableado: App.jsx y pasos intermedios
 const app = read("App.jsx");
-const handler = (nombre) => {
-  const i = app.indexOf("const " + nombre + " = ");
-  assert.ok(i >= 0, nombre);
-  return app.slice(i, app.indexOf("\n  };", i));
-};
+const nav = await import(pathToFileURL(path.join(ROOT, "components/coach/coachDashboardNav.js")).href);
+function navEspia(alumnosLista) {
+  const log = [];
+  const set = (k) => (v) => log.push([k, v]);
+  const n = nav.crearNavegacionDashboard({
+    setTab: set("tab"), setCoachAlumnosSearch: set("search"), setCoachAlumnosFilter: set("filter"),
+    setAlumnoActivo: (a) => log.push(["alumnoActivo", a && a.id]), setCoachDashIntent: set("intent"),
+    getAlumnos: () => alumnosLista, cargarFicha: async (a, label) => log.push(["cargarFicha", a.id, label]),
+  });
+  return { n, log, ultimo: (k) => [...log].reverse().find((x) => x[0] === k) };
+}
 
-await test("App: «Ver alumnos» / inactivos / sin rutina / baja fijan su filtro y limpian busqueda, ficha abierta y pedidos anteriores", () => {
-  const base = handler("irAlumnosConFiltroDesdeDashboard");
-  for (const s of ['setCoachAlumnosSearch("")', "setCoachAlumnosFilter(filtro)", "setAlumnoActivo(null)", "setCoachDashIntent(null)", 'setTab("alumnos")']) assert.ok(base.includes(s), s);
-  assert.match(handler("handleCoachDashboardRevisarAlumnos"), /irAlumnosConFiltroDesdeDashboard\("todos"\)/);
-  assert.match(handler("handleCoachDashboardVerInactivos"), /irAlumnosConFiltroDesdeDashboard\("inactivos"\)/);
-  assert.match(handler("handleCoachDashboardVerSinRutina"), /irAlumnosConFiltroDesdeDashboard\("sin_rutina"\)/);
-  assert.match(handler("handleCoachDashboardVerBajaActividad"), /irAlumnosConFiltroDesdeDashboard\("baja"\)/);
+await test("navegacion (coachDashboardNav, usada por App y la demo): cada destino fija SU filtro y limpia busqueda, ficha abierta y pedidos", () => {
+  for (const [fn, filtro] of [["verTodos", "todos"], ["verInactivos", "inactivos"], ["verSinRutina", "sin_rutina"], ["verBajaActividad", "baja"]]) {
+    const { n, log } = navEspia(alumnos);
+    n[fn]();
+    assert.deepEqual(log, [["search", ""], ["filter", filtro], ["alumnoActivo", null], ["intent", null], ["tab", "alumnos"]], fn);
+  }
 });
 
-await test("App: Perfil / Asignar abren ESE alumno sin filtro ni busqueda heredados y dejan el pedido para Alumnos", () => {
-  const open = handler("handleCoachDashboardOpenAlumno");
-  for (const s of ['setCoachAlumnosSearch("")', 'setCoachAlumnosFilter("todos")', 'setCoachDashIntent({ alumnoId: alum.id, accion: accion || "perfil" })', "setAlumnoActivo(alum)", 'setTab("alumnos")']) assert.ok(open.includes(s), s);
-  assert.match(handler("handleCoachDashboardAsignarRutina"), /handleCoachDashboardOpenAlumno\(alumnoId, "\[CoachDashboard onAsignarRutina\]", "asignar"\)/);
-  assert.doesNotMatch(open, /setTab\("routines"\)/);
+await test("navegacion: Perfil / Asignar abren ESE alumno con filtro Todos, sin busqueda, con el pedido y cargando su ficha", async () => {
+  let e = navEspia(alumnos);
+  await e.n.verPerfil("beto");
+  assert.deepEqual(e.log.slice(0, 5), [["search", ""], ["filter", "todos"], ["intent", { alumnoId: "beto", accion: "perfil" }], ["alumnoActivo", "beto"], ["tab", "alumnos"]]);
+  assert.deepEqual(e.ultimo("cargarFicha"), ["cargarFicha", "beto", "[CoachDashboard onVerPerfil]"]);
+  e = navEspia(alumnos);
+  await e.n.asignarRutina("cami");
+  assert.deepEqual(e.ultimo("intent"), ["intent", { alumnoId: "cami", accion: "asignar" }]);
+  e = navEspia(alumnos);
+  await e.n.verPerfil("nadie");
+  assert.deepEqual(e.log, [], "id inexistente: no navega");
+});
+
+await test("vistaAlumnosConBaja: agrega el contador «baja» y acota la lista solo con ese filtro", () => {
+  const lista = alumnos;
+  const ids = { beto: true };
+  assert.deepEqual(nav.vistaAlumnosConBaja({ counts: { todos: 4 }, lista, filtro: "todos", bajaIds: ids }), { counts: { todos: 4, baja: 1 }, lista });
+  assert.deepEqual(nav.vistaAlumnosConBaja({ counts: { todos: 4 }, lista, filtro: "baja", bajaIds: ids }).lista.map((a) => a.id), ["beto"]);
+});
+
+await test("App usa la navegacion compartida (no una propia) e inyecta la carga de la ficha de siempre", () => {
+  assert.match(app, /const coachDashboardNav = crearNavegacionDashboard\(\{[\s\S]*?getAlumnos: function \(\) \{ return alumnosActivosLimpios; \},[\s\S]*?sb\.getRutinas\(alum\.id\), sb\.getProgreso\(alum\.id\), sb\.getSesiones\(alum\.id\)/);
+  for (const [h, f] of [["RevisarAlumnos", "verTodos"], ["VerInactivos", "verInactivos"], ["VerSinRutina", "verSinRutina"], ["VerBajaActividad", "verBajaActividad"], ["VerPerfil", "verPerfil"], ["AsignarRutina", "asignarRutina"], ["Revisar", "revisar"]]) {
+    assert.match(app, new RegExp("const handleCoachDashboard" + h + " = coachDashboardNav\\." + f + ";"), h);
+  }
+  assert.match(app, /vistaAlumnosConBaja\(\{ counts: coachAlumnosCounts, lista: coachAlumnosListaFiltrada, filtro: coachAlumnosFilter, bajaIds: coachBajaActividadIds \}\)/);
 });
 
 await test("App: dashboardProps conecta los handlers nuevos; Alumnos recibe la lista y los contadores con «Baja actividad»", () => {
@@ -216,7 +242,6 @@ await test("App: dashboardProps conecta los handlers nuevos; Alumnos recibe la l
   const stu = app.match(/studentsProps:\s*\{([\s\S]*?)\n\s{6}\},/)[1];
   for (const k of ["coachAlumnosCounts: coachAlumnosCountsVista", "coachAlumnosListaFiltrada: coachAlumnosListaVista", "coachDashIntent: coachDashIntent", "setCoachDashIntent: setCoachDashIntent"]) assert.ok(stu.includes(k), k);
   assert.match(app, /bajaActividadIds\(\{ alumnos: alumnosActivosLimpios, catFn: coachAlumnoCategoria, rutinas: rutinasUnificadas, sesiones: sesionesGlobalesLimpias \}\)/);
-  assert.match(app, /if \(coachAlumnosFilter !== "baja"\) return coachAlumnosListaFiltrada;/);
 });
 
 await test("pasos intermedios: CoachDashboardMain y CoachStudentsMain reenvian todos los props nuevos (sin repetir D1)", () => {

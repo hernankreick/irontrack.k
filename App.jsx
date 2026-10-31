@@ -74,6 +74,7 @@ import { getCoachDialogModalConfig } from './components/coach/coachDialogConfig.
 import CoachEditStudentModal from './components/coach/CoachEditStudentModal.jsx';
 import CoachSectionRenderer from './components/coach/CoachSectionRenderer.jsx';
 import { bajaActividadIds } from './components/CoachDashboard.jsx';
+import { crearNavegacionDashboard, vistaAlumnosConBaja } from './components/coach/coachDashboardNav.js';
 import { coachInitialsFromFullName } from './components/coachUiScale.js';
 import { useDesktopMin1024 } from './components/DesktopSidebar.jsx';
 import AppShellModals from './components/AppShellModals.jsx';
@@ -1986,13 +1987,11 @@ function GymApp() {
   const coachBajaActividadIds = React.useMemo(function () {
     return bajaActividadIds({ alumnos: alumnosActivosLimpios, catFn: coachAlumnoCategoria, rutinas: rutinasUnificadas, sesiones: sesionesGlobalesLimpias });
   }, [alumnosActivosLimpios, coachAlumnoCategoria, rutinasUnificadas, sesionesGlobalesLimpias]);
-  const coachAlumnosCountsVista = React.useMemo(function () {
-    return Object.assign({}, coachAlumnosCounts, { baja: Object.keys(coachBajaActividadIds).length });
-  }, [coachAlumnosCounts, coachBajaActividadIds]);
-  const coachAlumnosListaVista = React.useMemo(function () {
-    if (coachAlumnosFilter !== "baja") return coachAlumnosListaFiltrada;
-    return coachAlumnosListaFiltrada.filter(function (a) { return !!coachBajaActividadIds[String(a.id)]; });
-  }, [coachAlumnosFilter, coachAlumnosListaFiltrada, coachBajaActividadIds]);
+  const coachAlumnosVista = React.useMemo(function () {
+    return vistaAlumnosConBaja({ counts: coachAlumnosCounts, lista: coachAlumnosListaFiltrada, filtro: coachAlumnosFilter, bajaIds: coachBajaActividadIds });
+  }, [coachAlumnosCounts, coachAlumnosListaFiltrada, coachAlumnosFilter, coachBajaActividadIds]);
+  const coachAlumnosCountsVista = coachAlumnosVista.counts;
+  const coachAlumnosListaVista = coachAlumnosVista.lista;
 
   React.useEffect(function () {
     setCoachRoutineDiaIdx(0);
@@ -3111,60 +3110,35 @@ function GymApp() {
   const handleCoachDashboardCrearRutina = function () {
     setTab("routines");
   };
-  // D4: Alumnos con un filtro explicito; nunca conserva un filtro, una busqueda ni una ficha abierta de antes.
-  const irAlumnosConFiltroDesdeDashboard = function (filtro) {
-    setCoachAlumnosSearch("");
-    setCoachAlumnosFilter(filtro);
-    setAlumnoActivo(null);
-    setCoachDashIntent(null);
-    setTab("alumnos");
-  };
-  const handleCoachDashboardRevisarAlumnos = function () {
-    irAlumnosConFiltroDesdeDashboard("todos");
-  };
-  const handleCoachDashboardVerInactivos = function () {
-    irAlumnosConFiltroDesdeDashboard("inactivos");
-  };
-  const handleCoachDashboardVerSinRutina = function () {
-    irAlumnosConFiltroDesdeDashboard("sin_rutina");
-  };
-  const handleCoachDashboardVerBajaActividad = function () {
-    irAlumnosConFiltroDesdeDashboard("baja");
-  };
-  const handleCoachDashboardOpenAlumno = async function (alumnoId, logLabel, accion) {
-    var alum = (alumnosActivosLimpios || []).find(function (x) {
-      return String(x.id) === String(alumnoId);
-    });
-    if (!alum) {
-      return;
-    }
-    // D4: sin filtro ni busqueda heredados (si no, la ficha abierta puede quedar fuera de la lista filtrada).
-    setCoachAlumnosSearch("");
-    setCoachAlumnosFilter("todos");
-    setCoachDashIntent({ alumnoId: alum.id, accion: accion || "perfil" });
-    setAlumnoActivo(alum);
-    setTab("alumnos");
-    setLoadingSB(true);
-    try {
-      var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
-      setRutinasSB(r[0] || []);
-      setAlumnoProgreso(r[1] || []);
-      setAlumnoSesiones(r[2] || []);
-    } catch (e) {
-      console.error(logLabel, e);
-    }
-    setLoadingSB(false);
-  };
-  const handleCoachDashboardRevisar = function (alumnoId) {
-    return handleCoachDashboardOpenAlumno(alumnoId, "[CoachDashboard onRevisar]");
-  };
-  const handleCoachDashboardVerPerfil = function (alumnoId) {
-    return handleCoachDashboardOpenAlumno(alumnoId, "[CoachDashboard onVerPerfil]");
-  };
-  // D4: abre la ficha y el flujo EXISTENTE de asignacion de esa ficha (StudentsSection, mismo dialogo que «Asignar rutina»).
-  const handleCoachDashboardAsignarRutina = function (alumnoId) {
-    return handleCoachDashboardOpenAlumno(alumnoId, "[CoachDashboard onAsignarRutina]", "asignar");
-  };
+  // D4: navegacion del Dashboard hacia Alumnos (components/coach/coachDashboardNav.js, la misma que usa la demostracion). Aca solo se
+  // inyectan los setters y la carga de la ficha desde Supabase.
+  const coachDashboardNav = crearNavegacionDashboard({
+    setTab: setTab,
+    setCoachAlumnosSearch: setCoachAlumnosSearch,
+    setCoachAlumnosFilter: setCoachAlumnosFilter,
+    setAlumnoActivo: setAlumnoActivo,
+    setCoachDashIntent: setCoachDashIntent,
+    getAlumnos: function () { return alumnosActivosLimpios; },
+    cargarFicha: async function (alum, logLabel) {
+      setLoadingSB(true);
+      try {
+        var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
+        setRutinasSB(r[0] || []);
+        setAlumnoProgreso(r[1] || []);
+        setAlumnoSesiones(r[2] || []);
+      } catch (e) {
+        console.error(logLabel, e);
+      }
+      setLoadingSB(false);
+    },
+  });
+  const handleCoachDashboardRevisarAlumnos = coachDashboardNav.verTodos;
+  const handleCoachDashboardVerInactivos = coachDashboardNav.verInactivos;
+  const handleCoachDashboardVerSinRutina = coachDashboardNav.verSinRutina;
+  const handleCoachDashboardVerBajaActividad = coachDashboardNav.verBajaActividad;
+  const handleCoachDashboardRevisar = coachDashboardNav.revisar;
+  const handleCoachDashboardVerPerfil = coachDashboardNav.verPerfil;
+  const handleCoachDashboardAsignarRutina = coachDashboardNav.asignarRutina;
   const handleCoachDashboardNuevoAlumno = function () {
     setTab("alumnos");
     setNewAlumnoForm(true);
