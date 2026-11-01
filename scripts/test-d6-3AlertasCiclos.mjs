@@ -210,4 +210,44 @@ await test("i. D6.1/D6.2 intactas y CoachDashboard ya no arma la clave a mano", 
   assert.match(read("components/coach/alertasEpisodio.js"), /Le queda 1 sesion "rutina-falta-1-<alumnoId>-<rutinaId>-w<semana0>"/);
 });
 
+// ======================================================================= regresion: «Rutina terminada» de Pia (iPhone, PR #147)
+// La alerta existia pero no tenia fecha (atMs): quedaba ultima en la campana, debajo de todos los entrenamientos, y en iOS Safari el
+// panel (70vh) terminaba debajo de la barra del navegador, asi que no se podia llegar a verla.
+await test("j. regresion Pia: «Rutina terminada» lleva la fecha de la ultima sesion y queda junto a sus entrenamientos, no al final", async () => {
+  const ayer = ses(0, 4, { fecha: dmy(HOY - 1), created_at: fechaDe(HOY - 1).toISOString() });
+  const hoy = ses(1, 4);
+  const rows = alertas(rut({ semana_activa: 4 }), [ayer, hoy]);
+  const t = termina(rows);
+  assert.equal(t.length, 1);
+  assert.equal(t[0].atMs, new Date(hoy.created_at).getTime(), "fecha de la ultima sesion de la semana (dato guardado)");
+  assert.equal(t[0].key, "rutina-terminada-a-r-c1", "la clave no cambia");
+  const orden = Prio.ordenarNotificaciones(Campana.mapAlertsToNotifications(rows), []);
+  const iT = orden.findIndex((x) => x.id === "real-" + t[0].key);
+  const iAyer = orden.findIndex((x) => x.tipo === "workout_completed" && x.atMs === new Date(ayer.created_at).getTime());
+  assert.ok(iT >= 0 && iT < iAyer, "antes del entrenamiento de ayer (" + iT + " / " + iAyer + ")");
+  // el escenario EXACTO de la demo (?alertas=muchas): la alerta de Pia aparece y ya no es la ultima, debajo de entrenamientos de hace dias
+  const d = await import(pathToFileURL(path.join(ROOT, "components/demo/dashboardCoachDemoData.js")).href);
+  const alumnos = d.DEMO_DASH_ALUMNOS.concat(d.DEMO_DASH_ALUMNOS_EXTRA);
+  const rutinas = d.demoDashRutinas().concat(d.demoDashRutinasExtra());
+  const sesiones = d.demoDashSesiones().concat(d.demoDashSesionesExtra());
+  const catFn = X.selectCoachStudentListState({ alumnosActivosLimpios: alumnos, rutinasUnificadas: rutinas, sesionesGlobalesLimpias: sesiones,
+    progresoGlobalLimpio: {}, coachAlumnosSearch: "", coachAlumnosFilter: "todos", nowMs: Date.now() }).coachAlumnoCategoria;
+  globalThis.__alertas = null;
+  renderToStaticMarkup(h(CoachDashboard, { alumnos, alumnosStatus: "ready", sesionesGlobales: sesiones, progresoGlobal: {},
+    historiaCompleta: { sesiones: true, progreso: true }, rutinasSBEntrenador: rutinas, getAlumnoCategoria: catFn, lang: "es", mensajesEntrenadorPendientes: [] }));
+  const demo = Prio.ordenarNotificaciones(Campana.mapAlertsToNotifications(globalThis.__alertas || []), []);
+  const iPia = demo.findIndex((x) => x.id.startsWith("real-rutina-terminada-demo-pia-"));
+  assert.ok(iPia >= 0, "la demo genera «Rutina terminada» para Pia");
+  assert.ok(iPia < demo.length - 1, "ya no es la ultima de la lista");
+  const masViejo = demo.findIndex((x, i) => i > iPia && x.tipo === "workout_completed");
+  assert.ok(masViejo > iPia, "queda antes de entrenamientos mas viejos");
+});
+
+await test("k. regresion iPhone: el panel movil se limita al alto VISIBLE (dvh y areas seguras), no a 70vh", () => {
+  const camp = read("components/CoachNotificationCenter.jsx");
+  assert.match(camp, /maxHeight: "min\(70dvh, calc\(100dvh - 140px - env\(safe-area-inset-top, 0px\) - env\(safe-area-inset-bottom, 0px\)\)\)"/);
+  assert.match(camp, /top: "calc\(8px \+ env\(safe-area-inset-top, 0px\) \+ 120px\)"/, "140px = top (128) + margen inferior (12)");
+  assert.doesNotMatch(camp, /maxHeight: "70vh"/);
+});
+
 console.log("\n" + count + " pruebas OK");
