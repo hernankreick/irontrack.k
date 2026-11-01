@@ -8,7 +8,7 @@ import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 import { getStudentRoutine, getStudentWeeklyProgress } from "../lib/studentWeeklyProgress.js";
 import { isCoachValidatedSession } from "../lib/orphanSessions.js";
-import { claveBajaActividad, claveInactivo, claveRutinaTerminada, claveSinRutina, ultimoDiaActividad } from "./coach/alertasEpisodio.js";
+import { claveBajaActividad, claveFaltaUna, claveInactivo, claveRutinaTerminada, claveSinRutina, ultimoDiaActividad } from "./coach/alertasEpisodio.js";
 import { adherencia, diaLocal, lunesDe } from "../lib/metricas/index.js";
 
 /** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
@@ -426,7 +426,7 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
         // «Le queda 1 sesión» solo para quien esta al dia: con baja actividad el aviso es ese (el conteo por semana de rutina no mira
         // el calendario y contradiria al Dashboard). El calculo de sesiones completadas no cambia.
         out.push({
-          key: "rutina-falta-1-" + a.id + "-" + rutinaId + "-w" + weekly.weekIndex,
+          key: claveFaltaUna(a.id, rutinaId, rutina, weekly.weekIndex),
           alumnoId: a.id,
           rutinaId: rutinaId,
           initials: initials,
