@@ -8,7 +8,7 @@ import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 import { getStudentRoutine, getStudentWeeklyProgress } from "../lib/studentWeeklyProgress.js";
 import { isCoachValidatedSession } from "../lib/orphanSessions.js";
-import { claveInactivo, clavePocaActividad, claveRutinaTerminada, claveSinRutina, ultimoDiaActividad } from "./coach/alertasEpisodio.js";
+import { claveBajaActividad, claveInactivo, claveRutinaTerminada, claveSinRutina, ultimoDiaActividad } from "./coach/alertasEpisodio.js";
 import { adherencia, diaLocal, lunesDe } from "../lib/metricas/index.js";
 
 /** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
@@ -107,21 +107,6 @@ function getLastActivityMs(a, sesionesGlobales, progresoGlobal) {
   return best;
 }
 
-function countSesionesSince(a, sesionesGlobales, sinceMs) {
-  return (sesionesGlobales || []).filter(function (s) {
-    if (String(s.alumno_id) !== String(a.id)) return false;
-    var t = parseDateMs(s.created_at || s.fecha);
-    return t != null && t >= sinceMs;
-  }).length;
-}
-
-function countProgresoSince(a, progresoGlobal, sinceMs) {
-  return (progresoGlobal[String(a.id)] || progresoGlobal[a.id] || []).filter(function (r) {
-    var t = parseDateMs(r.fecha);
-    return t != null && t >= sinceMs;
-  }).length;
-}
-
 /** Umbral de "Baja actividad": el mismo 30 % que ya usaba el Dashboard (no es un umbral nuevo). */
 var BAJA_ACTIVIDAD_PCT = 30;
 
@@ -190,6 +175,29 @@ export function bajaActividadIds(p) {
   return out;
 }
 
+/** Tope tecnico de la busqueda hacia atras de inicioBajaActividad (no es un umbral clinico: corta el bucle en ~2 anos). */
+var MAX_SEMANAS_EPISODIO_BAJA = 104;
+
+/**
+ * D6.2: lunes (numero de dia) en que EMPEZO el episodio actual de «Baja actividad» (regla de D3), para su identidad en la campana.
+ * Es la primera semana del tramo de semanas COMPLETAS consecutivas con adherencia < 30 % (misma funcion adherencia y mismo umbral que
+ * adherenciaSemanalAlumno) que termina en la semana pasada. Solo cuenta semanas medibles enteras (rutina asignada antes de su lunes).
+ * No cambia mientras dura el episodio (cada semana nueva con < 30 % alarga el tramo por el final, no por el principio) y cambia tras
+ * recuperarse: una semana completa con >= 30 % corta el tramo y una recaida posterior empieza otro. null si la semana pasada no cumple.
+ */
+export function inicioBajaActividad(a, rutina, sesiones, hoy) {
+  if (!a || a.id == null || !rutina) return null;
+  var lunesPrevia = lunesDe(hoy != null ? hoy : diaLocal()) - 7;
+  var inicio = null;
+  for (var k = 0; k < MAX_SEMANAS_EPISODIO_BAJA; k++) {
+    var desde = lunesPrevia - 7 * k;
+    var r = adherencia({ rutina: rutina, sesiones: sesiones, alumnoId: a.id, desde: desde, hasta: desde + 6 });
+    if (r.pct == null || r.desdeEfectivo !== desde || !(r.pct < BAJA_ACTIVIDAD_PCT)) break;
+    inicio = desde;
+  }
+  return inicio;
+}
+
 /**
  * Resumen del equipo con la regla de Progreso (coachProgresoMetrics.js, «Adherencia promedio»): promedio de los % de los alumnos
  * con plan; la variacion compara SOLO alumnos con plan en ambos periodos y no se informa con el historial de sesiones incompleto.
@@ -223,7 +231,8 @@ export function resumenAdherenciaEquipo(filas, historiaCompleta) {
 
 /**
  * Alertas derivadas solo de datos reales (sin inventar alumnos).
- * Prioridad: sin rutina > rutina terminada > a 1 sesión > inactivo > poca actividad en la semana (con rutina).
+ * Prioridad (severity): mensajes y sin rutina (0) > inactivo, rutina terminada y entrenamientos (1) > a 1 sesión y baja actividad (2).
+ * El orden visible lo decide la campana (alertasPrioridad.js: no leidas y de seguimiento primero).
  */
 function buildChatMessageAlerts(alumnos, mensajesPendientes, lang, P) {
   if (!Array.isArray(alumnos) || alumnos.length === 0 || !Array.isArray(mensajesPendientes)) return [];
@@ -353,8 +362,10 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
   // Historial todavia cargando: sin sesiones no se puede saber quien esta inactivo (se veria a todos "sin actividad").
   if (cargando) return out;
   out = out.concat(buildWorkoutCompletedAlerts(alumnos, ses, lang, P));
-  var now = Date.now();
   var pal = P || coachThemePalette(true);
+  var hoy = diaLocal();
+  // Misma funcion y mismas entradas que el Dashboard (coachDashboardModelo) y el filtro de Alumnos (App.jsx).
+  var bajaIds = bajaActividadIds({ alumnos: alumnos, catFn: catFn, rutinas: rutinasSBEntrenador, sesiones: ses, hoy: hoy });
   alumnos.forEach(function (a) {
     var cat = catFn(a);
     var name = coachDisplayName(a);
@@ -376,7 +387,11 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
       return;
     }
     var rutina = getStudentRoutine(rutinasSBEntrenador, a);
-    if (rutina) {
+    // D6.2: las alertas de seguimiento (sin rutina / inactivo / baja actividad) salen SIEMPRE con las categorias del Dashboard; las de
+    // avance de rutina (terminada / a 1 sesion) ya no las tapan (antes hacian "return" y un inactivo o un alumno con baja actividad podia
+    // figurar en la campana solo como «Le queda 1 sesión»). Con un alumno inactivo no se emiten: hablan de una semana que no esta en curso;
+    // con baja actividad se mantiene «Rutina terminada» (logro) y no «Le queda 1 sesión».
+    if (rutina && cat !== "inactivo") {
       var weekly = getStudentWeeklyProgress({
         alumno: a,
         rutina: rutina,
@@ -407,9 +422,9 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
           secondaryLabel: M(lang, "ASIGNAR NUEVA RUTINA", "ASSIGN NEW ROUTINE", "ATRIBUIR NOVA ROTINA"),
           secondaryAction: "review",
         });
-        return;
-      }
-      if (rutinaId && totalDays > 1 && hasRealRoutineSessions && completedDaysFromSessions > 0 && completedDaysFromSessions === totalDays - 1) {
+      } else if (rutinaId && totalDays > 1 && hasRealRoutineSessions && completedDaysFromSessions > 0 && completedDaysFromSessions === totalDays - 1 && !bajaIds[String(a.id)]) {
+        // «Le queda 1 sesión» solo para quien esta al dia: con baja actividad el aviso es ese (el conteo por semana de rutina no mira
+        // el calendario y contradiria al Dashboard). El calculo de sesiones completadas no cambia.
         out.push({
           key: "rutina-falta-1-" + a.id + "-" + rutinaId + "-w" + weekly.weekIndex,
           alumnoId: a.id,
@@ -421,9 +436,9 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
           bd: pal.blueDim,
           desc: M(
             lang,
-            "A " + name + " le queda 1 sesión para completar su rutina.",
-            name + " has 1 session left to complete their routine.",
-            "Falta 1 sessão para " + name + " concluir a rotina."
+            "A " + name + " le queda 1 sesión para completar la semana.",
+            name + " has 1 session left to complete the week.",
+            "Falta 1 sessão para " + name + " concluir a semana."
           ),
           severity: 2,
           category: "seguimiento",
@@ -432,7 +447,6 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
           secondaryLabel: M(lang, "ASIGNAR NUEVA RUTINA", "ASSIGN NEW ROUTINE", "ATRIBUIR NOVA ROTINA"),
           secondaryAction: "review",
         });
-        return;
       }
     }
     if (cat === "inactivo") {
@@ -455,23 +469,23 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
       });
       return;
     }
-    var since7 = now - 7 * 86400000;
-    var n7 = countSesionesSince(a, ses, since7);
-    var p7 = countProgresoSince(a, progresoGlobal, since7);
-    if (cat === "activo" && n7 === 0 && p7 === 0) {
+    // D6.2: «Baja actividad» con la regla COMPARTIDA de D3/D4 (bajaActividadIds, la misma del Dashboard y del filtro de Alumnos).
+    // Antes la campana usaba otra condicion («sin nada en 7 dias corridos») y podia avisar de alumnos «Al día» en el Dashboard.
+    if (bajaIds[String(a.id)]) {
       out.push({
-        key: clavePocaActividad(a.id, ultimoDiaActividad(a.id, ses, progresoGlobal)),
+        // (solo las sesiones del alumno: equivalente, adherencia ya filtra por alumno, y evita recorrer todo el historial en cada semana)
+        key: claveBajaActividad(a.id, inicioBajaActividad(a, rutina, ses.filter(function (s) { return s && String(s.alumno_id) === String(a.id); }), hoy)),
         alumnoId: a.id,
         initials: initials,
         name: name,
-        badge: M(lang, "Poca actividad", "Low activity", "Pouca atividade"),
+        badge: M(lang, "Baja actividad", "Low activity", "Baixa atividade"),
         bc: pal.yel,
         bd: pal.yelDim,
         desc: M(
           lang,
-          "Sin sesiones ni registros en la última semana.",
-          "No sessions or logs in the last week.",
-          "Sem sessões nem registros na última semana."
+          "Completó menos del 30 % de su plan la semana pasada y en lo que va de esta.",
+          "Completed under 30% of their plan last week and so far this week.",
+          "Concluiu menos de 30% do plano na semana passada e até agora nesta."
         ),
         severity: 2,
       });
@@ -482,7 +496,10 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
     if (x.atMs != null || y.atMs != null) return (y.atMs || 0) - (x.atMs || 0);
     return String(x.name).localeCompare(String(y.name), localeForSort(lang));
   });
-  return out.slice(0, 12);
+  // D6.2: sin recorte. Antes se cortaba en 12 ANTES de la campana y, con varios entrenamientos completados (severidad 1), se perdian
+  // alertas de seguimiento y el contador no las veia. El conjunto ya es acotado (una alerta de seguimiento por alumno, un mensaje por
+  // alumno y los 8 entrenamientos mas recientes); la campana ordena y muestra las primeras 12 con «Ver más» (alertasPrioridad.js).
+  return out;
 }
 
 /**

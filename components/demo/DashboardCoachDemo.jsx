@@ -19,7 +19,13 @@ import { EX } from '../../lib/exerciseStaticData.js';
 import { normalizeLibraryExercise } from '../../lib/exerciseResolve.js';
 import {
   DEMO_DASH_ALUMNOS, DEMO_DASH_ENTRENADOR_ID, DEMO_DASH_RUTINA_LOCAL, createDemoDashSb, demoDashRutinas, demoDashSesiones,
+  DEMO_DASH_ALUMNOS_EXTRA, demoDashRutinasExtra, demoDashSesionesExtra,
 } from './dashboardCoachDemoData.js';
+
+// D6.2: `?alertas=muchas` agrega alumnos ficticios (mas de 12 alertas en la campana) y `?tema=claro` muestra el modo claro.
+const DEMO_PARAMS = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams("");
+const DEMO_MUCHAS = DEMO_PARAMS.get("alertas") === "muchas";
+const DEMO_OSCURO = DEMO_PARAMS.get("tema") !== "claro";
 
 const DEMO = "DEMO · ";
 const HISTORIA_COMPLETA = { sesiones: true, progreso: true };
@@ -31,7 +37,7 @@ const HISTORIA_COMPLETA = { sesiones: true, progreso: true };
  * Toda accion que en la app escribiria algo (asignar, chat, crear) se reemplaza por un aviso "DEMO".
  */
 export default function DashboardCoachDemo() {
-  const darkMode = true;
+  const darkMode = DEMO_OSCURO;
   const lang = "es";
   const es = true;
   const msg = React.useCallback(function (esStr, enStr, ptStr) { return irontrackMsg(lang, esStr, enStr, ptStr); }, []);
@@ -51,13 +57,13 @@ export default function DashboardCoachDemo() {
   const avisoDemo = function (accion) { showToast(accion + ": no se guarda nada en la demostración"); };
 
   const [tab, setTab] = React.useState("plan");
-  const [alumnos, setAlumnos] = React.useState(DEMO_DASH_ALUMNOS);
+  const [alumnos, setAlumnos] = React.useState(DEMO_MUCHAS ? DEMO_DASH_ALUMNOS.concat(DEMO_DASH_ALUMNOS_EXTRA) : DEMO_DASH_ALUMNOS);
   const [alumnoActivo, setAlumnoActivo] = React.useState(null);
   const [alumnoProgreso, setAlumnoProgreso] = React.useState([]);
   const [alumnoSesiones, setAlumnoSesiones] = React.useState([]);
   const [rutinasSB, setRutinasSB] = React.useState([]);
-  const [rutinasSBEntrenador, setRutinasSBEntrenador] = React.useState(function () { return demoDashRutinas(); });
-  const [sesionesGlobales] = React.useState(function () { return demoDashSesiones(); });
+  const [rutinasSBEntrenador, setRutinasSBEntrenador] = React.useState(function () { return DEMO_MUCHAS ? demoDashRutinas().concat(demoDashRutinasExtra()) : demoDashRutinas(); });
+  const [sesionesGlobales] = React.useState(function () { return DEMO_MUCHAS ? demoDashSesiones().concat(demoDashSesionesExtra()) : demoDashSesiones(); });
   const [loadingSB, setLoadingSB] = React.useState(false);
   const [coachDialog, setCoachDialog] = React.useState({ t: 'none' });
   const [coachDashIntent, setCoachDashIntent] = React.useState(null);
@@ -116,7 +122,7 @@ export default function DashboardCoachDemo() {
         aria-pressed={on}
         data-demo-tab={key}
         onClick={function () { setTab(key); }}
-        style={{ flex: 1, minHeight: 44, borderRadius: 10, border: "1px solid " + (on ? "#2563eb" : T.coachAluBorderSoft), background: on ? "rgba(59,130,246,0.2)" : "transparent", color: on ? "#93c5fd" : T.textMuted, fontSize: 15, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}
+        style={{ flex: 1, minHeight: 44, borderRadius: 10, border: "1px solid " + (on ? "#2563eb" : T.coachAluBorderSoft), background: on ? "rgba(59,130,246,0.2)" : "transparent", color: on ? (darkMode ? "#93c5fd" : "#1d4ed8") : T.textMuted, fontSize: 15, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}
       >
         {label}
       </button>

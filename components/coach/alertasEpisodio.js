@@ -6,9 +6,13 @@
 //
 // Reglas (deterministas, sin aleatorios ni la fecha de cada render; iguales en todos los dispositivos porque salen de datos guardados):
 //   Inactivo         "in-<alumnoId>-d<ultimoDiaActividad|nunca>"
-//   Poca actividad   "wk-<alumnoId>-d<ultimoDiaActividad|nunca>"
 //                    El ultimo dia de actividad no cambia mientras dura el episodio (no hay actividad nueva). Cuando el alumno vuelve a
 //                    entrenar sale de la condicion; si mas adelante vuelve a caer, su ultimo dia de actividad es otro => clave nueva.
+//   Baja actividad   "wk-<alumnoId>-s<lunesDeInicio>"  (D6.2; antes "wk-<id>-d<ultimoDia>" con la condicion «nada en 7 dias»)
+//                    Con la regla compartida de D3 (< 30 % la semana pasada completa y en la actual) el alumno PUEDE entrenar durante el
+//                    episodio, asi que el ultimo dia de actividad cambiaria y generaria avisos artificiales. La identidad es el lunes de la
+//                    primera semana del tramo consecutivo de semanas completas con < 30 % (inicioBajaActividad, CoachDashboard.jsx):
+//                    fijo mientras dura el episodio y distinto tras recuperarse (una semana completa con >= 30 % corta el tramo).
 //   Rutina terminada "rutina-terminada-<alumnoId>-<rutinaId>-c<ciclo>"
 //                    Un episodio por rutina y ciclo (datos.ciclo_actual). La deteccion (semana 4) no cambia aqui (D6.3).
 //   Sin rutina       "sr-<alumnoId>" (SIN CAMBIOS, limitacion documentada): quitar o reasignar una rutina la borra sin dejar rastro y
@@ -56,8 +60,8 @@ export function claveInactivo(alumnoId, ultimoDia) {
   return "in-" + alumnoId + marca(ultimoDia);
 }
 
-export function clavePocaActividad(alumnoId, ultimoDia) {
-  return "wk-" + alumnoId + marca(ultimoDia);
+export function claveBajaActividad(alumnoId, lunesInicio) {
+  return "wk-" + alumnoId + "-s" + (lunesInicio == null ? "nd" : String(lunesInicio));
 }
 
 export function claveSinRutina(alumnoId) {
