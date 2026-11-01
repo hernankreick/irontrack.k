@@ -200,7 +200,7 @@ await test("7. persistencia D6.1 intacta: claves de inactivo / terminada / sin r
   assert.match(camp, /const LS_READ_PREFIX = "irontrack_coach_notif_read_v2";/);
   assert.match(camp, /const REMOTE_READS_TABLE = "coach_notification_reads";/);
   assert.match(camp, /onConflict: "entrenador_id,notification_id"/);
-  assert.match(camp, /function markAllRead\(\) \{[\s\S]*?setReadIds\(function \(prev\) \{[\s\S]*?unirLeidos\(prev, allItems\.map/);
+  assert.match(camp, /function markAllRead\(\) \{[\s\S]*?unirLeidos\(readIdsRef\.current, allItems\.map/);
   // lecturas guardadas (incluidas las de la clave anterior de baja actividad) se conservan tal cual
   globalThis.localStorage = memoria();
   const key = Campana.buildReadStorageKey(EID);
@@ -334,7 +334,7 @@ await test("13. «Marcar todas»: marca el conjunto completo (tambien las de «V
   assert.ok(previas.every((p) => todas.includes(p)));
   assert.equal(todas.length, previas.length + notifs.length);
   // markAllRead recorre allItems (el conjunto completo ordenado), no la lista visible recortada
-  assert.match(read("components/CoachNotificationCenter.jsx"), /unirLeidos\(prev, allItems\.map/);
+  assert.match(read("components/CoachNotificationCenter.jsx"), /unirLeidos\(readIdsRef\.current, allItems\.map/);
 });
 
 // ======================================================================= 14 carga e historial incompleto

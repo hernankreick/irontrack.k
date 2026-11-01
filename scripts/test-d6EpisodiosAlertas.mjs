@@ -211,7 +211,7 @@ await test("10. «Marcar todas» une con las lecturas anteriores (no las descart
   const visibles = ["real-in-ana-d200", "real-chat-ana-1"];
   assert.deepEqual(Ep.unirLeidos(previas, visibles), ["real-chat-ana-1", "real-in-beto-d100", "real-in-ana-d200"]);
   const src = read("components/CoachNotificationCenter.jsx");
-  assert.match(src, /function markAllRead\(\) \{[\s\S]*?setReadIds\(function \(prev\) \{[\s\S]*?unirLeidos\(prev, allItems\.map/);
+  assert.match(src, /function markAllRead\(\) \{[\s\S]*?unirLeidos\(readIdsRef\.current, allItems\.map/);
 });
 
 await test("11. sin duplicados: una sola alerta por alumno y categoria; claves unicas", () => {

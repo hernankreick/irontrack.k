@@ -383,6 +383,7 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
         bd: pal.yelDim,
         desc: M(lang, "No tiene rutina asignada en el sistema.", "No routine assigned.", "Sem rotina atribuída no sistema."),
         severity: 0,
+        category: "seguimiento",
       });
       return;
     }
@@ -469,6 +470,7 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
           "Sem sessões nem registros nas últimas 3 semanas."
         ),
         severity: 1,
+        category: "adherencia",
       });
       return;
     }
@@ -491,6 +493,7 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
           "Concluiu menos de 30% do plano na semana passada e até agora nesta."
         ),
         severity: 2,
+        category: "adherencia",
       });
     }
   });
