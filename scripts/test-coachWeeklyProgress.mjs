@@ -134,9 +134,10 @@ test("J: los checks de StudentRoutinePreview (entrenador) no dependen de it_cd",
   const line = src.split("\n").find((l) => l.includes("var dayDone"));
   assert.ok(line && /completedDayIndexes\.indexOf\(di\) !== -1;/.test(line) && !/completedDays|it_cd/.test(line));
 });
-test("actividad del dashboard intacta: getLastActivityMs/countProgresoSince/defaultCoachAlumnoCategoria siguen leyendo progreso", () => {
+// D6.2: countProgresoSince se elimino junto con la condicion «Poca actividad» de 7 dias (la campana usa la regla de D3, bajaActividadIds).
+test("actividad del dashboard intacta: getLastActivityMs/defaultCoachAlumnoCategoria siguen leyendo progreso", () => {
   const dash = readFileSync(new URL("../components/CoachDashboard.jsx", import.meta.url), "utf8");
-  for (const fn of ["function getLastActivityMs", "function countProgresoSince", "function defaultCoachAlumnoCategoria"]) assert.ok(dash.includes(fn));
+  for (const fn of ["function getLastActivityMs", "function defaultCoachAlumnoCategoria"]) assert.ok(dash.includes(fn));
   assert.ok(/function getLastActivityMs[\s\S]*progresoGlobal/.test(dash));
 });
 

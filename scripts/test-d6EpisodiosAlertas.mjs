@@ -145,15 +145,15 @@ await test("7. dos alumnos con el mismo problema: claves distintas", () => {
   assert.notEqual(a[0].key, b[0].key);
 });
 
-// ======================================================================= Poca actividad y Rutina terminada
-await test("Poca actividad: un episodio por ultimo dia de actividad (estable mientras dura, nuevo tras recuperarse)", () => {
+// ======================================================================= Baja actividad y Rutina terminada
+// D6.2: «Poca actividad» (nada en 7 dias) paso a «Baja actividad» con la regla de D3 y su identidad es el lunes de inicio del episodio
+// ("wk-<id>-s<lunes>"); estabilidad, recuperacion y recaida se prueban en scripts/test-d6-2CoherenciaAlertas.mjs.
+await test("Baja actividad: clave «wk-<id>-s<lunesDeInicio>» (D6.2), una por alumno", () => {
   const r1 = deTipo(alertas({ alumnos: [ana], rutinas, sesiones: [ses("ana", 10)] }), "wk-", "ana");
   assert.equal(r1.length, 1);
-  assert.equal(r1[0].key, "wk-ana-d" + diaDe(10));
-  const r2 = deTipo(alertas({ alumnos: [ana], rutinas, sesiones: [ses("ana", 10)], nowMs: Date.now() + 2 * DIA }), "wk-", "ana");
+  assert.match(r1[0].key, /^wk-ana-s\d+$/);
+  const r2 = deTipo(alertas({ alumnos: [ana], rutinas, sesiones: [ses("ana", 10)] }), "wk-", "ana");
   assert.equal(r2[0].key, r1[0].key, "misma condicion => misma clave");
-  const r3 = deTipo(alertas({ alumnos: [ana], rutinas, sesiones: [ses("ana", 10), ses("ana", 9)] }), "wk-", "ana");
-  assert.notEqual(r3[0].key, r1[0].key, "actividad nueva y nueva caida => clave nueva");
 });
 
 await test("Rutina terminada: un episodio por rutina y CICLO (el ciclo 2 avisa aunque el ciclo 1 este leido)", () => {
@@ -235,7 +235,7 @@ await test("reglas: sin aleatorios ni fecha de render en las claves; modulo puro
   assert.doesNotMatch(src, /Math\.random|Date\.now|new Date\(\)/);
   assert.doesNotMatch(src, /from ["']react["']|from ["'][^"']*supabase/i, "modulo puro: sin React ni Supabase");
   const dash = read("components/CoachDashboard.jsx");
-  for (const k of ["claveSinRutina(a.id)", "claveRutinaTerminada(a.id, rutinaId, rutina)", "claveInactivo(a.id, ultimoDiaActividad(a.id, ses, progresoGlobal))", "clavePocaActividad(a.id, ultimoDiaActividad(a.id, ses, progresoGlobal))"]) {
+  for (const k of ["claveSinRutina(a.id)", "claveRutinaTerminada(a.id, rutinaId, rutina)", "claveInactivo(a.id, ultimoDiaActividad(a.id, ses, progresoGlobal))", "claveBajaActividad(a.id, inicioBajaActividad(a, rutina, ses.filter("]) {
     assert.ok(dash.includes(k), k);
   }
   assert.doesNotMatch(dash, /key: "in-" \+ a\.id,|key: "wk-" \+ a\.id,|"-w" \+ weekly\.weekIndex,\n\s*alumnoId: a\.id,\n\s*rutinaId: rutinaId,\n\s*initials: initials,\n\s*name: name,\n\s*badge: M\(lang, "Rutina terminada"/);

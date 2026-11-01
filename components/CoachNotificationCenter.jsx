@@ -4,6 +4,7 @@ import { Bell, Check, MessageSquare, Target, Trophy, Zap } from "lucide-react";
 import { irontrackMsg as M } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 import { unirLeidos } from "./coach/alertasEpisodio.js";
+import { LIMITE_VISIBLE, contarNoLeidas, ordenarNotificaciones, requiereSeguimiento } from "./coach/alertasPrioridad.js";
 
 const LS_READ_LEGACY = "it_coach_notif_read_v1";
 const LS_READ_PREFIX = "irontrack_coach_notif_read_v2";
@@ -151,8 +152,10 @@ function formatRelative(atMs, lang) {
 export function mapAlertsToNotifications(alertRows) {
   if (!Array.isArray(alertRows)) return [];
   return alertRows.map(function (a) {
-    var important = a.severity <= 1;
     var cat = a.category || (a.severity === 2 ? "seguimiento" : "adherencia");
+    // D6.2: «Importantes» = las que piden una accion del entrenador (antes severity <= 1: incluia «Entrenamiento completo» y dejaba
+    // afuera «Baja actividad» y «Le queda 1 sesión»).
+    var important = requiereSeguimiento({ category: cat });
     var action = a.alumnoId != null ? { kind: "alumno", alumnoId: String(a.alumnoId) } : { kind: "tab", tab: "alumnos" };
     if (a.tipo === "workout_completed" && a.alumnoId != null) {
       action = { kind: "profile", alumnoId: String(a.alumnoId) };
@@ -168,6 +171,7 @@ export function mapAlertsToNotifications(alertRows) {
       dayIndex: a.dayIndex != null ? a.dayIndex : null,
       fecha: a.fecha || null,
       important: important,
+      severity: typeof a.severity === "number" ? a.severity : null,
       alumnoName: a.name,
       alumnoId: a.alumnoId != null ? String(a.alumnoId) : null,
       preview: a.desc,
@@ -236,6 +240,9 @@ export default function CoachNotificationCenter({
 
   var [open, setOpen] = React.useState(false);
   var [filter, setFilter] = React.useState("all");
+  // D6.2: el orden usa las lecturas del momento en que se abrio el panel (marcar una como leida no la mueve mientras se mira la lista).
+  var [ordenLeidos, setOrdenLeidos] = React.useState(null);
+  var [verTodas, setVerTodas] = React.useState(false);
   var [bellHover, setBellHover] = React.useState(false);
   var storageKey = React.useMemo(
     function () {
@@ -292,25 +299,18 @@ export default function CoachNotificationCenter({
     }
   }
 
+  // D6.2: conjunto COMPLETO, sin duplicados, ordenado por alertasPrioridad.js (no leidas y de seguimiento primero).
+  var ordenReadIds = open && ordenLeidos ? ordenLeidos : readIds;
   var allItems = React.useMemo(
     function () {
-      var out = mapAlertsToNotifications(alertRows);
-      out.sort(function (a, b) {
-        if (a.atMs == null && b.atMs == null) return 0;
-        if (a.atMs == null) return 1;
-        if (b.atMs == null) return -1;
-        return b.atMs - a.atMs;
-      });
-      return out;
+      return ordenarNotificaciones(mapAlertsToNotifications(alertRows), ordenReadIds);
     },
-    [alertRows]
+    [alertRows, ordenReadIds]
   );
 
   var unreadCount = React.useMemo(
     function () {
-      return allItems.filter(function (x) {
-        return readIds.indexOf(x.id) < 0;
-      }).length;
+      return contarNoLeidas(allItems, readIds);
     },
     [allItems, readIds]
   );
@@ -326,6 +326,8 @@ export default function CoachNotificationCenter({
     },
     [allItems, filter, readIds]
   );
+  var visibles = verTodas ? filtered : filtered.slice(0, LIMITE_VISIBLE);
+  var ocultas = filtered.length - visibles.length;
 
   React.useEffect(
     function () {
@@ -481,6 +483,7 @@ export default function CoachNotificationCenter({
               type="button"
               onClick={function () {
                 setFilter(t.id);
+                setVerTodas(false);
               }}
               style={{
                 flex: 1,
@@ -518,7 +521,8 @@ export default function CoachNotificationCenter({
             </div>
           </div>
         ) : (
-          filtered.map(function (item) {
+          <>
+          {visibles.map(function (item) {
             var unread = readIds.indexOf(item.id) < 0;
             var meta = categoryMeta(item.category, lang, C);
             var Icon = meta.Icon;
@@ -526,6 +530,8 @@ export default function CoachNotificationCenter({
               <button
                 key={item.id}
                 type="button"
+                data-notif-cat={item.category}
+                data-notif-leida={unread ? "no" : "si"}
                 onClick={function () {
                   runAction(item);
                 }}
@@ -573,7 +579,38 @@ export default function CoachNotificationCenter({
                 </div>
               </button>
             );
-          })
+          })}
+          {filtered.length > LIMITE_VISIBLE ? (
+            // D6.2: las alertas que no entran en las primeras 12 siguen accesibles (antes se descartaban antes de llegar aca).
+            <button
+              type="button"
+              data-testid="coach-notif-ver-mas"
+              aria-expanded={verTodas}
+              onClick={function () {
+                setVerTodas(function (v) {
+                  return !v;
+                });
+              }}
+              style={{
+                width: "100%",
+                minHeight: 44,
+                padding: "10px 14px",
+                border: "none",
+                background: "transparent",
+                color: C.blue,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                boxSizing: "border-box",
+              }}
+            >
+              {verTodas
+                ? M(lang, "Ver menos", "Show less", "Ver menos")
+                : M(lang, "Ver " + ocultas + " más", "Show " + ocultas + " more", "Ver mais " + ocultas)}
+            </button>
+          ) : null}
+          </>
         )}
       </div>
 
@@ -596,6 +633,10 @@ export default function CoachNotificationCenter({
           setBellHover(false);
         }}
         onClick={function () {
+          if (!open) {
+            setOrdenLeidos(readIds);
+            setVerTodas(false);
+          }
           setOpen(function (v) {
             return !v;
           });

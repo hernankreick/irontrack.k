@@ -83,3 +83,34 @@ export function createDemoDashSb(hoy) {
     },
   };
 }
+
+/**
+ * Escenario `?alertas=muchas` (D6.2): 10 alumnos ficticios mas para que la campana tenga mas de 12 alertas y se vea «Ver N más».
+ *   4 inactivos (ultima sesion hace 30 dias), 3 sin rutina y 3 con baja actividad (1 de 4 dias las dos semanas anteriores, nada esta).
+ */
+export const DEMO_DASH_ALUMNOS_EXTRA = [
+  ["fito", "Fito Inactivo"], ["gala", "Gala Inactiva"], ["hugo", "Hugo Inactivo"], ["ines", "Inés Inactiva"],
+  ["juan", "Juan Nuevo"], ["kira", "Kira Nueva"], ["leo", "Leo Nuevo"],
+  ["mara", "Mara Baja"], ["nico", "Nico Bajo"], ["olga", "Olga Baja"],
+].map(function (p) {
+  return { id: "demo-" + p[0], nombre: p[1], email: p[0] + "@ejemplo.com", entrenador_id: DEMO_DASH_ENTRENADOR_ID, created_at: "2026-08-01T10:00:00" };
+});
+
+export function demoDashRutinasExtra(hoy) {
+  var creada = haceDias(60, hoy).toISOString();
+  return ["fito", "gala", "hugo", "ines", "mara", "nico", "olga"].map(function (aid) {
+    return { id: "demo-rut-" + aid, alumno_id: "demo-" + aid, entrenador_id: DEMO_DASH_ENTRENADOR_ID, nombre: "Plan " + aid, es_plantilla: false, created_at: creada, datos: { semana_activa: 1, days: dias(4) } };
+  });
+}
+
+export function demoDashSesionesExtra(hoy) {
+  var lun = desdeLunes(hoy);
+  var out = [];
+  function s(aid, hace) {
+    var d = haceDias(hace, hoy);
+    out.push({ id: "demo-ses-x-" + aid + "-" + hace, alumno_id: "demo-" + aid, rutina_id: "demo-rut-" + aid, rutina_nombre: "", dia_idx: 0, semana: 1, fecha: dmy(d), hora: "15:00", ejercicios: "", created_at: d.toISOString() });
+  }
+  ["fito", "gala", "hugo", "ines"].forEach(function (aid) { s(aid, 30); });
+  ["mara", "nico", "olga"].forEach(function (aid) { s(aid, lun + 3); s(aid, lun + 10); });
+  return out;
+}
