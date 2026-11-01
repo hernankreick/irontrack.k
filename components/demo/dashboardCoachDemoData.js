@@ -85,22 +85,27 @@ export function createDemoDashSb(hoy) {
 }
 
 /**
- * Escenario `?alertas=muchas` (D6.2): 10 alumnos ficticios mas para que la campana tenga mas de 12 alertas y se vea «Ver N más».
+ * Escenario `?alertas=muchas` (D6.2; D6.3 suma Pia Termino y Quique Ciclo2): 10 alumnos ficticios mas para que la campana tenga mas de 12 alertas y se vea «Ver N más».
  *   4 inactivos (ultima sesion hace 30 dias), 3 sin rutina y 3 con baja actividad (1 de 4 dias las dos semanas anteriores, nada esta).
  */
 export const DEMO_DASH_ALUMNOS_EXTRA = [
   ["fito", "Fito Inactivo"], ["gala", "Gala Inactiva"], ["hugo", "Hugo Inactivo"], ["ines", "Inés Inactiva"],
   ["juan", "Juan Nuevo"], ["kira", "Kira Nueva"], ["leo", "Leo Nuevo"],
   ["mara", "Mara Baja"], ["nico", "Nico Bajo"], ["olga", "Olga Baja"],
+  ["pia", "Pía Terminó"], ["quique", "Quique Ciclo2"],
 ].map(function (p) {
   return { id: "demo-" + p[0], nombre: p[1], email: p[0] + "@ejemplo.com", entrenador_id: DEMO_DASH_ENTRENADOR_ID, created_at: "2026-08-01T10:00:00" };
 });
 
 export function demoDashRutinasExtra(hoy) {
   var creada = haceDias(60, hoy).toISOString();
-  return ["fito", "gala", "hugo", "ines", "mara", "nico", "olga"].map(function (aid) {
+  var out = ["fito", "gala", "hugo", "ines", "mara", "nico", "olga"].map(function (aid) {
     return { id: "demo-rut-" + aid, alumno_id: "demo-" + aid, entrenador_id: DEMO_DASH_ENTRENADOR_ID, nombre: "Plan " + aid, es_plantilla: false, created_at: creada, datos: { semana_activa: 1, days: dias(4) } };
   });
+  // D6.3: «Rutina terminada» (semana 4) y «Le queda 1 sesión» en un ciclo 2 (clave -c2-w0)
+  out.push({ id: "demo-rut-pia", alumno_id: "demo-pia", entrenador_id: DEMO_DASH_ENTRENADOR_ID, nombre: "Plan pia", es_plantilla: false, created_at: creada, datos: { semana_activa: 4, days: dias(2) } });
+  out.push({ id: "demo-rut-quique", alumno_id: "demo-quique", entrenador_id: DEMO_DASH_ENTRENADOR_ID, nombre: "Plan quique", es_plantilla: false, created_at: creada, datos: { semana_activa: 1, ciclo_actual: 2, ciclo_base: 2, days: dias(2) } });
+  return out;
 }
 
 export function demoDashSesionesExtra(hoy) {
@@ -112,5 +117,14 @@ export function demoDashSesionesExtra(hoy) {
   }
   ["fito", "gala", "hugo", "ines"].forEach(function (aid) { s(aid, 30); });
   ["mara", "nico", "olga"].forEach(function (aid) { s(aid, lun + 3); s(aid, lun + 10); });
+  // D6.3: avance de rutina. Pia termino (semana 4 completa); Quique reinicio la rutina (ciclo 2) y la sesion vieja es del ciclo 1.
+  function s2(aid, hace, diaIdx, semana, ciclo) {
+    var d = haceDias(hace, hoy);
+    var row = { id: "demo-ses-x-" + aid + "-" + hace + "-" + diaIdx, alumno_id: "demo-" + aid, rutina_id: "demo-rut-" + aid, rutina_nombre: "", dia_idx: diaIdx, semana: semana, fecha: dmy(d), hora: "15:00", ejercicios: "", created_at: d.toISOString() };
+    if (ciclo) row.ciclo = ciclo;
+    out.push(row);
+  }
+  s2("pia", 0, 0, 4); s2("pia", 1, 1, 4);
+  s2("quique", 0, 0, 1, 2); s2("quique", 40, 0, 1);
   return out;
 }

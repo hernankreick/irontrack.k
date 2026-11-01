@@ -15,6 +15,10 @@
 //                    fijo mientras dura el episodio y distinto tras recuperarse (una semana completa con >= 30 % corta el tramo).
 //   Rutina terminada "rutina-terminada-<alumnoId>-<rutinaId>-c<ciclo>"
 //                    Un episodio por rutina y ciclo (datos.ciclo_actual). La deteccion (semana 4) no cambia aqui (D6.3).
+//   Le queda 1 sesion "rutina-falta-1-<alumnoId>-<rutinaId>-w<semana0>"  (ciclo 1; clave anterior, las lecturas historicas siguen valiendo)
+//                    "rutina-falta-1-<alumnoId>-<rutinaId>-c<ciclo>-w<semana0>" (ciclo n > 1; D6.3)
+//                    Un reinicio de rutina o de semana abre un ciclo nuevo y la misma semana vuelve a generar el aviso: sin el ciclo en la
+//                    clave el aviso del ciclo nuevo figuraria como leido. Con ciclo 1 la clave no cambia (sin re-notificaciones al desplegar).
 //   Sin rutina       "sr-<alumnoId>" (SIN CAMBIOS, limitacion documentada): quitar o reasignar una rutina la borra sin dejar rastro y
 //                    no existe un registro de bajas, asi que no hay historial que permita distinguir episodios sin inventar recurrencias.
 // Modulo puro: sin React ni Supabase.
@@ -70,6 +74,11 @@ export function claveSinRutina(alumnoId) {
 
 export function claveRutinaTerminada(alumnoId, rutinaId, rutina) {
   return "rutina-terminada-" + alumnoId + "-" + rutinaId + "-c" + readCicloActual(rutina && rutina.datos);
+}
+
+export function claveFaltaUna(alumnoId, rutinaId, rutina, weekIndex) {
+  var ciclo = readCicloActual(rutina && rutina.datos);
+  return "rutina-falta-1-" + alumnoId + "-" + rutinaId + (ciclo > 1 ? "-c" + ciclo : "") + "-w" + weekIndex;
 }
 
 /** Lecturas tras «Marcar todas»: las anteriores MAS las visibles, sin duplicados ni vacios (no descarta lecturas previas). */

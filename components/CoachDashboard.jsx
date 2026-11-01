@@ -8,7 +8,7 @@ import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 import { getStudentRoutine, getStudentWeeklyProgress } from "../lib/studentWeeklyProgress.js";
 import { isCoachValidatedSession } from "../lib/orphanSessions.js";
-import { claveBajaActividad, claveInactivo, claveRutinaTerminada, claveSinRutina, ultimoDiaActividad } from "./coach/alertasEpisodio.js";
+import { claveBajaActividad, claveFaltaUna, claveInactivo, claveRutinaTerminada, claveSinRutina, ultimoDiaActividad } from "./coach/alertasEpisodio.js";
 import { adherencia, diaLocal, lunesDe } from "../lib/metricas/index.js";
 
 /** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
@@ -421,12 +421,15 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
           primaryAction: "chat",
           secondaryLabel: M(lang, "ASIGNAR NUEVA RUTINA", "ASSIGN NEW ROUTINE", "ATRIBUIR NOVA ROTINA"),
           secondaryAction: "review",
+          // D6.3: fecha de la ultima sesion de la semana que completo la rutina (dato guardado, no cambia la clave). Sin fecha quedaba
+          // al final de la campana, debajo de todos los entrenamientos completados, y en el iPhone podia no verse.
+          atMs: (weekly.sessionsUsed || []).reduce(function (max, s) { var t = parseSessionAlertMs(s); return t > max ? t : max; }, 0) || null,
         });
       } else if (rutinaId && totalDays > 1 && hasRealRoutineSessions && completedDaysFromSessions > 0 && completedDaysFromSessions === totalDays - 1 && !bajaIds[String(a.id)]) {
         // «Le queda 1 sesión» solo para quien esta al dia: con baja actividad el aviso es ese (el conteo por semana de rutina no mira
         // el calendario y contradiria al Dashboard). El calculo de sesiones completadas no cambia.
         out.push({
-          key: "rutina-falta-1-" + a.id + "-" + rutinaId + "-w" + weekly.weekIndex,
+          key: claveFaltaUna(a.id, rutinaId, rutina, weekly.weekIndex),
           alumnoId: a.id,
           rutinaId: rutinaId,
           initials: initials,

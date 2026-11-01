@@ -421,7 +421,9 @@ export default function CoachNotificationCenter({
     marginLeft: "auto",
     marginRight: "auto",
     boxSizing: "border-box",
-    maxHeight: "70vh",
+    // D6.3: en iOS Safari 70vh mide el viewport SIN barras: con la barra visible el final del panel quedaba debajo de ella y no se
+    // podia llegar a la ultima notificacion. Tope por el alto VISIBLE (dvh) menos el top del panel y las areas seguras.
+    maxHeight: "min(70dvh, calc(100dvh - 140px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))",
     background: C.card,
     border: "1px solid " + C.brd,
     borderRadius: 14,
