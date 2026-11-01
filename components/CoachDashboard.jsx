@@ -8,6 +8,7 @@ import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 import { getStudentRoutine, getStudentWeeklyProgress } from "../lib/studentWeeklyProgress.js";
 import { isCoachValidatedSession } from "../lib/orphanSessions.js";
+import { claveInactivo, clavePocaActividad, claveRutinaTerminada, claveSinRutina, ultimoDiaActividad } from "./coach/alertasEpisodio.js";
 import { adherencia, diaLocal, lunesDe } from "../lib/metricas/index.js";
 
 /** Padding/gap base compartidos con `navItemStyle` (tablas, listas). */
@@ -361,7 +362,8 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
     var initials = coachInitials(a);
     if (cat === "sin_rutina") {
       out.push({
-        key: "sr-" + a.id,
+        // D6.1: sin cambios (sin historial de bajas de rutina no se pueden distinguir episodios; ver alertasEpisodio.js)
+        key: claveSinRutina(a.id),
         alumnoId: a.id,
         initials: initials,
         name: name,
@@ -388,7 +390,8 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
       var rutinaId = String(rutina.id || weekly.rutinaId || "");
       if (rutinaId && totalDays > 0 && hasRealRoutineSessions && completedDaysFromSessions >= totalDays && weekly.weekIndex === 3) {
         out.push({
-          key: "rutina-terminada-" + a.id + "-" + rutinaId + "-w" + weekly.weekIndex,
+          // D6.1: un episodio por rutina y ciclo (la deteccion de semana 4 no cambia: D6.3)
+          key: claveRutinaTerminada(a.id, rutinaId, rutina),
           alumnoId: a.id,
           rutinaId: rutinaId,
           initials: initials,
@@ -434,7 +437,8 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
     }
     if (cat === "inactivo") {
       out.push({
-        key: "in-" + a.id,
+        // D6.1: un episodio por ultimo dia de actividad (vuelve a avisar si el alumno se recupera y recae)
+        key: claveInactivo(a.id, ultimoDiaActividad(a.id, ses, progresoGlobal)),
         alumnoId: a.id,
         initials: initials,
         name: name,
@@ -456,7 +460,7 @@ function buildCoachAlerts(alumnos, catFn, sesionesGlobales, progresoGlobal, ruti
     var p7 = countProgresoSince(a, progresoGlobal, since7);
     if (cat === "activo" && n7 === 0 && p7 === 0) {
       out.push({
-        key: "wk-" + a.id,
+        key: clavePocaActividad(a.id, ultimoDiaActividad(a.id, ses, progresoGlobal)),
         alumnoId: a.id,
         initials: initials,
         name: name,
