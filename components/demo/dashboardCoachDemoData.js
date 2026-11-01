@@ -8,10 +8,12 @@
 
 export const DEMO_DASH_ENTRENADOR_ID = "demo-entrenador-dash";
 
+// Solo demo: `?textos=largos` alarga el label de los dias para probar el layout con textos largos.
+var DEMO_TEXTOS_LARGOS = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("textos") === "largos";
 function dias(n) {
   return Array.from({ length: n }, function (_, i) {
     return {
-      label: "Día " + (i + 1),
+      label: DEMO_TEXTOS_LARGOS ? "Día " + (i + 1) + " · Fuerza tren inferior con énfasis en cadena posterior" : "Día " + (i + 1),
       warmup: [{ id: "demo-wu-" + i, name: "Movilidad general", sets: 2, reps: "10" }],
       exercises: [{ id: "demo-sq-" + i, name: "Sentadilla", sets: 3, reps: "8" }, { id: "demo-rm-" + i, name: "Remo con mancuerna", sets: 3, reps: "10" }],
     };

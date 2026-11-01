@@ -130,18 +130,18 @@ export default function StudentCard({
         </div>
       </div>
       {isActive && summary ? (
-        <div className="it-ficha-sum" style={{display:"flex",marginTop:8,paddingTop:8,borderTop:"1px solid "+P.border}}>
+        <div className="it-ficha-sum" style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",marginTop:8,paddingTop:8,borderTop:"1px solid "+P.border}}>
           {[
             { icon: "calendar", value: summary.semanaTxt, label: msg("Rutina actual", "Current routine") },
             { icon: "bar-chart-2", value: summary.diasTxt, label: msg("Esta semana", "This week") },
             { icon: "clock", value: summary.proxTxt, label: msg("Próxima sesión", "Next session") },
           ].map(function (it, i) {
             return (
-              <div key={it.icon} className="it-ficha-sum-item" style={{flex:"1 1 auto",display:"flex",alignItems:"center",gap:6,minWidth:0,padding:i===0?"1px 6px 1px 0":(i===2?"1px 0 1px 6px":"1px 6px"),borderLeft:i?"1px solid "+P.border:"none"}}>
+              <div key={it.icon} className="it-ficha-sum-item" title={it.value + " · " + it.label} style={{display:"flex",alignItems:"center",gap:6,minWidth:0,padding:i===0?"1px 6px 1px 0":(i===2?"1px 0 1px 6px":"1px 6px"),borderLeft:i?"1px solid "+P.border:"none",borderTop:"0 solid "+P.border}}>
                 <Ic name={it.icon} size={18} color={textMuted} style={{flexShrink:0}}/>
                 <div style={{minWidth:0}}>
-                  <div data-qa-text style={{fontSize:12.5,fontWeight:700,color:textMain,lineHeight:1.25,whiteSpace:"nowrap"}}>{it.value}</div>
-                  <div data-qa-text style={{fontSize:11,color:textMuted,lineHeight:1.3,whiteSpace:"nowrap"}}>{it.label}</div>
+                  <div data-qa-text style={{fontSize:12.5,fontWeight:700,color:textMain,lineHeight:1.25}}>{it.value}</div>
+                  <div data-qa-text style={{fontSize:11,color:textMuted,lineHeight:1.3}}>{it.label}</div>
                 </div>
               </div>
             );
