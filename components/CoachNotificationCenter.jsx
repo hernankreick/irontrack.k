@@ -233,7 +233,10 @@ export default function CoachNotificationCenter({
 }) {
   var C = React.useMemo(
     function () {
-      return coachThemePalette(darkMode);
+      // D6.4: colores LOCALES del panel con contraste >= 4.5:1 (coachThemePalette es compartida y no se toca).
+      return Object.assign({}, coachThemePalette(darkMode), darkMode
+        ? { t2: "#94A3B8" }
+        : { t2: "#475569", yel: "#B45309", green: "#15803d" });
     },
     [darkMode]
   );
@@ -253,6 +256,9 @@ export default function CoachNotificationCenter({
   var [readIds, setReadIds] = React.useState(function () {
     return loadReadIds(storageKey);
   });
+  // D6.4: ultimas lecturas conocidas, para guardar SIN esperar al updater de setReadIds (ver markRead).
+  var readIdsRef = React.useRef(readIds);
+  readIdsRef.current = readIds;
   var wrapRef = React.useRef(null);
   var panelRef = React.useRef(null);
 
@@ -268,7 +274,9 @@ export default function CoachNotificationCenter({
         try {
           var remoteIds = await loadRemoteReadIds(supabase, entrenadorId);
           if (cancelled) return;
-          var merged = mergeReadIds(localIds, remoteIds);
+          // D6.4: tambien las marcadas mientras llegaba la respuesta (readIdsRef), asi el merge no las pisa.
+          var merged = mergeReadIds(mergeReadIds(localIds, readIdsRef.current), remoteIds);
+          readIdsRef.current = merged;
           setReadIds(merged);
           saveReadIds(storageKey, merged);
           if (merged.length > remoteIds.length) {
@@ -351,24 +359,26 @@ export default function CoachNotificationCenter({
     [open]
   );
 
+  // D6.4: se guarda en el momento. Antes se guardaba dentro del updater de setReadIds: al tocar una notificacion que navega (p. ej.
+  // a «Mis alumnos») la campana se desmonta en el mismo ciclo, React descarta el updater y la lectura se perdia (volvia como nueva).
   function markRead(id) {
-    setReadIds(function (prev) {
-      if (prev.indexOf(id) >= 0) return prev;
-      var next = prev.concat([id]);
-      persistReadIds(next);
-      return next;
-    });
+    var prev = readIdsRef.current;
+    if (prev.indexOf(id) >= 0) return;
+    var next = prev.concat([id]);
+    readIdsRef.current = next;
+    persistReadIds(next);
+    setReadIds(next);
   }
 
   function markAllRead() {
     // D6.1: une con las lecturas anteriores (antes las reemplazaba por solo las visibles y se perdian del estado local).
-    setReadIds(function (prev) {
-      var next = unirLeidos(prev, allItems.map(function (x) {
-        return x.id;
-      }));
-      persistReadIds(next);
-      return next;
-    });
+    // D6.4: igual que markRead, se guarda en el momento (no dentro del updater).
+    var next = unirLeidos(readIdsRef.current, allItems.map(function (x) {
+      return x.id;
+    }));
+    readIdsRef.current = next;
+    persistReadIds(next);
+    setReadIds(next);
   }
 
   function runAction(item) {
@@ -464,6 +474,9 @@ export default function CoachNotificationCenter({
               display: "flex",
               alignItems: "center",
               gap: 4,
+              minHeight: 44,
+              padding: "0 6px",
+              flexShrink: 0,
             }}
           >
             <Check size={14} strokeWidth={2.5} />
@@ -489,11 +502,12 @@ export default function CoachNotificationCenter({
               }}
               style={{
                 flex: 1,
+                minHeight: 44,
                 padding: "6px 8px",
                 borderRadius: 8,
                 border: "1px solid " + (active ? C.blue : C.brd),
                 background: active ? "rgba(59,130,246,0.18)" : "transparent",
-                color: active ? C.blue : C.t2,
+                color: active ? (darkMode ? "#60A5FA" : "#1D4ED8") : C.t2,
                 fontSize: 12,
                 fontWeight: 700,
                 cursor: "pointer",

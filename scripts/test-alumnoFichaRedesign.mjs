@@ -142,7 +142,11 @@ await test("Movil: areas tactiles de 44 px con recuadros visibles mas chicos, fi
   assert.match(actions, /aria-label=\{msg\("Opciones de rutina", "Routine options"\)\} style=\{\{width:44,height:44,[\s\S]*?<span aria-hidden="true" style=\{\{width:36,height:36,/);
   for (const src of [prev, card]) assert.doesNotMatch(src, /fontWeight:(800|900)/, "sin pesos extra-bold/black en la ficha");
   const css = read("components/layout/AppGlobalStyles.jsx");
-  assert.match(css, /@media \(max-width:389px\)\{\.it-ficha-sum-item\{/, "resumen en una fila desde 390 px, como el mockup");
+  assert.match(css, /@media \(max-width:519px\)\{\.it-ficha-sum\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important\}\.it-ficha-sum-item:nth-child\(3\)\{grid-column:1\/-1;/, "resumen: semana y dias arriba y proxima sesion a todo el ancho por debajo de 520 px");
+  assert.match(card, /className="it-ficha-sum" style=\{\{display:"grid",gridTemplateColumns:"repeat\(3,minmax\(0,1fr\)\)"/, "resumen en 3 columnas minmax(0,1fr) en pantallas anchas");
+  assert.match(card, /className="it-ficha-sum-item" title=\{it\.value \+ " · " \+ it\.label\}/, "texto completo accesible por title");
+  assert.doesNotMatch(card.slice(card.indexOf("it-ficha-sum")), /whiteSpace:"nowrap"/, "los textos del resumen no usan nowrap");
+  assert.match(css, /\.it-ficha-sum-item \[data-qa-text\]\{overflow-wrap:anywhere\}/, "los valores largos saltan de linea dentro de su item");
   assert.match(css, /@media \(max-width:379px\)\{\.it-ficha-stats\{grid-template-columns:minmax\(0,1fr\)!important\}/);
 });
 
