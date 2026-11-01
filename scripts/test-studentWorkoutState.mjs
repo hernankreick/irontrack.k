@@ -403,7 +403,8 @@ test("C2 forma del set: sets locales marcados traen session_rutina_id y session_
   const entry = logLocal({}, "press", SESSION_DIA2).press;
   const set = entry.sets[0];
   assert.deepEqual(Object.keys(set).sort(),
-    ["created_at", "date", "kg", "note", "reps", "rpe", "session_dia_idx", "session_rutina_id", "week"].sort());
+    // D7.1: el set lleva tambien `ciclo` (undefined si no se pasa, como aca)
+    ["ciclo", "created_at", "date", "kg", "note", "reps", "rpe", "session_dia_idx", "session_rutina_id", "week"].sort());
   assert.equal(set.session_rutina_id, "r1");
   assert.equal(set.session_dia_idx, 1);
   assert.equal(set.created_at, undefined);

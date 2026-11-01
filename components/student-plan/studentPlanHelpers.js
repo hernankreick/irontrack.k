@@ -1,3 +1,5 @@
+import { normalizeFecha } from '../../lib/normalizeFecha.js';
+import { rowInCiclo } from '../../lib/rutinaCiclo.js';
 import { firstNonEmptyString } from '../../lib/appPureHelpers.js';
 
 /**
@@ -59,7 +61,7 @@ export function uniqueMuscleChipsFromDay(day, allEx, cap) {
  * Cuántos ejercicios del día (calor + principal) tienen al menos un set registrado hoy
  * (misma semana, misma data que el plan).
  */
-export function countExercisesWithLogToday(day, progress, hoy, currentWeek) {
+export function countExercisesWithLogToday(day, progress, hoy, currentWeek, ciclo) {
   if (!day) return 0;
   const ids = []
     .concat((day.warmup || []).map((e) => e.id), (day.exercises || []).map((e) => e.id))
@@ -70,7 +72,10 @@ export function countExercisesWithLogToday(day, progress, hoy, currentWeek) {
     const sets = (progress && progress[id] && progress[id].sets) || [];
     if (
       sets.some(function (s) {
-        return s.date === hoy && (s.week === undefined || s.week === currentWeek);
+        // D7.1: fecha normalizada ("5/3/2026" === "05/03/2026") y, con ciclo, solo series de ese ciclo (sin ciclo: no se filtra).
+        if (!s || !s.date || normalizeFecha(String(s.date)) !== normalizeFecha(String(hoy || ""))) return false;
+        if (ciclo != null && s.ciclo != null && s.ciclo !== "" && !rowInCiclo(s, ciclo)) return false;
+        return s.week === undefined || s.week === currentWeek;
       })
     ) {
       n++;
