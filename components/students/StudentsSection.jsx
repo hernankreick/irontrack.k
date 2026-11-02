@@ -420,7 +420,7 @@ export default function StudentsSection(props) {
                     <button type="button" className="coach-tap" onClick={function () { cargarFichaDe(a); }} style={{minHeight:44,minWidth:44,padding:"8px 14px",borderRadius:10,border:"1px solid "+coachAluBorderSoft,background:coachAluSurface,color:textMain,fontWeight:700,fontSize:13,cursor:"pointer"}}>{t("Reintentar", "Retry")}</button>
                   </div>
                 )}
-                {isAlumnoActive&&rutinaActiva&&!loadingSB&&(
+                {isAlumnoActive&&rutinaActiva&&!loadingSB&&fichaError!==String(a.id)&&(
                   <StudentOrphanSession
                     alumno={a}
                     rutina={rutinaActiva}

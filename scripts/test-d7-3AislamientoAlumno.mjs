@@ -287,9 +287,11 @@ await test("6g. vista de la ficha: una operacion de A solo toca la ficha si sigu
   assert.equal(op2(), false);
   sincronizarVistaFicha(A);
   const op3 = capturarVistaFicha(A);
-  nuevaCargaFicha(A); // reabrir el mismo alumno (VER de nuevo)
-  assert.equal(op3(), false);
+  nuevaCargaFicha(A); // recargar el MISMO alumno (Reintentar / Dashboard sobre la ficha abierta): sus operaciones en curso siguen aplicando
+  assert.equal(op3(), true);
   assert.equal(capturarVistaFicha(B)(), false); // operacion de B con la ficha de A abierta
+  nuevaCargaFicha(B); // abrir B
+  assert.equal(op3(), false);
   assert.equal(capturarVistaFicha(null)(), false);
 });
 
@@ -342,6 +344,7 @@ await test("6j. cableado: reiniciar rutina/semana, limpiar historial, asignar y 
   }
   const ver = src("components/students/StudentsSection.jsx");
   assert.match(ver, /data-qa="ficha-error"[\s\S]*?onClick=\{function \(\) \{ cargarFichaDe\(a\); \}\}/);
+  assert.match(ver, /isAlumnoActive&&rutinaActiva&&!loadingSB&&fichaError!==String\(a\.id\)&&\(\s*<StudentOrphanSession/); // sin aviso falso con carga fallida
   assert.match(ver, /const progresoAlu = isAlumnoActive \? filasDelAlumno\(alumnoProgreso, a\.id\) : \[\];/);
   assert.match(ver, /filasDelAlumno\(alumnoSesiones, aid\)/);
 });
