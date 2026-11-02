@@ -165,6 +165,7 @@ import {
   persistSetConfirmed,
 } from './lib/workoutSession.js';
 import { postProgressIdempotent } from './lib/progressInsert.js';
+import { nuevaCargaFicha } from './lib/studentFicha.js';
 import {
   generateOpId,
   enqueueItem,
@@ -2171,8 +2172,10 @@ function GymApp() {
         setAlumnoActivo(alum);
         setTab("alumnos");
         setLoadingSB(true);
+        var vigentealum = nuevaCargaFicha(); // D7.3: una respuesta tardia de otro alumno no pisa la ficha abierta
         Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)])
           .then(function (r) {
+            if (!vigentealum()) return;
             setRutinasSB(r[0] || []);
             setAlumnoProgreso(r[1] || []);
             setAlumnoSesiones(r[2] || []);
@@ -2181,7 +2184,7 @@ function GymApp() {
             console.error("[GlobalSearch alumnos]", e);
           })
           .finally(function () {
-            setLoadingSB(false);
+            if (vigentealum()) setLoadingSB(false);
           });
         return;
       }
@@ -2202,8 +2205,10 @@ function GymApp() {
         setAlumnoActivo(alum2);
         setTab("alumnos");
         setLoadingSB(true);
+        var vigentealum2 = nuevaCargaFicha(); // D7.3: una respuesta tardia de otro alumno no pisa la ficha abierta
         Promise.all([sb.getRutinas(alum2.id), sb.getProgreso(alum2.id), sb.getSesiones(alum2.id)])
           .then(function (r) {
+            if (!vigentealum2()) return;
             setRutinasSB(r[0] || []);
             setAlumnoProgreso(r[1] || []);
             setAlumnoSesiones(r[2] || []);
@@ -2212,7 +2217,7 @@ function GymApp() {
             console.error("[GlobalSearch sesiones]", e);
           })
           .finally(function () {
-            setLoadingSB(false);
+            if (vigentealum2()) setLoadingSB(false);
           });
       }
     },
@@ -3122,15 +3127,18 @@ function GymApp() {
     getAlumnos: function () { return alumnosActivosLimpios; },
     cargarFicha: async function (alum, logLabel) {
       setLoadingSB(true);
+      // D7.3: solo la ultima carga de ficha escribe estado (una respuesta tardia de otro alumno no pisa la ficha abierta)
+      var vigente = nuevaCargaFicha();
       try {
         var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
+        if (!vigente()) return;
         setRutinasSB(r[0] || []);
         setAlumnoProgreso(r[1] || []);
         setAlumnoSesiones(r[2] || []);
       } catch (e) {
         console.error(logLabel, e);
       }
-      setLoadingSB(false);
+      if (vigente()) setLoadingSB(false);
     },
   });
   const handleCoachDashboardRevisarAlumnos = coachDashboardNav.verTodos;
