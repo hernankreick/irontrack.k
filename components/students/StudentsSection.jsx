@@ -1,4 +1,4 @@
-import { loadAlumnoFicha } from "../../lib/studentFicha.js";
+import { loadAlumnoFicha, nuevaCargaFicha } from "../../lib/studentFicha.js";
 import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
@@ -346,11 +346,13 @@ export default function StudentsSection(props) {
                 coachAluDropdownShadow={coachAluDropdownShadow}
                 onVer={async function () {
                   setCoachCardMenuId(null);
-                  if (alumnoActivo?.id === a.id) { setAlumnoActivo(null); return; }
+                  // D7.3: cerrar la ficha invalida la carga en curso (su respuesta tardia no escribe nada)
+                  if (alumnoActivo?.id === a.id) { nuevaCargaFicha(); setAlumnoActivo(null); setLoadingSB(false); return; }
                   setAlumnoActivo(a); setRegistrosSubTab(0); setLoadingSB(true);
-                  let carga = null;
+                  const vigente = nuevaCargaFicha();
                   try {
-                    carga = await loadAlumnoFicha({
+                    await loadAlumnoFicha({
+                      esVigente: vigente,
                       alumno: a,
                       sb: sb,
                       mergeRutinasAsignadas: mergeRutinasAsignadas,
@@ -362,8 +364,8 @@ export default function StudentsSection(props) {
                   } catch (e) {
                     console.error("[VER alumno]", e);
                   } finally {
-                    // D7.3: una carga reemplazada por la de otro alumno no apaga el «cargando» de la nueva; un error de red no lo deja pegado
-                    if (!(carga && carga.stale)) setLoadingSB(false);
+                    // D7.3: solo la carga vigente apaga «cargando» (tambien si fallo la red); una reemplazada no apaga el de la nueva
+                    if (vigente()) setLoadingSB(false);
                   }
                 }}
                 onToggleMenu={function (e) { e.stopPropagation(); setCoachCardMenuId(coachCardMenuId === a.id ? null : a.id); }}

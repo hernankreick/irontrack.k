@@ -188,7 +188,7 @@ await test("6. nuevaCargaFicha: solo la ultima carga es vigente; App (Dashboard 
   assert.equal((app.match(/nuevaCargaFicha\(\)/g) || []).length, 3, "cargarFicha + 2 rutas de la busqueda global");
   assert.match(app, /cargarFicha: async function[\s\S]{0,400}if \(!vigente\(\)\) return;/);
   const ver = src("components/students/StudentsSection.jsx");
-  assert.match(ver, /if \(!\(carga && carga\.stale\)\) setLoadingSB\(false\)/);
+  assert.match(ver, /if \(vigente\(\)\) setLoadingSB\(false\)/);
 });
 
 await test("6b. carga reemplazada tras avanzar semana_activa: la lista del entrenador refleja el avance; la ficha abierta no recibe nada", async () => {
@@ -215,10 +215,31 @@ await test("6b. carga reemplazada tras avanzar semana_activa: la lista del entre
 
 await test("6c. VER con error de red no deja «cargando» pegado; los botones +/- de kg aceptan coma", () => {
   const ver = src("components/students/StudentsSection.jsx");
-  assert.match(ver, /try \{\s*carga = await loadAlumnoFicha\([\s\S]*?\} finally \{[\s\S]*?if \(!\(carga && carga\.stale\)\) setLoadingSB\(false\)/);
+  assert.match(ver, /const vigente = nuevaCargaFicha\(\);\s*try \{\s*await loadAlumnoFicha\(\{\s*esVigente: vigente,[\s\S]*?\} finally \{[\s\S]*?if \(vigente\(\)\) setLoadingSB\(false\)/);
+  assert.match(ver, /if \(alumnoActivo\?\.id === a\.id\) \{ nuevaCargaFicha\(\); setAlumnoActivo\(null\);/);
   assert.match(src("components/WorkoutExercisePanel.jsx"), /const adjustKg = \(d\) => setKg\(v=>String\(Math\.max\(0,normalizeWorkoutKg\(v\)\+d\)\)\)/);
   assert.match(src("components/LogForm.jsx"), /const adjustKg = \(delta\) => setKg\(v=>String\(Math\.max\(0,normalizeWorkoutKg\(v\)\+delta\)\)\)/);
   assert.equal(Math.max(0, normalizeWorkoutKg("82,5") + 2.5), 85);
+});
+
+await test("6d. turno tomado por quien llama: error de red en una carga vieja no afecta a la vigente; cerrar la ficha invalida la carga", async () => {
+  const e = estadoFicha();
+  let falla;
+  const vA = nuevaCargaFicha();
+  const pA = loadAlumnoFicha(Object.assign({ alumno: { id: A }, esVigente: vA, sb: { getRutinas: () => new Promise((_, rj) => { falla = rj; }) } }, e.setters)).catch(() => "error");
+  const vB = nuevaCargaFicha(); // VER de B
+  falla(new Error("red"));
+  assert.equal(await pA, "error");
+  assert.equal(vA(), false); // VER de A no apaga «cargando»
+  assert.equal(vB(), true);
+  // cerrar: nuevo turno sin carga -> la respuesta de B ya no escribe
+  const f = sbDiferido(), e2 = estadoFicha();
+  const vC = nuevaCargaFicha();
+  const pC = loadAlumnoFicha(Object.assign({ alumno: { id: C }, esVigente: vC, sb: f.sb }, e2.setters));
+  nuevaCargaFicha(); // cerrar ficha
+  await f.resolverTodo();
+  assert.equal((await pC).stale, true);
+  assert.equal(e2.st.rutinasSB, null);
 });
 
 // ---- PR ----
