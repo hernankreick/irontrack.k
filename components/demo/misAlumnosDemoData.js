@@ -67,7 +67,10 @@ export const DEMO_MA_RUTINAS_LOCALES = [
   { id: "demo-rt-local-2", name: "Fuerza 3 días (demo)", days: dias(3), saved: true },
 ];
 
-export function createDemoMaSb(hoy) {
+/** opts: { onInsert(row): la demo agrega la sesion validada a sus datos }. */
+export function createDemoMaSb(hoy, opts) {
+  var o = opts || {};
+  var simSeq = 0;
   var rutinas = demoMaRutinas(hoy);
   var sesiones = demoMaSesiones(hoy);
   var clone = function (x) { return JSON.parse(JSON.stringify(x)); };
@@ -78,6 +81,14 @@ export function createDemoMaSb(hoy) {
     reconcileSemanaActivaAlumno: async function () { return { status: "noop" }; },
     getSesionesByAlumnoRutinaSemana: async function (alumnoId, rutinaId, _nombre, semana) {
       return clone(sesiones.filter(function (x) { return x.alumno_id === String(alumnoId) && x.rutina_id === String(rutinaId) && Number(x.semana) === Number(semana); }));
+    },
+    // D7.2: «Validar sesión manualmente» en la demo. Antes faltaba y el modal mostraba «No se pudo validar la sesión». Solo memoria:
+    // agrega la fila (con id y created_at simulados, como la base) y avisa a la demo para que los indicadores la reflejen.
+    addSesion: async function (payload) {
+      var row = Object.assign({ id: "demo-ses-sim-" + (++simSeq), created_at: new Date().toISOString() }, payload);
+      sesiones = [row].concat(sesiones);
+      if (o.onInsert) o.onInsert(clone(row));
+      return [clone(row)];
     },
   };
 }

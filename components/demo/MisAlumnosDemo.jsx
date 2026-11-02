@@ -37,7 +37,9 @@ export default function MisAlumnosDemo() {
   const T = getAppThemeTokens(darkMode);
   const pal = alumnosPaleta(darkMode);
   const ui = useCoachUIState();
-  const sb = React.useMemo(function () { return createDemoMaSb(); }, []);
+  // D7.2: la validacion manual se simula en memoria y se refleja en la lista (sesionesGlobales).
+  const onInsertDemo = React.useRef(null);
+  const sb = React.useMemo(function () { return createDemoMaSb(undefined, { onInsert: function (row) { if (onInsertDemo.current) onInsertDemo.current(row); } }); }, []);
   const allEx = React.useMemo(function () { return EX.map(function (e) { return normalizeLibraryExercise(e, { catalog: true }); }); }, []);
 
   const [toast, setToast] = React.useState(null);
@@ -57,6 +59,7 @@ export default function MisAlumnosDemo() {
   const [rutinasSB, setRutinasSB] = React.useState([]);
   const [rutinasSBEntrenador, setRutinasSBEntrenador] = React.useState(function () { return demoMaRutinas(); });
   const [sesionesGlobales, setSesionesGlobales] = React.useState(function () { return demoMaSesiones(); });
+  onInsertDemo.current = function (row) { setSesionesGlobales(function (prev) { return [row].concat(prev); }); };
   const [loadingSB, setLoadingSB] = React.useState(false);
   const [coachDashIntent, setCoachDashIntent] = React.useState(null);
   const [coachDialog, setCoachDialog] = React.useState({ t: 'none' });
