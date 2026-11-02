@@ -66,7 +66,7 @@ export default function GlobalSearchResultRow({
               <HighlightMatch text={row.nombre} query={query} highlightColor={th.highlight} />
             </div>
             <div style={{ fontSize: 12, color: th.rowMuted, marginTop: 2 }}>
-              {row.pctSemanal}% semanal · {row.sesionesCompletadas} sesiones
+              Semana de rutina: {row.pctSemanal}% · {row.sesionesCompletadas} sesiones
             </div>
           </div>
           {(() => {

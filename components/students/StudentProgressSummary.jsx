@@ -43,7 +43,7 @@ export default function StudentProgressSummary({
           </svg>
           <div style={{minWidth:0}}>
             <div data-qa-text style={{fontSize:13.5,fontWeight:700,color:textMain,lineHeight:1.25}}>{diasCompletados + "\u00a0" + msg("de", "of") + "\u00a0" + dias.length} {msg("días", "days")}</div>
-            <div data-qa-text style={{fontSize:11.5,color:textMuted,fontWeight:500,lineHeight:1.25,marginTop:1}}>{pct}% {msg("completado", "completed")}</div>
+            <div data-qa-text style={{fontSize:11.5,color:textMuted,fontWeight:500,lineHeight:1.25,marginTop:1}}>{pct}% {msg("de la semana de rutina", "of the routine week")}</div>
           </div>
         </div>
       </div>

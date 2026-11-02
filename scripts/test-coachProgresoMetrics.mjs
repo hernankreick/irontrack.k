@@ -58,7 +58,7 @@ const sesEvi = [
   ses(EVI, "r-evi", "2026-10-01", 3), ses(EVI, "r-evi", "2026-10-05", 4), ses(EVI, "r-evi", "2026-10-06", 4),
   ses(EVI, "r-evi", "2026-08-14", 1), ses(EVI, "r-evi", "2026-08-21", 2), ses(EVI, "r-evi", "2026-08-28", 3),
 ];
-// Julieta: 12 sesiones en el periodo (12/16 = 75%), 4 en el anterior (25%)
+// Julieta: 12 sesiones seguidas (jue 10 a lun 21/9); D7.2 tope por semana de calendario (4 dias): 4 + 4 + 1 = 9/16 = 56% (antes 12/16 = 75%), 4 en el anterior (25%)
 const sesJul = [];
 for (let d = 10; d <= 21; d++) sesJul.push(ses(JUL, "r-jul", "2026-09-" + String(d).padStart(2, "0"), 2));
 for (let d = 14; d <= 17; d++) sesJul.push(ses(JUL, "r-jul", "2026-08-" + d, 1));
@@ -95,15 +95,15 @@ const chip = (chips, key) => chips.find((c) => c.key === key);
 const mEvi = build(EVI), mJul = build(JUL), mNone = build(null);
 
 // ---- valores globales protegidos (mismos que antes de E2: la adherencia de este fixture no cambia) ----
-const GLOBAL_ADHER_AVG = 50;   // (50 + 75 + 25) / 3
+const GLOBAL_ADHER_AVG = 44;   // D7.2 (tope por semana): (50 + 56 + 25) / 3; antes (50 + 75 + 25) / 3 = 50
 const GLOBAL_STALLED = 1;      // solo Marta
 const GLOBAL_ADHERENCIA_ROWS = [
-  { id: JUL, n: "Julieta", p: 75, color: "#22c55e", tienePlan: true, completed: 12, planned: 16, validadas: 0 },
+  { id: JUL, n: "Julieta", p: 56, color: "#eab308", tienePlan: true, completed: 9, planned: 16, validadas: 0 },
   { id: EVI, n: "Evi", p: 50, color: "#eab308", tienePlan: true, completed: 6, planned: 12, validadas: 0 },
   { id: MAR, n: "Marta", p: 25, color: "#ef4444", tienePlan: true, completed: 2, planned: 8, validadas: 0 },
 ];
 const GLOBAL_RANKING = [
-  { id: JUL, initials: "JU", n: "Julieta", p: 75, color: "#22c55e", completed: 12, planned: 16, validadas: 0 },
+  { id: JUL, initials: "JU", n: "Julieta", p: 56, color: "#eab308", completed: 9, planned: 16, validadas: 0 },
   { id: EVI, initials: "EV", n: "Evi", p: 50, color: "#eab308", completed: 6, planned: 12, validadas: 0 },
   { id: MAR, initials: "MA", n: "Marta", p: 25, color: "#ef4444", completed: 2, planned: 8, validadas: 0 },
 ];
@@ -123,7 +123,7 @@ test("A: Evi seleccionada -> alumnoChips solo usa Evi", () => {
 
 test("B: Julieta seleccionada -> alumnoChips cambia a Julieta", () => {
   const ad = chip(mJul.alumnoChips, "alumnoAdherence");
-  assert.equal(ad.value, 75);
+  assert.equal(ad.value, 56); // D7.2: tope por semana de calendario (antes 75)
   assert.match(ad.label, /Julieta/);
   assert.equal(chip(mJul.alumnoChips, "alumnoPrs").value, 0); // solo primeros registros e igualaciones
   assert.equal(chip(mJul.alumnoChips, "alumnoVolume").value, 340); // 1360 kg / 4
@@ -138,8 +138,8 @@ test("C: teamChips identico con Evi, Julieta o sin seleccion", () => {
   assert.equal(chip(mEvi.teamChips, "teamAdherence").value, GLOBAL_ADHER_AVG);
   assert.equal(chip(mEvi.teamChips, "teamStalled").value, GLOBAL_STALLED);
   assert.match(chip(mEvi.teamChips, "teamAdherence").label, /equipo/i);
-  // adherencia previa del equipo: (25 + 25 + 0) / 3 = 17 -> delta +33
-  assert.match(chip(mEvi.teamChips, "teamAdherence").delta, /^↑ 33%/);
+  // adherencia previa del equipo: (25 + 25 + 0) / 3 = 17 -> delta +27 (D7.2; antes +33)
+  assert.match(chip(mEvi.teamChips, "teamAdherence").delta, /^↑ 27%/);
 });
 
 test("D: un PR de Julieta no suma para Evi (PRs del periodo)", () => {
@@ -243,7 +243,8 @@ test("K: periodo de 4 semanas y periodo anterior (dias de calendario)", () => {
   // adherencia individual del periodo anterior: Evi 3/12 = 25% -> delta +25
   assert.match(chip(mEvi.alumnoChips, "alumnoAdherence").delta, /^↑ 25%/);
   assert.equal(mJul.prsPrev, 0);
-  assert.match(chip(mJul.alumnoChips, "alumnoAdherence").delta, /^↑ 50%/);
+  // Julieta: 56% (D7.2, tope por semana; antes 75%) vs 25% en el anterior -> +31
+  assert.match(chip(mJul.alumnoChips, "alumnoAdherence").delta, /^↑ 31%/);
   assert.equal(build(EVI, { periodId: "semanas8" }).prsPeriod, 1);
 });
 
