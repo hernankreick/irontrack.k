@@ -49,6 +49,7 @@ export default function StudentMainView({
           expectedDaysPerWeek={routineDaysCount}
           onRegistrarPrimerEntrenamiento={onRegistrarPrimerEntrenamiento}
           esEntrenador={false}
+          routines={routines}
         />
       )}
     </>

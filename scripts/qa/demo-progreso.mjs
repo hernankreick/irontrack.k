@@ -183,7 +183,10 @@ async function main() {
     await eq.scrollIntoViewIfNeeded();
     f.equipoColapsado = (await eq.getAttribute("aria-expanded")) === "false";
     await eq.click(); await wait(300);
-    f.equipoAbierto = (await eq.getAttribute("aria-expanded")) === "true" && /Carla Sosa/.test(await page.locator('[data-section="equipo"]').innerText());
+    // D7.3: con los alumnos A y B de la demo, Carla (inactiva) queda fuera de la vista previa del ranking: se abre el ranking completo
+    const verTodo = page.locator('[data-section="equipo"] button', { hasText: /Ver ranking completo/ });
+    if (await verTodo.count()) { await verTodo.first().click(); await wait(250); }
+    f.equipoAbierto = (await eq.getAttribute("aria-expanded")) === "true" && /Carla Sosa/.test(await page.locator('[data-section="equipo"]').innerText()) && /Alumno C Demo/.test(await page.locator('[data-section="equipo"]').innerText());
     await page.locator('[data-section="equipo"]').screenshot({ path: path.join(o.out, width + "_04_equipo.png") });
     // buscador de ejercicios -> personalizado -> historial
     await page.locator('[data-qa="ver-ejercicios"]').scrollIntoViewIfNeeded();
@@ -204,7 +207,8 @@ async function main() {
     f.escapeCierra = !(await page.locator('[data-qa-sheet="historial"]').count());
     // modo claro
     await page.locator('[data-qa="demo-tema"]').click(); await wait(400);
-    f.modoClaro = await page.evaluate(() => getComputedStyle(document.querySelector('[data-qa="progreso-coach"]')).backgroundColor === "rgb(255, 255, 255)");
+    // D7.3: desde #144 el fondo claro de Progreso es el de «Mis alumnos» (#F1F5F9, components/students/alumnosPaleta.js), no blanco puro
+    f.modoClaro = await page.evaluate(() => getComputedStyle(document.querySelector('[data-qa="progreso-coach"]')).backgroundColor === "rgb(241, 245, 249)");
     const m1 = await page.evaluate(MEASURE);
     await page.evaluate(() => window.scrollTo(0, 0)); await wait(200);
     await shot("07_claro");

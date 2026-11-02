@@ -6,6 +6,7 @@ import { ProgressPhotosPanel } from './ProgressPhotosPanel.jsx'
 import { StudentProgressEmptyState } from './StudentProgressEmptyState.jsx'
 import { StudentProgressKpiStrip } from './StudentProgressKpiStrip.jsx'
 import { StudentProgressWeeklyVolumeHero } from './StudentProgressWeeklyVolumeHero.jsx'
+import { indiceEjerciciosPorTiempo } from '../../lib/metricas/tipoCarga.js'
 import {
   averageImprovementPercent,
   computeDayStreak,
@@ -78,6 +79,8 @@ export default function StudentProgressSection({
   expectedDaysPerWeek,
   onRegistrarPrimerEntrenamiento,
   esEntrenador = false,
+  /** D7.3: rutinas del alumno, para excluir del volumen los ejercicios por tiempo. */
+  routines = [],
   initialSubView = 'main',
   hideBack = false,
 }) {
@@ -132,8 +135,9 @@ export default function StudentProgressSection({
   }, [sesiones, allEx, EX, progress, sbData])
 
   const volModel = React.useMemo(
-    () => buildWeeklyVolumeModel(progress, sbData, sesiones),
-    [progress, sbData, sesiones]
+    // D7.3: misma regla de volumen que el entrenador (sin ejercicios por tiempo: catalogo + snapshots de la rutina del alumno)
+    () => buildWeeklyVolumeModel(progress, sbData, sesiones, undefined, { indiceTiempo: indiceEjerciciosPorTiempo([].concat(EX || [], allEx || []), routines || []) }),
+    [progress, sbData, sesiones, EX, allEx, routines]
   )
 
   const hasData = React.useMemo(

@@ -311,6 +311,13 @@ function sessionActivaEnBloque(ses, datos) {
   return filaActivaEnBloque(datos, ses, ses.semana);
 }
 
+/** Dia (numero de dia local) de un created_at, o null. */
+function diaDeCreatedAtLocal(value) {
+  if (!value) return null;
+  var d = new Date(value);
+  return isNaN(d.getTime()) ? null : diaLocal(d);
+}
+
 function progressRowMatchesRoutine(row, routineId, routineExerciseIds, fallbackStartMs, fallbackEndMs, maxSemana, routineDatos) {
   if (!row) return false;
   if (!progressRowActivaEnBloque(row, routineDatos)) return false;
@@ -340,7 +347,7 @@ function sessionMatchesRoutine(ses, routineId, fallbackStartMs, fallbackEndMs, r
   return t >= fallbackStartMs && t < fallbackEndMs;
 }
 
-function buildRoutineWeekContext(progressRows, sessions, now) {
+function buildRoutineWeekContext(progressRows, sessions, now, routineDatos) {
   var anchors = [];
   var latestSessionWeek = null;
   (progressRows || []).forEach(function (row) {
@@ -371,6 +378,10 @@ function buildRoutineWeekContext(progressRows, sessions, now) {
     var rawWeek = Math.floor((currentMondayMs - routineStartMs) / (7 * DAY_MS)) + 1;
     semanaDetectada = Math.max(1, rawWeek || 1);
   }
+  // D7.3: la semana actual de la rutina es su semana_activa (respeta reinicios de semana / rutina y semanas completas que ya avanzaron);
+  // sin semana_activa (datos anteriores) se deduce de la ultima sesion como antes. Las ventanas de calendario de respaldo no cambian.
+  var semanaActiva = routineDatos && routineDatos.semana_activa != null ? Number(routineDatos.semana_activa) : NaN;
+  if (Number.isInteger(semanaActiva) && semanaActiva >= 1) semanaDetectada = semanaActiva;
   var currentRoutineWeekIndex = Math.min(3, semanaDetectada - 1);
   var weekStarts = [];
   for (var i = 0; i < 4; i++) {
@@ -469,7 +480,7 @@ export function buildCoachProgresoModel(params) {
   var selectedSessions = (sesionesGlobales || []).filter(function (ses) {
     return String(ses.alumno_id) === String(alumnoSel) && sessionMatchesRoutine(ses, routineForSelectedId, fallbackWeekStartMs, fallbackWeekEndMs, routineDatos);
   });
-  var routineWeekContext = buildRoutineWeekContext(selectedProgressRows, selectedSessions, now);
+  var routineWeekContext = buildRoutineWeekContext(selectedProgressRows, selectedSessions, now, routineDatos);
 
   var alumnoRows = alumnos.map(function (a, idx) {
     return {
@@ -677,12 +688,50 @@ export function buildCoachProgresoModel(params) {
     };
   });
 
-  /** Volumen semanal: alumno seleccionado + bloque vigente de la rutina activa (volumenEnRango por semana de la rutina). */
+  /**
+   * Volumen semanal: alumno seleccionado + bloque vigente de la rutina activa, agrupado por la SEMANA DE LA RUTINA de cada serie
+   * (progreso.semana, igual que «Evolución de carga»). D7.3: antes se agrupaba por ventanas de calendario contadas desde la ultima
+   * sesion: tras un reinicio de semana o una semana salteada la Semana 1 quedaba en 0. Las filas sin semana usan la ventana de
+   * calendario de respaldo. Tampoco se recorta por la duracion del periodo elegido (con 7 dias desaparecia la Semana 3).
+   */
+  // `progreso` no guarda rutina_id: una serie sin rutina_id anterior a la asignacion de la rutina vigente es de una rutina anterior
+  // (con los mismos ejercicios) y no entra en el bloque.
+  var asignadaDia = diaDeCreatedAtLocal(routineForSelected && routineForSelected.created_at);
+  var blockRows = alumnoAllRows.filter(function (row) {
+    if (!progressRowMatchesRoutine(row, routineForSelectedId, routineExerciseIds, fallbackWeekStartMs, fallbackWeekEndMs, Infinity, routineDatos)) return false;
+    if (asignadaDia != null && (row.rutina_id == null || row.rutina_id === "")) {
+      var diaFila = parseFechaDMY(row.fecha);
+      if (diaFila != null && diaFila < asignadaDia) return false;
+    }
+    return true;
+  });
+  /**
+   * D7.3: semana de la rutina (0..3) de una serie del bloque: progreso.semana; sin semana, la ventana de calendario de respaldo.
+   * Es la UNICA referencia temporal de «Volumen por semana» y «Volumen por patrón» (antes el patrón usaba una ventana de calendario
+   * lunes-domingo y, con «Semana 4» en ambas tarjetas, mostraba 1.300 kg contra 5.000 kg de la misma semana).
+   */
+  function semanaRutinaDeFila(row) {
+    var w = progressRowWeekIndex(row, LOAD_BLOCK_WEEKS);
+    if (w != null) return w;
+    var dia = parseFechaDMY(row.fecha);
+    for (var wf = 0; wf < LOAD_BLOCK_WEEKS; wf++) {
+      var desdeF = diaLocal(new Date(routineWeekContext.weekStarts[wf]));
+      if (dia != null && dia >= desdeF && dia <= desdeF + 6) return wf;
+    }
+    return null;
+  }
+  var volPorSemana = [];
+  for (var wz = 0; wz < LOAD_BLOCK_WEEKS; wz++) volPorSemana.push(0);
+  blockRows.forEach(function (row) {
+    var vol = volumenDeSerie(row, indiceTiempo);
+    if (!(vol > 0)) return;
+    var w = semanaRutinaDeFila(row);
+    if (w != null) volPorSemana[w] += vol;
+  });
   var volBars = [];
   var maxVol = 0;
   for (var wv = 0; wv < LOAD_BLOCK_WEEKS; wv++) {
-    var wkDesde = diaLocal(new Date(routineWeekContext.weekStarts[wv]));
-    var vsum = volumenEnRango(selectedProgressRows, { desde: wkDesde, hasta: wkDesde + 6, indiceTiempo: indiceTiempo }).total;
+    var vsum = volPorSemana[wv];
     volBars.push({
       v: vsum,
       s: M(lang, "Semana " + (wv + 1), "Week " + (wv + 1), "Semana " + (wv + 1)),
@@ -707,9 +756,11 @@ export function buildCoachProgresoModel(params) {
     };
   });
 
-  /** Volumen por patrón: semana actual de la rutina activa; 1 fila progreso = 1 serie (las series por tiempo cuentan como serie, no como volumen). */
-  var gDesde = diaLocal(new Date(routineWeekContext.currentWeekStartMs));
-  var gHasta = gDesde + 6;
+  /**
+   * Volumen por patrón: semana actual de la rutina activa (la misma semana y el mismo bloque que la barra resaltada de «Volumen por
+   * semana»); 1 fila progreso = 1 serie (las series por tiempo cuentan como serie, no como volumen).
+   */
+  var semanaPatron = routineWeekContext.currentRoutineWeekIndex;
   var volByKey = { empuje: 0, traccion: 0, rodilla: 0, bisagra: 0, core: 0 };
   /** @type {Record<string, Record<string, number>>} patternKey -> ejercicio_id -> series */
   var seriesByPatternAndEx = {
@@ -719,8 +770,8 @@ export function buildCoachProgresoModel(params) {
     bisagra: {},
     core: {},
   };
-  selectedProgressRows.forEach(function (r) {
-    if (!enRango(parseFechaDMY(r.fecha), gDesde, gHasta)) return;
+  blockRows.forEach(function (r) {
+    if (semanaRutinaDeFila(r) !== semanaPatron) return;
     var ex = exMap[r.ejercicio_id];
     var mk = patternToMovementKey(ex ? ex.pattern : "");
     if (!mk) return;

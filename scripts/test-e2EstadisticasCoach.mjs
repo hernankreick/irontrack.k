@@ -198,9 +198,9 @@ await test("alcance: pantallas del entrenador importan lib/metricas; calculos an
   assert.match(read("components/coach/EjercicioHistorialCoach.jsx"), /lib\/metricas/);
   assert.match(read("components/ProgresoView.jsx"), /historiaCompleta: historiaCompleta/);
   assert.match(read("components/ProgresoView.jsx"), /indiceTiempo=\{model\.indiceTiempo\}/);
-  for (const f of ["App.jsx", "components/student-progress/progressMetrics.js", "lib/trainingVolume.js"]) {
-    assert.doesNotMatch(read(f), /lib\/metricas/, f + " (alumno) no se toca en E2");
-  }
+  // D7.3: las vistas del alumno usan ahora la MISMA regla de volumen (lib/metricas); App.jsx sigue sin importar el nucleo
+  assert.doesNotMatch(read("App.jsx"), /lib\/metricas/, "App.jsx");
+  assert.match(read("components/student-progress/progressMetrics.js"), /lib\/metricas\/volumen\.js/, "D7.3: progreso del alumno con compararVolumen");
 });
 
 console.log("\n" + count + " pruebas OK");

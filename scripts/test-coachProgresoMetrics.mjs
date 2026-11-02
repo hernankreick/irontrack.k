@@ -170,13 +170,15 @@ test("F: sesiones de Julieta no modifican la adherencia de Evi", () => {
   assert.equal(chip(masJul.alumnoChips, "alumnoAdherence").delta, chip(mEvi.alumnoChips, "alumnoAdherence").delta);
 });
 
-// Evi aislada con 3 series reales de 50 kg x 15 reps en la semana actual de la rutina (lunes 5/10)
+// Evi aislada con 3 series reales de 50 kg x 15 reps en la semana actual de la rutina (Semana 4: progreso.semana = 3, lunes 5/10).
+// D7.3: antes estas filas tenian semana 0 (Semana 1) y el patron igual las sumaba como «Semana 4» por caer en su ventana de calendario.
+const enSemana = (r, semana) => Object.assign(r, { semana });
 const soloTres = (extraRows) => build(EVI, {
   sesionesGlobales: sesEvi,
   progresoGlobal: { [EVI]: [
-    row("r-evi", "sq", "6/10/2026", "50", "15"),
-    row("r-evi", "sq", "6/10/2026", "50", "15"),
-    row("r-evi", "sq", "6/10/2026", "50", "15"),
+    enSemana(row("r-evi", "sq", "6/10/2026", "50", "15"), 3),
+    enSemana(row("r-evi", "sq", "6/10/2026", "50", "15"), 3),
+    enSemana(row("r-evi", "sq", "6/10/2026", "50", "15"), 3),
   ].concat(extraRows || []) },
 });
 
@@ -184,6 +186,7 @@ test("G: 3 x (50 x 15) = 2250 kg (no 750)", () => {
   const rows = [{ kg: "50", reps: "15" }, { kg: 50, reps: 15 }, { kg: "50", reps: "15" }];
   assert.equal(rows.reduce((a, r) => a + rowVolumeKg(r), 0), 2250);
   const m = soloTres();
+  // D7.3: «Volumen por semana» agrupa por la semana de la RUTINA de cada serie (progreso.semana = 3 -> Semana 4), como «Evolución de carga»
   assert.equal(m.volBars[3].v, 2250);
   assert.equal(m.volSemPromKg, 562.5);
   assert.deepEqual([m.volPct, m.volMotivo], [null, "sin_ejercicios_comunes"], "sin periodo anterior no hay porcentaje");
@@ -214,8 +217,9 @@ test("I: series repetidas no se colapsan (volumen y conteo de series por patron)
   assert.equal(rod.vol, 2250);
   assert.equal(rod.exercises.length, 1);
   assert.equal(rod.exercises[0].series, 3);
-  const cuatro = soloTres([row("r-evi", "sq", "6/10/2026", "50", "15")]);
-  assert.equal(cuatro.volBars[3].v, 3000);
+  const cuatro = soloTres([enSemana(row("r-evi", "sq", "6/10/2026", "50", "15"), 3)]);
+  assert.equal(cuatro.volBars[3].v, 3000); // D7.3: semana de la rutina (progreso.semana = 3)
+  assert.equal(cuatro.patronTotalVol, 3000); // misma semana y mismo bloque que la barra
 });
 
 test("J: ranking y adherenciaRows son globales e iguales al cambiar alumnoSel", () => {
@@ -311,8 +315,8 @@ test("H2: copy del patron describe la ventana calculada (semana actual de la rut
   assert.doesNotMatch(card, /4 semanas|4 weeks/);
   // la ventana del modelo es la semana actual de la rutina: soloTres suma solo filas de esa semana (lunes 5/10)
   const m = build(EVI, { sesionesGlobales: sesEvi, progresoGlobal: { [EVI]: [
-    row("r-evi", "sq", "6/10/2026", "50", "15"),
-    row("r-evi", "sq", "1/10/2026", "50", "15"), // semana anterior de la rutina: no entra al patron
+    enSemana(row("r-evi", "sq", "6/10/2026", "50", "15"), 3),
+    enSemana(row("r-evi", "sq", "1/10/2026", "50", "15"), 2), // semana anterior de la rutina: no entra al patron
   ] } });
   assert.equal(m.patronPatterns.find((p) => p.key === "rodilla").vol, 750);
   assert.equal(m.currentRoutineWeekIndex, 3);

@@ -1,6 +1,9 @@
 /** @typedef {{ kg: number, reps: number, fecha: string }} RawSet */
 
 import { parseFechaDMY, parseFechaDMYToLocalDate } from '../../lib/progressDate.js'
+import { compararVolumen } from '../../lib/metricas/volumen.js'
+import { tipoDeCarga, TIPO_CARGA } from '../../lib/metricas/tipoCarga.js'
+import { lunesDe } from '../../lib/metricas/fechas.js'
 
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/
 
@@ -224,10 +227,15 @@ export function mondayStart(d) {
   return x
 }
 
-/** Volumen en kg·reps de un registro (una serie). */
-export function rowVolumeKg(row) {
+/**
+ * Volumen en kg·reps de un registro (una serie). D7.3: misma regla que el entrenador (lib/metricas/volumen.js): solo kg > 0 y reps > 0,
+ * y nunca un ejercicio POR TIEMPO (sus reps son segundos; antes sumaba kg x segundos). `indiceTiempo` = indiceEjerciciosPorTiempo(...).
+ */
+export function rowVolumeKg(row, indiceTiempo) {
   const kg = parseFloat(row.kg) || 0
   const reps = parseInt(row.reps, 10) || 0
+  if (!(kg > 0) || !(reps > 0)) return 0
+  if (tipoDeCarga(row.ejercicio_id, indiceTiempo) === TIPO_CARGA.TIEMPO) return 0
   return kg * reps
 }
 
@@ -255,26 +263,27 @@ export function collectAllProgressRows(progress, sbData) {
   return reconcileRowsByMaxMultiplicity(local, remote, (r) => setSignature(r.ejercicio_id, r.fecha, r.kg, r.reps))
 }
 
-function volumeInRange(rows, startMs, endMs) {
+function volumeInRange(rows, startMs, endMs, indiceTiempo) {
   let v = 0
   rows.forEach((r) => {
     const t = parseProgressDate(r.fecha)?.getTime()
     if (t == null || Number.isNaN(t)) return
-    if (t >= startMs && t < endMs) v += rowVolumeKg(r)
+    if (t >= startMs && t < endMs) v += rowVolumeKg(r, indiceTiempo)
   })
   return v
 }
 
 /** Toneladas totales en un intervalo [start, end). */
-export function volumeTonnesBetween(rows, start, end) {
-  return volumeInRange(rows, start.getTime(), end.getTime()) / 1000
+export function volumeTonnesBetween(rows, start, end, indiceTiempo) {
+  return volumeInRange(rows, start.getTime(), end.getTime(), indiceTiempo) / 1000
 }
 
 /**
  * Modelo hero: volumen semana actual/previa, delta %, sparkline últimos 7 días (ton/día),
  * barras L–D para semana actual.
  */
-export function buildWeeklyVolumeModel(progress, sbData, sesiones, now = new Date()) {
+export function buildWeeklyVolumeModel(progress, sbData, sesiones, now = new Date(), opts = {}) {
+  const indiceTiempo = opts && opts.indiceTiempo
   const rows = collectAllProgressRows(progress, sbData)
   const today = new Date(now)
   today.setHours(0, 0, 0, 0)
@@ -287,15 +296,17 @@ export function buildWeeklyVolumeModel(progress, sbData, sesiones, now = new Dat
   prevWeekStart.setDate(prevWeekStart.getDate() - 7)
   const prevWeekEnd = new Date(weekStart)
 
-  const volWeekTon = volumeTonnesBetween(rows, weekStart, weekEnd)
-  const volPrevTon = volumeTonnesBetween(rows, prevWeekStart, prevWeekEnd)
+  const volWeekTon = volumeTonnesBetween(rows, weekStart, weekEnd, indiceTiempo)
+  const volPrevTon = volumeTonnesBetween(rows, prevWeekStart, prevWeekEnd, indiceTiempo)
 
-  let deltaPct = null
-  if (volPrevTon > 1e-6) {
-    deltaPct = Math.round(((volWeekTon - volPrevTon) / volPrevTon) * 100)
-  } else if (volWeekTon > 1e-6) {
-    deltaPct = 100
-  }
+  // D7.3: «vs semana pasada» con la comparacion del entrenador (compararVolumen): MISMO tramo (lunes -> hoy contra lunes-7 -> hoy-7),
+  // solo ejercicios presentes en ambos y sin % con base insuficiente. Antes: semana en curso parcial contra semana pasada COMPLETA
+  // (un lunes daba -67 %), +100 % inventado con base 0 y mezcla de rutinas.
+  const hoyDia = Math.round(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) / 86400000)
+  const lun = lunesDe(hoyDia)
+  const cmp = compararVolumen(rows, { desde: lun, hasta: hoyDia }, { desde: lun - 7, hasta: hoyDia - 7 }, { indiceTiempo })
+  const deltaPct = cmp.pct == null ? null : Math.round(cmp.pct) // la vista muestra un entero (como antes)
+  const deltaMotivo = cmp.motivo
 
   /** Sparkline: últimos 7 días inclusive (toneladas por día). */
   const sparkDaily = []
@@ -304,7 +315,7 @@ export function buildWeeklyVolumeModel(progress, sbData, sesiones, now = new Dat
     d.setDate(d.getDate() - i)
     const next = new Date(d)
     next.setDate(next.getDate() + 1)
-    const ton = volumeTonnesBetween(rows, d, next)
+    const ton = volumeTonnesBetween(rows, d, next, indiceTiempo)
     sparkDaily.push(Math.max(0, ton))
   }
 
@@ -333,6 +344,7 @@ export function buildWeeklyVolumeModel(progress, sbData, sesiones, now = new Dat
     volWeekTon,
     volPrevTon,
     deltaPct,
+    deltaMotivo,
     sparkDaily,
     weekBars: bars,
   }

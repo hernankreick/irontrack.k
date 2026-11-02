@@ -1,8 +1,8 @@
 import React from 'react';
 import BaseModal from '../modals/BaseModal.jsx';
-import { loadWeekCompletion, validateManualSession, mergeSesionesById } from '../../lib/manualSessionValidation.js';
+import { loadWeekCompletion, validateManualSession } from '../../lib/manualSessionValidation.js';
 import { advanceWeekAfterValidation } from '../../lib/orphanSessions.js';
-import { applySemanaActivaToRutinas } from '../../lib/rutinaOperationalState.js';
+import { capturarVistaFicha, aplicarSesionesValidadas, aplicarAvanceSemana } from '../../lib/studentFicha.js';
 import { isoDateAR, isoToFechaAR, fechaLimites } from './fechaValidacion.js';
 
 /**
@@ -17,6 +17,7 @@ export default function ManualSessionValidationModal({
   semana,
   sb,
   setAlumnoSesiones,
+  setSesionesGlobales,
   setRutinasSB,
   setRutinasSBEntrenador,
   toast2,
@@ -68,23 +69,22 @@ export default function ManualSessionValidationModal({
     inFlight.current = true;
     setBusy(true);
     setError("");
+    // D7.3: si el entrenador cambia de alumno o cierra la ficha mientras se valida, la ficha no recibe nada; la sesion igual queda guardada
+    const enVista = capturarVistaFicha(alumnoId);
     try {
       const res = await validateManualSession({ sb: sb, alumnoId: alumnoId, rutina: rutina, diaIdx: selected, semana: semana, fecha: isoToFechaAR(fechaIso) });
+      const quien = (alumno && (alumno.nombre || alumno.email)) || "";
+      aplicarSesionesValidadas({ rows: res.status === "saved" ? [res.row] : res.rows, enVista: enVista, setAlumnoSesiones: setAlumnoSesiones, setSesionesGlobales: setSesionesGlobales });
       if (res.status === "saved") {
-        setAlumnoSesiones(function (prev) { return mergeSesionesById(prev, [res.row]); });
-        toast2(msg("Sesión validada ✓", "Session validated ✓"));
+        toast2(msg("Sesión validada ✓", "Session validated ✓") + (enVista() ? "" : " · " + quien));
       } else {
-        setAlumnoSesiones(function (prev) { return mergeSesionesById(prev, res.rows); });
-        toast2(msg("Ese día ya estaba completado", "That day was already completed"));
+        toast2(msg("Ese día ya estaba completado", "That day was already completed") + (enVista() ? "" : " · " + quien));
       }
       onClose();
       // Mismo chequeo de semana que corre al abrir la ficha: si la semana queda completa, semana_activa avanza (monotono, idempotente).
       // No puede fallar la validacion: la sesion ya esta guardada y, si falla, se reintenta al volver a abrir la ficha.
       const week = await advanceWeekAfterValidation({ sb: sb, alumnoId: alumnoId, rutina: rutina });
-      if (week.status === "advanced") {
-        const apply = function (prev) { return applySemanaActivaToRutinas(prev, week.rutinaId, week.semanaActiva); };
-        if (typeof setRutinasSB === "function") setRutinasSB(apply);
-        if (typeof setRutinasSBEntrenador === "function") setRutinasSBEntrenador(apply);
+      if (aplicarAvanceSemana({ week: week, enVista: enVista, setRutinasSB: setRutinasSB, setRutinasSBEntrenador: setRutinasSBEntrenador })) {
         toast2(msg("Semana completa: pasó a la semana " + week.semanaActiva, "Week complete: moved to week " + week.semanaActiva));
       }
     } catch (e) {

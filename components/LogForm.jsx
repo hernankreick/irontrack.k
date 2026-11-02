@@ -36,7 +36,7 @@ export function LogForm({ex, btn, inp, lbl, tag, fmtP, progress, onLog, onClose,
   const rpeLabels={6:M(lang,"Muy facil","Easy","Muito fácil"),7:M(lang,"Controlado","Moderate","Controlado"),8:M(lang,"Exigente","Hard","Exigente"),9:M(lang,"Muy duro","Very Hard","Muito pesado"),10:M(lang,"Al limite","Max","No limite")};
   const kgNum = parseFloat(kg)||0;
   const canLogSet = canLogWorkoutSet(ex, kg, reps);
-  const adjustKg = (delta) => setKg(v=>String(Math.max(0,(parseFloat(v)||0)+delta)));
+  const adjustKg = (delta) => setKg(v=>String(Math.max(0,normalizeWorkoutKg(v)+delta)));
   const holdTimer = useRef(null);
   const holdInterval = useRef(null);
   const suppressKgClick = useRef(false);

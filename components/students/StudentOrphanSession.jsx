@@ -1,22 +1,11 @@
 import React from 'react';
 import BaseModal from '../modals/BaseModal.jsx';
 import { detectOrphanSessions, confirmOrphanSessions, validateOrphanSession, advanceWeekAfterValidation } from '../../lib/orphanSessions.js';
-import { applySemanaActivaToRutinas } from '../../lib/rutinaOperationalState.js';
+import { capturarVistaFicha, aplicarSesionesValidadas, aplicarAvanceSemana } from '../../lib/studentFicha.js';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 
 // "Ocultar por ahora" solo oculta el aviso en la UI (en memoria, hasta recargar la app): no borra nada ni usa localStorage.
 const dismissedKeys = new Set();
-
-function mergeSesiones(prev, incoming) {
-  var seen = {};
-  return (incoming || []).concat(prev || []).filter(function (s) {
-    var k = s && s.id != null ? String(s.id) : null;
-    if (k == null) return true;
-    if (seen[k]) return false;
-    seen[k] = true;
-    return true;
-  });
-}
 
 /**
  * Aviso "Sesión sin finalizar" en la ficha del alumno (vista entrenador): el alumno registro series pero no finalizo el
@@ -30,6 +19,7 @@ export default function StudentOrphanSession({
   allEx = [],
   sb,
   setAlumnoSesiones,
+  setSesionesGlobales,
   setRutinasSB,
   setRutinasSBEntrenador,
   toast2,
@@ -105,6 +95,8 @@ export default function StudentOrphanSession({
     if (busy || !current || diaSel === "") return;
     setBusy(true);
     setError("");
+    // D7.3: si el entrenador cambia de alumno o cierra la ficha mientras se valida, la ficha no recibe nada; la sesion igual queda guardada
+    const enVista = capturarVistaFicha(alumno.id);
     try {
       const res = await validateOrphanSession({
         sb: sb,
@@ -115,21 +107,18 @@ export default function StudentOrphanSession({
       });
       // getSesiones del alumno ordena por created_at y corta en 10: la fila validada lleva created_at del dia entrenado y podria quedar
       // fuera de esa pagina, asi que se incorpora al estado en vez de re-pedir la lista.
+      const quien = alumno.nombre || alumno.email || "";
+      aplicarSesionesValidadas({ rows: res.status === "saved" ? [res.row] : res.rows, enVista: enVista, setAlumnoSesiones: setAlumnoSesiones, setSesionesGlobales: setSesionesGlobales });
       if (res.status === "saved") {
-        setAlumnoSesiones(function (prev) { return mergeSesiones(prev, [res.row]); });
-        toast2(msg("Sesión validada ✓", "Session validated ✓"));
+        toast2(msg("Sesión validada ✓", "Session validated ✓") + (enVista() ? "" : " · " + quien));
       } else {
-        setAlumnoSesiones(function (prev) { return mergeSesiones(prev, res.rows); });
-        toast2(msg("Esa sesión ya estaba registrada", "That session was already recorded"));
+        toast2(msg("Esa sesión ya estaba registrada", "That session was already recorded") + (enVista() ? "" : " · " + quien));
       }
       setOpenKey(null);
       // Si con esta sesion la semana queda completa, se habilita la siguiente ya (el mismo chequeo que corre al abrir la ficha). No puede
       // fallar la validacion: la sesion ya esta guardada y, si el chequeo falla, se reintenta al volver a abrir la ficha.
       const week = await advanceWeekAfterValidation({ sb: sb, alumnoId: alumno.id, rutina: rutina });
-      if (week.status === "advanced") {
-        const apply = function (prev) { return applySemanaActivaToRutinas(prev, week.rutinaId, week.semanaActiva); };
-        if (typeof setRutinasSB === "function") setRutinasSB(apply);
-        if (typeof setRutinasSBEntrenador === "function") setRutinasSBEntrenador(apply);
+      if (aplicarAvanceSemana({ week: week, enVista: enVista, setRutinasSB: setRutinasSB, setRutinasSBEntrenador: setRutinasSBEntrenador })) {
         toast2(msg("Semana completa: pasó a la semana " + week.semanaActiva, "Week complete: moved to week " + week.semanaActiva));
       }
     } catch (e) {

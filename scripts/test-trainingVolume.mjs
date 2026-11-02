@@ -129,7 +129,7 @@ await test("orden de exclusion: fecha > ventana > kg > reps > resolucion", () =>
     rowOff("custom_1", 0, 0, 99),          // fuera_de_ventana gana a kg
     rowOff("custom_1", 0, 5, 1),           // kg<=0 gana a reps y a resolucion
     rowOff("custom_1", 5, 0, 1),           // reps<=0 gana a resolucion
-    rowOff("custom_1", 5, 5, 1),           // recien aqui: no_resoluble
+    rowOff("custom_1", 5, 5, 1),           // D7.3: un personalizado valido CUENTA (antes no_resoluble)
   ]);
   const by = m.diagnostics.byReason;
   assert.deepEqual(EXCLUSION_REASONS, ["fecha_invalida", "fuera_de_ventana", "kg<=0", "reps<=0", "no_resoluble", "patron_no_fuerza", "equipo_sin_carga_externa", "peso_corporal_o_asistido", "objetivo_de_tiempo_en_rutina"]);
@@ -137,51 +137,56 @@ await test("orden de exclusion: fecha > ventana > kg > reps > resolucion", () =>
   assert.equal(by.fuera_de_ventana.sets, 1);
   assert.equal(by["kg<=0"].sets, 1);
   assert.equal(by["reps<=0"].sets, 1);
-  assert.equal(by.no_resoluble.sets, 1);
+  assert.equal(by.no_resoluble.sets, 0);
+  assert.equal(m.currentTotal, 25);
 });
-await test("exclusion: no_resoluble (custom_* y cualquier id fuera del catalogo; sin heuristica reps<=50)", () => {
-  const m = compute([rowOff("custom_1778697447353", 20, 10, 1), rowOff("zzz", 20, 10, 1), rowOff(null, 20, 10, 1), rowOff("custom_x", 20, 30, 1), rowOff("custom_y", 20, 60, 1)]);
-  assert.equal(m.diagnostics.byReason.no_resoluble.sets, 5);
-  assert.equal(m.currentTotal, 0);
-  assert.deepEqual(Object.keys(m.currentByExercise), []);
+// D7.3: MISMA regla que el entrenador (lib/metricas/volumen.js): los personalizados y los ids fuera del catalogo con kg y reps validos
+// CUENTAN; solo se excluyen los ejercicios por tiempo (catalogo o snapshot de la rutina).
+await test("D7.3: personalizados e ids fuera del catalogo cuentan (antes no_resoluble)", () => {
+  const m = compute([rowOff("custom_1778697447353", 20, 10, 1), rowOff("zzz", 20, 10, 1), rowOff("custom_x", 20, 30, 1), rowOff("custom_y", 20, 60, 1)]);
+  assert.equal(m.diagnostics.byReason.no_resoluble.sets, 0);
+  assert.equal(m.currentTotal, 200 + 200 + 600 + 1200);
+  assert.deepEqual(Object.keys(m.currentByExercise).sort(), ["custom_1778697447353", "custom_x", "custom_y", "zzz"]);
 });
-await test("custom sin metadata accesible => no_resoluble aunque haya snapshot de rutina con pattern/equip", () => {
-  const defs = collectRoutineExerciseDefs([{ days: [{ exercises: [{ id: "custom_9", pattern: "rodilla", equip: "Barra", name: "Mi custom" }] }] }]);
-  assert.equal(classifyExercise("custom_9", undefined, defs).reason, "no_resoluble");
-  const m = compute([rowOff("custom_9", 40, 10, 1)], { routineExerciseDefs: defs });
-  assert.equal(m.currentTotal, 0);
-  assert.equal(m.diagnostics.byReason.no_resoluble.sets, 1);
+await test("D7.3: un personalizado por tiempo en la rutina se excluye; sin tiempo cuenta", () => {
+  const defs = collectRoutineExerciseDefs([{ days: [{ exercises: [{ id: "custom_9", pattern: "rodilla", equip: "Barra", name: "Mi custom" }, { id: "custom_t", reps: "45s" }] }] }]);
+  assert.deepEqual(classifyExercise("custom_9", undefined, defs), { ok: true });
+  const m = compute([rowOff("custom_9", 40, 10, 1), rowOff("custom_t", 10, 45, 1)], { routineExerciseDefs: defs });
+  assert.equal(m.currentTotal, 400);
+  assert.equal(m.diagnostics.byReason.objetivo_de_tiempo_en_rutina.sets, 1);
 });
-await test("exclusion: patron_no_fuerza (core, cardio, movilidad) y normalizacion trim/lowercase", () => {
+await test("D7.3: el patron ya no excluye (core, cardio, movilidad con kg registrado cuentan)", () => {
   const catalog = {
     c1: { id: "c1", pattern: "core", equip: "Mancuernas" }, c2: { id: "c2", pattern: "cardio", equip: "Bicicleta" },
     c3: { id: "c3", pattern: " MOVILIDAD ", equip: "Barra" }, c4: { id: "c4", pattern: "", equip: "Barra" },
     n1: { id: "n1", pattern: "  RoDiLLa ", equip: "Barra", name: "normalizado" }, n2: { id: "n2", pattern: " Oly", equip: "Barra" },
   };
   const m = compute([rowOff("c1", 10, 10, 1), rowOff("c2", 10, 10, 1), rowOff("c3", 10, 10, 1), rowOff("c4", 10, 10, 1), rowOff("n1", 10, 10, 1), rowOff("n2", 10, 10, 1)], { catalog });
-  assert.equal(m.diagnostics.byReason.patron_no_fuerza.sets, 4);
-  assert.equal(m.currentTotal, 200, "n1 y n2 (rodilla/oly normalizados) cuentan");
+  assert.equal(m.diagnostics.byReason.patron_no_fuerza.sets, 0);
+  assert.equal(m.currentTotal, 600);
   const real = compute([rowOff("bike", 5, 20, 1), rowOff("core_remo_renegado", 12, 12, 1)]);
-  assert.equal(real.diagnostics.byReason.patron_no_fuerza.sets, 2);
+  assert.equal(real.diagnostics.byReason.patron_no_fuerza.sets, 0);
+  assert.equal(real.currentTotal, 100 + 144);
 });
 await test("patrones de fuerza validos: rodilla, empuje, traccion, bisagra, oly", () => {
   const catalog = {};
   ["rodilla", "empuje", "traccion", "bisagra", "oly"].forEach((p) => { catalog["p_" + p] = { id: "p_" + p, pattern: p, equip: "Barra" }; });
   assert.equal(compute(Object.keys(catalog).map((id) => rowOff(id, 10, 10, 1)), { catalog }).currentTotal, 500);
 });
-await test("exclusion: equipo_sin_carga_externa (case-insensitive, trim; 'Banco 45' y 'Banco' ambos)", () => {
+await test("D7.3: el equipo ya no excluye (el kg registrado en Libre/Banco/Paralelas cuenta)", () => {
   const equips = ["Libre", "Colchoneta", "Paralelas", "Anillas", "Banco", "Banco 45", "Rueda", "Soga", "Fitball", "LIBRE", " banco 45 ", "fitBALL"];
   const catalog = {};
   equips.forEach((e, i) => { catalog["e" + i] = { id: "e" + i, pattern: "empuje", equip: e, name: "x" }; });
   catalog.okEquip = { id: "okEquip", pattern: "empuje", equip: "Mancuerna", name: "x" };
   const m = compute(equips.map((e, i) => rowOff("e" + i, 10, 10, 1)).concat([rowOff("okEquip", 10, 10, 1)]), { catalog });
-  assert.equal(m.diagnostics.byReason.equipo_sin_carga_externa.sets, equips.length);
-  assert.equal(m.currentTotal, 100);
+  assert.equal(m.diagnostics.byReason.equipo_sin_carga_externa.sets, 0);
+  assert.equal(m.currentTotal, 100 * (equips.length + 1));
 });
-await test("exclusion: peso_corporal_o_asistido (dominadas; exerciseIsBodyweightLike)", () => {
-  const m = compute([rowOff("pu", 10, 5, 1), rowOff("pusu", 10, 5, 1), rowOff("punu", 10, 5, 1)]);
-  assert.equal(m.diagnostics.byReason.peso_corporal_o_asistido.sets, 3);
-  assert.equal(m.currentTotal, 0);
+await test("D7.3: peso corporal con lastre cuenta el lastre registrado; sin kg no se inventa nada", () => {
+  const m = compute([rowOff("pu", 10, 5, 1), rowOff("pusu", 10, 5, 1), rowOff("punu", 10, 5, 1), rowOff("pu", 0, 12, 1)]);
+  assert.equal(m.diagnostics.byReason.peso_corporal_o_asistido.sets, 0);
+  assert.equal(m.currentTotal, 150, "solo los 10 kg de lastre x reps");
+  assert.equal(m.diagnostics.byReason["kg<=0"].sets, 1);
 });
 await test("exclusion: objetivo_de_tiempo_en_rutina (solo por snapshot; un snapshot sin tiempo no excluye)", () => {
   const timed = collectRoutineExerciseDefs([{ days: [{ exercises: [{ id: "sq", reps: "30 seg" }] }] }]);
@@ -191,13 +196,10 @@ await test("exclusion: objetivo_de_tiempo_en_rutina (solo por snapshot; un snaps
   assert.equal(m.currentTotal, 480 + 1000);
   assert.equal(m.diagnostics.byReason.objetivo_de_tiempo_en_rutina.sets, 0);
 });
-await test("clasificacion real del catalogo: legext valido; core/cardio/dominadas excluidos", () => {
+await test("D7.3: clasificacion del catalogo = la del entrenador (solo se excluye lo que es por tiempo)", () => {
   assert.deepEqual(classifyExercise("legext"), { ok: true });
   assert.equal(classifyExercise("sq").ok, true);
-  assert.equal(classifyExercise("core_remo_renegado").reason, "patron_no_fuerza");
-  assert.equal(classifyExercise("bike").reason, "patron_no_fuerza");
-  assert.equal(classifyExercise("pusu").reason, "peso_corporal_o_asistido");
-  assert.equal(classifyExercise("custom_1778697447353").reason, "no_resoluble");
+  for (const id of ["core_remo_renegado", "bike", "pusu", "kuohp", "custom_1778697447353"]) assert.equal(classifyExercise(id).ok, true, id);
 });
 
 // ------------------------------------------------------------------ 5. multiplicidad / merge remoto + local
@@ -364,7 +366,9 @@ await test("card: visible solo con currentTotal > 0 y >= 2 dias CURRENT", () => 
   assert.equal(compute([rowOff("sq", 50, 5, 1), rowOff("sq", 50, 5, 1)]).showCard, false, "1 solo dia");
   assert.equal(compute([rowOff("sq", 50, 5, 1), rowOff("sq", 50, 5, 2)]).showCard, true);
   assert.equal(compute([rowOff("sq", 50, 5, 30), rowOff("sq", 50, 5, 31)]).showCard, false, "solo PREVIOUS");
-  assert.equal(compute([rowOff("sq", 50, 5, 1), rowOff("custom_1", 50, 5, 2)]).showCard, false, "el 2.o dia no es valido");
+  // D7.3: un personalizado con kg y reps validos SI es un dia valido (antes no_resoluble); uno sin kg no
+  assert.equal(compute([rowOff("sq", 50, 5, 1), rowOff("custom_1", 50, 5, 2)]).showCard, true);
+  assert.equal(compute([rowOff("sq", 50, 5, 1), rowOff("custom_1", 0, 5, 2)]).showCard, false, "el 2.o dia no es valido (sin kg)");
 });
 await test("barras: siempre cuatro (B1..B4), semanas vacias = 0, B4 = off 6..0", () => {
   const m = compute([rowOff("sq", 10, 10, 27), rowOff("sq", 10, 10, 21), rowOff("sq", 10, 10, 6), rowOff("sq", 10, 10, 0)]);
@@ -491,15 +495,16 @@ const EVI = [
 await test("Evi (today=2026-10-05): resultado de referencia del preflight", () => {
   const rows = EVI.map(([id, fecha, vol]) => row(id, vol, 1, fecha));
   const m = compute(rows);
-  assert.equal(m.currentTotal, 12075);
-  assert.equal(formatVolume(m.currentTotal), "12.075 kg");
-  assert.deepEqual(m.blocks.map((b) => b.kg), [5895, 0, 0, 6180]);
-  assert.equal(m.previousTotal, 16707.5);
-  assert.equal(m.commonExercises.length, 13);
-  assert.equal(m.currentComparable, 12075);
-  assert.equal(m.previousComparable, 16707.5);
-  assert.ok(Math.abs(m.pct - -27.727068681729764) < 1e-9);
-  assert.equal(Math.round(m.pct), -28);
+  // D7.3: ahora tambien cuentan core_remo_renegado, el personalizado y pusu (lastre): +564 en CURRENT (9/9) y +574 en PREVIOUS (3/9)
+  assert.equal(m.currentTotal, 12075 + 564);
+  assert.equal(formatVolume(m.currentTotal), "12.639 kg");
+  assert.deepEqual(m.blocks.map((b) => b.kg), [5895 + 564, 0, 0, 6180]);
+  assert.equal(m.previousTotal, 16707.5 + 574);
+  assert.equal(m.commonExercises.length, 16);
+  assert.equal(m.currentComparable, 12639);
+  assert.equal(m.previousComparable, 17281.5);
+  assert.ok(Math.abs(m.pct - ((12639 - 17281.5) / 17281.5) * 100) < 1e-9);
+  assert.equal(Math.round(m.pct), -27);
   assert.equal(m.showPct, false);
   assert.deepEqual(m.pctHiddenReasons, ["PREVIOUS_span_<7_dias"]);
   assert.deepEqual(m.currentDays.map(formatDayShort), ["09/09", "14/09", "29/09"]);
@@ -509,13 +514,8 @@ await test("Evi (today=2026-10-05): resultado de referencia del preflight", () =
   assert.equal(m.previousHistorySpan, 6, "7/9 - 1/9");
   assert.equal(m.showCard, true);
   const by = m.diagnostics.byReason;
-  assert.deepEqual(Object.keys(by.patron_no_fuerza.ids), ["core_remo_renegado"]);
-  assert.deepEqual(Object.keys(by.no_resoluble.ids), ["custom_1778697447353"]);
-  assert.deepEqual(Object.keys(by.peso_corporal_o_asistido.ids), ["pusu"]);
-  assert.equal(by.patron_no_fuerza.volume, 288);
-  assert.equal(by.no_resoluble.volume, 470);
-  assert.equal(by.peso_corporal_o_asistido.volume, 380);
-  assert.deepEqual(Object.keys(m.currentByExercise).concat(Object.keys(m.previousByExercise)).filter((id) => id.startsWith("custom")), [], "ningun custom se cuenta");
+  for (const r of ["patron_no_fuerza", "no_resoluble", "peso_corporal_o_asistido"]) assert.equal(by[r].sets, 0, r);
+  assert.ok(m.currentByExercise.custom_1778697447353 > 0, "D7.3: el personalizado cuenta");
 });
 
 // ------------------------------------------------------------------ 11. vista (copy, accesibilidad, color neutro)
@@ -533,7 +533,11 @@ const React = (await import("react")).default;
 const { renderToStaticMarkup } = (await import("react-dom/server")).default || (await import("react-dom/server"));
 const msg = (es) => es;
 const render = (model, dm = false) => renderToStaticMarkup(React.createElement(TrainingVolumeCardView, { model, _dm: dm, textMuted: "#64748B", msg }));
-const eviModel = () => compute(EVI.map(([id, fecha, vol]) => row(id, vol, 1, fecha)));
+// D7.3: las pruebas de VISTA usan las series de Evi que ya contaban antes (sin core_remo_renegado, el personalizado ni pusu), asi
+// las cifras de referencia de la card (12.075 kg, 5895/0/0/6180, pct oculto) siguen probando el render; la regla nueva (que suma esos
+// tres) se prueba arriba en «Evi (today=2026-10-05)».
+const EVI_VISTA = EVI.filter(([id]) => ["core_remo_renegado", "custom_1778697447353", "pusu"].indexOf(id) === -1);
+const eviModel = () => compute(EVI_VISTA.map(([id, fecha, vol]) => row(id, vol, 1, fecha)));
 
 await test("vista Evi: titulo, subtitulo, 12.075 kg, SIN porcentaje, 4 barras 5895/0/0/6180", () => {
   const html = render(eviModel());
@@ -599,7 +603,7 @@ await test("vista: ingles", () => {
 
 // ------------------------------------------------------------------ 12. regresion QA preview: pct matematico existente + showPct=false => NO se renderiza
 const { buildTrainingVolumeModel } = V;
-const eviRemote = () => EVI.map(([id, fecha, vol], i) => ({ id: i + 1, ejercicio_id: id, kg: vol, reps: 1, fecha, semana: 1, nota: "", created_at: "2026-09-01T00:00:00Z" }));
+const eviRemote = () => EVI_VISTA.map(([id, fecha, vol], i) => ({ id: i + 1, ejercicio_id: id, kg: vol, reps: 1, fecha, semana: 1, nota: "", created_at: "2026-09-01T00:00:00Z" }));
 // Misma tuberia que el contenedor: fetch paginado -> merge remoto+local -> modelo -> vista.
 const eviPipeline = async (now) => {
   const remote = await fetchTrainingVolumeRows(async (p) => (/offset=0\b/.test(p) ? eviRemote() : []), "76fb8876-270a-4fa6-9b7a-f664e0b42799", { now });
