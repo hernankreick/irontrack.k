@@ -132,6 +132,7 @@ await test("adherencia (caso de la auditoria): otra rutina no cuenta; validadas 
   for (let i = 0; i < 4; i++) sesiones.push(ses(i % 3, { rutina_id: "rOld", fecha: f(2 + i * 4, 10) }));
   for (let i = 0; i < 2; i++) sesiones.push(ses(i, { origen: "validada_coach", ejercicios: "", fecha: f(3 + i * 4, 10) }));
   const a = M.adherencia({ rutina, sesiones, alumnoId: "A", desde: D(1, 10), hasta: D(28, 10) });
+  // D7.2 (tope por semana de calendario): ninguna semana lunes-domingo supera los 3 dias del plan, el resultado no cambia
   assert.deepEqual([a.planificadas, a.completadas, a.realizadas, a.validadas, a.pct], [12, 8, 6, 2, 67]);
 });
 await test("adherencia: el mismo dia y dia de rutina se cuenta una vez; realizada gana a validada", () => {

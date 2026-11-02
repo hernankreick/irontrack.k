@@ -3,6 +3,7 @@ import BaseModal from '../modals/BaseModal.jsx';
 import { loadWeekCompletion, validateManualSession, mergeSesionesById } from '../../lib/manualSessionValidation.js';
 import { advanceWeekAfterValidation } from '../../lib/orphanSessions.js';
 import { applySemanaActivaToRutinas } from '../../lib/rutinaOperationalState.js';
+import { isoDateAR, isoToFechaAR, fechaLimites } from './fechaValidacion.js';
 
 /**
  * "Validar sesión manualmente" (menú ⋮ de la rutina, ficha del alumno): el entrenador marca como completado un día pendiente de la
@@ -33,6 +34,9 @@ export default function ManualSessionValidationModal({
   // Guard de reentrada: el estado `busy` llega un render tarde, un doble tap rapido podria disparar dos validaciones.
   const inFlight = React.useRef(false);
 
+  const limites = fechaLimites(rutina);
+  const [fechaIso, setFechaIso] = React.useState(function () { return isoDateAR(new Date()); });
+
   const days = (rutina && rutina.datos && Array.isArray(rutina.datos.days)) ? rutina.datos.days : [];
   const alumnoId = alumno && alumno.id;
   const rutinaId = rutina && rutina.id;
@@ -42,6 +46,7 @@ export default function ManualSessionValidationModal({
     var cancelled = false;
     setSelected(null);
     setError("");
+    setFechaIso(isoDateAR(new Date()));
     setLoading(true);
     loadWeekCompletion({ sb: sb, alumnoId: alumnoId, rutina: rutina, semana: semana })
       .then(function (r) { if (!cancelled) setCompleted(r.completed); })
@@ -64,7 +69,7 @@ export default function ManualSessionValidationModal({
     setBusy(true);
     setError("");
     try {
-      const res = await validateManualSession({ sb: sb, alumnoId: alumnoId, rutina: rutina, diaIdx: selected, semana: semana });
+      const res = await validateManualSession({ sb: sb, alumnoId: alumnoId, rutina: rutina, diaIdx: selected, semana: semana, fecha: isoToFechaAR(fechaIso) });
       if (res.status === "saved") {
         setAlumnoSesiones(function (prev) { return mergeSesionesById(prev, [res.row]); });
         toast2(msg("Sesión validada ✓", "Session validated ✓"));
@@ -152,12 +157,23 @@ export default function ManualSessionValidationModal({
                   "Do you confirm the athlete did this workout? The session will be marked as manually completed, even without logged exercises."
                 )}
               </div>
+              <label htmlFor="msv-fecha" style={{ display: "block", fontSize: 12, fontWeight: 700, color: textMuted, margin: "10px 0 6px" }}>{msg("Fecha del entrenamiento", "Workout date")}</label>
+              <input
+                id="msv-fecha"
+                type="date"
+                value={fechaIso}
+                min={limites.min}
+                max={limites.max}
+                disabled={busy}
+                onChange={function (e) { setFechaIso(e.target.value); }}
+                style={{ boxSizing: "border-box", width: "100%", maxWidth: "100%", minHeight: 44, padding: "8px 12px", borderRadius: 10, fontFamily: "inherit", fontSize: 16, color: textMain, background: coachAluSurface, border: "1px solid " + coachAluBorderSoft }}
+              />
               {error && <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", margin: "8px 0" }}>{error}</div>}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14, flexWrap: "wrap" }}>
                 <button type="button" disabled={busy} onClick={function () { setSelected(null); setError(""); }} style={Object.assign({}, btn, { background: "transparent", color: textMuted, border: "1px solid " + coachAluBorderSoft })}>
                   {msg("Volver", "Back")}
                 </button>
-                <button type="button" disabled={busy} onClick={confirm} style={Object.assign({}, btn, { background: "#22c55e", color: "#fff", opacity: busy ? 0.6 : 1 })}>
+                <button type="button" disabled={busy || !fechaIso || fechaIso < limites.min || fechaIso > limites.max} onClick={confirm} style={Object.assign({}, btn, { background: "#22c55e", color: "#fff", opacity: busy ? 0.6 : 1 })}>
                   {busy ? msg("Validando…", "Validating…") : msg("Confirmar", "Confirm")}
                 </button>
               </div>

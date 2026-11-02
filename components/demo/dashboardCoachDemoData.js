@@ -71,9 +71,12 @@ export function demoDashSesiones(hoy) {
 export const DEMO_DASH_RUTINA_LOCAL = { id: "demo-rt-local", name: "Rutina inicial (demo)", days: dias(2), saved: true };
 
 /** Capa de datos en memoria con la forma de `sb` que usa la ficha (rutinas, progreso, sesiones). Nada persiste ni sale a la red. */
-export function createDemoDashSb(hoy) {
-  var rutinas = demoDashRutinas(hoy);
-  var sesiones = demoDashSesiones(hoy);
+/** opts: { extra: incluir los alumnos de ?alertas=muchas, onInsert(row): la demo agrega la sesion validada a sus datos }. */
+export function createDemoDashSb(hoy, opts) {
+  var o = opts || {};
+  var simSeq = 0;
+  var rutinas = o.extra ? demoDashRutinas(hoy).concat(demoDashRutinasExtra(hoy)) : demoDashRutinas(hoy);
+  var sesiones = o.extra ? demoDashSesiones(hoy).concat(demoDashSesionesExtra(hoy)) : demoDashSesiones(hoy);
   var clone = function (x) { return JSON.parse(JSON.stringify(x)); };
   return {
     getRutinas: async function (alumnoId) { return clone(rutinas.filter(function (r) { return r.alumno_id === String(alumnoId); })); },
@@ -82,6 +85,14 @@ export function createDemoDashSb(hoy) {
     reconcileSemanaActivaAlumno: async function () { return { status: "noop" }; },
     getSesionesByAlumnoRutinaSemana: async function (alumnoId, rutinaId, _nombre, semana) {
       return clone(sesiones.filter(function (x) { return x.alumno_id === String(alumnoId) && x.rutina_id === String(rutinaId) && Number(x.semana) === Number(semana); }));
+    },
+    // D7.2: «Validar sesión manualmente» en la demo. Antes faltaba y el modal mostraba «No se pudo validar la sesión». Solo memoria:
+    // agrega la fila (con id y created_at simulados, como la base) y avisa a la demo para que los indicadores la reflejen.
+    addSesion: async function (payload) {
+      var row = Object.assign({ id: "demo-ses-sim-" + (++simSeq), created_at: new Date().toISOString() }, payload);
+      sesiones = [row].concat(sesiones);
+      if (o.onInsert) o.onInsert(clone(row));
+      return [clone(row)];
     },
   };
 }

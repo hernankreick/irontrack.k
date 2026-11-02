@@ -85,7 +85,7 @@ await test("Tarjeta de rutina: encabezado, semana con fechas, anillo + barra con
   assert.ok(html.includes("Semana 3 de 4"));
   assert.match(html, /2\/11 — 8\/11/);
   assert.ok(html.includes("2 de 4 días"));
-  assert.match(html, /50% completado/);
+  assert.match(html, /50% de la semana de rutina/);
   assert.match(html, /role="progressbar"[^>]*aria-valuenow="50"/);
   assert.equal((html.match(/role="progressbar"/g) || []).length, 1, "una sola barra");
   assert.doesNotMatch(html, /67%|Semana 2 de 4|Cata/);

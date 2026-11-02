@@ -43,7 +43,9 @@ export default function DashboardCoachDemo() {
   const msg = React.useCallback(function (esStr, enStr, ptStr) { return irontrackMsg(lang, esStr, enStr, ptStr); }, []);
   const T = getAppThemeTokens(darkMode);
   const ui = useCoachUIState();
-  const sb = React.useMemo(function () { return createDemoDashSb(); }, []);
+  // D7.2: la validacion manual se simula en memoria y se refleja en los indicadores (sesionesGlobales).
+  const onInsertDemo = React.useRef(null);
+  const sb = React.useMemo(function () { return createDemoDashSb(undefined, { extra: DEMO_MUCHAS, onInsert: function (row) { if (onInsertDemo.current) onInsertDemo.current(row); } }); }, []);
   const allEx = React.useMemo(function () { return EX.map(function (e) { return normalizeLibraryExercise(e, { catalog: true }); }); }, []);
 
   const [toast, setToast] = React.useState(null);
@@ -63,7 +65,8 @@ export default function DashboardCoachDemo() {
   const [alumnoSesiones, setAlumnoSesiones] = React.useState([]);
   const [rutinasSB, setRutinasSB] = React.useState([]);
   const [rutinasSBEntrenador, setRutinasSBEntrenador] = React.useState(function () { return DEMO_MUCHAS ? demoDashRutinas().concat(demoDashRutinasExtra()) : demoDashRutinas(); });
-  const [sesionesGlobales] = React.useState(function () { return DEMO_MUCHAS ? demoDashSesiones().concat(demoDashSesionesExtra()) : demoDashSesiones(); });
+  const [sesionesGlobales, setSesionesGlobales] = React.useState(function () { return DEMO_MUCHAS ? demoDashSesiones().concat(demoDashSesionesExtra()) : demoDashSesiones(); });
+  onInsertDemo.current = function (row) { setSesionesGlobales(function (prev) { return [row].concat(prev); }); };
   const [loadingSB, setLoadingSB] = React.useState(false);
   const [coachDialog, setCoachDialog] = React.useState({ t: 'none' });
   const [coachDashIntent, setCoachDashIntent] = React.useState(null);
