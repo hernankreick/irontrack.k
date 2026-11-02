@@ -184,7 +184,8 @@ test("G: 3 x (50 x 15) = 2250 kg (no 750)", () => {
   const rows = [{ kg: "50", reps: "15" }, { kg: 50, reps: 15 }, { kg: "50", reps: "15" }];
   assert.equal(rows.reduce((a, r) => a + rowVolumeKg(r), 0), 2250);
   const m = soloTres();
-  assert.equal(m.volBars[3].v, 2250);
+  // D7.3: «Volumen por semana» agrupa por la semana de la RUTINA de cada serie (progreso.semana = 0 -> Semana 1), como «Evolución de carga»
+  assert.equal(m.volBars[0].v, 2250);
   assert.equal(m.volSemPromKg, 562.5);
   assert.deepEqual([m.volPct, m.volMotivo], [null, "sin_ejercicios_comunes"], "sin periodo anterior no hay porcentaje");
   assert.equal(m.patronPatterns.find((p) => p.key === "rodilla").vol, 2250);
@@ -215,7 +216,7 @@ test("I: series repetidas no se colapsan (volumen y conteo de series por patron)
   assert.equal(rod.exercises.length, 1);
   assert.equal(rod.exercises[0].series, 3);
   const cuatro = soloTres([row("r-evi", "sq", "6/10/2026", "50", "15")]);
-  assert.equal(cuatro.volBars[3].v, 3000);
+  assert.equal(cuatro.volBars[0].v, 3000); // D7.3: semana de la rutina (progreso.semana = 0)
 });
 
 test("J: ranking y adherenciaRows son globales e iguales al cambiar alumnoSel", () => {

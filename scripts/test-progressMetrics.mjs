@@ -163,7 +163,10 @@ test("E. volumen semana actual / previa / delta / sparkline", () => {
   const m = buildWeeklyVolumeModel({}, SB_WEEK, [], NOW);
   assert.equal(m.volWeekTon, 1.5); // 5/10 (1000) + 6/10 (500)
   assert.equal(m.volPrevTon, 2); // 29/9 (2000); 1/9 queda afuera
-  assert.equal(m.deltaPct, -25);
+  // D7.3: el % compara el MISMO tramo (lun 5 -> mar 6 contra lun 28/9 -> mar 29/9) y solo ejercicios comunes; con 1 dia en el
+  // tramo anterior no hay base suficiente: sin % (antes -25 %, semana parcial contra semana pasada completa)
+  assert.equal(m.deltaPct, null);
+  assert.ok(m.deltaMotivo);
   assert.deepEqual(m.sparkDaily, [0, 0, 0, 0, 0, 1, 0.5]); // 30/9 ... 6/10
 });
 

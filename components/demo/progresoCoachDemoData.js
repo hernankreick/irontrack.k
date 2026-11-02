@@ -10,6 +10,10 @@
 //   Martina Vega  sin rutina asignada · registros de una rutina anterior
 //   Tomás Ruiz    activo, alta adherencia, PRs
 
+import { volumenEnRango } from "../../lib/metricas/volumen.js";
+import { indiceEjerciciosPorTiempo } from "../../lib/metricas/tipoCarga.js";
+import { diaLocal } from "../../lib/metricas/fechas.js";
+
 function dia(n) {
   const d = new Date();
   d.setHours(12, 0, 0, 0);
@@ -35,6 +39,76 @@ export const DEMO_CATALOGO = [
   { id: "demo-plank", name: "Plancha", nameEn: "Plank", pattern: "core", duration: "45 seg" },
   { id: "custom_demo_remo", name: "Remo con mancuerna (personalizado)", nameEn: "Dumbbell row (custom)", pattern: "traccion", custom: true },
 ];
+
+// ---- Escenario ?volumen=comparar (D7.3, solo demo): un alumno con el caso de referencia de un día.
+export const VOL_ALUMNO_ID = "demo-vol";
+export const VOL_CATALOGO = [
+  { id: "vol-sq", name: "Sentadilla", nameEn: "Back squat", pattern: "rodilla", equipment: "Barra" },
+  { id: "custom_vol_x", name: "Ejercicio personalizado", nameEn: "Custom exercise", pattern: "traccion", custom: true },
+  { id: "vol-pu", name: "Dominadas con lastre", nameEn: "Weighted pull-up", pattern: "traccion", equipment: "Barra fija" },
+  { id: "vol-plank", name: "Plancha con peso", nameEn: "Weighted plank", pattern: "core", equipment: "Libre" },
+  { id: "vol-kuohp", name: "Press militar unilateral", nameEn: "Single-arm overhead press", pattern: "empuje", equipment: "Libre" },
+  { id: "vol-lunge", name: "Zancada", nameEn: "Lunge", pattern: "rodilla", equipment: "Libre" },
+];
+// [ejercicio, [[kg, reps], ...]] de hoy y de hace 7 días.
+const VOL_HOY = [["vol-sq", [[100, 5], [100, 5]]], ["custom_vol_x", [[40, 10]]], ["vol-pu", [[10, 8]]], ["vol-plank", [[10, 45]]], ["vol-kuohp", [[20, 10]]], ["vol-lunge", [[16, 10]]]];
+const VOL_SEM_PASADA = [["vol-sq", [[95, 5], [95, 5]]], ["custom_vol_x", [[37.5, 10]]], ["vol-pu", [[10, 6]]], ["vol-plank", [[10, 40]]], ["vol-kuohp", [[17.5, 10]]], ["vol-lunge", [[14, 10]]]];
+
+const num = (v) => parseFloat(v) || 0;
+const VOL_FUERZA = ["rodilla", "empuje", "traccion", "bisagra"];
+// Réplica de la definición anterior, solo demo: A, entrenador (Progreso) = Σ kg×reps con kg>0 y reps>0, sin ejercicios por tiempo.
+export function volumenAntesA(rows, catalogo, rutinas) {
+  const t = indiceEjerciciosPorTiempo(catalogo, rutinas);
+  return rows.reduce((a, r) => (num(r.kg) > 0 && num(r.reps) > 0 && !t[String(r.ejercicio_id)] ? a + num(r.kg) * num(r.reps) : a), 0);
+}
+// Réplica de la definición anterior, solo demo: B, tarjeta «Volumen de entrenamiento» del alumno = solo catálogo con patrón de fuerza,
+// sin equipo Libre/Banco/Paralelas y sin coincidencia con peso corporal; excluía los personalizados.
+export function volumenAntesB(rows, catalogo) {
+  const porId = {};
+  catalogo.forEach((e) => { porId[String(e.id)] = e; });
+  return rows.reduce((a, r) => {
+    const e = porId[String(r.ejercicio_id)];
+    if (!e || e.custom || String(r.ejercicio_id).indexOf("custom_") === 0) return a;
+    if (VOL_FUERZA.indexOf(e.pattern) < 0) return a;
+    if (/^(libre|banco|paralelas)/i.test(e.equipment || "")) return a;
+    if (/dominada|pull.?up|flexion|push.?up|fondos|dips|plancha|plank|peso corporal|bodyweight/i.test((e.name || "") + " " + (e.nameEn || ""))) return a;
+    return num(r.kg) > 0 ? a + num(r.kg) * num(r.reps) : a;
+  }, 0);
+}
+// Réplica de la definición anterior, solo demo: C, «t esta semana» del alumno = kg×reps de toda fila con kg>0 (incluye tiempo: kg×segundos).
+export function volumenAntesC(rows) {
+  return rows.reduce((a, r) => (num(r.kg) > 0 ? a + num(r.kg) * num(r.reps) : a), 0);
+}
+// Réplica de la definición anterior, solo demo: D, resumen de la sesión = kg×reps sin ningún filtro (kg negativo resta).
+export function volumenAntesD(rows) {
+  return rows.reduce((a, r) => a + num(r.kg) * num(r.reps), 0);
+}
+
+/** Comparación antes/ahora de un día (n = días atrás) para el alumno del escenario. data = buildProgresoDemoData({ volumen: true }). */
+export function compararVolumenDemo(data, n) {
+  const dd = n || 0;
+  const f = fecha(dd);
+  const rows = (data.progresoGlobal[VOL_ALUMNO_ID] || []).filter((r) => r.fecha === f);
+  const rutinas = data.rutinasSBEntrenador.filter((r) => r.alumno_id === VOL_ALUMNO_ID);
+  const indiceTiempo = indiceEjerciciosPorTiempo(data.allEx, rutinas);
+  const d = diaLocal(dia(dd));
+  const real = volumenEnRango(rows, { desde: d, hasta: d, indiceTiempo });
+  const nombres = {};
+  data.allEx.forEach((e) => { nombres[String(e.id)] = e.name; });
+  const ids = [];
+  rows.slice().sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).forEach((r) => { if (ids.indexOf(r.ejercicio_id) < 0) ids.push(r.ejercicio_id); });
+  const ejercicios = ids.map((id) => {
+    const kg = real.porEjercicio[id] || 0;
+    const motivo = indiceTiempo[id] ? "por tiempo: las reps son segundos" : kg > 0 ? "" : "sin kg registrados";
+    return { id, nombre: nombres[id] || id, incluido: kg > 0, kg, motivo };
+  });
+  return {
+    fecha: f,
+    antes: { A: volumenAntesA(rows, data.allEx, rutinas), B: volumenAntesB(rows, data.allEx), C: volumenAntesC(rows), D: volumenAntesD(rows) },
+    ahora: real.total,
+    ejercicios,
+  };
+}
 
 const ALUMNOS = [
   { id: "demo-abril", nombre: "Abril Méndez", email: "abril@demo.invalid" },
@@ -164,6 +238,15 @@ export function buildProgresoDemoData(opts) {
   sesion("demo-diego", "demo-r-diego", "Inicio", 4, 1, 0, 1, { "demo-sq": tres(60, 8), "demo-bp": tres(45, 8) });
   sesion("demo-diego", "demo-r-diego", "Inicio", 2, 1, 1, 1, { "demo-dl": tres(90, 5), "demo-ohp": tres(30, 8) });
 
+  if (o.volumen) {
+    rutinas.push({ id: "demo-r-vol", alumno_id: VOL_ALUMNO_ID, nombre: "Fuerza + tiempo", created_at: iso(30), datos: { days: dias([ex("vol-sq"), ex("custom_vol_x"), ex("vol-pu"), ex("vol-plank", "45s"), ex("vol-kuohp"), ex("vol-lunge")]) } });
+    [[0, VOL_HOY], [7, VOL_SEM_PASADA]].forEach(([n, lista]) => {
+      const series = {};
+      lista.forEach(([id, s]) => { series[id] = s; });
+      sesion(VOL_ALUMNO_ID, "demo-r-vol", "Fuerza + tiempo", n, n === 0 ? 2 : 1, 0, 1, series);
+    });
+  }
+
   // Mismo orden que entrega el cargador real (lib/coachHistoryLoader.js): created_at descendente, progreso agrupado por alumno.
   const desc = (a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0);
   sesiones.sort(desc);
@@ -172,11 +255,11 @@ export function buildProgresoDemoData(opts) {
   progreso.forEach((r) => { (progresoGlobal[r.alumno_id] = progresoGlobal[r.alumno_id] || []).push(r); });
 
   return {
-    alumnos: ALUMNOS.map((a) => Object.assign({}, a)),
+    alumnos: ALUMNOS.map((a) => Object.assign({}, a)).concat(o.volumen ? [{ id: VOL_ALUMNO_ID, nombre: "Valentina Carga", email: "valentina@demo.invalid" }] : []),
     rutinasSBEntrenador: rutinas,
     sesionesGlobales: sesiones,
     progresoGlobal: progresoGlobal,
-    allEx: DEMO_CATALOGO,
+    allEx: o.volumen ? DEMO_CATALOGO.concat(VOL_CATALOGO) : DEMO_CATALOGO,
     // `incompleto`: simula que el historial no se pudo cargar completo (para probar los avisos), sin tocar los datos.
     historiaCompleta: o.incompleto ? { sesiones: true, progreso: false } : { sesiones: true, progreso: true },
   };
