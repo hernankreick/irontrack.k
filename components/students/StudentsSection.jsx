@@ -348,17 +348,23 @@ export default function StudentsSection(props) {
                   setCoachCardMenuId(null);
                   if (alumnoActivo?.id === a.id) { setAlumnoActivo(null); return; }
                   setAlumnoActivo(a); setRegistrosSubTab(0); setLoadingSB(true);
-                  const carga = await loadAlumnoFicha({
-                    alumno: a,
-                    sb: sb,
-                    mergeRutinasAsignadas: mergeRutinasAsignadas,
-                    setRutinasSB: setRutinasSB,
-                    setRutinasSBEntrenador: setRutinasSBEntrenador,
-                    setAlumnoProgreso: setAlumnoProgreso,
-                    setAlumnoSesiones: setAlumnoSesiones,
-                  });
-                  // D7.3: una carga reemplazada por la de otro alumno no apaga el «cargando» de la nueva
-                  if (!(carga && carga.stale)) setLoadingSB(false);
+                  let carga = null;
+                  try {
+                    carga = await loadAlumnoFicha({
+                      alumno: a,
+                      sb: sb,
+                      mergeRutinasAsignadas: mergeRutinasAsignadas,
+                      setRutinasSB: setRutinasSB,
+                      setRutinasSBEntrenador: setRutinasSBEntrenador,
+                      setAlumnoProgreso: setAlumnoProgreso,
+                      setAlumnoSesiones: setAlumnoSesiones,
+                    });
+                  } catch (e) {
+                    console.error("[VER alumno]", e);
+                  } finally {
+                    // D7.3: una carga reemplazada por la de otro alumno no apaga el «cargando» de la nueva; un error de red no lo deja pegado
+                    if (!(carga && carga.stale)) setLoadingSB(false);
+                  }
                 }}
                 onToggleMenu={function (e) { e.stopPropagation(); setCoachCardMenuId(coachCardMenuId === a.id ? null : a.id); }}
                 onEdit={function () {

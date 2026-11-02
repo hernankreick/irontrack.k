@@ -191,6 +191,36 @@ await test("6. nuevaCargaFicha: solo la ultima carga es vigente; App (Dashboard 
   assert.match(ver, /if \(!\(carga && carga\.stale\)\) setLoadingSB\(false\)/);
 });
 
+await test("6b. carga reemplazada tras avanzar semana_activa: la lista del entrenador refleja el avance; la ficha abierta no recibe nada", async () => {
+  let resolverReconcile;
+  const e = estadoFicha();
+  e.st.rutinasSBEntrenador = [{ id: "r-" + A, alumno_id: A, datos: { semana_activa: 1 } }];
+  const sb = {
+    getRutinas: async (id) => [{ id: "r-" + id, alumno_id: id, datos: { semana_activa: 1 } }],
+    reconcileSemanaActivaAlumno: () => new Promise((res) => { resolverReconcile = res; }),
+    getProgreso: async (id) => [{ alumno_id: id }],
+    getSesiones: async (id) => [{ alumno_id: id }],
+  };
+  const pA = loadAlumnoFicha(Object.assign({ alumno: { id: A }, sb }, e.setters));
+  for (let k = 0; k < 5; k++) await Promise.resolve();
+  nuevaCargaFicha(); // otra ficha (B) empezo a cargar
+  e.st.rutinasSB = [{ id: "r-" + B, alumno_id: B, datos: { semana_activa: 1 } }];
+  resolverReconcile({ status: "advanced", rutinaId: "r-" + A, semanaActiva: 2 });
+  assert.equal((await pA).stale, true);
+  const enLista = e.st.rutinasSBEntrenador.find((r) => r.id === "r-" + A);
+  assert.equal(enLista.datos.semana_activa, 2);
+  assert.equal(dueno(e.st.rutinasSB), B);
+  assert.equal(e.st.progreso, null);
+});
+
+await test("6c. VER con error de red no deja «cargando» pegado; los botones +/- de kg aceptan coma", () => {
+  const ver = src("components/students/StudentsSection.jsx");
+  assert.match(ver, /try \{\s*carga = await loadAlumnoFicha\([\s\S]*?\} finally \{[\s\S]*?if \(!\(carga && carga\.stale\)\) setLoadingSB\(false\)/);
+  assert.match(src("components/WorkoutExercisePanel.jsx"), /const adjustKg = \(d\) => setKg\(v=>String\(Math\.max\(0,normalizeWorkoutKg\(v\)\+d\)\)\)/);
+  assert.match(src("components/LogForm.jsx"), /const adjustKg = \(delta\) => setKg\(v=>String\(Math\.max\(0,normalizeWorkoutKg\(v\)\+delta\)\)\)/);
+  assert.equal(Math.max(0, normalizeWorkoutKg("82,5") + 2.5), 85);
+});
+
 // ---- PR ----
 const r = (ex, fecha, kg, reps, extra) => Object.assign({ ejercicio_id: ex, fecha, kg, reps }, extra || {});
 await test("7. PR: igualar no es PR, superar si, bajar no; orden cronologico aunque las filas lleguen desordenadas", () => {

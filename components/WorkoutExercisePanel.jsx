@@ -143,7 +143,7 @@ export function WorkoutExercisePanel(props) {
     };
   }, []);
 
-  const adjustKg = (d) => setKg(v=>String(Math.max(0,(parseFloat(v)||0)+d)));
+  const adjustKg = (d) => setKg(v=>String(Math.max(0,normalizeWorkoutKg(v)+d)));
 
   const stopKgHold = () => {
     if (holdTimer.current) {
