@@ -124,10 +124,14 @@ export function findTodayFinishedSession(params) {
 }
 
 /** Series de hoy (misma fecha y semana) de un ejercicio; mismo criterio que countExercisesWithLogToday. */
-function todaySetsOf(progress, exId, hoy, weekIndex) {
+function todaySetsOf(progress, exId, hoy, weekIndex, ciclo) {
   const sets = (progress && progress[exId] && progress[exId].sets) || [];
+  const fecha = normalizeFecha(hoy);
+  // D7.1: fecha normalizada ("5/3/2026" === "05/03/2026") y, con ciclo, solo series de ese ciclo (una serie sin ciclo no se filtra).
   return sets.filter(function (s) {
-    return s && s.date === hoy && (s.week === undefined || s.week === weekIndex);
+    if (!s || !s.date || normalizeFecha(String(s.date)) !== fecha) return false;
+    if (ciclo != null && s.ciclo != null && s.ciclo !== "" && !rowInCiclo(s, ciclo)) return false;
+    return s.week === undefined || s.week === weekIndex;
   });
 }
 
@@ -224,7 +228,7 @@ export function countUnexplainedActivity({ rutina, day, progress, hoy, weekIndex
   let unexplained = 0;
   dayExercises.forEach(function (ex) {
     if (!ex || ex.id == null) return;
-    const sets = todaySetsOf(progress, ex.id, hoy, weekIndex);
+    const sets = todaySetsOf(progress, ex.id, hoy, weekIndex, readCicloActual(rutina && rutina.datos));
     if (!sets.length) return;
     if (!covered[String(ex.id)]) {
       unexplained++;
@@ -278,7 +282,7 @@ export function countUnexplainedActivity({ rutina, day, progress, hoy, weekIndex
  *   tendria created_at posterior; solo afecta ejercicios compartidos.
  */
 export function getStudentWorkoutState({ rutina, day, sesiones, progress, hoy, weekNumber, weekIndex, alumnoId }) {
-  const doneExercises = day ? countExercisesWithLogToday(day, progress, hoy, weekIndex) : 0;
+  const doneExercises = day ? countExercisesWithLogToday(day, progress, hoy, weekIndex, readCicloActual(rutina && rutina.datos)) : 0;
   const finished = findTodayFinishedSessions({ rutina, sesiones, hoy, weekNumber, alumnoId });
   if (finished.length) {
     const unexplained = countUnexplainedActivity({ rutina, day, progress, hoy, weekIndex, finishedSessions: finished });

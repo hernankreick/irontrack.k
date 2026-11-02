@@ -66,11 +66,15 @@ export function WorkoutScreen(props) {
        }[info?.pattern] || { icon:"E", color:textMuted })
     : { icon:"E", color:textMuted };
 
+  // D7.1: solo las series del ciclo vigente cuentan para el entrenamiento de hoy (tras un reinicio el mismo dia, las del ciclo
+  // anterior no completan ejercicios ni habilitan «Finalizar»).
+  const cicloVigente = readCicloActual(activeR && activeR.datos);
   const exerciseStatus = getWorkoutExerciseStatus({
     exercise: ex,
     progress: progress,
     date: hoy,
     currentWeek: currentWeek,
+    ciclo: cicloVigente,
   });
   const setsHoy = exerciseStatus.setsToday;
   const totalSets = exerciseStatus.totalSets;
@@ -79,7 +83,7 @@ export function WorkoutScreen(props) {
   const ultimoSet = exerciseStatus.lastSet;
   const pr = exerciseStatus.pr;
 
-  const dayProgress = calculateDayProgress(exercises, progress, hoy, currentWeek, { checkWeek: false });
+  const dayProgress = calculateDayProgress(exercises, progress, hoy, currentWeek, { checkWeek: false, ciclo: cicloVigente });
   const totalExDone = dayProgress.done;
   const pct = dayProgress.pct;
   const workoutReadyToFinish = exercises.length > 0 && totalExDone >= exercises.length;
@@ -346,6 +350,7 @@ export function WorkoutScreen(props) {
           date: hoy,
           currentWeek: currentWeek,
           checkWeek: false,
+          ciclo: cicloVigente,
         })}
         green={green}
         blue={blue}

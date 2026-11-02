@@ -2027,7 +2027,8 @@ function GymApp() {
       : currentWeek;
     const weekForSet = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : effectiveCurrentWeek;
     const cicloForSet = readCicloActual(routines[0] && routines[0].datos);
-    const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe);
+    // D7.1: la serie local guarda su ciclo (el mismo que va a Supabase) para no mezclarla con el ciclo nuevo tras un reinicio.
+    const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe, cicloForSet);
     setProgress(prev=>{
       // Igual que updateExerciseProgressRecord, marcando el set con el contexto LOCAL del entrenamiento
       // abierto (session_rutina_id / session_dia_idx). No se envia a Supabase: el payload remoto se arma
@@ -3630,7 +3631,7 @@ function GymApp() {
                 msg: msg,
               });
               const totalEjHero = todayDayPresentation.exerciseCount;
-              const doneEjHero = todayDay ? countExercisesWithLogToday(todayDay, progress, hoy, currentWeekForStudent) : 0;
+              const doneEjHero = todayDay ? countExercisesWithLogToday(todayDay, progress, hoy, currentWeekForStudent, readCicloActual(routines[0] && routines[0].datos)) : 0;
               const pctHero = totalEjHero > 0 ? Math.min(100, Math.round((100 * doneEjHero) / totalEjHero)) : 0;
               const progressStatusHero =
                 pctHero === 0
@@ -3865,7 +3866,7 @@ function GymApp() {
                     const doneEjRow = isDayDone
                       ? totalEj
                       : isNextDay
-                        ? countExercisesWithLogToday(d, progress, hoyStr, currentWeekForRoutine)
+                        ? countExercisesWithLogToday(d, progress, hoyStr, currentWeekForRoutine, readCicloActual(r && r.datos))
                         : 0;
                     const rightProgress = doneEjRow + "/" + totalEj;
 
