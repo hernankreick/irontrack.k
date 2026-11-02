@@ -139,7 +139,9 @@ await test("8. abrir la lista (sin tocar VER) no dispara reconciliaciones; wirin
   const sec = readFileSync(path.join(here, "../components/students/StudentsSection.jsx"), "utf8");
   const calls = sec.match(/reconcileSemanaActivaAlumno|loadAlumnoFicha\(/g) || [];
   assert.equal(calls.length, 1, "la reconciliacion solo cuelga de onVer (loadAlumnoFicha)");
-  assert.ok(/onVer=\{async function[\s\S]*?loadAlumnoFicha\(/.test(sec));
+  // D7.3: VER (y Reintentar) cargan con cargarFichaDe(a), que es el unico llamador de loadAlumnoFicha
+  assert.ok(/onVer=\{async function[\s\S]*?cargarFichaDe\(a\)/.test(sec));
+  assert.ok(/const cargarFichaDe = async function \(a\) \{[\s\S]*?loadAlumnoFicha\(/.test(sec));
 });
 
 const base = () => [row("a", EVI, "A", "2026-01-01", { days: days(4), semana_activa: 3, k: { x: 1 } }), row("b", EVI, "B", "2026-02-01", { days: days(4), semana_activa: 1 })];

@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildProgresoDemoData, VOL_ALUMNO_ID } from "../components/demo/progresoCoachDemoData.js";
 import { buildCoachProgresoModel } from "../components/coachProgresoMetrics.js";
+import { deriveSemanaActivaTarget } from "../lib/reconcileSemanaActiva.js";
 import { cicloEfectivoDeSemana, readCicloActual, readCicloBase } from "../lib/rutinaCiclo.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -95,16 +96,16 @@ test("Julián: ciclo 1 con 4 semanas (una sesión de cada día por semana, sin d
   assert.deepEqual([...new Set(ses3.map((s) => s.semana))].sort(), [1, 2]);
 });
 
-test("Julián: la rutina vigente es ciclo 3 semana 2 y el modelo solo cuenta ese ciclo", () => {
+test("Julián: la rutina vigente es ciclo 3, semana activa 3 (1 y 2 completas) y el modelo solo cuenta ese ciclo", () => {
   const r = rutinaDe(J);
   assert.equal(readCicloActual(r.datos), 3);
   assert.equal(readCicloBase(r.datos), 3);
-  assert.equal(r.datos.semana_activa, 2);
+  assert.equal(r.datos.semana_activa, 3, "semanas 1 y 2 del ciclo 3 completas -> avanza a la 3");
   assert.equal(r.datos.ciclos_meta.length, 2);
-  assert.equal(cicloEfectivoDeSemana(r.datos, 2), 3);
+  assert.equal(cicloEfectivoDeSemana(r.datos, 3), 3);
   const m = modelo(J);
-  assert.equal(m.currentRoutineWeekIndex, 1, "semana activa 2");
-  assert.equal(m.volBars[0].v > 0 && m.volBars[1].v > 0 && m.volBars[2].v === 0 && m.volBars[3].v === 0, true);
+  assert.equal(m.currentRoutineWeekIndex, 2, "semana activa 3 = índice 2 (coachProgresoMetrics debe leer semana_activa; hoy deduce la semana de la última sesión)");
+  assert.deepEqual(m.volBars.map((x) => x.v), [5175, 5235, 0, 0], "semanas 1 y 2 con volumen, la 3 sin registros todavía");
   const ciclo3 = data.progresoGlobal[J].filter((r2) => r2.ciclo === 3);
   const total3 = ciclo3.reduce((a, r2) => a + parseFloat(r2.kg) * parseFloat(r2.reps), 0);
   assert.equal(m.volBars[0].v + m.volBars[1].v, total3);
@@ -116,6 +117,22 @@ test("Julián: la historia de PR no cambia (100 kg en el día 42, iguala en 14 y
   const sq = data.progresoGlobal[J].filter((r) => r.ejercicio_id === "demo-sq" && parseFloat(r.kg) === 100).map((r) => r.fecha);
   assert.equal(new Set(sq).size, 3, "100 kg en tres días (42, 14 y 7)");
   assert.equal(maxKg(J, "demo-sq"), 100);
+});
+
+test("reconcile real: ninguna rutina de la demo con semana_activa cambiaría (ni avanza ni retrocede)", () => {
+  let n = 0;
+  for (const r of data.rutinasSBEntrenador) {
+    if (r.datos.semana_activa == null) continue;
+    n++;
+    const d = deriveSemanaActivaTarget({ datos: r.datos, sesiones: data.sesionesGlobales, rutinaId: r.id, alumnoId: r.alumno_id });
+    assert.equal(d.target, null, r.id + ": semana_activa " + r.datos.semana_activa + " pero las sesiones piden " + d.target + " (" + d.reason + ")");
+  }
+  assert.equal(n, 4, "Julián, A, B y C son las rutinas con semana_activa");
+  // semana de la demo == semana reconciliada: persistida o destino si avanzara
+  const j = rutinaDe(J);
+  const dj = deriveSemanaActivaTarget({ datos: j.datos, sesiones: data.sesionesGlobales, rutinaId: j.id, alumnoId: J });
+  assert.equal(dj.completeWeek, 2);
+  assert.equal(dj.persisted, 3);
 });
 
 test("fuente: la tarjeta de volumen solo con Valentina seleccionada y ProgresoView con aviso opcional", () => {

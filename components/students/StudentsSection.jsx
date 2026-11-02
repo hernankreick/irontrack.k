@@ -1,4 +1,4 @@
-import { loadAlumnoFicha, nuevaCargaFicha } from "../../lib/studentFicha.js";
+import { loadAlumnoFicha, nuevaCargaFicha, filasDelAlumno } from "../../lib/studentFicha.js";
 import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
@@ -16,12 +16,12 @@ export default function StudentsSection(props) {
     allEx = [], alumnoActivo, alumnoProgreso = [], alumnoSesiones = [], alumnos = [], bgCard, bgSub, border, cargarAlumnos, alumnosStatus, cleanActiveCoachAlumnos,
     coachAluBorderSoft, coachAluDropdown, coachAluDropdownShadow, coachAluGhostBtn, coachAluShell, coachAluSubtle, coachAluSurface, coachAluTrack,
     coachAlumnosCounts = { todos: 0, activos: 0, inactivos: 0, sin_rutina: 0 }, coachAlumnosFilter, coachAlumnosListaFiltrada = [], coachAlumnosSearch, coachDashIntent = null, setCoachDashIntent, coachCardMenuId, coachDiaSecsOpen = {}, coachRoutineDiaIdx, coachRutinaMenuOpen,
-    completedDays = [], currentWeek, darkMode, ENTRENADOR_ID, es, EX = [], generarSugerenciasAlumno, getRutinaAsignadaAlumno, loadingSB, mergeRutinasAsignadas, msg,
+    completedDays = [], currentWeek, darkMode, ENTRENADOR_ID, es, EX = [], fichaError = null, setFichaError, generarSugerenciasAlumno, getRutinaAsignadaAlumno, loadingSB, mergeRutinasAsignadas, msg,
     newAlumnoData = { nombre: "", email: "", pass: "" }, newAlumnoErrors = {}, newAlumnoForm, notaDiaInput, routineForAssign, routines = [], rutinasLoaded, sb,
     setAddExModal, setAddExMuscle, setAddExPat, setAddExSearch, setAddExSelectedIds, setAliasModal, setAlumnoActivo, setAlumnoProgreso, setAlumnoSesiones, setAlumnos, setAssignRoutineId,
     setCoachAlumnosFilter, setCoachAlumnosSearch, setCoachCardMenuId, setChatModal, setCoachDiaSecsOpen, setCoachDialog, setCoachRoutineDiaIdx, setCoachRutinaMenuOpen, setEditEx,
     setLoadingSB, setNewAlumnoData, setNewAlumnoErrors, setNewAlumnoForm, setNotaDiaInput, setRegistrosSubTab, setRutinasSB, setRutinasSBEntrenador,
-    sesionesGlobales = [], progresoGlobal = {}, showCoachDesktopShell, sugsOpen = {}, setSugsOpen, textMain, textMuted, toast2
+    sesionesGlobales = [], setSesionesGlobales, progresoGlobal = {}, showCoachDesktopShell, sugsOpen = {}, setSugsOpen, textMain, textMuted, toast2
   } = props;
   const t = typeof msg === "function" ? msg : function (esText, enText) { return es ? esText : enText; };
   const assignedRoutineFor = typeof getRutinaAsignadaAlumno === "function"
@@ -46,12 +46,43 @@ export default function StudentsSection(props) {
   const newAlumnoPristine = !((newAlumnoData.nombre || "").trim() || (newAlumnoData.email || "").trim());
   useDialogA11y({ open: !!newAlumnoForm, containerRef: newAlumnoDialogRef, onEscape: newAlumnoPristine && !creatingAlumno ? closeNewAlumnoForm : undefined });
   const [manualValidate, setManualValidate] = React.useState(null);
+  // D7.3: carga de la ficha del alumno `a` (VER y Reintentar). Vacia lo anterior, solo la carga vigente escribe y apaga «cargando»,
+  // y si falla la red queda el estado de error de ESE alumno (nunca datos de otro).
+  const cargarFichaDe = async function (a) {
+    setLoadingSB(true);
+    if (typeof setFichaError === "function") setFichaError(null);
+    const vigente = nuevaCargaFicha(a.id);
+    let res = null;
+    try {
+      res = await loadAlumnoFicha({
+        esVigente: vigente,
+        alumno: a,
+        sb: sb,
+        mergeRutinasAsignadas: mergeRutinasAsignadas,
+        setRutinasSB: setRutinasSB,
+        setRutinasSBEntrenador: setRutinasSBEntrenador,
+        setAlumnoProgreso: setAlumnoProgreso,
+        setAlumnoSesiones: setAlumnoSesiones,
+      });
+    } catch (e) {
+      res = { error: e };
+    } finally {
+      if (vigente()) {
+        if (res && res.error) {
+          console.error("[VER alumno]", res.error);
+          if (typeof setFichaError === "function") setFichaError(String(a.id));
+        }
+        setLoadingSB(false);
+      }
+    }
+  };
   const sesionesForAlumno = React.useCallback(function (a) {
     var aid = String(a && a.id != null ? a.id : a);
     var byGlobal = (sesionesGlobales || []).filter(function (s) {
       return String(s && s.alumno_id) === aid;
     });
-    var bySelected = alumnoActivo && String(alumnoActivo.id) === aid ? (alumnoSesiones || []) : [];
+    // D7.3: solo filas de ESTE alumno (una respuesta de otro alumno nunca se muestra como suya)
+    var bySelected = alumnoActivo && String(alumnoActivo.id) === aid ? filasDelAlumno(alumnoSesiones, aid) : [];
     var seen = {};
     return bySelected.concat(byGlobal).filter(function (s, idx) {
       var key = s && s.id != null ? "id:" + String(s.id) : "row:" + idx + ":" + String(s && (s.fecha || s.created_at || ""));
@@ -319,9 +350,10 @@ export default function StudentsSection(props) {
               });
               const rutSB = isAlumnoActive ? assignedRoutineFor(a.id) : null;
               // "Reiniciar desde cero": las sugerencias de carga solo parten de los registros del bloque vigente (un reinicio de semana las mantiene).
+              const progresoAlu = isAlumnoActive ? filasDelAlumno(alumnoProgreso, a.id) : [];
               const regsAlu = rutSB && readCicloCargas(rutSB.datos) === CICLO_CARGAS.CERO && readCicloBase(rutSB.datos) > 1
-                ? (alumnoProgreso || []).filter(function (reg) { return rowCiclo(reg) >= readCicloBase(rutSB.datos); })
-                : (alumnoProgreso || []);
+                ? progresoAlu.filter(function (reg) { return rowCiclo(reg) >= readCicloBase(rutSB.datos); })
+                : progresoAlu;
               const sugs = rutSB && regsAlu.length >= 2 ? generarSugerenciasAlumno(regsAlu, rutSB.datos, EX) : [];
               const suggestionsOpen = !!sugsOpen[a.id];
               return (
@@ -346,27 +378,10 @@ export default function StudentsSection(props) {
                 coachAluDropdownShadow={coachAluDropdownShadow}
                 onVer={async function () {
                   setCoachCardMenuId(null);
-                  // D7.3: cerrar la ficha invalida la carga en curso (su respuesta tardia no escribe nada)
-                  if (alumnoActivo?.id === a.id) { nuevaCargaFicha(); setAlumnoActivo(null); setLoadingSB(false); return; }
-                  setAlumnoActivo(a); setRegistrosSubTab(0); setLoadingSB(true);
-                  const vigente = nuevaCargaFicha();
-                  try {
-                    await loadAlumnoFicha({
-                      esVigente: vigente,
-                      alumno: a,
-                      sb: sb,
-                      mergeRutinasAsignadas: mergeRutinasAsignadas,
-                      setRutinasSB: setRutinasSB,
-                      setRutinasSBEntrenador: setRutinasSBEntrenador,
-                      setAlumnoProgreso: setAlumnoProgreso,
-                      setAlumnoSesiones: setAlumnoSesiones,
-                    });
-                  } catch (e) {
-                    console.error("[VER alumno]", e);
-                  } finally {
-                    // D7.3: solo la carga vigente apaga «cargando» (tambien si fallo la red); una reemplazada no apaga el de la nueva
-                    if (vigente()) setLoadingSB(false);
-                  }
+                  // D7.3: cerrar la ficha invalida la carga y las operaciones en curso (sus respuestas tardias no tocan la ficha)
+                  if (alumnoActivo?.id === a.id) { nuevaCargaFicha(null); setAlumnoActivo(null); setLoadingSB(false); if (typeof setFichaError === "function") setFichaError(null); return; }
+                  setAlumnoActivo(a); setRegistrosSubTab(0);
+                  await cargarFichaDe(a);
                 }}
                 onToggleMenu={function (e) { e.stopPropagation(); setCoachCardMenuId(coachCardMenuId === a.id ? null : a.id); }}
                 onEdit={function () {
@@ -399,15 +414,22 @@ export default function StudentsSection(props) {
                 }}
                 onAsignarRutina={function () {}}
               >
+                {isAlumnoActive&&fichaError===String(a.id)&&!loadingSB&&(
+                  <div role="alert" data-qa="ficha-error" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",margin:"8px 0",padding:"10px 12px",borderRadius:12,border:"1px solid "+coachAluBorderSoft,background:coachAluSubtle,color:textMain,fontSize:13}}>
+                    <span>{t("No se pudo cargar la ficha de ", "Could not load the profile of ")}{a.nombre || a.email}{t(". Revisá la conexión.", ". Check your connection.")}</span>
+                    <button type="button" className="coach-tap" onClick={function () { cargarFichaDe(a); }} style={{minHeight:44,minWidth:44,padding:"8px 14px",borderRadius:10,border:"1px solid "+coachAluBorderSoft,background:coachAluSurface,color:textMain,fontWeight:700,fontSize:13,cursor:"pointer"}}>{t("Reintentar", "Retry")}</button>
+                  </div>
+                )}
                 {isAlumnoActive&&rutinaActiva&&!loadingSB&&(
                   <StudentOrphanSession
                     alumno={a}
                     rutina={rutinaActiva}
-                    progreso={alumnoProgreso}
+                    progreso={progresoAlu}
                     sesiones={sesionesForAlumno(a)}
                     allEx={allEx}
                     sb={sb}
                     setAlumnoSesiones={setAlumnoSesiones}
+                    setSesionesGlobales={setSesionesGlobales}
                     setRutinasSB={setRutinasSB}
                     setRutinasSBEntrenador={setRutinasSBEntrenador}
                     toast2={toast2}
@@ -516,6 +538,7 @@ export default function StudentsSection(props) {
               semana={manualValidate ? manualValidate.semana : null}
               sb={sb}
               setAlumnoSesiones={setAlumnoSesiones}
+              setSesionesGlobales={setSesionesGlobales}
               setRutinasSB={setRutinasSB}
               setRutinasSBEntrenador={setRutinasSBEntrenador}
               toast2={toast2}

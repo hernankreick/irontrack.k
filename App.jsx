@@ -165,7 +165,7 @@ import {
   persistSetConfirmed,
 } from './lib/workoutSession.js';
 import { postProgressIdempotent } from './lib/progressInsert.js';
-import { nuevaCargaFicha } from './lib/studentFicha.js';
+import { nuevaCargaFicha, observarCargaFicha, sincronizarVistaFicha, capturarVistaFicha, filasDelAlumno } from './lib/studentFicha.js';
 import {
   generateOpId,
   enqueueItem,
@@ -718,6 +718,10 @@ function GymApp() {
     cargarAlumnos,
     notifyAlumno,
   } = useAlumnos({ sb });
+  // D7.3: la vista de la ficha sigue a alumnoActivo (las operaciones asincronas de la ficha la consultan antes de tocar su estado visual)
+  sincronizarVistaFicha(alumnoActivo && alumnoActivo.id != null ? alumnoActivo.id : null);
+  // D7.3: alumno cuya ficha no se pudo cargar (red). Nunca se muestran datos de otro alumno en su lugar; la ficha ofrece reintentar.
+  const [fichaError, setFichaError] = useState(null);
   const {
     registrosSubTab, setRegistrosSubTab,
     sugsOpen, setSugsOpen,
@@ -984,6 +988,8 @@ function GymApp() {
 
     var alumnoIdAssign = resolveAlumnoId(alumno);
     var entrenadorIdAssign = resolveEntrenadorId(authSessionAssign);
+    // D7.3: rutinasSB es la ficha abierta; si el entrenador cambio de alumno mientras se asignaba, solo se actualiza la lista global
+    var fichaDelAsignado = capturarVistaFicha(alumnoIdAssign);
     if (!alumnoIdAssign || !entrenadorIdAssign || !rutina) {
       console.error("[assignRut] datos invalidos");
       throw new Error("Datos invalidos para asignar rutina");
@@ -1043,7 +1049,7 @@ function GymApp() {
           console.error("[assignRut] error al quitar rutina anterior despues del insert", eOldRutina);
         }
       }
-      setRutinasSB(function (prev) {
+      if (fichaDelAsignado()) setRutinasSB(function (prev) {
         return (prev || []).filter(function (x) {
           return !oldRutinaIds[String(x.id)];
         });
@@ -1055,7 +1061,7 @@ function GymApp() {
       });
     }
 
-    setRutinasSB(function (prev) {
+    if (fichaDelAsignado()) setRutinasSB(function (prev) {
       return mergeRutinasAsignadas([res], prev);
     });
     setRutinasSBEntrenador(function (prev) {
@@ -2172,7 +2178,8 @@ function GymApp() {
         setAlumnoActivo(alum);
         setTab("alumnos");
         setLoadingSB(true);
-        var vigentealum = nuevaCargaFicha(); // D7.3: una respuesta tardia de otro alumno no pisa la ficha abierta
+        var vigentealum = nuevaCargaFicha(alum.id); // D7.3: una respuesta tardia de otro alumno no pisa la ficha abierta
+        setRutinasSB([]); setAlumnoProgreso([]); setAlumnoSesiones([]); setFichaError(null); // nada del alumno anterior mientras carga
         Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)])
           .then(function (r) {
             if (!vigentealum()) return;
@@ -2182,6 +2189,7 @@ function GymApp() {
           })
           .catch(function (e) {
             console.error("[GlobalSearch alumnos]", e);
+            if (vigentealum()) setFichaError(String(alum.id));
           })
           .finally(function () {
             if (vigentealum()) setLoadingSB(false);
@@ -2205,7 +2213,8 @@ function GymApp() {
         setAlumnoActivo(alum2);
         setTab("alumnos");
         setLoadingSB(true);
-        var vigentealum2 = nuevaCargaFicha(); // D7.3: una respuesta tardia de otro alumno no pisa la ficha abierta
+        var vigentealum2 = nuevaCargaFicha(alum2.id); // D7.3: una respuesta tardia de otro alumno no pisa la ficha abierta
+        setRutinasSB([]); setAlumnoProgreso([]); setAlumnoSesiones([]); setFichaError(null); // nada del alumno anterior mientras carga
         Promise.all([sb.getRutinas(alum2.id), sb.getProgreso(alum2.id), sb.getSesiones(alum2.id)])
           .then(function (r) {
             if (!vigentealum2()) return;
@@ -2215,13 +2224,14 @@ function GymApp() {
           })
           .catch(function (e) {
             console.error("[GlobalSearch sesiones]", e);
+            if (vigentealum2()) setFichaError(String(alum2.id));
           })
           .finally(function () {
             if (vigentealum2()) setLoadingSB(false);
           });
       }
     },
-    [alumnosActivosLimpios, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones]
+    [alumnosActivosLimpios, sb, setAlumnoActivo, setTab, setLoadingSB, setRutinasSB, setAlumnoProgreso, setAlumnoSesiones, setFichaError]
   );
 
   const activeR = session ? routines.find(r=>r.id===session.rId) : null;
@@ -2468,6 +2478,9 @@ function GymApp() {
     var rid = rutinaId != null ? String(rutinaId) : "";
     var local = (rutinasSBEntrenador || []).concat(rutinasSB || []).find(function (r0) { return r0 && String(r0.id) === rid && r0.datos; });
     var esperado = o.cicloEsperado != null ? o.cicloEsperado : (local ? readCicloActual(local.datos) : undefined);
+    // D7.3: la ficha que vio el entrenador al reiniciar; si cambia de alumno o la cierra, la respuesta no toca la ficha (el reinicio igual queda guardado)
+    var aidLocal = local && local.alumno_id != null ? String(local.alumno_id) : (alumnoActivo && alumnoActivo.id != null ? String(alumnoActivo.id) : null);
+    var fichaDelReinicio = capturarVistaFicha(aidLocal);
     var res = await sb.reiniciarRutinaCiclo({ rutinaId: rid, cargas: cargas, tipo: o.tipo, semana: o.semana, cicloEsperado: esperado });
     if (!res || !res.ok) {
       if (res && res.reason === "conflicto_ciclo") {
@@ -2483,23 +2496,27 @@ function GymApp() {
       });
     }
     setRutinasSBEntrenador(applyDatos);
-    setRutinasSB(applyDatos);
     var aid = res.rutina && res.rutina.alumno_id != null ? String(res.rutina.alumno_id) : "";
+    var enFicha = function () { return fichaDelReinicio() && (!aid || aid === aidLocal); };
+    if (enFicha()) setRutinasSB(applyDatos);
     // it_cd del dispositivo del entrenador: claves de esta rutina de ciclos anteriores.
     setCompletedDays(function (prev) {
       return (prev || []).filter(function (k) { return !(rid && String(k).startsWith(rid + "-")); });
     });
-    setCoachRoutineDiaIdx(0);
-    setRegistrosSubTab(0);
+    if (enFicha()) {
+      setCoachRoutineDiaIdx(0);
+      setRegistrosSubTab(0);
+    }
     try {
       var results = await Promise.all([cargarRutinasEntrenador(), cargarSesionesGlobales()]);
       void results;
       if (aid) {
         var freshSes = await sb.getSesiones(aid);
         var freshProg = await sb.getProgreso(aid);
-        if (Array.isArray(freshSes) && alumnoActivo && String(alumnoActivo.id) === aid) setAlumnoSesiones(freshSes);
+        // enFicha(): vista actual (no el alumnoActivo de la clausura, que es el de cuando empezo el reinicio)
+        if (Array.isArray(freshSes) && enFicha()) setAlumnoSesiones(freshSes);
         // progresoGlobal ya quedo completo con cargarSesionesGlobales(); getProgreso no pagina y no debe reemplazarlo.
-        if (Array.isArray(freshProg) && alumnoActivo && String(alumnoActivo.id) === aid) setAlumnoProgreso(freshProg);
+        if (Array.isArray(freshProg) && enFicha()) setAlumnoProgreso(freshProg);
       }
     } catch (e) {
       // El reinicio YA quedo guardado; si falla el refresco, la UI se corrige al recargar.
@@ -2514,7 +2531,8 @@ function GymApp() {
     if (!alumno || alumno.id == null || !rutina) return null;
     var aid = String(alumno.id);
     var esActivo = !!(alumnoActivo && String(alumnoActivo.id) === aid);
-    var prog = esActivo && Array.isArray(alumnoProgreso) && alumnoProgreso.length ? alumnoProgreso : ((progresoGlobal || {})[aid] || []);
+    var progActivo = esActivo ? filasDelAlumno(alumnoProgreso, aid) : []; // D7.3: solo filas de este alumno
+    var prog = progActivo.length ? progActivo : ((progresoGlobal || {})[aid] || []);
     var ses = (sesionesGlobales || []).concat(esActivo ? (alumnoSesiones || []) : []);
     try {
       return textoSeriesSinFinalizar(resumirSeriesSinFinalizar({ progreso: prog, sesiones: ses, rutina: rutina, alumnoId: aid }), msgM);
@@ -2556,20 +2574,18 @@ function GymApp() {
   async function clearAlumnoProgressHistory(alumnoId) {
     var aid = alumnoId != null ? String(alumnoId) : "";
     if (!aid) throw new Error("alumnoId requerido");
+    // D7.3: si al terminar la ficha muestra a otro alumno (o se cerro), su estado visual no se toca; las listas globales si se limpian
+    var fichaDelBorrado = capturarVistaFicha(aid);
 
     await Promise.all([
       sb.deleteProgresoByAlumno(aid),
       sb.deleteSesionesByAlumno(aid),
     ]);
 
-    setAlumnoProgreso(function (prev) {
-      if (!alumnoActivo || String(alumnoActivo.id) === aid) return [];
-      return prev || [];
-    });
-    setAlumnoSesiones(function (prev) {
-      if (!alumnoActivo || String(alumnoActivo.id) === aid) return [];
-      return prev || [];
-    });
+    if (fichaDelBorrado()) {
+      setAlumnoProgreso([]);
+      setAlumnoSesiones([]);
+    }
     setSesionesGlobales(function (prev) {
       return (prev || []).filter(function (s) {
         return String(s && s.alumno_id) !== aid;
@@ -2623,11 +2639,11 @@ function GymApp() {
     });
     setPendingSync(readVisiblePending());
 
-    if (alumnoActivo && String(alumnoActivo.id) === aid) {
+    if (fichaDelBorrado()) {
       setRegistrosSubTab(0);
       try {
         var freshRutinas = await sb.getRutinas(aid);
-        setRutinasSB(freshRutinas || []);
+        if (fichaDelBorrado()) setRutinasSB(freshRutinas || []);
       } catch (e) {}
     }
 
@@ -2719,6 +2735,8 @@ function GymApp() {
         return;
       }
       if (c.t === 'assignRut' && c.a && c.rutinaLocal) {
+        // D7.3: si mientras se asigna se abre otra ficha, su «cargando» es de esa carga: no se apaga aca
+        var turnoAsignar = observarCargaFicha();
         setLoadingSB(true);
         try {
           await assignRoutineToAlumno({ alumno: c.a, rutina: c.rutinaLocal, previousRoutine: c.ex || null });
@@ -2727,7 +2745,7 @@ function GymApp() {
           console.error('[assignRut] error al asignar rutina', eAssignRut);
           toast2('Error al asignar rutina');
         }
-        setLoadingSB(false);
+        if (turnoAsignar()) setLoadingSB(false);
         setCoachDialog({ t: 'none' });
         return;
         /*
@@ -3128,7 +3146,8 @@ function GymApp() {
     cargarFicha: async function (alum, logLabel) {
       setLoadingSB(true);
       // D7.3: solo la ultima carga de ficha escribe estado (una respuesta tardia de otro alumno no pisa la ficha abierta)
-      var vigente = nuevaCargaFicha();
+      var vigente = nuevaCargaFicha(alum.id);
+      setRutinasSB([]); setAlumnoProgreso([]); setAlumnoSesiones([]); setFichaError(null); // nada del alumno anterior mientras carga
       try {
         var r = await Promise.all([sb.getRutinas(alum.id), sb.getProgreso(alum.id), sb.getSesiones(alum.id)]);
         if (!vigente()) return;
@@ -3137,6 +3156,7 @@ function GymApp() {
         setAlumnoSesiones(r[2] || []);
       } catch (e) {
         console.error(logLabel, e);
+        if (vigente()) setFichaError(String(alum.id));
       }
       if (vigente()) setLoadingSB(false);
     },
@@ -3320,6 +3340,9 @@ function GymApp() {
         generarSugerenciasAlumno: generarSugerenciasAlumno,
         getRutinaAsignadaAlumno: getRutinaAsignadaAlumno,
         loadingSB: loadingSB,
+        fichaError: fichaError,
+        setFichaError: setFichaError,
+        setSesionesGlobales: setSesionesGlobales,
         mergeRutinasAsignadas: mergeRutinasAsignadas,
         msg: msg,
         newAlumnoData: newAlumnoData,

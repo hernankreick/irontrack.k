@@ -8,7 +8,7 @@
 //   Alumno C Demo rutina asignada y SIN ningún registro (estados vacíos)
 //   Carla Sosa    inactiva (última sesión hace 23 días)
 //   Diego Lima    rutina asignada hace 5 días · solo primeras marcas (0 PRs)
-//   Julián Paz    estancado: récord hace más de 3 semanas, entrena pero sin superarlo (iguala) · 3 ciclos (rutina vigente: ciclo 3, semana 2)
+//   Julián Paz    estancado: récord hace más de 3 semanas, entrena pero sin superarlo (iguala) · 3 ciclos (rutina vigente: ciclo 3, semana activa 3: semanas 1 y 2 completas)
 //   Martina Vega  sin rutina asignada · registros de una rutina anterior
 //   Tomás Ruiz    activo, alta adherencia, PRs
 
@@ -138,10 +138,10 @@ export function buildProgresoDemoData(opts) {
     },
     { id: "demo-r-tomas", alumno_id: "demo-tomas", nombre: "Hipertrofia", created_at: iso(30), datos: { days: dias([ex("demo-bp"), ex("demo-ohp")], [ex("demo-sq"), ex("demo-hip")], [ex("demo-row")], [ex("demo-dl")]) } },
     {
-      // 3 ciclos: reinicios de rutina hace ~44 y ~9 días (formato real de lib/rutinaCiclo.js). Vigente: ciclo 3, semana 2.
+      // 3 ciclos: reinicios de rutina hace ~44 y ~9 días (formato real de lib/rutinaCiclo.js). Vigente: ciclo 3, semana activa 3 (semanas 1 y 2 completas, la 3 sin registros).
       id: "demo-r-julian", alumno_id: "demo-julian", nombre: "Fuerza básica", created_at: iso(75),
       datos: {
-        ciclo_actual: 3, ciclo_base: 3, semana_activa: 2, ciclo_reiniciado_at: iso(9),
+        ciclo_actual: 3, ciclo_base: 3, semana_activa: 3, ciclo_reiniciado_at: iso(9),
         ciclos_meta: [
           { ciclo: 2, tipo: "rutina", semana_inicio: 1, desde_ciclo: 1, at: iso(44) },
           { ciclo: 3, tipo: "rutina", semana_inicio: 1, desde_ciclo: 2, at: iso(9) },
@@ -234,7 +234,7 @@ export function buildProgresoDemoData(opts) {
   }
 
   // ---- Julián: sube hasta hace 5 semanas y después iguala o queda por debajo (estancado)
-  // [n, semana, ciclo]: ciclo 1 = 4 semanas (una sesión por semana), ciclo 2 = 4 semanas, ciclo 3 = 2 semanas (vigente, semana 2).
+  // [n, semana, ciclo]: ciclo 1 = 4 semanas (una sesión por semana), ciclo 2 = 4 semanas, ciclo 3 = semanas 1 y 2 completas (vigente; semana_activa 3, como avanza lib/reconcileSemanaActiva).
   const julianPlan = { 70: [1, 1], 63: [2, 1], 56: [3, 1], 49: [4, 1], 42: [1, 2], 28: [2, 2], 21: [3, 2], 14: [4, 2], 7: [1, 3], 2: [2, 3] };
   [[70, 85, 60, 120, 60], [63, 90, 62.5, 125, 62.5], [56, 95, 65, 130, 65], [49, 97.5, 67.5, 135, 65], [42, 100, 70, 140, 67.5],
    [28, 95, 67.5, 135, 65], [21, 97.5, 67.5, 140, 67.5], [14, 100, 70, 135, 67.5], [7, 100, 67.5, 140, 65], [2, 97.5, 70, 140, 67.5]].forEach(([n, sq, bp, dl, row]) => {

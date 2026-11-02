@@ -9,7 +9,7 @@ process.env.TZ = "America/Argentina/Buenos_Aires";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildCoachProgresoModel } from "../components/coachProgresoMetrics.js";
-import { loadAlumnoFicha, nuevaCargaFicha } from "../lib/studentFicha.js";
+import { loadAlumnoFicha, nuevaCargaFicha, sincronizarVistaFicha, capturarVistaFicha, filasDelAlumno, aplicarSesionesValidadas, aplicarAvanceSemana } from "../lib/studentFicha.js";
 import { eventosPR, historialPorDia, mejoresMarcas } from "../lib/metricas/pr.js";
 import { volumenEnRango, volumenDeSerie } from "../lib/metricas/volumen.js";
 import { diaLocal } from "../lib/metricas/fechas.js";
@@ -185,10 +185,10 @@ await test("6. nuevaCargaFicha: solo la ultima carga es vigente; App (Dashboard 
   assert.equal(v1(), false);
   assert.equal(v2(), true);
   const app = src("App.jsx");
-  assert.equal((app.match(/nuevaCargaFicha\(\)/g) || []).length, 3, "cargarFicha + 2 rutas de la busqueda global");
-  assert.match(app, /cargarFicha: async function[\s\S]{0,400}if \(!vigente\(\)\) return;/);
+  assert.equal((app.match(/nuevaCargaFicha\((alum|alum2)\.id\)/g) || []).length, 3, "cargarFicha + 2 rutas de la busqueda global");
+  assert.match(app, /cargarFicha: async function[\s\S]{0,700}if \(!vigente\(\)\) return;/);
   const ver = src("components/students/StudentsSection.jsx");
-  assert.match(ver, /if \(vigente\(\)\) setLoadingSB\(false\)/);
+  assert.match(ver, /if \(vigente\(\)\) \{[\s\S]{0,300}setLoadingSB\(false\)/);
 });
 
 await test("6b. carga reemplazada tras avanzar semana_activa: la lista del entrenador refleja el avance; la ficha abierta no recibe nada", async () => {
@@ -210,13 +210,13 @@ await test("6b. carga reemplazada tras avanzar semana_activa: la lista del entre
   const enLista = e.st.rutinasSBEntrenador.find((r) => r.id === "r-" + A);
   assert.equal(enLista.datos.semana_activa, 2);
   assert.equal(dueno(e.st.rutinasSB), B);
-  assert.equal(e.st.progreso, null);
+  assert.deepEqual(e.st.progreso, []); // nada de A (se vacio al empezar y la respuesta tardia no escribio)
 });
 
 await test("6c. VER con error de red no deja «cargando» pegado; los botones +/- de kg aceptan coma", () => {
   const ver = src("components/students/StudentsSection.jsx");
-  assert.match(ver, /const vigente = nuevaCargaFicha\(\);\s*try \{\s*await loadAlumnoFicha\(\{\s*esVigente: vigente,[\s\S]*?\} finally \{[\s\S]*?if \(vigente\(\)\) setLoadingSB\(false\)/);
-  assert.match(ver, /if \(alumnoActivo\?\.id === a\.id\) \{ nuevaCargaFicha\(\); setAlumnoActivo\(null\);/);
+  assert.match(ver, /const vigente = nuevaCargaFicha\(a\.id\);[\s\S]*?res = await loadAlumnoFicha\(\{\s*esVigente: vigente,[\s\S]*?\} finally \{\s*if \(vigente\(\)\) \{[\s\S]*?setLoadingSB\(false\)/);
+  assert.match(ver, /if \(alumnoActivo\?\.id === a\.id\) \{ nuevaCargaFicha\(null\); setAlumnoActivo\(null\);/);
   assert.match(src("components/WorkoutExercisePanel.jsx"), /const adjustKg = \(d\) => setKg\(v=>String\(Math\.max\(0,normalizeWorkoutKg\(v\)\+d\)\)\)/);
   assert.match(src("components/LogForm.jsx"), /const adjustKg = \(delta\) => setKg\(v=>String\(Math\.max\(0,normalizeWorkoutKg\(v\)\+delta\)\)\)/);
   assert.equal(Math.max(0, normalizeWorkoutKg("82,5") + 2.5), 85);
@@ -226,10 +226,10 @@ await test("6d. turno tomado por quien llama: error de red en una carga vieja no
   const e = estadoFicha();
   let falla;
   const vA = nuevaCargaFicha();
-  const pA = loadAlumnoFicha(Object.assign({ alumno: { id: A }, esVigente: vA, sb: { getRutinas: () => new Promise((_, rj) => { falla = rj; }) } }, e.setters)).catch(() => "error");
+  const pA = loadAlumnoFicha(Object.assign({ alumno: { id: A }, esVigente: vA, sb: { getRutinas: () => new Promise((_, rj) => { falla = rj; }) } }, e.setters));
   const vB = nuevaCargaFicha(); // VER de B
   falla(new Error("red"));
-  assert.equal(await pA, "error");
+  assert.deepEqual(await pA, { stale: true }); // el error de una carga reemplazada no se reporta en la ficha nueva
   assert.equal(vA(), false); // VER de A no apaga «cargando»
   assert.equal(vB(), true);
   // cerrar: nuevo turno sin carga -> la respuesta de B ya no escribe
@@ -239,7 +239,111 @@ await test("6d. turno tomado por quien llama: error de red en una carga vieja no
   nuevaCargaFicha(); // cerrar ficha
   await f.resolverTodo();
   assert.equal((await pC).stale, true);
-  assert.equal(e2.st.rutinasSB, null);
+  assert.deepEqual(e2.st.rutinasSB, []); // vaciada al empezar; la respuesta tardia no escribio
+});
+
+// ---- D7.3 cierre: operaciones asincronas de la ficha, errores de red y datos residuales ----
+await test("6e. error de red al abrir B: la ficha queda vacia con error (nunca datos de A); el reintento carga B", async () => {
+  const e = estadoFicha();
+  e.st.rutinasSB = [{ id: "r-" + A, alumno_id: A }]; e.st.progreso = [{ alumno_id: A }]; e.st.sesiones = [{ alumno_id: A }]; // ficha de A abierta
+  let falla = true;
+  const sb = {
+    getRutinas: async (id) => { if (falla) throw new Error("red"); return [{ id: "r-" + id, alumno_id: id }]; },
+    getProgreso: async (id) => [{ alumno_id: id }],
+    getSesiones: async (id) => [{ alumno_id: id }],
+  };
+  const r1 = await loadAlumnoFicha(Object.assign({ alumno: { id: B }, sb }, e.setters));
+  assert.ok(r1.error instanceof Error);
+  assert.deepEqual([e.st.rutinasSB, e.st.progreso, e.st.sesiones], [[], [], []]);
+  falla = false; // Reintentar
+  const r2 = await loadAlumnoFicha(Object.assign({ alumno: { id: B }, sb }, e.setters));
+  assert.ok(!r2.error && !r2.stale);
+  assert.equal(dueno(e.st.rutinasSB), B);
+  assert.equal(dueno(e.st.progreso), B);
+  assert.equal(dueno(e.st.sesiones), B);
+});
+
+await test("6f. alumno sin rutina ni registros: la ficha queda vacia (no hereda la del alumno anterior)", async () => {
+  const e = estadoFicha();
+  e.st.rutinasSB = [{ id: "r-" + A, alumno_id: A }]; e.st.progreso = [{ alumno_id: A }]; e.st.sesiones = [{ alumno_id: A }];
+  const sb = { getRutinas: async () => null, getProgreso: async () => [], getSesiones: async () => null };
+  const r = await loadAlumnoFicha(Object.assign({ alumno: { id: C }, sb }, e.setters));
+  assert.ok(!r.error && !r.stale);
+  assert.deepEqual([e.st.rutinasSB, e.st.progreso, e.st.sesiones], [[], [], []]);
+});
+
+await test("6g. vista de la ficha: una operacion de A solo toca la ficha si sigue abierta A en la misma apertura", () => {
+  sincronizarVistaFicha(A);
+  const op = capturarVistaFicha(A);
+  assert.equal(op(), true);
+  sincronizarVistaFicha(A); // re-render con el mismo alumno: sigue vigente
+  assert.equal(op(), true);
+  sincronizarVistaFicha(B); // cambio a B
+  assert.equal(op(), false);
+  sincronizarVistaFicha(A); // volver a A: apertura nueva (sus datos se recargan desde Supabase), la operacion vieja no escribe
+  assert.equal(op(), false);
+  const op2 = capturarVistaFicha(A);
+  sincronizarVistaFicha(null); // cerrar
+  assert.equal(op2(), false);
+  sincronizarVistaFicha(A);
+  const op3 = capturarVistaFicha(A);
+  nuevaCargaFicha(A); // reabrir el mismo alumno (VER de nuevo)
+  assert.equal(op3(), false);
+  assert.equal(capturarVistaFicha(B)(), false); // operacion de B con la ficha de A abierta
+  assert.equal(capturarVistaFicha(null)(), false);
+});
+
+await test("6h. validar sesion de A con B abierto: la confirmacion queda en la lista global y la ficha de B no cambia", () => {
+  let global = [{ id: "s0", alumno_id: B }], ficha = [{ id: "sb1", alumno_id: B }];
+  const setG = (f) => { global = f(global); }, setF = (f) => { ficha = f(ficha); };
+  sincronizarVistaFicha(A);
+  const enVista = capturarVistaFicha(A);
+  sincronizarVistaFicha(B);
+  aplicarSesionesValidadas({ rows: [{ id: "sA", alumno_id: A }], enVista, setAlumnoSesiones: setF, setSesionesGlobales: setG });
+  assert.deepEqual(global.map((x) => x.id), ["sA", "s0"]);
+  assert.deepEqual(ficha.map((x) => x.id), ["sb1"]);
+  aplicarSesionesValidadas({ rows: [{ id: "sA", alumno_id: A }], enVista, setAlumnoSesiones: setF, setSesionesGlobales: setG }); // repetida: sin duplicar
+  assert.equal(global.length, 2);
+  // en vista: ficha y global
+  const v2 = capturarVistaFicha(B);
+  aplicarSesionesValidadas({ rows: [{ id: "sB2", alumno_id: B }], enVista: v2, setAlumnoSesiones: setF, setSesionesGlobales: setG });
+  assert.deepEqual(ficha.map((x) => x.id), ["sB2", "sb1"]);
+  // avance de semana: lista global siempre, ficha solo en vista
+  let lista = [{ id: "rA", datos: { semana_activa: 1 } }], rutFicha = [{ id: "rB", datos: { semana_activa: 2 } }];
+  aplicarAvanceSemana({ week: { status: "advanced", rutinaId: "rA", semanaActiva: 2 }, enVista, setRutinasSB: (f) => { rutFicha = f(rutFicha); }, setRutinasSBEntrenador: (f) => { lista = f(lista); } });
+  assert.equal(lista[0].datos.semana_activa, 2);
+  assert.equal(rutFicha[0].datos.semana_activa, 2); // la rutina de B no cambia
+  assert.equal(rutFicha[0].id, "rB");
+});
+
+await test("6i. filas de otro alumno nunca se muestran como propias", () => {
+  const rows = [{ alumno_id: A, kg: 1 }, { alumno_id: B, kg: 2 }, { kg: 3 }];
+  assert.deepEqual(filasDelAlumno(rows, B).map((r) => r.kg), [2, 3]);
+  assert.deepEqual(filasDelAlumno(null, B), []);
+});
+
+await test("6j. cableado: reiniciar rutina/semana, limpiar historial, asignar y validar consultan la vista; VER muestra error + Reintentar", () => {
+  const app = src("App.jsx");
+  assert.match(app, /var fichaDelReinicio = capturarVistaFicha\(aidLocal\);[\s\S]*?if \(Array\.isArray\(freshSes\) && enFicha\(\)\) setAlumnoSesiones\(freshSes\);[\s\S]*?if \(Array\.isArray\(freshProg\) && enFicha\(\)\) setAlumnoProgreso\(freshProg\);/);
+  assert.doesNotMatch(app, /alumnoActivo && String\(alumnoActivo\.id\) === aid\) setAlumno(Sesiones|Progreso)/);
+  assert.match(app, /var fichaDelBorrado = capturarVistaFicha\(aid\);[\s\S]*?if \(fichaDelBorrado\(\)\) \{\s*setAlumnoProgreso\(\[\]\);/);
+  assert.match(app, /if \(fichaDelBorrado\(\)\) setRutinasSB\(freshRutinas \|\| \[\]\)/);
+  assert.match(app, /var fichaDelAsignado = capturarVistaFicha\(alumnoIdAssign\);/);
+  assert.equal((app.match(/if \(fichaDelAsignado\(\)\) setRutinasSB/g) || []).length, 2);
+  assert.match(app, /var turnoAsignar = observarCargaFicha\(\);[\s\S]*?if \(turnoAsignar\(\)\) setLoadingSB\(false\);/);
+  assert.match(app, /sincronizarVistaFicha\(alumnoActivo && alumnoActivo\.id != null \? alumnoActivo\.id : null\);/);
+  assert.equal((app.match(/setRutinasSB\(\[\]\); setAlumnoProgreso\(\[\]\); setAlumnoSesiones\(\[\]\); setFichaError\(null\);/g) || []).length, 3);
+  for (const f of ["components/students/StudentOrphanSession.jsx", "components/students/ManualSessionValidationModal.jsx"]) {
+    const c = src(f);
+    assert.match(c, /const enVista = capturarVistaFicha\(alumno(\.id|Id)\);/, f);
+    assert.match(c, /aplicarSesionesValidadas\(\{[^}]*enVista: enVista/, f);
+    assert.match(c, /aplicarAvanceSemana\(\{[^}]*enVista: enVista/, f);
+    assert.doesNotMatch(c, /setAlumnoSesiones\(function/, f);
+  }
+  const ver = src("components/students/StudentsSection.jsx");
+  assert.match(ver, /data-qa="ficha-error"[\s\S]*?onClick=\{function \(\) \{ cargarFichaDe\(a\); \}\}/);
+  assert.match(ver, /const progresoAlu = isAlumnoActive \? filasDelAlumno\(alumnoProgreso, a\.id\) : \[\];/);
+  assert.match(ver, /filasDelAlumno\(alumnoSesiones, aid\)/);
 });
 
 // ---- PR ----

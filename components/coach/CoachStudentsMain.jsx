@@ -28,6 +28,9 @@ export default function CoachStudentsMain({
   currentWeek,
   darkMode,
   ENTRENADOR_ID,
+  fichaError,
+  setFichaError,
+  setSesionesGlobales,
   es,
   EX,
   generarSugerenciasAlumno,
@@ -122,6 +125,9 @@ export default function CoachStudentsMain({
       generarSugerenciasAlumno={generarSugerenciasAlumno}
       getRutinaAsignadaAlumno={getRutinaAsignadaAlumno}
       loadingSB={loadingSB}
+      fichaError={fichaError}
+      setFichaError={setFichaError}
+      setSesionesGlobales={setSesionesGlobales}
       mergeRutinasAsignadas={mergeRutinasAsignadas}
       msg={msg}
       newAlumnoData={newAlumnoData}
