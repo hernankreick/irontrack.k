@@ -4,9 +4,11 @@
 //
 // Alumnos (A–Z):
 //   Abril Méndez  activa · 3 rutinas (Inicial hace ~7 meses -> Base -> Fuerza) · 2 ciclos de Fuerza · PRs · ejercicio personalizado y por tiempo · 1 validada
+//   Alumno A Demo sentadilla 100 kg, 5.000 kg/semana, adherencia 80 % (16 de 20) · Alumno B Demo sentadilla 60 kg, 2.000 kg/semana, 50 % (8 de 16)
+//   Alumno C Demo rutina asignada y SIN ningún registro (estados vacíos)
 //   Carla Sosa    inactiva (última sesión hace 23 días)
 //   Diego Lima    rutina asignada hace 5 días · solo primeras marcas (0 PRs)
-//   Julián Paz    estancado: récord hace más de 3 semanas, entrena pero sin superarlo (iguala)
+//   Julián Paz    estancado: récord hace más de 3 semanas, entrena pero sin superarlo (iguala) · 3 ciclos (rutina vigente: ciclo 3, semana 2)
 //   Martina Vega  sin rutina asignada · registros de una rutina anterior
 //   Tomás Ruiz    activo, alta adherencia, PRs
 
@@ -117,6 +119,9 @@ const ALUMNOS = [
   { id: "demo-julian", nombre: "Julián Paz", email: "julian@demo.invalid" },
   { id: "demo-martina", nombre: "Martina Vega", email: "martina@demo.invalid" },
   { id: "demo-tomas", nombre: "Tomás Ruiz", email: "tomas@demo.invalid" },
+  { id: "demo-alumno-a", nombre: "Alumno A Demo", email: "alumno-a@demo.invalid" },
+  { id: "demo-alumno-b", nombre: "Alumno B Demo", email: "alumno-b@demo.invalid" },
+  { id: "demo-alumno-c", nombre: "Alumno C Demo", email: "alumno-c@demo.invalid" },
 ];
 
 const ex = (id, reps) => (reps ? { id, reps } : { id });
@@ -132,7 +137,21 @@ export function buildProgresoDemoData(opts) {
       datos: { ciclo_actual: 2, days: dias([ex("demo-sq"), ex("demo-rdl")], [ex("demo-bp"), ex("custom_demo_remo")], { warmup: [ex("demo-plank", '45"')], exercises: [ex("demo-dl"), ex("demo-ohp")] }) },
     },
     { id: "demo-r-tomas", alumno_id: "demo-tomas", nombre: "Hipertrofia", created_at: iso(30), datos: { days: dias([ex("demo-bp"), ex("demo-ohp")], [ex("demo-sq"), ex("demo-hip")], [ex("demo-row")], [ex("demo-dl")]) } },
-    { id: "demo-r-julian", alumno_id: "demo-julian", nombre: "Fuerza básica", created_at: iso(75), datos: { days: dias([ex("demo-sq"), ex("demo-bp")], [ex("demo-dl"), ex("demo-row")]) } },
+    {
+      // 3 ciclos: reinicios de rutina hace ~44 y ~9 días (formato real de lib/rutinaCiclo.js). Vigente: ciclo 3, semana 2.
+      id: "demo-r-julian", alumno_id: "demo-julian", nombre: "Fuerza básica", created_at: iso(75),
+      datos: {
+        ciclo_actual: 3, ciclo_base: 3, semana_activa: 2, ciclo_reiniciado_at: iso(9),
+        ciclos_meta: [
+          { ciclo: 2, tipo: "rutina", semana_inicio: 1, desde_ciclo: 1, at: iso(44) },
+          { ciclo: 3, tipo: "rutina", semana_inicio: 1, desde_ciclo: 2, at: iso(9) },
+        ],
+        days: dias([ex("demo-sq"), ex("demo-bp")], [ex("demo-dl"), ex("demo-row")]),
+      },
+    },
+    { id: "demo-r-alumno-a", alumno_id: "demo-alumno-a", nombre: "Fuerza 5 días", created_at: iso(40), datos: { semana_activa: 4, days: dias([ex("demo-sq")], [ex("demo-sq")], [ex("demo-sq")], [ex("demo-sq")], [ex("demo-sq")]) } },
+    { id: "demo-r-alumno-b", alumno_id: "demo-alumno-b", nombre: "Fuerza 4 días", created_at: iso(40), datos: { semana_activa: 4, days: dias([ex("demo-sq")], [ex("demo-sq")], [ex("demo-sq")], [ex("demo-sq")]) } },
+    { id: "demo-r-alumno-c", alumno_id: "demo-alumno-c", nombre: "Rutina sin registros", created_at: iso(10), datos: { semana_activa: 1, days: dias([ex("demo-sq")], [ex("demo-bp")]) } },
     { id: "demo-r-carla", alumno_id: "demo-carla", nombre: "Movilidad + fuerza", created_at: iso(60), datos: { days: dias([ex("demo-sq"), ex("demo-row")], { warmup: [ex("demo-plank", '45"')], exercises: [ex("demo-bp")] }) } },
     { id: "demo-r-diego", alumno_id: "demo-diego", nombre: "Inicio", created_at: iso(5), datos: { days: dias([ex("demo-sq"), ex("demo-bp")], [ex("demo-dl"), ex("demo-ohp")]) } },
   ];
@@ -215,12 +234,30 @@ export function buildProgresoDemoData(opts) {
   }
 
   // ---- Julián: sube hasta hace 5 semanas y después iguala o queda por debajo (estancado)
+  // [n, semana, ciclo]: ciclo 1 = 4 semanas (una sesión por semana), ciclo 2 = 4 semanas, ciclo 3 = 2 semanas (vigente, semana 2).
+  const julianPlan = { 70: [1, 1], 63: [2, 1], 56: [3, 1], 49: [4, 1], 42: [1, 2], 28: [2, 2], 21: [3, 2], 14: [4, 2], 7: [1, 3], 2: [2, 3] };
   [[70, 85, 60, 120, 60], [63, 90, 62.5, 125, 62.5], [56, 95, 65, 130, 65], [49, 97.5, 67.5, 135, 65], [42, 100, 70, 140, 67.5],
-   [28, 95, 67.5, 135, 65], [21, 97.5, 67.5, 140, 67.5], [14, 100, 70, 135, 67.5], [7, 100, 67.5, 140, 65], [2, 97.5, 70, 140, 67.5]].forEach(([n, sq, bp, dl, row], i) => {
-    const ciclo = i < 5 ? 1 : 2;
-    const sem = (i % 5) + 1 > 4 ? 4 : (i % 5) + 1;
+   [28, 95, 67.5, 135, 65], [21, 97.5, 67.5, 140, 67.5], [14, 100, 70, 135, 67.5], [7, 100, 67.5, 140, 65], [2, 97.5, 70, 140, 67.5]].forEach(([n, sq, bp, dl, row]) => {
+    const sem = julianPlan[n][0];
+    const ciclo = julianPlan[n][1];
     sesion("demo-julian", "demo-r-julian", "Fuerza básica", n, sem, 0, ciclo, { "demo-sq": tres(sq, 5), "demo-bp": tres(bp, 5) });
     sesion("demo-julian", "demo-r-julian", "Fuerza básica", n - 1 < 0 ? 0 : n - 1, sem, 1, ciclo, { "demo-dl": tres(dl, 3), "demo-row": tres(row, 8) });
+  });
+
+  // ---- Alumno A / B: sentadilla, 4 semanas móviles (k = 0 es la actual: días 0-3; k = 1, días 7-10; ...). Cada sesión suma
+  // exactamente el volumen objetivo: series principales kg×reps + una serie de relleno más liviana (nunca supera la marca).
+  // Alumno C: rutina asignada y nada más (sin sesiones ni progreso).
+  function sesionVol(alumnoId, rutinaId, nombreRutina, n, sem, diaIdx, kg, reps, principales, objetivo) {
+    const series = [];
+    for (let i = 0; i < principales; i++) series.push([kg, reps]);
+    series.push([(objetivo - principales * kg * reps) / reps, reps]);
+    sesion(alumnoId, rutinaId, nombreRutina, n, sem, diaIdx, 1, { "demo-sq": series });
+  }
+  [100, 97.5, 95, 92.5].forEach((kg, k) => { // A: 4 sesiones por semana x 1.250 kg = 5.000 kg/semana; 16 de 20 planificadas = 80 %
+    for (let j = 0; j < 4; j++) sesionVol("demo-alumno-a", "demo-r-alumno-a", "Fuerza 5 días", 7 * k + 3 - j, 4 - k, j, kg, 5, 2, 1250);
+  });
+  [60, 57.5, 55, 50].forEach((kg, k) => { // B: 2 sesiones por semana x 1.000 kg = 2.000 kg/semana; 8 de 16 planificadas = 50 %
+    for (let j = 0; j < 2; j++) sesionVol("demo-alumno-b", "demo-r-alumno-b", "Fuerza 4 días", 7 * k + 3 - 2 * j, 4 - k, j, kg, 10, 1, 1000);
   });
 
   // ---- Carla: entrenó un mes y dejó de venir hace 23 días

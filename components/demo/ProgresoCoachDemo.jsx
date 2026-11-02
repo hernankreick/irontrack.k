@@ -4,7 +4,7 @@ import AppGlobalStyles from '../layout/AppGlobalStyles.jsx';
 import { IronTrackI18nProvider } from '../../contexts/IronTrackI18nContext.jsx';
 import { getAppThemeTokens } from '../../lib/appThemeTokens.js';
 import { alumnosPaleta } from '../students/alumnosPaleta.js';
-import { buildProgresoDemoData, compararVolumenDemo } from './progresoCoachDemoData.js';
+import { buildProgresoDemoData, compararVolumenDemo, VOL_ALUMNO_ID } from './progresoCoachDemoData.js';
 
 /**
  * Demostración de Progreso del entrenador con el componente REAL (ProgresoView y sus tarjetas, hojas y gráficos) y datos
@@ -33,6 +33,8 @@ export default function ProgresoCoachDemo() {
   const comparacion = React.useMemo(function () {
     return volumen ? { hoy: compararVolumenDemo(data, 0), previa: compararVolumenDemo(data, 7) } : null;
   }, [volumen, data]);
+  // Alumno seleccionado en ProgresoView (aviso opcional onAlumnoSelChange): la tarjeta de volumen es solo de Valentina Carga.
+  const [alumnoSelId, setAlumnoSelId] = React.useState(null);
   const T = getAppThemeTokens(darkMode);
   const bannerText = darkMode ? '#fde68a' : '#78350f';
 
@@ -63,7 +65,7 @@ export default function ProgresoCoachDemo() {
             </button>
           </div>
         </div>
-        {comparacion ? <VolumenComparacionCard comparacion={comparacion} T={T} darkMode={darkMode} /> : null}
+        {comparacion && String(alumnoSelId) === VOL_ALUMNO_ID ? <VolumenComparacionCard comparacion={comparacion} T={T} darkMode={darkMode} /> : null}
         <ProgresoView
           alumnos={data.alumnos}
           sesionesGlobales={data.sesionesGlobales}
@@ -71,6 +73,7 @@ export default function ProgresoCoachDemo() {
           rutinasSBEntrenador={data.rutinasSBEntrenador}
           allEx={data.allEx}
           historiaCompleta={data.historiaCompleta}
+          onAlumnoSelChange={setAlumnoSelId}
           darkMode={darkMode}
         />
       </div>

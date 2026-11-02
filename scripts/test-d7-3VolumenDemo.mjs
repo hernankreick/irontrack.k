@@ -43,9 +43,11 @@ test("sin el parametro la demo queda igual (sin alumno ni ejercicios del escenar
   assert.ok(!base.alumnos.some((a) => a.id === VOL_ALUMNO_ID));
   assert.ok(!base.allEx.some((e) => String(e.id).startsWith("vol-")));
   assert.equal(base.alumnos.length, data.alumnos.length - 1);
+  assert.ok(data.alumnos.some((a) => a.id === VOL_ALUMNO_ID && a.nombre === "Valentina Carga"));
   const jsx = read("components/demo/ProgresoCoachDemo.jsx");
   assert.match(jsx, /get\('volumen'\) === 'comparar'/);
-  assert.match(jsx, /comparacion \? <VolumenComparacionCard/);
+  assert.match(jsx, /comparacion && String\(alumnoSelId\) === VOL_ALUMNO_ID \? <VolumenComparacionCard/);
+  assert.match(jsx, /onAlumnoSelChange=\{setAlumnoSelId\}/);
 });
 
 test("fuente: réplicas comentadas como solo demo y tarjeta con los textos pedidos", () => {

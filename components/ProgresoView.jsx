@@ -123,6 +123,7 @@ export default function ProgresoView({
   allEx = [],
   darkMode = true,
   historiaCompleta = null,
+  onAlumnoSelChange = null,
 }) {
   const { lang } = useIronTrackI18n();
   const isUnder768 = useIsUnder768();
@@ -170,6 +171,13 @@ export default function ProgresoView({
     })[0];
     return first ? first.id : null;
   });
+  // Aviso opcional (solo la demo lo usa): informa el alumno seleccionado al montar y en cada cambio. Sin la prop no hace nada.
+  useEffect(
+    function () {
+      if (typeof onAlumnoSelChange === "function") onAlumnoSelChange(alumnoSel);
+    },
+    [alumnoSel, onAlumnoSelChange]
+  );
   const [diaIdx, setDiaIdx] = useState(0);
   const [ejercicioSelId, setEjercicioSelId] = useState(null);
   const [patronExpanded, setPatronExpanded] = useState({});

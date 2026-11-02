@@ -77,6 +77,12 @@ for (const tema of ["oscuro", "claro"]) {
     const page = await ctx.newPage();
     page.on("pageerror", (e) => errors.push(String(e).slice(0, 200)));
     await page.goto("http://127.0.0.1:" + port + "/" + DEMO + "?volumen=comparar", { waitUntil: "load" });
+    await page.waitForSelector('[data-qa="progreso-alumno-btn"]', { timeout: 15000 });
+    await page.waitForTimeout(500);
+    // La tarjeta es solo de Valentina Carga: con el alumno inicial (otro) no se muestra; al elegirla aparece.
+    check((await page.locator('[data-qa="volumen-comparar"]').count()) === 0, tag + " sin tarjeta con otro alumno seleccionado");
+    await page.click('[data-qa="progreso-alumno-btn"]'); await page.waitForTimeout(300);
+    await page.locator('[data-qa-sheet="alumnos"] button', { hasText: "Valentina Carga" }).first().click();
     await page.waitForSelector('[data-qa="volumen-comparar"]', { timeout: 15000 });
     if (tema === "claro") { await page.click('[data-qa="demo-tema"]'); await page.waitForTimeout(300); }
     await page.waitForTimeout(800);
@@ -96,6 +102,9 @@ for (const tema of ["oscuro", "claro"]) {
       check(m.contraste >= 4.5, tag + " contraste >= 4.5 (" + m.contraste.toFixed(2) + " en «" + m.peorTxt + "»)");
       check(m.chicos === 0, tag + " controles de la tarjeta >= 44 px");
     }
+    await page.click('[data-qa="progreso-alumno-btn"]'); await page.waitForTimeout(300);
+    await page.locator('[data-qa-sheet="alumnos"] button', { hasText: "Abril Méndez" }).first().click(); await page.waitForTimeout(400);
+    check((await page.locator('[data-qa="volumen-comparar"]').count()) === 0, tag + " la tarjeta desaparece al cambiar de alumno");
     check(errors.length === 0, tag + " sin errores de pagina: " + errors.join(" | "));
     const ext = [...external].filter((h) => !/fonts\.(googleapis|gstatic)\.com/.test(h));
     check(ext.length === 0, tag + " sin red externa: " + ext.join(","));
