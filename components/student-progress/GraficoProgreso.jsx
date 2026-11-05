@@ -10,10 +10,17 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
   React.useEffect(()=>{
     const alumnoId = sessionData?.alumnoId || (sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     if(!alumnoId) { setLoadingGrafico(false); return; }
-    sb.getProgreso(alumnoId).then(function(prog){
-      if(prog) setSbData(prog);
+    // D7.5: historial completo paginado (misma carga y cache que Progreso); sin respuestas tardias tras desmontar
+    let vigente = true;
+    const carga = typeof sb.getHistorialProgreso === "function"
+      ? sb.getHistorialProgreso(alumnoId).then(function(h){ return h && h.rows; })
+      : sb.getProgreso(alumnoId);
+    Promise.resolve(carga).then(function(prog){
+      if(!vigente) return;
+      if(Array.isArray(prog)) setSbData(prog);
       setLoadingGrafico(false);
-    }).catch(function(){setLoadingGrafico(false)});
+    }).catch(function(){ if(vigente) setLoadingGrafico(false); });
+    return function(){ vigente = false; };
   },[]);
 
   const getDatos = (exId) => mergeSetsForExercise(exId, progress, sbData);

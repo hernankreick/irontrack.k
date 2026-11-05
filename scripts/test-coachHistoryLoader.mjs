@@ -172,10 +172,12 @@ await test("cableado: App usa el loader (completo + incremental cada 30 s); Prog
   const dash = readFileSync(new URL("../components/CoachDashboard.jsx", import.meta.url), "utf8");
   assert.match(dash, /historiaCompleta=\{historiaCompleta\}/);
 });
-await test("el alumno no cambia: sus lecturas (getSesiones / getProgreso) quedan exactamente como estaban", () => {
+await test("lecturas del alumno: getSesiones igual que en E0; getProgreso pagina el historial completo (D7.5)", () => {
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
   assert.ok(app.includes('getSesiones: (alumnoId) => sbFetch("sesiones?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=10"),'));
-  assert.ok(app.includes('getProgreso: (alumnoId) => sbFetch("progreso?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc"),'));
+  // D7.5: antes una sola consulta que PostgREST cortaba en su tope de filas; ahora las mismas paginas de E0 (lib/alumnoHistoryLoader.js)
+  assert.match(app, /getProgreso: async \(alumnoId\) => \{\s*const r = await cargarHistorialProgreso\(sbFetch, alumnoId\);/);
+  assert.match(app, /getHistorialProgreso: \(alumnoId, opts\) => obtenerHistorialProgreso\(sbFetch, alumnoId, opts\),/);
 });
 
 console.log("\n" + count + " pruebas OK");

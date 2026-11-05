@@ -28,6 +28,7 @@ import {
 } from './lib/appHelpers.js';
 import { alumnosIdsKey } from './lib/coachAlumnosLoad.js';
 import { syncCoachHistory, groupByAlumno } from './lib/coachHistoryLoader.js';
+import { cargarHistorialProgreso, obtenerHistorialProgreso, invalidarHistorialProgreso } from './lib/alumnoHistoryLoader.js';
 import { getYTVideoId } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
 import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVideoUrl, isValidHttpUrlString, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from './lib/exerciseResolve.js';
@@ -412,7 +413,15 @@ const sb = {
     const { error } = await supabase.from("rutinas").delete().eq("id", id);
     if (error) throw error;
   },
-  getProgreso: (alumnoId) => sbFetch("progreso?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc"),
+  // D7.5: historial COMPLETO paginado (antes una sola consulta que PostgREST cortaba en su tope de filas, perdiendo lo mas antiguo).
+  // getProgreso mantiene su contrato (array; si falla la primera pagina, lanza como antes). getHistorialProgreso devuelve ademas si el
+  // historial quedo completo, con cache corta y una sola consulta en vuelo por alumno (ver lib/alumnoHistoryLoader.js).
+  getProgreso: async (alumnoId) => {
+    const r = await cargarHistorialProgreso(sbFetch, alumnoId);
+    if (!r.rows) throw new Error("[getProgreso] no se pudo leer el progreso");
+    return r.rows;
+  },
+  getHistorialProgreso: (alumnoId, opts) => obtenerHistorialProgreso(sbFetch, alumnoId, opts),
   addProgreso: (data) => sbFetch("progreso", "POST", data),
   // Insercion idempotente: data.id (UUID de la operacion) se reutiliza en los reintentos; 23505 sobre ese id se verifica leyendo la fila.
   addProgresoIdempotente: (data) => postProgressIdempotent({
@@ -1329,6 +1338,7 @@ function GymApp() {
     setSesionesGlobales([]);
     setProgresoGlobal({});
     coachHistoryRef.current = { sesiones: null, progreso: null, state: {}, seq: 0, fullSeq: 0, inFlight: 0 };
+    invalidarHistorialProgreso(); // D7.5: el historial cacheado de un alumno no sobrevive al cierre de sesion
     setCoachHistoriaCompleta(null);
     setMensajesEntrenadorPendientes([]);
     setRutinasSBEntrenador([]);
@@ -1716,7 +1726,12 @@ function GymApp() {
             sb.getRutinas(sessionData.alumnoId),
             sb.getSesiones(sessionData.alumnoId),
             sbFetch("alumnos?id=eq."+sessionData.alumnoId+"&select=ultimo_pago_confirmado"),
-            sb.getProgreso(sessionData.alumnoId),
+            // D7.5: historial completo (forzado: al iniciar sesion siempre se lee de nuevo); queda en cache para Progreso
+            sb.getHistorialProgreso(sessionData.alumnoId, { forzar: true }).then(function (h) {
+              if (!h || !h.rows) throw new Error("[historial alumno] no se pudo leer el progreso");
+              if (!h.complete) console.warn("[historial alumno] historial incompleto", h.reason);
+              return h.rows;
+            }),
           ]);
           // Rehidratar el historial de PRs/series desde Supabase: progress
           // (localStorage "it_pg") se borra en cada login nuevo y, sin esto,
