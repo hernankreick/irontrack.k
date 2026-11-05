@@ -181,6 +181,9 @@ export function WorkoutExercisePanel(props) {
 
   const handleLogSet = () => {
     if(!canLogWorkoutSet(validationExercise, kg, reps)) return;
+    // D76-01: primero se registra (persistencia local antes que todo); si no se pudo guardar en el dispositivo, los datos quedan en pantalla.
+    const saved = logSet(ex.id, normalizeWorkoutKg(kg), resolveWorkoutRepsInput(reps, validationExercise), note, rpe, currentWeek);
+    if(saved === false) return;
     // Haptic feedback — vibración corta al registrar set
     try { if(navigator.vibrate) navigator.vibrate([40]); } catch(e){}
     // Micro-feedback: flash + check animation
@@ -193,10 +196,10 @@ export function WorkoutExercisePanel(props) {
     if(newPR) {
       // Haptic doble para PR
       try { if(navigator.vibrate) navigator.vibrate([60,40,120]); } catch(e){}
-      setPrCelebration({ejercicio: displayName, kg: newPR.kg});
+      // logSet ahora corre antes: si ya publico la celebracion completa de este PR (con diff/prevKg) se conserva, como antes del cambio de orden.
+      setPrCelebration(function(prev){ return prev && prev.exId === ex.id && prev.kg === newPR.kg ? prev : {ejercicio: displayName, kg: newPR.kg}; });
       setTimeout(()=>setPrCelebration(null), 2500);
     }
-    logSet(ex.id, normalizeWorkoutKg(kg), resolveWorkoutRepsInput(reps, validationExercise), note, rpe, currentWeek);
     if(pause>0) startTimer(pause, pat.color);
     setNote("");
     setRpe(null);

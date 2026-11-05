@@ -232,11 +232,12 @@ await t("cerrar sesion: clearAllIronTrackPrefixedKeys conserva arreglo, respaldo
   assert.equal(s._m.size, 0); delete globalThis.localStorage;
 });
 
-await t("cableado estatico: SettingsPage usa isPendingQueueKey; la escritura de logSet sigue yendo al arreglo (enqueueItem) y no al formato por clave", () => {
+await t("cableado estatico: SettingsPage usa isPendingQueueKey; D76-01: logSet escribe el pendiente por clave ANTES de enviarlo (writeAheadPendingSet) y ya no encola en el arreglo", () => {
   const sp = readFileSync(new URL("../components/settings/SettingsPage.jsx", import.meta.url), "utf8");
   assert.ok(sp.includes("isPendingQueueKey(k)") && sp.includes("lib/pendingQueueKeyed.js"));
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
-  assert.ok(app.includes("enqueueItem(localStorage, buildPendingProgressItem("), "logSet sigue encolando en el arreglo");
+  assert.ok(app.includes("writeAheadPendingSet(localStorage, pendingItem"), "logSet persiste el pendiente por clave antes del envio (D76-01)");
+  assert.ok(!app.includes("enqueueItem(localStorage, buildPendingProgressItem("), "logSet ya no encola en el arreglo despues del intento");
   for (const fn of ["adoptLegacyArray", "removeConfirmedKeyed", "runSendAttempt", "beginAttempt", "withSendLock"]) assert.ok(!app.includes(fn), fn + " no esta conectado a App.jsx en 0a");
   const q = readFileSync(new URL("../lib/pendingSyncQueue.js", import.meta.url), "utf8");
   assert.ok(!q.includes("adoptLegacyArray"), "la adopcion por clave no se ejecuta en produccion en 0a");
