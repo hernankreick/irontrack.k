@@ -381,6 +381,8 @@ export function WorkoutScreen(props) {
             logSet={logSet} startTimer={startTimer}
             setPrCelebration={setPrCelebration} progress={progress}
             rutinaDatos={activeR && activeR.datos}
+            // D76-03: identidad de alumno + sesion para la guarda de registro (un cambio de contexto libera y descarta el opId de reintento).
+            logScope={[sessionData && sessionData.alumnoId, session && session.rId, session && session.dIdx, session && session.startTime].join("|")}
           />
         )}
 
