@@ -120,17 +120,11 @@ ok("4. buildNewSessionPRList: falso PR y primer registro", () => {
   assert.deepEqual(buildNewSessionPRList(ex, null, null, D), []);
   assert.deepEqual(buildNewSessionPRList(null, mk([50]), {}, D), []);
 
-  // Primer registro (sin record previo). COMPORTAMIENTO REAL, asimetrico:
-  //  - buildNewSessionPRList (workoutSession.js:428) trata prevKg=0 como
-  //    "sin record" y SI emite PR (prevKg 0, diff = kg).
-  //  - calculateNewWeightPR (workoutSession.js:376) exige previousMax > 0 y
-  //    devuelve null en el primer registro.
-  // Esta prueba solo documenta lo que cada una hace; no declara cual es correcta.
-  const first = buildNewSessionPRList(ex, mk([60]), {}, D);
-  assert.equal(first.length, 1);
-  assert.equal(first[0].prevKg, 0);
-  assert.equal(first[0].diff, 60);
-  assert.equal(buildNewSessionPRList(ex, mk([60]), null, D).length, 1);
+  // Primer registro (sin record previo). D7.4 fija la regla unica (lib/metricas/pr.js): la primera marca NO es PR nuevo, en el
+  // resumen de sesion (buildNewSessionPRList, antes daba PR con prevKg 0) igual que en el indicador del entrenamiento
+  // (calculateNewWeightPR) y en las estadisticas del entrenador (eventosPR).
+  assert.deepEqual(buildNewSessionPRList(ex, mk([60]), {}, D), []);
+  assert.deepEqual(buildNewSessionPRList(ex, mk([60]), null, D), []);
   assert.equal(calculateNewWeightPR({ sets: [], max: 0 }, 60), null);
   assert.equal(calculateNewWeightPR(null, 60), null);
   // calculateNewWeightPR con record previo

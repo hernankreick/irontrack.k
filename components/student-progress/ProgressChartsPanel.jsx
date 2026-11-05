@@ -8,6 +8,8 @@ import ExerciseProgressSummaryCard from './ExerciseProgressSummaryCard.jsx'
 import ProgressChartsToolbar from './ProgressChartsToolbar.jsx'
 import {
   mergeSetsForExercise,
+  mergeAllSetsForExercise,
+  exerciseRecordKg,
   exercisesWithData,
   exerciseMatchesMuscleFilter,
   parseProgressDate,
@@ -93,6 +95,8 @@ function DetailChart({
   metricMode,
   rangeKey,
   exId,
+  historial,
+  indiceTiempo,
   accent,
   prHex,
   bgHex,
@@ -114,7 +118,8 @@ function DetailChart({
   const yVals = sorted.map((r) => metricValue(r, metricMode))
   const metricKey =
     metricMode === 'peso' ? 'peso' : metricMode === 'reps' ? 'reps' : 'volumen'
-  const prFlags = progressivePRMasks(sorted, metricKey)
+  // D7.4: en «Peso» los PR salen de la regla unica sobre TODO el historial (no del rango visible ni de las ultimas 20 series)
+  const prFlags = progressivePRMasks(sorted, metricKey, historial ? { exId, historial, indiceTiempo } : undefined)
   const maWin = sorted.length >= 4 ? 3 : 2
   const ma = movingAverage(yVals, maWin)
 
@@ -306,6 +311,7 @@ export function ProgressChartsPanel({
   sbData,
   loadingSb,
   emptySkeleton,
+  indiceTiempo,
 }) {
   const [expandedEx, setExpandedEx] = React.useState(null)
   const [muscle, setMuscle] = React.useState('Todos')
@@ -330,7 +336,9 @@ export function ProgressChartsPanel({
   const items = React.useMemo(() => {
     const rows = exConDatos.map((e) => {
       const datos = mergeSetsForExercise(e.id, progress, sbData)
-      const pr = Math.max(...datos.map((d) => d.kg), 0)
+      // D7.4: record sobre TODO el historial con la regla unica (antes: max de las ultimas 20 series, con reps 0 y ejercicios por tiempo)
+      const historial = mergeAllSetsForExercise(e.id, progress, sbData)
+      const pr = exerciseRecordKg(e.id, progress, sbData, { indiceTiempo })
       const ultimo = datos[datos.length - 1]
       const primero = datos[0]
       const pct =
@@ -359,6 +367,7 @@ export function ProgressChartsPanel({
         improvement: pct ?? 0,
         kgSeries,
         atPR,
+        historial,
       }
     })
     const sorted = [...rows]
@@ -367,7 +376,7 @@ export function ProgressChartsPanel({
     else if (sortBy === 'alfa') sorted.sort((a, b) => a.name.localeCompare(b.name))
     else if (sortBy === 'peso') sorted.sort((a, b) => b.pr - a.pr)
     return sorted
-  }, [exConDatos, progress, sbData, es, sortBy])
+  }, [exConDatos, progress, sbData, es, sortBy, indiceTiempo])
 
   const activeCount = items.length
   const limited = showAll ? items : items.slice(0, 10)
@@ -457,7 +466,7 @@ export function ProgressChartsPanel({
       />
 
       <div className="flex flex-col gap-4 px-1">
-        {limited.map(({ ex, datos, datosAsc, pr, ultimo, pct, trend, name, kgSeries, atPR }) => {
+        {limited.map(({ ex, datos, datosAsc, pr, ultimo, pct, trend, name, kgSeries, atPR, historial }) => {
           const isOpen = expandedEx === ex.id
           const hist = [...datos].reverse()
 
@@ -499,6 +508,8 @@ export function ProgressChartsPanel({
                 <ExerciseProgressDetails
                   ex={ex}
                   datosAsc={datosAsc}
+                  historial={historial}
+                  indiceTiempo={indiceTiempo}
                   hist={hist}
                   pr={pr}
                   metricTab={metricTab}

@@ -125,19 +125,22 @@ export default function StudentProgressSection({
       .catch(() => setLoadingSb(false))
   }, [sb, sessionData?.alumnoId, sharedParam])
 
+  // D7.4: ejercicios por tiempo (catalogo + snapshots de la rutina): ni volumen ni PR de carga, igual que el entrenador
+  const indiceTiempo = React.useMemo(() => indiceEjerciciosPorTiempo([].concat(EX || [], allEx || []), routines || []), [EX, allEx, routines])
+
   const stats = React.useMemo(() => {
     return {
       totalSessions: sesiones?.length ?? 0,
-      prsThisMonth: countPRsThisMonth(allEx, EX, progress, sbData),
+      prsThisMonth: countPRsThisMonth(allEx, EX, progress, sbData, { indiceTiempo }),
       streak: computeDayStreak(sesiones, progress),
       overall: averageImprovementPercent(allEx, EX, progress, sbData),
     }
-  }, [sesiones, allEx, EX, progress, sbData])
+  }, [sesiones, allEx, EX, progress, sbData, indiceTiempo])
 
   const volModel = React.useMemo(
     // D7.3: misma regla de volumen que el entrenador (sin ejercicios por tiempo: catalogo + snapshots de la rutina del alumno)
-    () => buildWeeklyVolumeModel(progress, sbData, sesiones, undefined, { indiceTiempo: indiceEjerciciosPorTiempo([].concat(EX || [], allEx || []), routines || []) }),
-    [progress, sbData, sesiones, EX, allEx, routines]
+    () => buildWeeklyVolumeModel(progress, sbData, sesiones, undefined, { indiceTiempo }),
+    [progress, sbData, sesiones, indiceTiempo]
   )
 
   const hasData = React.useMemo(
@@ -321,6 +324,7 @@ export default function StudentProgressSection({
               sbData={sbData}
               loadingSb={loadingSb}
               emptySkeleton={!loadingSb && !hasData}
+              indiceTiempo={indiceTiempo}
             />
 
             {/* Achievements */}

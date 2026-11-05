@@ -78,7 +78,7 @@ await test("datos ficticios: emails .invalid, ids demo-* y todas las situaciones
     const d = buildProgresoDemoData();
     assert.ok(d.alumnos.every((a) => /@demo\.invalid$/.test(a.email) && /^demo-/.test(a.id)));
     assert.ok(d.rutinasSBEntrenador.every((r) => /^demo-r-/.test(r.id)));
-    const mm = Object.fromEntries(d.alumnos.map((a) => [a.nombre.split(" ")[0], buildCoachProgresoModel({ ...d, periodId: "semanas4", alumnoSel: a.id, diaIdx: 0, lang: "es" })]));
+    const mm = Object.fromEntries(d.alumnos.filter((a) => !/-records$/.test(a.id)).map((a) => [a.nombre.split(" ")[0], buildCoachProgresoModel({ ...d, periodId: "semanas4", alumnoSel: a.id, diaIdx: 0, lang: "es" })]));
     const { Abril, Carla, Diego, Julián, Martina, Tomás } = mm;
     // activos con PRs, varios ciclos, personalizado, por tiempo, validada, ejercicio fuera de la rutina
     assert.ok(Abril.prsPeriod > 0 && Tomás.prsPeriod > 0);

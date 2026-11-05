@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Ic } from './Ic.jsx';
+import { esPRNuevo } from '../lib/metricas/pr.js';
 import { useIronTrackI18n } from '../contexts/IronTrackI18nContext.jsx';
 import { irontrackMsg as M, pickExerciseName, pickPatLabel } from '../lib/irontrackMsg.js';
 import {
@@ -31,7 +32,8 @@ export function LogForm({ex, btn, inp, lbl, tag, fmtP, progress, onLog, onClose,
   const [showAdvanced,setShowAdvanced]=useState(false);
   const pat=PATS[ex.pattern]||{icon:"E",color:"#8B9AB2",label:"Otro",labelEn:"Other"};
   const lastSet=progress[ex.id]?.sets?.[0];
-  const isPR = parseFloat(kg)>0 && parseFloat(kg)>(progress[ex.id]?.max||0);
+  // D7.4: regla unica de PR (lib/metricas/pr.js): supera un record previo existente; la primera marca e igualar no son PR
+  const isPR = esPRNuevo(progress[ex.id]?.max||0, kg);
   const rpeColors={6:"#22C55E",7:"#22C55E",8:"#60A5FA",9:"#8B9AB2",10:"#2563EB"};
   const rpeLabels={6:M(lang,"Muy facil","Easy","Muito fácil"),7:M(lang,"Controlado","Moderate","Controlado"),8:M(lang,"Exigente","Hard","Exigente"),9:M(lang,"Muy duro","Very Hard","Muito pesado"),10:M(lang,"Al limite","Max","No limite")};
   const kgNum = parseFloat(kg)||0;

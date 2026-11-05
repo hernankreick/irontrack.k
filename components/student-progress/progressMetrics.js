@@ -3,7 +3,8 @@
 import { parseFechaDMY, parseFechaDMYToLocalDate } from '../../lib/progressDate.js'
 import { compararVolumen } from '../../lib/metricas/volumen.js'
 import { tipoDeCarga, TIPO_CARGA } from '../../lib/metricas/tipoCarga.js'
-import { lunesDe } from '../../lib/metricas/fechas.js'
+import { lunesDe, diaLocal } from '../../lib/metricas/fechas.js'
+import { eventosPR, historialPorDia, recordDe, kgDeSerie } from '../../lib/metricas/pr.js'
 
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/
 
@@ -77,17 +78,25 @@ export function reconcileRowsByMaxMultiplicity(localRows, remoteRows, signatureO
  * Igual que getDatos en GraficoProgreso: combina local + Supabase (multiplicidad máxima) y ordena por fecha.
  */
 export function mergeSetsForExercise(exId, progress, sbData) {
-  const local = (progress[exId]?.sets || [])
+  return mergeAllSetsForExercise(exId, progress, sbData).slice(-20)
+}
+
+/**
+ * D7.4: TODO el historial del ejercicio (local + Supabase, misma reconciliacion), del mas antiguo al mas reciente. Los records y los
+ * PR se calculan sobre esto; mergeSetsForExercise (ultimas 20) queda solo para graficos y tendencias.
+ */
+export function mergeAllSetsForExercise(exId, progress, sbData) {
+  const local = ((progress && progress[exId]?.sets) || [])
     .map((s) => ({
-      kg: parseFloat(s.kg) || 0,
+      kg: kgDeSerie(s.kg) || 0,
       reps: parseInt(s.reps, 10) || 0,
       fecha: s.date,
     }))
     .filter((s) => s.kg > 0)
   const remote = (sbData || [])
-    .filter((d) => d.ejercicio_id === exId && parseFloat(d.kg) > 0)
+    .filter((d) => d.ejercicio_id === exId && kgDeSerie(d.kg) > 0)
     .map((d) => ({
-      kg: parseFloat(d.kg),
+      kg: kgDeSerie(d.kg),
       reps: parseInt(d.reps, 10) || 0,
       fecha: d.fecha,
     }))
@@ -99,7 +108,17 @@ export function mergeSetsForExercise(exId, progress, sbData) {
       return ta === tb ? 0 : ta > tb ? 1 : -1
     }
   )
-  return todos.slice(-20)
+  return todos
+}
+
+/** Filas con ejercicio_id para lib/metricas/pr.js. */
+function filasPR(exId, rows) {
+  return (rows || []).map((r) => ({ ejercicio_id: exId, fecha: r.fecha, kg: r.kg, reps: r.reps }))
+}
+
+/** D7.4: record (kg) del ejercicio sobre TODO su historial, con la regla unica (series validas, sin ejercicios por tiempo). */
+export function exerciseRecordKg(exId, progress, sbData, opts) {
+  return recordDe(filasPR(exId, mergeAllSetsForExercise(exId, progress, sbData)), exId, { indiceTiempo: opts && opts.indiceTiempo })
 }
 
 export function exercisesWithData(allEx, EX, progress, sbData) {
@@ -158,32 +177,22 @@ export function computeDayStreak(sesiones, progress) {
   return streak
 }
 
-/** Cuenta eventos de PR (superar el máximo previo) en el mes calendario actual. */
-export function countPRsThisMonth(allEx, EX, progress, sbData) {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = now.getMonth()
-  const inMonth = (fechaStr) => {
-    const d = parseProgressDate(fechaStr)
-    if (!d) return false
-    return d.getFullYear() === y && d.getMonth() === m
-  }
+/**
+ * Cuenta eventos de PR en el mes calendario actual con la regla unica (lib/metricas/pr.js): historial COMPLETO del ejercicio (antes
+ * solo las ultimas 20 series: una carga menor que un record viejo podia contar como PR), un PR por ejercicio y dia, el primer registro
+ * no cuenta e igualar tampoco.
+ */
+export function countPRsThisMonth(allEx, EX, progress, sbData, opts) {
+  const now = opts && opts.now ? opts.now : new Date()
+  const desde = diaLocal(new Date(now.getFullYear(), now.getMonth(), 1))
+  const hasta = diaLocal(new Date(now.getFullYear(), now.getMonth() + 1, 0))
   let count = 0
   const exList = exercisesWithData(allEx, EX, progress, sbData)
   exList.forEach((e) => {
-    const datos = mergeSetsForExercise(e.id, progress, sbData)
-    if (datos.length < 2) return
-    const sorted = [...datos].sort((a, b) => {
-      const da = parseProgressDate(a.fecha)?.getTime() ?? 0
-      const db = parseProgressDate(b.fecha)?.getTime() ?? 0
-      return da - db
+    const rows = filasPR(e.id, mergeAllSetsForExercise(e.id, progress, sbData))
+    eventosPR(rows, { indiceTiempo: opts && opts.indiceTiempo }).forEach((ev) => {
+      if (ev.dia >= desde && ev.dia <= hasta) count += 1
     })
-    let runningMax = sorted[0].kg
-    for (let i = 1; i < sorted.length; i++) {
-      const row = sorted[i]
-      if (row.kg > runningMax && inMonth(row.fecha)) count += 1
-      runningMax = Math.max(runningMax, row.kg)
-    }
   })
   return count
 }
@@ -414,7 +423,24 @@ export function movingAverage(values, win) {
   return out
 }
 
-export function progressivePRMasks(sortedByDateAsc, metric) {
+/**
+ * Marcas de PR para el grafico. Con metric 'peso' y ctx.historial (TODO el historial del ejercicio) usa la regla unica: solo la mejor
+ * serie de un dia que supera el record previo de todo el historial (la primera marca e igualar no son PR, aunque el grafico muestre un
+ * rango recortado). ctx.clase devuelve tambien "iguala" para marcar records igualados.
+ */
+export function progressivePRMasks(sortedByDateAsc, metric, ctx) {
+  if (metric === 'peso' && ctx && Array.isArray(ctx.historial)) {
+    const clases = clasesPorDia(ctx.exId, ctx.historial, ctx.indiceTiempo)
+    const marcado = {}
+    return sortedByDateAsc.map((r) => {
+      const dia = parseFechaDMY(typeof r.fecha === 'string' ? r.fecha.trim() : r.fecha)
+      const c = dia == null ? null : clases[dia]
+      if (!c || c.clase !== 'pr' || marcado[dia]) return false
+      if (Math.round((kgDeSerie(r.kg) - c.kg) * 1000) !== 0) return false
+      marcado[dia] = true
+      return true
+    })
+  }
   let maxKg = -Infinity
   let maxReps = -Infinity
   let maxVol = -Infinity
@@ -435,4 +461,11 @@ export function progressivePRMasks(sortedByDateAsc, metric) {
     }
     return pr
   })
+}
+
+/** D7.4: clase de cada dia de un ejercicio sobre todo su historial: { dia: { kg, clase: "primera" | "pr" | "iguala" | null } }. */
+export function clasesPorDia(exId, historial, indiceTiempo) {
+  const out = {}
+  historialPorDia(filasPR(exId, historial), exId, { indiceTiempo }).forEach((h) => { out[h.dia] = { kg: h.kg, clase: h.clase } })
+  return out
 }
