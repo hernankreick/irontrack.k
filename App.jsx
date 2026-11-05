@@ -29,6 +29,7 @@ import {
 import { alumnosIdsKey } from './lib/coachAlumnosLoad.js';
 import { syncCoachHistory, groupByAlumno } from './lib/coachHistoryLoader.js';
 import { cargarHistorialProgreso, obtenerHistorialProgreso, invalidarHistorialProgreso } from './lib/alumnoHistoryLoader.js';
+import { crearControladorSesiones, necesitaReintento, estadoPlanAlumno, puedeIniciarEntrenamientoAlumno, manejarSesionGuardada } from './lib/sesionesLectura.js';
 import { getYTVideoId } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
 import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVideoUrl, isValidHttpUrlString, sanitizeRoutineDaysForWrite, sanitizeExerciseSnapshotForWrite } from './lib/exerciseResolve.js';
@@ -430,6 +431,8 @@ const sb = {
     return true;
   },
   getSesiones: (alumnoId) => sbFetch("sesiones?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=10"),
+  // D76-02: misma consulta que getSesiones, pero devuelve { ok, status, data } para no confundir una lectura fallida con "cero sesiones".
+  getSesionesDetallado: (alumnoId) => sbRequestStatus("sesiones?alumno_id=eq."+encodeURIComponent(alumnoId)+"&select=*&order=created_at.desc&limit=10", "GET", null),
   addSesion: (data) => sbFetch("sesiones", "POST", data),
   deleteSesionesByAlumno: async (alumnoId) => {
     const { error } = await supabase.from("sesiones").delete().eq("alumno_id", String(alumnoId));
@@ -723,6 +726,20 @@ function GymApp() {
     cargarAlumnos,
     notifyAlumno,
   } = useAlumnos({ sb });
+  // D76-02: sesiones del ALUMNO via controlador (una lectura fallida nunca se aplica como "cero sesiones"; orden de respuestas y alumno).
+  const [sesionesLectura, setSesionesLectura] = useState({ status: "sin_datos", confiable: false, reason: null, alumnoId: null });
+  const sesionesRowsRef = useRef(null);
+  const sesionesCtlRef = useRef(null);
+  if (!sesionesCtlRef.current) {
+    sesionesCtlRef.current = crearControladorSesiones({
+      leer: function (aid) { return sb.getSesionesDetallado(aid); },
+      alCambiar: function (e) {
+        if (e.rows !== sesionesRowsRef.current) { sesionesRowsRef.current = e.rows; setSesiones(e.rows); }
+        setSesionesLectura({ status: e.status, confiable: e.confiable, reason: e.reason, alumnoId: e.alumnoId });
+      },
+    });
+  }
+  const sesionesCtl = sesionesCtlRef.current;
   // D7.3: la vista de la ficha sigue a alumnoActivo (las operaciones asincronas de la ficha la consultan antes de tocar su estado visual)
   sincronizarVistaFicha(alumnoActivo && alumnoActivo.id != null ? alumnoActivo.id : null);
   // D7.3: alumno cuya ficha no se pudo cargar (red). Nunca se muestran datos de otro alumno en su lugar; la ficha ofrece reintentar.
@@ -1327,6 +1344,7 @@ function GymApp() {
     setTab("plan");
     setSession(null);
     setAlumnos([]);
+    sesionesCtl.reiniciar(); // D76-02
     setSesiones([]);
     setAlumnoActivo(null);
     setAlumnoSesiones([]);
@@ -1632,8 +1650,8 @@ function GymApp() {
             const ruts = [selectCurrentRoutine(rutsRaw, decoded.alumnoId)].filter(Boolean);
             if(ruts && ruts[0] && ruts[0].datos) {
               setRoutines([{...ruts[0].datos, datos: ruts[0].datos || {}, alumnoId: decoded.alumnoId, alumno_id: decoded.alumnoId, id: ruts[0].id}]);
-              const ses = await sb.getSesiones(decoded.alumnoId);
-              setSesiones(ses || []);
+              // D76-02: lectura via controlador; si falla no bloquea el flujo de solo lectura
+              sesionesCtl.cargar(decoded.alumnoId);
               setSharedLoaded(true);
               return;
             }
@@ -1709,7 +1727,8 @@ function GymApp() {
     console.log('useEffect fired, alumnoId:', sessionData?.alumnoId);
     if(!readOnly && sessionData?.role==="alumno" && sessionData?.alumnoId) {
       setCargandoAlumno(true);
-      setSesiones([]); // FIX B: flush stale sesiones from a previous student before fetching
+      // D76-02: sin setSesiones([]) (FIX B). El controlador vacia solo al cambiar de alumno y una lectura fallida no se aplica como "cero sesiones".
+      sesionesCtl.cargar(sessionData.alumnoId);
       setUltimoPagoConfirmado(null); // flush stale payment status from a previous student before fetching
       const safetyTimeout = setTimeout(() => {
         console.log('TIMEOUT fired at 1586');
@@ -1719,9 +1738,8 @@ function GymApp() {
       (async () => {
         try {
           // FIX A: fetch rutinas and sesiones in parallel
-          const [rutsRaw, ses, alumnoRows, progresoRows] = await Promise.all([
+          const [rutsRaw, alumnoRows, progresoRows] = await Promise.all([
             sb.getRutinas(sessionData.alumnoId),
-            sb.getSesiones(sessionData.alumnoId),
             sbFetch("alumnos?id=eq."+sessionData.alumnoId+"&select=ultimo_pago_confirmado"),
             // D7.5: historial completo (forzado: al iniciar sesion siempre se lee de nuevo); queda en cache para Progreso
             // Si no se puede leer, el login sigue igual que antes (rutina, semana, sesiones y pago se cargan; progreso vacio).
@@ -1785,7 +1803,6 @@ function GymApp() {
               }
             }).catch(function (e) { console.error("[reconcileSemanaActiva]", e); });
           }
-          setSesiones(ses || []);
           sb.getNota(sessionData.alumnoId).then(function(res) {
             if(res && res[0]) setNotaDia(res[0].contenido||res[0].texto||"");
           }).catch(function(){});
@@ -1828,7 +1845,7 @@ function GymApp() {
         var local = alumnoCicloRef.current.routines[0];
         if (!cur || !cur.datos || !local || String(local.id) !== String(cur.id)) return "sin_datos";
         if (readCicloActual(cur.datos) <= readCicloActual(local.datos)) return "sin_cambios";
-        var freshSes = await sb.getSesiones(alumnoId);
+        await sesionesCtl.cargar(alumnoId); // D76-02: si la lectura falla se conservan las sesiones previas
         if (cancelled) return "sin_datos";
         setRoutines(function (prev) {
           return (prev || []).map(function (r0) {
@@ -1840,7 +1857,6 @@ function GymApp() {
         setCompletedDays(function (prev) {
           return (prev || []).filter(function (k) { return !String(k).startsWith(String(cur.id) + "-"); });
         });
-        if (Array.isArray(freshSes)) setSesiones(freshSes);
         try { localStorage.removeItem("it_last_week_advance_date"); } catch (e) {}
         if (!o.silent) toast2(textoPlanReiniciado(tipoReinicioVigente(cur.datos), wk, msgM));
         return "actualizado";
@@ -1861,6 +1877,24 @@ function GymApp() {
       window.removeEventListener("focus", refreshCiclo);
     };
   }, [readOnly, sessionData?.role, sessionData?.alumnoId]);
+  // D76-02: si la ultima lectura de sesiones del alumno fallo, reintentar al recuperar la conexion o al volver a la app.
+  const sesionesNecesitanReintento = necesitaReintento(sesionesLectura);
+  useEffect(() => {
+    if (readOnly || sessionData?.role !== "alumno" || !sessionData?.alumnoId || !sesionesNecesitanReintento) return undefined;
+    var alumnoId = sessionData.alumnoId;
+    function reintentar(ev) {
+      if (ev && ev.type === "visibilitychange" && document.visibilityState !== "visible") return;
+      sesionesCtl.cargar(alumnoId);
+    }
+    window.addEventListener("online", reintentar);
+    document.addEventListener("visibilitychange", reintentar);
+    window.addEventListener("focus", reintentar);
+    return function () {
+      window.removeEventListener("online", reintentar);
+      document.removeEventListener("visibilitychange", reintentar);
+      window.removeEventListener("focus", reintentar);
+    };
+  }, [readOnly, sessionData?.role, sessionData?.alumnoId, sesionesNecesitanReintento]);
   useEffect(function () {
     try {
       localStorage.setItem("it_pattern_ov", JSON.stringify(patternOverrides || {}));
@@ -2297,8 +2331,11 @@ function GymApp() {
   // Con conexion, antes de iniciar se lee la rutina FRESCA: si el entrenador la reinicio (ciclo nuevo) se actualiza el plan y NO se inicia
   // el dia viejo (el alumno ve el aviso y vuelve a tocar Iniciar sobre el plan nuevo). Sin conexion o si la lectura falla, inicia igual.
   const startingWorkoutRef = React.useRef(false);
+  // D76-02: alumno (no solo lectura) cuyas sesiones no se pudieron leer: no se calcula ni se inicia ningun dia (no se asume "Dia 1").
+  const planAlumno = estadoPlanAlumno({ esAlumno: esAlumno, readOnly: readOnly, lectura: sesionesLectura });
   const startStudentWorkout = function (nextSession) {
     if (weekGate.active) return false;
+    if (!puedeIniciarEntrenamientoAlumno({ esAlumno: esAlumno, readOnly: readOnly, lectura: sesionesLectura, weekGateActivo: weekGate.active })) return false;
     var check = checkCicloAlumnoRef.current;
     if (!esAlumno || readOnly || !isOnline || typeof check !== "function") {
       setSession(nextSession);
@@ -3626,7 +3663,21 @@ function GymApp() {
         <CoachSectionRenderer {...buildCoachSectionRendererProps()} />
         {tab==="plan"&&esAlumno&&(
           <div className="mx-auto w-full max-w-[32rem] pt-4">
-            {esAlumno&&!cargandoAlumno&&routines.length>0&&(()=>{
+            {esAlumno&&!cargandoAlumno&&routines.length>0&&(planAlumno==="cargando"||planAlumno==="error")&&(
+              <div style={{background:bgCard,border:"1px solid "+border,borderRadius:12,padding:"16px",marginTop:20,textAlign:"center"}}>
+                {planAlumno==="error"?(
+                  <>
+                    <div style={{color:textMain,fontSize:15,fontWeight:700,marginBottom:12}}>{msg("No pudimos cargar tus entrenamientos. Revisá tu conexión.","We couldn't load your workouts. Check your connection.","Não foi possível carregar seus treinos. Verifique sua conexão.")}</div>
+                    <button type="button" className="hov" style={{...btn(),minHeight:44,width:"100%"}} onClick={function(){ if (sessionData?.alumnoId) sesionesCtl.cargar(sessionData.alumnoId); }}>
+                      {msg("Reintentar","Retry","Tentar novamente")}
+                    </button>
+                  </>
+                ):(
+                  <div style={{color:textMuted,fontSize:14}}>{msg("Cargando tus entrenamientos…","Loading your workouts…","Carregando seus treinos…")}</div>
+                )}
+              </div>
+            )}
+            {esAlumno&&!cargandoAlumno&&routines.length>0&&(planAlumno==="plan"||planAlumno==="no_aplica")&&(()=>{
               const r0 = routines[0];
               const hoy = new Date().toLocaleDateString("es-AR");
               const totalDays = r0?.days?.length||0;
@@ -3843,7 +3894,7 @@ function GymApp() {
             {esAlumno&&!cargandoAlumno&&routines.length===0&&(
               <StudentNoRoutinesEmptyState msg={msg} textMuted={textMuted} />
             )}
-            {esAlumno&&!cargandoAlumno&&routines.length>0&&routines.map(r=>{
+            {esAlumno&&!cargandoAlumno&&routines.length>0&&(planAlumno==="plan"||planAlumno==="no_aplica")&&routines.map(r=>{
               const hoyStr = new Date().toLocaleDateString("es-AR");
               const currentWeekForRoutine = String(r.id) === String(routines[0]?.id) ? studentCurrentWeek : currentWeek;
               const completedDaysForRoutine = String(r.id) === String(routines[0]?.id)
@@ -4077,7 +4128,7 @@ function GymApp() {
       )}
       <AppShellModals
         welcomeProps={{
-          open: showWelcome, sessionData, routines, alumnos, onboardStep,
+          open: showWelcome && !(esAlumno && !readOnly && planAlumno !== "plan"), sessionData, routines, alumnos, onboardStep,
           studentCurrentWeek, activeStudentRoutinePosition, allEx, es,
           progress, sesiones, weekGate,
           bgCard, border, textMain, textMuted, msg,
@@ -4474,11 +4525,9 @@ function GymApp() {
               });
             });
           }}
-          onSesionGuardada={async function () {
-            if (sessionData?.alumnoId) {
-              var fresh = await sb.getSesiones(sessionData.alumnoId);
-              setSesiones(fresh || []);
-            }
+          onSesionGuardada={async function (filaConfirmada) {
+            // D76-02: la sesion confirmada queda visible aunque la relectura falle (antes una relectura fallida dejaba [] => "Dia 1")
+            await manejarSesionGuardada(sesionesCtl, sessionData?.alumnoId, filaConfirmada);
           }}
         />
       )}

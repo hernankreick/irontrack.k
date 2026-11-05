@@ -170,21 +170,23 @@ export function WorkoutScreen(props) {
         const todayStr = new Date().toDateString();
         let lastAdvanceDate = null;
         try { lastAdvanceDate = localStorage.getItem("it_last_week_advance_date"); } catch (e) {}
+        // D76-02: se guarda el payload para pasarle a onSesionGuardada la fila confirmada por el servidor
+        const sesionPayload = removeUndefinedPayloadFields(buildSessionPayload({
+          alumnoId: sessionData.alumnoId,
+          session: session,
+          activeDay: activeDay,
+          activeRoutine: r,
+          exercises: exercises,
+          weekToSave: semanaParaGuardar,
+          date: hoyFin,
+          time: horaFin,
+          includeRoutineId: true,
+          ciclo: cicloActual,
+        }));
         const outcome = await finalizeStudentSession({
           sb: sb,
           alumnoId: sessionData.alumnoId,
-          payload: removeUndefinedPayloadFields(buildSessionPayload({
-            alumnoId: sessionData.alumnoId,
-            session: session,
-            activeDay: activeDay,
-            activeRoutine: r,
-            exercises: exercises,
-            weekToSave: semanaParaGuardar,
-            date: hoyFin,
-            time: horaFin,
-            includeRoutineId: true,
-            ciclo: cicloActual,
-          })),
+          payload: sesionPayload,
           date: hoyFin,
           dayIndex: session.dIdx,
           weekToSave: semanaParaGuardar,
@@ -233,7 +235,8 @@ export function WorkoutScreen(props) {
           : (weekAdvanceFailed ? Object.assign({}, buildSummary(), { weekAdvanceFailed: true }) : buildSummary()));
         setSession(null);
         if (typeof onSesionGuardada === "function") {
-          Promise.resolve().then(function () { return onSesionGuardada(); }).catch(function (e) {
+          const filaConfirmada = Object.assign({}, sesionPayload, { created_at: new Date().toISOString(), _confirmadaLocal: true });
+          Promise.resolve().then(function () { return onSesionGuardada(filaConfirmada); }).catch(function (e) {
             console.error("[onSesionGuardada]", e);
           });
         }
