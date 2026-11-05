@@ -2094,11 +2094,12 @@ function GymApp() {
       : currentWeek;
     const weekForSet = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : effectiveCurrentWeek;
     const cicloForSet = readCicloActual(routines[0] && routines[0].datos);
-    // D7.1: la serie local guarda su ciclo (el mismo que va a Supabase) para no mezclarla con el ciclo nuevo tras un reinicio.
-    const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe, cicloForSet);
-    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     // D76-03: el panel pasa el opId del intento (lib/setLogGuard.js): el reintento del MISMO registro tras un error reutiliza el mismo id.
     const opId = isUuid(opIdIntento) ? opIdIntento : generateOpId();   // identidad estable de esta serie: progreso.id en el POST y en todos los reintentos
+    // D7.1: la serie local guarda su ciclo (el mismo que va a Supabase) para no mezclarla con el ciclo nuevo tras un reinicio.
+    // D76-04: y su opId (= progreso.id), para reconciliarla con la fila hidratada por identidad y no solo por valores.
+    const newSet = Object.assign(buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe, cicloForSet), { id: opId });
+    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     // D76-01 (write-ahead): la serie se persiste como pendiente ANTES de mostrarla y de enviarla. Si Safari descarta la pestaña durante el
     // envio, el pendiente sigue en el dispositivo y el proximo flush lo reenvia con el mismo id. Si no se puede persistir, no se registra.
     if(alumnoIdSync) {
