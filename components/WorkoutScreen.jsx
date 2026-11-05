@@ -21,6 +21,8 @@ import {
 import { readCicloActual, tipoReinicioVigente } from '../lib/rutinaCiclo.js';
 import { textoSesionTrasReinicio } from '../lib/reinicioMensajes.js';
 import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
+// D76-05: fecha estable del entrenamiento activo (medianoche / recarga de Safari).
+import { cerrarSesionActiva, claveDiaDeSesion, fechaDeSesion } from '../lib/workoutSessionDate.js';
 
 export function WorkoutScreen(props) {
   const {
@@ -53,7 +55,8 @@ export function WorkoutScreen(props) {
   const blue    = "#2563EB";
   const green   = "#22C55E";
 
-  const hoy       = new Date().toLocaleDateString("es-AR");
+  // D76-05: fecha del entrenamiento (fijada al iniciar), no la del reloj: tras medianoche las series previas siguen contando.
+  const hoy       = fechaDeSesion(session, Date.now());
   // Entrada en calor + bloque principal, en ese orden — igual que en el resto de las
   // pantallas (plan semanal, resumen). Antes solo se tomaba activeDay.exercises, así que
   // el entrenamiento activo arrancaba directo en el bloque principal y la entrada en
@@ -151,7 +154,8 @@ export function WorkoutScreen(props) {
     const totalDays = r ? r.days.length : 1;
     const semanaParaGuardar = effectiveWeek + 1;
     const cicloActual = readCicloActual(r && r.datos);
-    const hoyFin = new Date().toLocaleDateString("es-AR");
+    // D76-05: la sesion se guarda (y se busca para no duplicarla) con la fecha del entrenamiento; horaFin sigue siendo la hora real.
+    const hoyFin = fechaDeSesion(session, Date.now());
     const horaFin = new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
     const buildSummary = () => buildWorkoutSummary({
       session: session,
@@ -169,7 +173,7 @@ export function WorkoutScreen(props) {
       setFinalizing(true);
       setFinalizeError("");
       try {
-        const todayStr = new Date().toDateString();
+        const todayStr = claveDiaDeSesion(session, Date.now());   // D76-05
         let lastAdvanceDate = null;
         try { lastAdvanceDate = localStorage.getItem("it_last_week_advance_date"); } catch (e) {}
         // D76-02: se guarda el payload para pasarle a onSesionGuardada la fila confirmada por el servidor
@@ -219,6 +223,8 @@ export function WorkoutScreen(props) {
         }
 
         // Persistencia confirmada: recién ahora se aplican los efectos de "terminado".
+        // D76-05: entrenamiento cerrado; se borra su ancla (solo si es de esta sesion) para que un nuevo inicio no lo continue.
+        try { cerrarSesionActiva(localStorage, { alumnoId: sessionData.alumnoId, session: session }); } catch (e) {}
         if (hasPersistedWeek && effectiveWeek !== currentWeek) {
           setCurrentWeek(effectiveWeek);
         }
@@ -299,7 +305,7 @@ export function WorkoutScreen(props) {
       } catch(e) {}
     }
     const lastAdvance = localStorage.getItem("it_last_week_advance_date");
-    const todayStr = new Date().toDateString();
+    const todayStr = claveDiaDeSesion(session, Date.now());   // D76-05
     if (daysThisWeek >= totalDays && effectiveWeek < 3 && lastAdvance !== todayStr) {
       setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+effectiveWeek)));
       setCurrentWeek(effectiveWeek + 1);
