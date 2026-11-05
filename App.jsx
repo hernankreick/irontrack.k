@@ -170,13 +170,12 @@ import { postProgressIdempotent } from './lib/progressInsert.js';
 import { nuevaCargaFicha, observarCargaFicha, sincronizarVistaFicha, capturarVistaFicha, filasDelAlumno } from './lib/studentFicha.js';
 import {
   generateOpId,
-  readQueue,
   visiblePendingItems,
-  flushPendingForAlumno,
-  withFlushLock,
   removeAllPendingForAlumno,
 } from './lib/pendingSyncQueue.js';
 import { writeAheadPendingSet, sendWriteAheadSet, isSetSendInFlight } from './lib/setWriteAhead.js';
+import { createPendingSyncController, attachSyncTriggers } from './lib/pendingSyncController.js';
+import PendingSyncIndicator from './components/workout/PendingSyncIndicator.jsx';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
 
@@ -1333,6 +1332,7 @@ function GymApp() {
     try { setCompletedDays(JSON.parse(localStorage.getItem("it_cd") || "[]")); } catch (e) { setCompletedDays([]); }
     try { setCustomEx(JSON.parse(localStorage.getItem("it_cex") || "[]")); } catch (e) { setCustomEx([]); }
     setPendingSync(readVisiblePending());
+    if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.refresh();
     try { setPagosEstado(JSON.parse(localStorage.getItem("it_pagos_estado") || "{}")); } catch (e) { setPagosEstado({}); }
     try {
       if (sess && (sess.role === "entrenador" || sess.role === "alumno")) {
@@ -1569,45 +1569,7 @@ function GymApp() {
     };
   }, []);
 
-  // ── Detectar online/offline y sincronizar cola ─────────────────────────
-  useEffect(()=>{
-    const flushPendingSync = async () => {
-      setIsOnline(true);
-      const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})();
-      if(!alumnoIdSync) return;
-      if(readQueue(localStorage).corrupt) {
-        console.warn('[offline sync] it_pending_sync corrupto o no es una lista; se conserva sin sincronizar');
-        return;
-      }
-      // Un solo flush a la vez (por pestaña y entre pestañas); solo los elementos DE ESTE alumno; se quitan por opId solo si el servidor confirma.
-      const r = await withFlushLock(function () {
-        return flushPendingForAlumno({
-          storage: localStorage,
-          alumnoId: alumnoIdSync,
-          isInFlight: isSetSendInFlight,
-          send: function (item) { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo, item.opId)); },
-        });
-      });
-      setPendingSync(readVisiblePending());
-      const syncedCount = r.ran && r.value ? r.value.sent : 0;
-      if(syncedCount > 0) toast2(syncedCount+' set'+(syncedCount>1?'s':'')+' sincronizados ✓');
-    };
-    flushPendingRef.current = flushPendingSync;
-    const goOnline = () => { flushPendingSync(); };
-    const goOffline = () => setIsOnline(false);
-    window.addEventListener('online',  goOnline);
-    window.addEventListener('offline', goOffline);
-    // Si la app se abre/recupera sesión ya con conexión (ej. se cerró offline
-    // y se reabrió con internet), el evento 'online' no vuelve a disparar
-    // porque no hay transición offline→online. Chequear y flushear acá.
-    if (typeof navigator !== 'undefined' && navigator.onLine) {
-      flushPendingSync();
-    }
-    return () => {
-      window.removeEventListener('online',  goOnline);
-      window.removeEventListener('offline', goOffline);
-    };
-  }, [sessionData]);
+  // ── Online/offline y sincronizacion de la cola: ver D76-08 junto a logSet (lib/pendingSyncController.js) ──
 
     // ── Registrar Service Worker (PWA) ───────────────────────────────────
   useEffect(() => {
@@ -2071,7 +2033,57 @@ function GymApp() {
   };
 
   const flushPendingRef = React.useRef(null);
-  const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe, weekOverride, opIdIntento) => {
+  const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);
+  // D76-08: sincronizacion automatica de pendientes (lib/pendingSyncController.js). Identidad VALIDADA: solo un alumno con sesion propia
+  // (nunca coach, enlace compartido ni lectura) que coincide con it_session del dispositivo. Un unico controlador por carga de la app.
+  const readSyncAlumnoId = () => {
+    if (readOnly || sharedParam) return null;
+    const sd = sessionDataRef.current;
+    if (!sd || sd.role !== "alumno" || sd.alumnoId == null || sd.alumnoId === "") return null;
+    try {
+      const ls = JSON.parse(localStorage.getItem("it_session") || "null");
+      if (!ls || ls.role !== "alumno" || ls.alumnoId == null || String(ls.alumnoId) !== String(sd.alumnoId)) return null;
+    } catch (e) { return null; }
+    return String(sd.alumnoId);
+  };
+  const syncToastRef = React.useRef(null); syncToastRef.current = toast2;
+  const [pendingSyncState, setPendingSyncState] = useState(null);
+  const pendingSyncCtlRef = React.useRef(null);
+  if (!pendingSyncCtlRef.current && typeof window !== "undefined") {
+    pendingSyncCtlRef.current = createPendingSyncController({
+      storage: localStorage,
+      getAlumnoId: readSyncAlumnoId,
+      isOnline: function () { return typeof navigator === "undefined" || navigator.onLine !== false; },
+      isInFlight: isSetSendInFlight,
+      // Mismo payload que antes; el opId viaja como progreso.id en todos los reintentos.
+      sendItem: function (item, alumnoIdSync) { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo, item.opId)); },
+      onChange: function (st) { setPendingSyncState(st); },
+      onResult: function (r) {
+        setPendingSync(readVisiblePending());
+        if (r.sent > 0 && syncToastRef.current) syncToastRef.current(r.sent+' set'+(r.sent>1?'s':'')+' sincronizados ✓');
+      },
+    });
+  }
+  flushPendingRef.current = function () { return pendingSyncCtlRef.current ? pendingSyncCtlRef.current.trigger('retry') : null; };
+  // Online/offline + volver al primer plano (visibilitychange visible, focus, pageshow de bfcache en iOS). Sin sondeo.
+  React.useEffect(() => {
+    const ctl = pendingSyncCtlRef.current;
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online',  goOnline);
+    window.addEventListener('offline', goOffline);
+    const detach = ctl ? attachSyncTriggers(ctl, { win: window, doc: document }) : function () {};
+    return () => {
+      window.removeEventListener('online',  goOnline);
+      window.removeEventListener('offline', goOffline);
+      detach();
+    };
+  }, []);
+  // Inicio/recuperacion de sesion, recarga con pendientes, cambio de alumno o logout (sin identidad el controlador se resetea y no envia).
+  React.useEffect(() => {
+    if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.trigger('session');
+  }, [readOnly, sessionData?.role, sessionData?.alumnoId]);
+  const logSet = (exId, kg, reps, note, rpe, weekOverride, opIdIntento) => {
     const d = new Date().toLocaleDateString("es-AR");
     // Mismo criterio que al finalizar una sesión: si la rutina tiene una semana persistida
     // en el servidor, es la fuente de verdad por sobre el currentWeek local (que puede
@@ -2098,6 +2110,7 @@ function GymApp() {
         return false;
       }
       setPendingSync(readVisiblePending());
+      if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.refresh();
     }
     setProgress(prev=>{
       // Igual que updateExerciseProgressRecord, marcando el set con el contexto LOCAL del entrenamiento
@@ -2117,6 +2130,7 @@ function GymApp() {
         send: function () { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId)); },
       }).then(function (res) {
         setPendingSync(readVisiblePending());
+        if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.refresh();
         if (res.confirmed) {
           toast2(es?'Serie guardada ✓':'Set saved ✓');
           return;
@@ -2693,6 +2707,7 @@ function GymApp() {
     // D76-01: los pendientes del alumno pueden estar en el arreglo antiguo y en el formato por clave (it_pq:*).
     removeAllPendingForAlumno(localStorage, aid);
     setPendingSync(readVisiblePending());
+    if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.refresh();
 
     if (fichaDelBorrado()) {
       setRegistrosSubTab(0);
@@ -3529,7 +3544,14 @@ function GymApp() {
       <AppGlobalStyles darkMode={darkMode} bgSub={bgSub} textMain={textMain} border={border} />
 
       <div className="app-inner" style={alumnoFullScreenShell ? {display:"flex",flexDirection:"column",flex:1,minHeight:0} : showCoachDesktopShell ? {display:"flex",flexDirection:"column",minHeight:"100vh",width:"100%",flex:1,maxWidth:"none",margin:0} : undefined}>
-      {!isOnline&&(
+      {pendingSyncState&&pendingSyncState.alumnoId ? (
+        // D76-08: alumno con identidad validada -> indicador con el conteo real y accion de reintento (no se muestra si no hay nada pendiente).
+        // Durante el entrenamiento (session&&activeDay) solo queda el indicador inline de WorkoutScreen: una sola region aria-live.
+        session&&activeDay ? null : (
+          <PendingSyncIndicator variant="banner" state={pendingSyncState} es={es} darkMode={darkMode}
+            onRetry={function () { if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.retryNow(); }} />
+        )
+      ) : !isOnline&&(
         <OfflineSyncBanner
           message={msg("Sin conexión — sets guardados localmente", "Offline — sets saved locally")}
           pendingCount={pendingSync.length}
@@ -4513,6 +4535,8 @@ function GymApp() {
           videoOverrides={videoOverrides}
           setVideoModal={setVideoModal}
           toast2={toast2}
+          pendingSyncState={pendingSyncState}
+          onPendingSyncRetry={function () { if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.retryNow(); }}
           onCicloCambiado={function () {
             // La sesion termino despues de un reinicio: recargar el plan del ciclo nuevo sin repetir el aviso (ya lo muestra el resumen).
             var f = checkCicloAlumnoRef.current;

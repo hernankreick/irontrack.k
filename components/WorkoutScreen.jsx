@@ -6,6 +6,7 @@ import RestTimer from './workout/RestTimer.jsx';
 import WorkoutFinishSection from './workout/WorkoutFinishSection.jsx';
 import WorkoutHeader from './workout/WorkoutHeader.jsx';
 import WorkoutProgressStrip from './workout/WorkoutProgressStrip.jsx';
+import PendingSyncIndicator from './workout/PendingSyncIndicator.jsx';
 import {
   buildCompletedDayKey,
   buildSessionPayload,
@@ -28,6 +29,7 @@ export function WorkoutScreen(props) {
     preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode,
     prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData,
     onSesionGuardada, sessionPRList, videoOverrides, setVideoModal, toast2, onWeekAdvanced, onCicloCambiado,
+    pendingSyncState, onPendingSyncRetry,
   } = props;
 
   const [exitWorkoutOpen, setExitWorkoutOpen] = useState(false);
@@ -362,6 +364,9 @@ export function WorkoutScreen(props) {
 
       {/* ── Contenido scrollable ── */}
       <div onScroll={handleWorkoutScroll} style={{ flex:1, minHeight:0, overflowY:"auto", padding:"10px 16px 0", paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))", WebkitOverflowScrolling:"touch" }}>
+
+        {/* D76-08: series pendientes de sincronizar (el banner global de App queda tapado por esta pantalla). */}
+        <PendingSyncIndicator variant="inline" state={pendingSyncState} onRetry={onPendingSyncRetry} es={es} darkMode={_dm} />
 
         {ex && (
           <WorkoutExercisePanel
