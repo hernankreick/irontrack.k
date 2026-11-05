@@ -106,6 +106,16 @@ test("1-5. historial del ejercicio (biblioteca) y oportunidades de PR del día: 
   assert.equal(countPendingPrOpportunities({ exercises: [{ id: "sq", weeks: [{ kg: "102,5" }] }] }, progress, 0), 1);
 });
 
+test("1-5. resumen de sesión: un ejercicio por tiempo no genera PR de carga; el gráfico del alumno usa la misma regla", () => {
+  const plank = [{ id: "pl", name: "Plancha", reps: "60s" }];
+  const entry = updateExerciseProgressRecord(updateExerciseProgressRecord(null, { kg: 10, reps: 60, date: "1/10/2026" }), { kg: 20, reps: 60, date: "29/10/2026" });
+  assert.deepEqual(buildNewSessionPRList(plank, { pl: entry }, { pl: 10 }, "29/10/2026"), []); // antes: 1 PR
+  assert.deepEqual(buildNewSessionPRList([{ id: "pl", name: "Plancha" }], { pl: entry }, { pl: 10 }, "29/10/2026").map((p) => p.kg), [20]);
+  const graf = src("components/student-progress/GraficoProgreso.jsx");
+  assert.match(graf, /const esPR\s+= diaUlt != null && !!clases\[diaUlt\] && clases\[diaUlt\]\.clase === "pr";/);
+  assert.doesNotMatch(graf, /ultimo\?\.kg > primero\?\.kg/);
+});
+
 // ---- 6 y 7: reinicios y ciclos ----
 test("6. reinicio de rutina: el record histórico se conserva (100 tras el reinicio iguala, 95 no es PR)", () => {
   const rows = SQ.map((r) => Object.assign({ ciclo: 1, rutina_id: "r1" }, r)).concat([

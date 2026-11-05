@@ -1,5 +1,6 @@
 import React from 'react';
-import { mergeSetsForExercise, parseProgressDate } from './progressMetrics.js';
+import { mergeSetsForExercise, mergeAllSetsForExercise, clasesPorDia, parseProgressDate } from './progressMetrics.js';
+import { parseFechaDMY } from '../../lib/progressDate.js';
 
 function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, es, darkMode, sesiones, allEx}) {
   const [sbData, setSbData] = React.useState([]);
@@ -190,7 +191,11 @@ function GraficoProgreso({progress, EX, readOnly, sharedParam, sb, sessionData, 
           const pct      = primero?.kg && ultimo?.kg
             ? (((ultimo.kg - primero.kg) / primero.kg)*100).toFixed(0)
             : null;
-          const esPR     = datos.length >= 2 && ultimo?.kg > primero?.kg;
+          // D7.4: regla unica de PR (lib/metricas/pr.js) sobre TODO el historial: el ultimo dia registrado supero el record previo
+          // (antes: «la ultima serie supera a la primera de las ultimas 20», que marcaba PR por debajo del record).
+          const clases   = clasesPorDia(ex.id, mergeAllSetsForExercise(ex.id, progress, sbData));
+          const diaUlt   = ultimo ? parseFechaDMY(String(ultimo.fecha || "").trim()) : null;
+          const esPR     = diaUlt != null && !!clases[diaUlt] && clases[diaUlt].clase === "pr";
           const expanded = expandedEx === ex.id;
 
           return (
