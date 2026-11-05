@@ -24,7 +24,7 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       input: includeDemo
-        ? { index: path.resolve(__dirname, 'index.html'), demoFicha: path.resolve(__dirname, 'demo/ficha-alumno.html'), demoDashboard: path.resolve(__dirname, 'demo/dashboard-coach.html'), demoMisAlumnos: path.resolve(__dirname, 'demo/mis-alumnos.html'), demoProgreso: path.resolve(__dirname, 'demo/progreso-coach.html') }
+        ? { index: path.resolve(__dirname, 'index.html'), demoFicha: path.resolve(__dirname, 'demo/ficha-alumno.html'), demoDashboard: path.resolve(__dirname, 'demo/dashboard-coach.html'), demoMisAlumnos: path.resolve(__dirname, 'demo/mis-alumnos.html'), demoSesiones: path.resolve(__dirname, 'demo/sesiones-lectura.html'), demoProgreso: path.resolve(__dirname, 'demo/progreso-coach.html') }
         : { index: path.resolve(__dirname, 'index.html') },
       output: {
         manualChunks: {
