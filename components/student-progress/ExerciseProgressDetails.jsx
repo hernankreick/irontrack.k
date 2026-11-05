@@ -15,6 +15,7 @@ export default function ExerciseProgressDetails({
   pctColor,
   historial,
   indiceTiempo,
+  ocultarPR,
 }) {
   return (
     <div
@@ -89,6 +90,7 @@ export default function ExerciseProgressDetails({
         exId={ex.id}
         historial={historial}
         indiceTiempo={indiceTiempo}
+        ocultarPR={ocultarPR}
         accent="#3b82f6"
         prHex="#f59e0b"
         bgHex="#0F1923"

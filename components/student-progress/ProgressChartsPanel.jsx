@@ -97,6 +97,7 @@ function DetailChart({
   exId,
   historial,
   indiceTiempo,
+  ocultarPR,
   accent,
   prHex,
   bgHex,
@@ -119,7 +120,8 @@ function DetailChart({
   const metricKey =
     metricMode === 'peso' ? 'peso' : metricMode === 'reps' ? 'reps' : 'volumen'
   // D7.4: en «Peso» los PR salen de la regla unica sobre TODO el historial (no del rango visible ni de las ultimas 20 series)
-  const prFlags = progressivePRMasks(sorted, metricKey, historial ? { exId, historial, indiceTiempo } : undefined)
+  // D7.5: con historial parcial no se marcan PR (un record viejo puede faltar)
+  const prFlags = ocultarPR ? sorted.map(() => false) : progressivePRMasks(sorted, metricKey, historial ? { exId, historial, indiceTiempo } : undefined)
   const maWin = sorted.length >= 4 ? 3 : 2
   const ma = movingAverage(yVals, maWin)
 
@@ -312,6 +314,7 @@ export function ProgressChartsPanel({
   loadingSb,
   emptySkeleton,
   indiceTiempo,
+  historialParcial,
 }) {
   const [expandedEx, setExpandedEx] = React.useState(null)
   const [muscle, setMuscle] = React.useState('Todos')
@@ -492,7 +495,7 @@ export function ProgressChartsPanel({
                 pct={pct}
                 trend={trend}
                 kgSeries={kgSeries}
-                atPR={atPR}
+                atPR={historialParcial ? false : atPR}
                 isOpen={isOpen}
                 accent={accent}
                 es={es}
@@ -511,7 +514,8 @@ export function ProgressChartsPanel({
                   historial={historial}
                   indiceTiempo={indiceTiempo}
                   hist={hist}
-                  pr={pr}
+                  pr={historialParcial ? 0 : pr}
+                  ocultarPR={!!historialParcial}
                   metricTab={metricTab}
                   rangeKey={rangeKey}
                   setMetricTab={setMetricTab}

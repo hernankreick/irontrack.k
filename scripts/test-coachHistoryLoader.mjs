@@ -176,7 +176,7 @@ await test("lecturas del alumno: getSesiones igual que en E0; getProgreso pagina
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
   assert.ok(app.includes('getSesiones: (alumnoId) => sbFetch("sesiones?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=10"),'));
   // D7.5: antes una sola consulta que PostgREST cortaba en su tope de filas; ahora las mismas paginas de E0 (lib/alumnoHistoryLoader.js)
-  assert.match(app, /getProgreso: async \(alumnoId\) => \{\s*const r = await cargarHistorialProgreso\(sbFetch, alumnoId\);/);
+  assert.match(app, /getProgreso: async \(alumnoId\) => \(await cargarHistorialProgreso\(sbFetch, alumnoId\)\)\.rows,/);
   assert.match(app, /getHistorialProgreso: \(alumnoId, opts\) => obtenerHistorialProgreso\(sbFetch, alumnoId, opts\),/);
 });
 

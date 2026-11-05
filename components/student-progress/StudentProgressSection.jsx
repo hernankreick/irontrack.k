@@ -365,6 +365,7 @@ export default function StudentProgressSection({
               loadingSb={loadingSb}
               emptySkeleton={!loadingSb && !hasData}
               indiceTiempo={indiceTiempo}
+              historialParcial={historialParcial}
             />
 
             {/* Achievements */}

@@ -414,13 +414,10 @@ const sb = {
     if (error) throw error;
   },
   // D7.5: historial COMPLETO paginado (antes una sola consulta que PostgREST cortaba en su tope de filas, perdiendo lo mas antiguo).
-  // getProgreso mantiene su contrato (array; si falla la primera pagina, lanza como antes). getHistorialProgreso devuelve ademas si el
-  // historial quedo completo, con cache corta y una sola consulta en vuelo por alumno (ver lib/alumnoHistoryLoader.js).
-  getProgreso: async (alumnoId) => {
-    const r = await cargarHistorialProgreso(sbFetch, alumnoId);
-    if (!r.rows) throw new Error("[getProgreso] no se pudo leer el progreso");
-    return r.rows;
-  },
+  // getProgreso mantiene su contrato: array, o null si no se pudo leer (sbFetch devuelve null ante un error HTTP; los llamadores ya
+  // hacen `|| []`). getHistorialProgreso devuelve ademas si el historial quedo completo, con cache corta y una sola consulta en vuelo
+  // por alumno (ver lib/alumnoHistoryLoader.js).
+  getProgreso: async (alumnoId) => (await cargarHistorialProgreso(sbFetch, alumnoId)).rows,
   getHistorialProgreso: (alumnoId, opts) => obtenerHistorialProgreso(sbFetch, alumnoId, opts),
   addProgreso: (data) => sbFetch("progreso", "POST", data),
   // Insercion idempotente: data.id (UUID de la operacion) se reutiliza en los reintentos; 23505 sobre ese id se verifica leyendo la fila.
@@ -1727,11 +1724,12 @@ function GymApp() {
             sb.getSesiones(sessionData.alumnoId),
             sbFetch("alumnos?id=eq."+sessionData.alumnoId+"&select=ultimo_pago_confirmado"),
             // D7.5: historial completo (forzado: al iniciar sesion siempre se lee de nuevo); queda en cache para Progreso
+            // Si no se puede leer, el login sigue igual que antes (rutina, semana, sesiones y pago se cargan; progreso vacio).
             sb.getHistorialProgreso(sessionData.alumnoId, { forzar: true }).then(function (h) {
-              if (!h || !h.rows) throw new Error("[historial alumno] no se pudo leer el progreso");
+              if (!h || !h.rows) { console.warn("[historial alumno] no se pudo leer el progreso"); return []; }
               if (!h.complete) console.warn("[historial alumno] historial incompleto", h.reason);
               return h.rows;
-            }),
+            }, function (e) { console.warn("[historial alumno] no se pudo leer el progreso", e); return []; }),
           ]);
           // Rehidratar el historial de PRs/series desde Supabase: progress
           // (localStorage "it_pg") se borra en cada login nuevo y, sin esto,
@@ -2530,7 +2528,7 @@ function GymApp() {
         var freshProg = await sb.getProgreso(aid);
         // enFicha(): vista actual (no el alumnoActivo de la clausura, que es el de cuando empezo el reinicio)
         if (Array.isArray(freshSes) && enFicha()) setAlumnoSesiones(freshSes);
-        // progresoGlobal ya quedo completo con cargarSesionesGlobales(); getProgreso no pagina y no debe reemplazarlo.
+        // progresoGlobal ya quedo completo con cargarSesionesGlobales() (incluye a todo el roster); freshProg es solo la ficha.
         if (Array.isArray(freshProg) && enFicha()) setAlumnoProgreso(freshProg);
       }
     } catch (e) {

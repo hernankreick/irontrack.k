@@ -158,11 +158,18 @@ await test("13. error de red durante la paginacion: historial parcial marcado; p
   assert.deepEqual([parcial.complete, parcial.reason, parcial.rows.length], [false, "error", 1000]);
   const nada = await cargarHistorialProgreso(servidor({ a: filas }, { falla: (p, off) => off === 0 }).fetchPath, "a");
   assert.deepEqual([nada.rows, nada.complete, nada.reason], [null, false, "error"]);
-  // getProgreso conserva su contrato: si falla la primera pagina lanza (los llamadores ya lo manejaban)
+  // sbFetch devuelve null ante un error HTTP (no lanza): la primera pagina fallida tambien se detecta asi
+  const nulo = await cargarHistorialProgreso(async () => null, "a");
+  assert.deepEqual([nulo.rows, nulo.reason], [null, "error"]);
+  // getProgreso conserva su contrato anterior: array, o null si no se pudo leer (los llamadores hacen `|| []`; nunca lanza)
   const app = src("App.jsx");
-  assert.match(app, /getProgreso: async \(alumnoId\) => \{\s*const r = await cargarHistorialProgreso\(sbFetch, alumnoId\);\s*if \(!r\.rows\) throw/);
-  // la carga del login lanza si no hay datos y avisa (consola) si quedo incompleto; Progreso del alumno lo muestra
-  assert.match(app, /sb\.getHistorialProgreso\(sessionData\.alumnoId, \{ forzar: true \}\)/);
+  assert.match(app, /getProgreso: async \(alumnoId\) => \(await cargarHistorialProgreso\(sbFetch, alumnoId\)\)\.rows,/);
+  // QA D7.5 (P1): si el progreso no se puede leer, el login del alumno SIGUE (rutina, semana, sesiones y pago); antes de este arreglo
+  // lanzaba dentro del Promise.all y el alumno quedaba sin rutina
+  const login = app.slice(app.indexOf("sb.getHistorialProgreso(sessionData.alumnoId, { forzar: true })"), app.indexOf("const hydratedProgress"));
+  assert.match(login, /if \(!h \|\| !h\.rows\) \{ console\.warn\([^)]*\); return \[\]; \}/);
+  assert.match(login, /function \(e\) \{ console\.warn\([^)]*\); return \[\]; \}\)/);
+  assert.doesNotMatch(login, /throw /);
 });
 
 await test("14. cambio rapido de alumno: cada alumno su historial; una respuesta tardia no se aplica; una sola consulta en vuelo", async () => {
@@ -218,6 +225,13 @@ await test("15. historial incompleto: no se cachea, y Progreso no presenta los P
   assert.match(sec, /prsThisMonth: historialParcial \? null : countPRsThisMonth\(/);
   assert.match(sec, /data-qa="historial-alumno-incompleto"/);
   assert.match(sec, /'Historial incompleto'/);
+  // QA D7.5 (P2): las insignias y marcas de PR de cada ejercicio tampoco se muestran con historial parcial
+  assert.match(sec, /historialParcial=\{historialParcial\}/);
+  const panel = src("components/student-progress/ProgressChartsPanel.jsx");
+  assert.match(panel, /atPR=\{historialParcial \? false : atPR\}/);
+  assert.match(panel, /pr=\{historialParcial \? 0 : pr\}/);
+  assert.match(panel, /const prFlags = ocultarPR \? sorted\.map\(\(\) => false\)/);
+  assert.match(src("components/student-progress/ExerciseProgressDetails.jsx"), /ocultarPR=\{ocultarPR\}/);
 });
 
 console.log("\n" + count + " tests OK");
