@@ -35,6 +35,28 @@ export default function ProgresoCoachDemo() {
   }, [volumen, data]);
   // Alumno seleccionado en ProgresoView (aviso opcional onAlumnoSelChange): la tarjeta de volumen es solo de Valentina Carga.
   const [alumnoSelId, setAlumnoSelId] = React.useState(null);
+  // ?alumno=martina | bruno (D7.4, solo demo): abre directo a Martina/Bruno Récords. ProgresoView elige al primer alumno A-Z y no recibe
+  // un alumno inicial, así que se acciona su propio selector (clic en el botón del alumno y en su fila). Sin el parámetro no hace nada.
+  const alumnoParam = React.useMemo(function () {
+    try {
+      const q = (new URLSearchParams(window.location.search).get('alumno') || '').toLowerCase();
+      return q === 'martina' ? 'Martina Récords' : q === 'bruno' ? 'Bruno Récords' : null;
+    } catch (e) { return null; }
+  }, []);
+  React.useEffect(function () {
+    if (!alumnoParam) return undefined;
+    let intentos = 0;
+    let abierto = false;
+    const timer = setInterval(function () {
+      intentos++;
+      const fila = Array.prototype.find.call(document.querySelectorAll('[data-qa-sheet="alumnos"] button'), function (b) { return (b.textContent || '').indexOf(alumnoParam) >= 0; });
+      if (fila) { fila.click(); clearInterval(timer); return; }
+      const btn = document.querySelector('[data-qa="progreso-alumno-btn"]');
+      if (btn && !abierto) { abierto = true; btn.click(); }
+      if (intentos > 100) clearInterval(timer);
+    }, 50);
+    return function () { clearInterval(timer); };
+  }, [alumnoParam]);
   const T = getAppThemeTokens(darkMode);
   const bannerText = darkMode ? '#fde68a' : '#78350f';
 

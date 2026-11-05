@@ -11,6 +11,9 @@
 //   Julián Paz    estancado: récord hace más de 3 semanas, entrena pero sin superarlo (iguala) · 3 ciclos (rutina vigente: ciclo 3, semana activa 3: semanas 1 y 2 completas)
 //   Martina Vega  sin rutina asignada · registros de una rutina anterior
 //   Tomás Ruiz    activo, alta adherencia, PRs
+//   Martina Récords (D7.4) sentadilla 80 -> 90 -> 90 -> 85 -> 100 kg (hace 28, 21, 14, 7 y 2 días): primera marca, PR, iguala, sin marca, PR.
+//                 La de hace 28 días es del ciclo 1 y el resto del ciclo 2 (rutina reiniciada): el récord se conserva. PRs del período: 2.
+//   Bruno Récords (D7.4) press banca 60 -> 62,5 -> 62,5 (1 PR + iguala) y sentadilla 120 -> 117,5 (sin PR): no se mezclan con Martina.
 
 import { volumenEnRango } from "../../lib/metricas/volumen.js";
 import { indiceEjerciciosPorTiempo } from "../../lib/metricas/tipoCarga.js";
@@ -122,6 +125,9 @@ const ALUMNOS = [
   { id: "demo-alumno-a", nombre: "Alumno A Demo", email: "alumno-a@demo.invalid" },
   { id: "demo-alumno-b", nombre: "Alumno B Demo", email: "alumno-b@demo.invalid" },
   { id: "demo-alumno-c", nombre: "Alumno C Demo", email: "alumno-c@demo.invalid" },
+  // D7.4: récords personales (al final: test-progresoVisual usa demo.alumnos[0]).
+  { id: "demo-martina-records", nombre: "Martina Récords", email: "martina-records@demo.invalid" },
+  { id: "demo-bruno-records", nombre: "Bruno Récords", email: "bruno-records@demo.invalid" },
 ];
 
 const ex = (id, reps) => (reps ? { id, reps } : { id });
@@ -154,6 +160,16 @@ export function buildProgresoDemoData(opts) {
     { id: "demo-r-alumno-c", alumno_id: "demo-alumno-c", nombre: "Rutina sin registros", created_at: iso(10), datos: { semana_activa: 1, days: dias([ex("demo-sq")], [ex("demo-bp")]) } },
     { id: "demo-r-carla", alumno_id: "demo-carla", nombre: "Movilidad + fuerza", created_at: iso(60), datos: { days: dias([ex("demo-sq"), ex("demo-row")], { warmup: [ex("demo-plank", '45"')], exercises: [ex("demo-bp")] }) } },
     { id: "demo-r-diego", alumno_id: "demo-diego", nombre: "Inicio", created_at: iso(5), datos: { days: dias([ex("demo-sq"), ex("demo-bp")], [ex("demo-dl"), ex("demo-ohp")]) } },
+    {
+      // D7.4: 2 ciclos; reinicio de rutina hace ~24 días (entre la sesión de hace 28 y la de hace 21).
+      id: "demo-r-martina-records", alumno_id: "demo-martina-records", nombre: "Fuerza récords", created_at: iso(35),
+      datos: {
+        ciclo_actual: 2, ciclo_base: 2, ciclo_reiniciado_at: iso(24),
+        ciclos_meta: [{ ciclo: 2, tipo: "rutina", semana_inicio: 1, desde_ciclo: 1, at: iso(24) }],
+        days: dias([ex("demo-sq")]),
+      },
+    },
+    { id: "demo-r-bruno-records", alumno_id: "demo-bruno-records", nombre: "Fuerza récords", created_at: iso(30), datos: { days: dias([ex("demo-bp")], [ex("demo-sq")]) } },
   ];
 
   const sesiones = [];
@@ -274,6 +290,18 @@ export function buildProgresoDemoData(opts) {
   // ---- Diego: rutina asignada hace 5 días, dos sesiones = solo primeras marcas
   sesion("demo-diego", "demo-r-diego", "Inicio", 4, 1, 0, 1, { "demo-sq": tres(60, 8), "demo-bp": tres(45, 8) });
   sesion("demo-diego", "demo-r-diego", "Inicio", 2, 1, 1, 1, { "demo-dl": tres(90, 5), "demo-ohp": tres(30, 8) });
+
+  // ---- D7.4 Martina Récords: sentadilla 80 (ciclo 1) -> 90 -> 90 -> 85 -> 100 (ciclo 2). 3 series por día; la mejor del día es ese kg, reps 5.
+  [[28, 80, 1, 1], [21, 90, 1, 2], [14, 90, 2, 2], [7, 85, 3, 2], [2, 100, 4, 2]].forEach(([n, kg, sem, ciclo]) => {
+    sesion("demo-martina-records", "demo-r-martina-records", "Fuerza récords", n, sem, 0, ciclo, { "demo-sq": tres(kg, 5) });
+  });
+  // ---- D7.4 Bruno Récords: press banca 60 -> 62,5 -> 62,5 y sentadilla 120 -> 117,5 (otro alumno y otro ejercicio: no se mezclan).
+  [[21, 60, 1], [14, 62.5, 2], [7, 62.5, 3]].forEach(([n, kg, sem]) => {
+    sesion("demo-bruno-records", "demo-r-bruno-records", "Fuerza récords", n, sem, 0, 1, { "demo-bp": tres(kg, 8) });
+  });
+  [[13, 120, 2], [6, 117.5, 3]].forEach(([n, kg, sem]) => {
+    sesion("demo-bruno-records", "demo-r-bruno-records", "Fuerza récords", n, sem, 1, 1, { "demo-sq": tres(kg, 5) });
+  });
 
   if (o.volumen) {
     rutinas.push({ id: "demo-r-vol", alumno_id: VOL_ALUMNO_ID, nombre: "Fuerza + tiempo", created_at: iso(30), datos: { days: dias([ex("vol-sq"), ex("custom_vol_x"), ex("vol-pu"), ex("vol-plank", "45s"), ex("vol-kuohp"), ex("vol-lunge")]) } });
