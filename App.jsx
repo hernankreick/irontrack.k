@@ -162,6 +162,7 @@ import {
   calculateNewWeightPR,
   formatWorkoutSetLabel,
   hydrateProgressFromRows,
+  isUuid,
   mergeProgressEntries,
   updateExerciseKgInRoutines,
 } from './lib/workoutSession.js';
@@ -2070,7 +2071,7 @@ function GymApp() {
   };
 
   const flushPendingRef = React.useRef(null);
-  const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe, weekOverride) => {
+  const sessionDataRef = React.useRef(sessionData);React.useEffect(()=>{sessionDataRef.current=sessionData;},[sessionData]);const logSet = (exId, kg, reps, note, rpe, weekOverride, opIdIntento) => {
     const d = new Date().toLocaleDateString("es-AR");
     // Mismo criterio que al finalizar una sesión: si la rutina tiene una semana persistida
     // en el servidor, es la fuente de verdad por sobre el currentWeek local (que puede
@@ -2084,7 +2085,8 @@ function GymApp() {
     // D7.1: la serie local guarda su ciclo (el mismo que va a Supabase) para no mezclarla con el ciclo nuevo tras un reinicio.
     const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe, cicloForSet);
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
-    const opId = generateOpId();   // identidad estable de esta serie: progreso.id en el POST y en todos los reintentos
+    // D76-03: el panel pasa el opId del intento (lib/setLogGuard.js): el reintento del MISMO registro tras un error reutiliza el mismo id.
+    const opId = isUuid(opIdIntento) ? opIdIntento : generateOpId();   // identidad estable de esta serie: progreso.id en el POST y en todos los reintentos
     // D76-01 (write-ahead): la serie se persiste como pendiente ANTES de mostrarla y de enviarla. Si Safari descarta la pestaña durante el
     // envio, el pendiente sigue en el dispositivo y el proximo flush lo reenvia con el mismo id. Si no se puede persistir, no se registra.
     if(alumnoIdSync) {

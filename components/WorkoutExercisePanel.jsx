@@ -7,6 +7,8 @@ import { getYTVideoId } from '../lib/getYTVideoId.js';
 import { setsForLoadPrefill } from '../lib/rutinaCiclo.js';
 import { createRepsSwipeHandlers } from '../lib/repsSwipe.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
+import { generateOpId } from '../lib/pendingSyncQueue.js';
+import { createSetLogGuard } from '../lib/setLogGuard.js';
 import {
   calculateNewWeightPR,
   calculateSetsVolume,
@@ -97,6 +99,7 @@ export function WorkoutExercisePanel(props) {
     setPrCelebration,
     rutinaDatos,
     progress,
+    logScope,
   } = props;
 
   const [kg, setKg] = React.useState("");
@@ -114,6 +117,11 @@ export function WorkoutExercisePanel(props) {
   const [note, setNote] = React.useState("");
   const [pause, setPause] = React.useState(90);
   const [rpe, setRpe] = React.useState(null);
+  // D76-03: guarda de registro (lib/setLogGuard.js). Un toque de REGISTRAR (o el swipe) = una serie: mientras dura el registro y la
+  // confirmacion visual ("LISTO", 800 ms) los toques extra se ignoran; tras un error el reintento usa el mismo opId.
+  const logGuardRef = React.useRef(null);
+  if (!logGuardRef.current) logGuardRef.current = createSetLogGuard({ generateId: generateOpId });
+  const attemptScope = String(logScope || "") + "|" + activeExIdx + "|" + (ex && ex.id);
 
   const validationExercise = { ...(info || {}), ...(ex || {}) };
   const hasSuggestedLoad = exerciseHasSuggestedLoad(validationExercise);
@@ -136,10 +144,23 @@ export function WorkoutExercisePanel(props) {
     }
   }, [activeExIdx]);
 
+  // D76-03: cambio de ejercicio, sesion o alumno -> se descarta el opId de reintento del contexto anterior. Si hay una confirmacion
+  // ("LISTO") en curso, se completa (la apaga el timeout de 800 ms con su token): el toque extra no cae en el ejercicio siguiente.
   React.useEffect(() => {
+    logGuardRef.current.reset(attemptScope);
+    if (logGuardRef.current.snapshot().phase !== "confirming") {
+      setShowCheckAnim(false);
+      setSetFlash(false);
+    }
+  }, [attemptScope]);
+
+  React.useEffect(() => {
+    // D76-03: si un remontaje (p. ej. StrictMode) reutiliza el ref de una guarda ya descartada, se crea una nueva.
+    if (logGuardRef.current.snapshot().disposed) logGuardRef.current = createSetLogGuard({ generateId: generateOpId });
     return () => {
       if (holdTimer.current) clearTimeout(holdTimer.current);
       if (holdInterval.current) clearInterval(holdInterval.current);
+      logGuardRef.current.dispose();
     };
   }, []);
 
@@ -182,15 +203,20 @@ export function WorkoutExercisePanel(props) {
   const handleLogSet = () => {
     if(!canLogWorkoutSet(validationExercise, kg, reps)) return;
     // D76-01: primero se registra (persistencia local antes que todo); si no se pudo guardar en el dispositivo, los datos quedan en pantalla.
-    const saved = logSet(ex.id, normalizeWorkoutKg(kg), resolveWorkoutRepsInput(reps, validationExercise), note, rpe, currentWeek);
-    if(saved === false) return;
+    // D76-03: el registro pasa por la guarda con el opId del intento.
+    const res = logGuardRef.current.attempt(attemptScope, (opId) => logSet(ex.id, normalizeWorkoutKg(kg), resolveWorkoutRepsInput(reps, validationExercise), note, rpe, currentWeek, opId));
+    // busy/disposed: el toque extra se ignora; failed: los datos quedan en pantalla y el proximo toque reintenta con el mismo opId.
+    if(res.status === "failed" && res.error) console.error("[PROGRESO] error al registrar la serie", res.error);
+    if(res.status !== "logged") return;
     // Haptic feedback — vibración corta al registrar set
     try { if(navigator.vibrate) navigator.vibrate([40]); } catch(e){}
     // Micro-feedback: flash + check animation
     setSetFlash(true);
     setShowCheckAnim(true);
     setTimeout(()=>setSetFlash(false), 600);
-    setTimeout(()=>setShowCheckAnim(false), 800);
+    // D76-03: al terminar la confirmacion visual se libera la guarda. Un token ya usado o de una guarda descartada no libera ni apaga nada.
+    const token = res.token;
+    setTimeout(()=>{ if(logGuardRef.current.finishConfirmation(token)) setShowCheckAnim(false); }, 800);
     // Detectar PR
     const newPR = hasSuggestedLoad ? calculateNewWeightPR({ max: pr }, kg) : null;
     if(newPR) {
@@ -431,7 +457,7 @@ export function WorkoutExercisePanel(props) {
 
             {/* BOTÓN REGISTRAR */}
             <button className={"hov"+(showCheckAnim?" check-pulse":"")} onClick={handleLogSet}
-              disabled={!canLogSet}
+              disabled={!canLogSet || showCheckAnim} aria-busy={showCheckAnim}
               style={{width:"100%",padding:"14px",
                 background:(!canLogSet)?"#1a2535":showCheckAnim?"#22C55E":"#2563EB",
                 color:(!canLogSet)?"#475569":"#fff",border:"none",borderRadius:10,

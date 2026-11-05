@@ -367,7 +367,8 @@ await t("p. App.logSet: write-ahead antes del POST, sin enqueueItem tras el inte
   const hb = panel.slice(h, panel.indexOf("\n  };\n", h));
   const ls = hb.indexOf("logSet(");
   assert.ok(ls > 0 && ls < hb.indexOf("setSetFlash(") && ls < hb.indexOf("navigator.vibrate") && ls < hb.indexOf("startTimer(") && ls < hb.indexOf('setNote("")'));
-  assert.ok(/const saved = logSet\([\s\S]*?\);\s*if\(saved === false\) return;/.test(hb), "retorno temprano si logSet devuelve false");
+  // D76-03: logSet corre dentro de la guarda (attempt); si no quedo registrada (false, ocupado o error) el handler retorna antes del feedback.
+  assert.ok(/const res = logGuardRef\.current\.attempt\([\s\S]*?logSet\([\s\S]*?\);\s*(?:\/\/[^\n]*\n\s*)*if\s*\(\s*res\.status !== "logged"\s*\)\s*return;/.test(hb), "retorno temprano si logSet devuelve false");
 });
 
 console.log(`\n${n} pruebas OK` + (failed ? `, ${failed} FALLARON` : ""));
