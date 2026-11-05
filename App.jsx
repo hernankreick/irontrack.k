@@ -163,19 +163,18 @@ import {
   hydrateProgressFromRows,
   mergeProgressEntries,
   updateExerciseKgInRoutines,
-  persistSetConfirmed,
 } from './lib/workoutSession.js';
 import { postProgressIdempotent } from './lib/progressInsert.js';
 import { nuevaCargaFicha, observarCargaFicha, sincronizarVistaFicha, capturarVistaFicha, filasDelAlumno } from './lib/studentFicha.js';
 import {
   generateOpId,
-  enqueueItem,
-  updateQueue,
   readQueue,
   visiblePendingItems,
   flushPendingForAlumno,
   withFlushLock,
+  removeAllPendingForAlumno,
 } from './lib/pendingSyncQueue.js';
+import { writeAheadPendingSet, sendWriteAheadSet, isSetSendInFlight } from './lib/setWriteAhead.js';
 import { IronTrackI18nProvider, useIronTrackI18n } from './contexts/IronTrackI18nContext.jsx';
 import { usePWAInstall } from './hooks/usePWAInstall.js';
 
@@ -1566,6 +1565,7 @@ function GymApp() {
         return flushPendingForAlumno({
           storage: localStorage,
           alumnoId: alumnoIdSync,
+          isInFlight: isSetSendInFlight,
           send: function (item) { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo, item.opId)); },
         });
       });
@@ -2049,6 +2049,20 @@ function GymApp() {
     const cicloForSet = readCicloActual(routines[0] && routines[0].datos);
     // D7.1: la serie local guarda su ciclo (el mismo que va a Supabase) para no mezclarla con el ciclo nuevo tras un reinicio.
     const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe, cicloForSet);
+    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
+    const opId = generateOpId();   // identidad estable de esta serie: progreso.id en el POST y en todos los reintentos
+    // D76-01 (write-ahead): la serie se persiste como pendiente ANTES de mostrarla y de enviarla. Si Safari descarta la pestaña durante el
+    // envio, el pendiente sigue en el dispositivo y el proximo flush lo reenvia con el mismo id. Si no se puede persistir, no se registra.
+    if(alumnoIdSync) {
+      const pendingItem = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, cicloForSet, alumnoIdSync, opId);
+      const wa = writeAheadPendingSet(localStorage, pendingItem, Date.now());
+      if(!wa.ok) {
+        console.error("[PROGRESO] no se pudo persistir la serie en el dispositivo (" + wa.reason + "); no se registra");
+        toast2(es ? "No se pudo guardar la serie en este dispositivo. Tus datos siguen en pantalla: liberá espacio o intentá de nuevo." : "Could not save the set on this device. Your data is still on screen: free up space or try again.");
+        return false;
+      }
+      setPendingSync(readVisiblePending());
+    }
     setProgress(prev=>{
       // Igual que updateExerciseProgressRecord, marcando el set con el contexto LOCAL del entrenamiento
       // abierto (session_rutina_id / session_dia_idx). No se envia a Supabase: el payload remoto se arma
@@ -2056,34 +2070,26 @@ function GymApp() {
       const ex = updateProgressEntryWithSessionContext(prev[exId], newSet, session);
       return {...prev,[exId]:ex};
     });
-    // Guardar en Supabase — si offline, guardar en cola local. Online: la serie se da por guardada SOLO si Supabase
-    // devuelve la fila insertada (sbFetch devuelve null en HTTP no-ok); si no, se encola y se avisa que esta pendiente.
-    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
-    const opId = generateOpId();   // identidad LOCAL estable de esta serie (se conserva en los reintentos; no se envia a Supabase)
-    const enqueuePendingSet = function () {
-      enqueueItem(localStorage, buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, cicloForSet, alumnoIdSync, opId));
-      setPendingSync(readVisiblePending());
-    };
+    // Enviar a Supabase (la serie ya esta en cola). Online: se retira de la cola SOLO si Supabase devuelve la fila insertada; si no, queda
+    // pendiente con el mismo id. Offline: queda en cola para el proximo flush.
     let confirmacionRemotaEnCurso = false;
-    if(alumnoIdSync) {
-      if(!isOnline) {
-        enqueuePendingSet();
-      } else {
-        confirmacionRemotaEnCurso = true;
-        persistSetConfirmed({
-          addProgreso: function () { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId)); },
-        }).then(function (res) {
-          if (res.confirmed) {
-            toast2(es?'Serie guardada ✓':'Set saved ✓');
-            return;
-          }
-          console.error("[PROGRESO] serie no confirmada por el servidor (" + res.reason + "); se encola para reintentar");
-          enqueuePendingSet();
-          toast2(es?'Guardado localmente, pendiente de sincronizar':'Saved locally, pending sync');
-          // Un reintento automatico (el cerrojo del flush evita enviar dos veces lo mismo); si falla, queda en cola.
-          setTimeout(function () { if (flushPendingRef.current) flushPendingRef.current(); }, 10000);
-        });
-      }
+    if(alumnoIdSync && isOnline) {
+      confirmacionRemotaEnCurso = true;
+      sendWriteAheadSet({
+        storage: localStorage,
+        opId: opId,
+        send: function () { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId)); },
+      }).then(function (res) {
+        setPendingSync(readVisiblePending());
+        if (res.confirmed) {
+          toast2(es?'Serie guardada ✓':'Set saved ✓');
+          return;
+        }
+        console.error("[PROGRESO] serie no confirmada por el servidor (" + res.reason + "); queda en cola para reintentar");
+        toast2(es?'Guardado localmente, pendiente de sincronizar':'Saved locally, pending sync');
+        // Un reintento automatico (el cerrojo del flush evita enviar dos veces lo mismo); si falla, queda en cola.
+        setTimeout(function () { if (flushPendingRef.current) flushPendingRef.current(); }, 10000);
+      });
     }
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
     const exPrevData = progress[exId]||{sets:[],max:0};
@@ -2110,6 +2116,7 @@ function GymApp() {
     if(parseFloat(kg)>0) {
       setRoutines(prev=>updateExerciseKgInRoutines(prev, exId, kg));
     }
+    return true;
   };
 
   const {
@@ -2644,12 +2651,8 @@ function GymApp() {
       }
     } catch (e) {}
 
-    updateQueue(localStorage, function (items) {
-      return items.filter(function (item) {
-        if (!item || item.alumno_id == null) return true;
-        return String(item.alumno_id) !== aid;
-      });
-    });
+    // D76-01: los pendientes del alumno pueden estar en el arreglo antiguo y en el formato por clave (it_pq:*).
+    removeAllPendingForAlumno(localStorage, aid);
     setPendingSync(readVisiblePending());
 
     if (fichaDelBorrado()) {
