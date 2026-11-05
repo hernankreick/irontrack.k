@@ -1,5 +1,6 @@
 import { normalizeFecha } from '../../lib/normalizeFecha.js';
 import { rowInCiclo } from '../../lib/rutinaCiclo.js';
+import { esPRNuevo } from '../../lib/metricas/pr.js';
 import { firstNonEmptyString } from '../../lib/appPureHelpers.js';
 
 /**
@@ -132,7 +133,7 @@ export function countPendingPrOpportunities(day, progress, currentWeek) {
     const w = ((ex.weeks || [])[currentWeek]) || {};
     const kgProg = parseFloat(String(w.kg != null ? w.kg : ex.kg || "")) || 0;
     const prevMax = (progress && progress[ex.id] && progress[ex.id].max) || 0;
-    if (prevMax > 0 && kgProg > 0 && kgProg > prevMax) n++;
+    if (esPRNuevo(prevMax, kgProg)) n++; // D7.4: misma regla de PR
   });
   return n;
 }

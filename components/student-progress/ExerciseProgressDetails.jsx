@@ -13,6 +13,8 @@ export default function ExerciseProgressDetails({
   es,
   DetailChart,
   pctColor,
+  historial,
+  indiceTiempo,
 }) {
   return (
     <div
@@ -85,6 +87,8 @@ export default function ExerciseProgressDetails({
         metricMode={metricTab === 'volumen' ? 'volumen' : metricTab}
         rangeKey={rangeKey}
         exId={ex.id}
+        historial={historial}
+        indiceTiempo={indiceTiempo}
         accent="#3b82f6"
         prHex="#f59e0b"
         bgHex="#0F1923"
