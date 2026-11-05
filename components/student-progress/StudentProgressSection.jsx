@@ -86,6 +86,8 @@ export default function StudentProgressSection({
 }) {
   const [sbData, setSbData] = React.useState([])
   const [loadingSb, setLoadingSb] = React.useState(true)
+  // D7.5: 'cargando' | 'completo' | 'incompleto' (fallo una pagina o se llego al tope) | 'error' (no se pudo leer el servidor)
+  const [historialEstado, setHistorialEstado] = React.useState('cargando')
   const [subView, setSubView] = React.useState(initialSubView)
   const [seenAch, setSeenAch] = React.useState(() => {
     try {
@@ -115,15 +117,37 @@ export default function StudentProgressSection({
         : null)
     if (!alumnoId) {
       setLoadingSb(false)
+      setHistorialEstado('completo')
       return
     }
-    sb.getProgreso(alumnoId)
-      .then((prog) => {
-        if (prog) setSbData(prog)
+    // D7.5: historial COMPLETO paginado; nada del alumno anterior mientras carga y una respuesta tardia de otro alumno no se aplica
+    let vigente = true
+    setSbData([])
+    setLoadingSb(true)
+    setHistorialEstado('cargando')
+    const carga =
+      sb && typeof sb.getHistorialProgreso === 'function'
+        ? sb.getHistorialProgreso(alumnoId)
+        : Promise.resolve(sb.getProgreso(alumnoId)).then((rows) => ({ rows, complete: Array.isArray(rows) }))
+    carga
+      .then((h) => {
+        if (!vigente) return
+        if (h && Array.isArray(h.rows)) setSbData(h.rows)
+        setHistorialEstado(!h || !Array.isArray(h.rows) ? 'error' : h.complete ? 'completo' : 'incompleto')
         setLoadingSb(false)
       })
-      .catch(() => setLoadingSb(false))
+      .catch(() => {
+        if (!vigente) return
+        setHistorialEstado('error')
+        setLoadingSb(false)
+      })
+    return () => {
+      vigente = false
+    }
   }, [sb, sessionData?.alumnoId, sharedParam])
+
+  // D7.5: con un historial parcial los records viejos pueden faltar: los PR no se presentan como definitivos
+  const historialParcial = historialEstado === 'incompleto' || historialEstado === 'error'
 
   // D7.4: ejercicios por tiempo (catalogo + snapshots de la rutina): ni volumen ni PR de carga, igual que el entrenador
   const indiceTiempo = React.useMemo(() => indiceEjerciciosPorTiempo([].concat(EX || [], allEx || []), routines || []), [EX, allEx, routines])
@@ -131,11 +155,11 @@ export default function StudentProgressSection({
   const stats = React.useMemo(() => {
     return {
       totalSessions: sesiones?.length ?? 0,
-      prsThisMonth: countPRsThisMonth(allEx, EX, progress, sbData, { indiceTiempo }),
+      prsThisMonth: historialParcial ? null : countPRsThisMonth(allEx, EX, progress, sbData, { indiceTiempo }),
       streak: computeDayStreak(sesiones, progress),
       overall: averageImprovementPercent(allEx, EX, progress, sbData),
     }
-  }, [sesiones, allEx, EX, progress, sbData, indiceTiempo])
+  }, [sesiones, allEx, EX, progress, sbData, indiceTiempo, historialParcial])
 
   const volModel = React.useMemo(
     // D7.3: misma regla de volumen que el entrenador (sin ejercicios por tiempo: catalogo + snapshots de la rutina del alumno)
@@ -218,7 +242,7 @@ export default function StudentProgressSection({
       id: 'pr',
       label: es ? 'PRs del mes' : 'PRs (mo)',
       val: !hasData ? null : stats.prsThisMonth > 0 ? stats.prsThisMonth : null,
-      sub: es ? 'Récords' : 'Records',
+      sub: historialParcial ? (es ? 'Historial incompleto' : 'Incomplete history') : es ? 'Récords' : 'Records',
       pr: true,
     },
     {
@@ -295,6 +319,22 @@ export default function StudentProgressSection({
 
         {subView === 'main' && (
           <>
+            {!loadingSb && historialParcial ? (
+              <div
+                role="status"
+                data-qa="historial-alumno-incompleto"
+                className="mb-4 rounded-2xl border px-4 py-3 text-[13px] leading-snug"
+                style={{ borderColor: 'rgba(250, 204, 21, 0.45)', background: 'rgba(250, 204, 21, 0.08)', color: '#FDE68A' }}
+              >
+                {historialEstado === 'error'
+                  ? es
+                    ? 'No se pudo cargar tu historial desde el servidor. Se muestran solo los registros de este dispositivo: récords y PRs pueden estar incompletos.'
+                    : 'Your history could not be loaded from the server. Only this device’s records are shown: records and PRs may be incomplete.'
+                  : es
+                    ? 'No se pudo cargar todo tu historial (falta lo más antiguo). Récords y PRs pueden estar incompletos; volvé a abrir Progreso más tarde.'
+                    : 'Your full history could not be loaded (the oldest part is missing). Records and PRs may be incomplete; reopen Progress later.'}
+              </div>
+            ) : null}
             {!loadingSb && !hasData ? (
               <StudentProgressEmptyState
                 displayName={displayName}
@@ -325,6 +365,7 @@ export default function StudentProgressSection({
               loadingSb={loadingSb}
               emptySkeleton={!loadingSb && !hasData}
               indiceTiempo={indiceTiempo}
+              historialParcial={historialParcial}
             />
 
             {/* Achievements */}
