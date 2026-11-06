@@ -67,7 +67,18 @@ export const DEMO_MA_RUTINAS_LOCALES = [
   { id: "demo-rt-local-2", name: "Fuerza 3 días (demo)", days: dias(3), saved: true },
 ];
 
-/** opts: { onInsert(row): la demo agrega la sesion validada a sus datos }. */
+/** Modos del envio de «Nota del día» en la demo (mismo contrato que sb.setNota en la app: ver components/students/notaDelDia.js). */
+export const DEMO_MA_NOTA_MODOS = [
+  { k: "ok", label: "Envío OK" },
+  { k: "http", label: "Error HTTP" },
+  { k: "red", label: "Sin red" },
+  { k: "sin_confirmar", label: "Sin confirmar" },
+];
+
+/**
+ * opts: { onInsert(row): la demo agrega la sesion validada a sus datos; notaModo(): modo del envio de nota (DEMO_MA_NOTA_MODOS);
+ * notaDemoraMs: espera simulada del servidor; onNota(row): nota "recibida" por el servidor simulado }.
+ */
 export function createDemoMaSb(hoy, opts) {
   var o = opts || {};
   var simSeq = 0;
@@ -88,6 +99,19 @@ export function createDemoMaSb(hoy, opts) {
       var row = Object.assign({ id: "demo-ses-sim-" + (++simSeq), created_at: new Date().toISOString() }, payload);
       sesiones = [row].concat(sesiones);
       if (o.onInsert) o.onInsert(clone(row));
+      return [clone(row)];
+    },
+    // «Nota del día»: imita a sbFetch("notas", "POST") -> fila insertada (éxito), null (error HTTP), rechazo (sin red) o [] (sin confirmar).
+    // Solo memoria: nada sale del navegador.
+    setNota: async function (payload) {
+      var modo = typeof o.notaModo === "function" ? o.notaModo() : "ok";
+      var demora = o.notaDemoraMs != null ? o.notaDemoraMs : 1500;
+      await new Promise(function (r) { setTimeout(r, demora); });
+      if (modo === "http") return null;
+      if (modo === "red") throw new TypeError("Failed to fetch (simulado)");
+      if (modo === "sin_confirmar") return [];
+      var row = Object.assign({ id: "demo-nota-sim-" + (++simSeq), created_at: new Date().toISOString() }, payload);
+      if (o.onNota) o.onNota(clone(row));
       return [clone(row)];
     },
   };
