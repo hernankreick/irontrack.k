@@ -35,14 +35,18 @@ create table public.sesiones (
   rutina_id uuid, rutina_nombre text, dia_label text, dia_idx integer, semana integer, ejercicios text,
   fecha text, hora text, ciclo integer not null default 1, created_at timestamptz default now());
 
+create table public.entrenadores (id text primary key, email text, nombre text);
+
 -- Igual que producción hoy: RLS activo + acceso_total abierto + permisos amplios.
 alter table public.alumnos  enable row level security;
 alter table public.progreso enable row level security;
 alter table public.sesiones enable row level security;
+alter table public.entrenadores enable row level security;
+create policy acceso_total on public.entrenadores for all to public using (true) with check (true);
 create policy acceso_total on public.alumnos  for all to public using (true) with check (true);
 create policy acceso_total on public.progreso for all to public using (true) with check (true);
 create policy acceso_total on public.sesiones for all to public using (true) with check (true);
-grant all on public.alumnos, public.progreso, public.sesiones to anon, authenticated, service_role;
+grant all on public.alumnos, public.progreso, public.sesiones, public.entrenadores to anon, authenticated, service_role;
 
 -- Datos ficticios (UID fijos, los usa 04_pruebas_pg.mjs).
 insert into auth.users (id, email, raw_app_meta_data) values
@@ -58,3 +62,4 @@ insert into public.alumnos (id, nombre, email, entrenador_id, auth_uid) values
   ('b0000000-0000-4000-8000-000000000001', 'Alumno Uno',  'uno@ficticio.test',  'entrenador_principal', 'a0000000-0000-4000-8000-000000000001'),
   ('b0000000-0000-4000-8000-000000000002', 'Alumno Dos',  'dos@ficticio.test',  'entrenador_principal', null),  -- vínculo solo por app_metadata
   ('b0000000-0000-4000-8000-000000000003', 'Alumno Tres', 'tres@ficticio.test', 'entrenador_principal', null);  -- SIN vínculo (como el caso real)
+insert into public.entrenadores (id, email, nombre) values ('c0000000-0000-4000-8000-000000000001', 'coach@ficticio.test', 'Entrenador ficticio');

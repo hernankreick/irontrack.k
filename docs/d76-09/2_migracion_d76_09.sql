@@ -1,9 +1,10 @@
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
--- D76-09 · Migración propuesta — época de historial por alumno, borrado atómico, sello de servidor, cuarentena/reingreso
--- ESTADO: PROPUESTA. NO EJECUTAR sin autorización explícita del dueño y sin haber pasado 04_pruebas_pg.mjs (GO-1).
+-- D76-09 · PASO 2 — Migración (versión final de despliegue)
+-- Época de historial por alumno, borrado atómico, sello de servidor, cuarentena/reingreso y vínculo seguro.
+-- NO EJECUTAR sin la autorización explícita del dueño y sin el PASO 1 (diagnóstico) completamente en OK.
 -- Destino: PostgreSQL 17 (Supabase), READ COMMITTED. Se aplica UNA vez (aborta si it_private ya existe).
--- Efecto inmediato al aplicarla: NINGUNO sobre el registro de series (modo 'off'). Solo agrega objetos y columnas nullable.
--- Antes de aplicar: reemplazar el UID del entrenador en la sección 2 (valor de COACH_UIDS de la Edge Function).
+-- Efecto inmediato: NINGUNO sobre el registro de series (modo 'off'). Solo agrega objetos y columnas nullable; no modifica filas.
+-- Una sola transacción: si cualquier verificación falla, NO queda nada aplicado. No requiere editar nada antes de ejecutarla.
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 begin;
 set local lock_timeout = '3s';          -- si hay inserts en curso y no obtiene el lock, aborta sin efectos (reintentar luego)
@@ -38,6 +39,29 @@ begin
        where a.attrelid = 'public.progreso'::regclass and a.attname = 'kg' and not a.attisdropped)
      not similar to '(numeric|real|double precision)%' then
     raise exception 'D76-09: progreso.kg no es decimal (numeric/real/double): revisar el reingreso';
+  end if;
+  -- Columnas que usan el trigger y «Subir igual» (it_historial_reingresar inserta columnas explícitas).
+  select string_agg(c.rel || '.' || c.col, ', ') into v_bad
+    from (values ('progreso','ejercicio_id'), ('progreso','kg'), ('progreso','reps'), ('progreso','nota'), ('progreso','semana'),
+                 ('progreso','ciclo'), ('sesiones','rutina_id'), ('sesiones','rutina_nombre'), ('sesiones','dia_label'),
+                 ('sesiones','dia_idx'), ('sesiones','semana'), ('sesiones','ejercicios'), ('sesiones','hora'), ('sesiones','ciclo')) as c(rel, col)
+   where not exists (select 1 from pg_attribute a where a.attrelid = to_regclass('public.' || c.rel) and a.attname = c.col and not a.attisdropped);
+  if v_bad is not null then raise exception 'D76-09: faltan columnas: %', v_bad; end if;
+  -- Ninguna otra columna NOT NULL sin default (el reingreso no la completaría).
+  select string_agg(c.relname || '.' || a.attname, ', ') into v_bad
+    from pg_attribute a join pg_class c on c.oid = a.attrelid
+   where c.oid in ('public.progreso'::regclass, 'public.sesiones'::regclass) and a.attnum > 0 and not a.attisdropped
+     and a.attnotnull and not a.atthasdef and a.attidentity = '' and a.attgenerated = ''
+     and not (c.relname = 'progreso' and a.attname in ('id', 'alumno_id', 'ejercicio_id', 'kg', 'reps', 'nota', 'fecha', 'semana', 'ciclo'))
+     and not (c.relname = 'sesiones' and a.attname in ('alumno_id', 'rutina_id', 'rutina_nombre', 'dia_label', 'dia_idx', 'semana', 'ejercicios', 'fecha', 'hora', 'ciclo'));
+  if v_bad is not null then raise exception 'D76-09: columnas NOT NULL sin default no contempladas: %', v_bad; end if;
+  if not exists (select 1 from pg_attribute a where a.attrelid = 'public.sesiones'::regclass and a.attname = 'id'
+                  and (a.atthasdef or a.attidentity <> '')) then
+    raise exception 'D76-09: sesiones.id no tiene valor por defecto (el reingreso de sesiones lo necesita)';
+  end if;
+  if not exists (select 1 from pg_constraint k where k.conname = 'progreso_pkey' and k.conrelid = 'public.progreso'::regclass and k.contype = 'p'
+                  and k.conkey = array[(select a.attnum from pg_attribute a where a.attrelid = 'public.progreso'::regclass and a.attname = 'id')]) then
+    raise exception 'D76-09: la clave primaria de progreso no es progreso_pkey(id) (la usa la deteccion del reintento idempotente)';
   end if;
   if exists (select 1 from pg_trigger t
               where t.tgrelid in ('public.alumnos'::regclass, 'public.progreso'::regclass, 'public.sesiones'::regclass)
@@ -116,15 +140,21 @@ alter table it_private.eventos                  enable row level security;
 alter table it_private.vinculos                 enable row level security;
 alter table it_private.via_tx                   enable row level security;
 
--- ─── 2. Entrenador autorizado (REEMPLAZAR el UID; mismo valor que COACH_UIDS) ─────────────────────────────────────────
+-- ─── 2. Entrenador autorizado (se resuelve solo; sin editar nada) ─────────────────────────────────────────────────────
+-- Ancla: la cuenta de Supabase Auth con el email de entrenador que usa el login de la app (App.jsx). Se exige EXACTAMENTE una cuenta,
+-- con el email confirmado y con su fila en public.entrenadores (la que crea el login del entrenador). Si no, aborta TODO.
+-- (No se usan tablas que los clientes puedan escribir como única prueba: el email de Auth solo lo cambia el servidor.)
 do $coach$
-declare v_uid uuid := '00000000-0000-0000-0000-000000000000';   -- <<< REEMPLAZAR por el UID de COACH_UIDS
+declare v_email text := 'entrenador@irontrack.app'; v_n int; v_uid uuid;
 begin
-  if v_uid = '00000000-0000-0000-0000-000000000000' then
-    raise exception 'D76-09: reemplazar el UID del entrenador en la sección 2';
+  select count(*), min(u.id::text)::uuid into v_n, v_uid
+    from auth.users u where pg_catalog.lower(u.email) = v_email and u.email_confirmed_at is not null;
+  if v_n <> 1 then
+    raise exception 'D76-09: se esperaba exactamente 1 cuenta Auth confirmada del entrenador (%), hay %', v_email, v_n;
   end if;
-  if not exists (select 1 from auth.users u where u.id = v_uid) then
-    raise exception 'D76-09: el UID del entrenador no existe en auth.users';
+  if to_regclass('public.entrenadores') is not null
+     and not exists (select 1 from public.entrenadores e where e.id::text = v_uid::text) then
+    raise exception 'D76-09: la cuenta del entrenador no tiene fila en public.entrenadores';
   end if;
   insert into it_private.entrenadores_autorizados (uid) values (v_uid);
 end $coach$;
@@ -541,6 +571,7 @@ begin
      and not exists (select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) c where c like 'search_path=%');
   if v_bad is not null then raise exception 'D76-09: funciones sin search_path fijo: %', v_bad; end if;
   if (select modo from it_private.config) <> 'off' then raise exception 'D76-09: el modo inicial debe ser off'; end if;
+  if (select count(*) from it_private.entrenadores_autorizados) <> 1 then raise exception 'D76-09: debe haber exactamente 1 entrenador autorizado'; end if;
 end $post$;
 
 notify pgrst, 'reload schema';

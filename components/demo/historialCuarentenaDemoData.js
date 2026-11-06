@@ -3,7 +3,7 @@
 // La lógica es la REAL: sello del historial (lib/historialSello.js), write-ahead (lib/setWriteAhead.js), flush y cuarentena
 // (lib/pendingSyncQueue.js + lib/historialCuarentena.js), controlador (lib/pendingSyncController.js), payload/pendiente
 // (lib/workoutSession.js) y POST idempotente (lib/progressInsert.js). El servidor falso aplica la MISMA regla que el trigger de la
-// migración D76-09 (docs/d76-09/01_migracion_d76_09.sql) y responde como PostgREST (400 + code IT409).
+// migración D76-09 (docs/d76-09/2_migracion_d76_09.sql) y responde como PostgREST (400 + code IT409).
 //
 //   node scripts/test-demoHistorialCuarentena.mjs   (corre ejecutarEscenarios, lo mismo que el botón "Ejecutar pruebas automáticas")
 import { crearStorageDemo } from './registroSeriesDemoData.js';

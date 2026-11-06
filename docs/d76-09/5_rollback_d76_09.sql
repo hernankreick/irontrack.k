@@ -1,4 +1,4 @@
--- D76-09 · Rollback (PROPUESTA — NO EJECUTAR sin autorización)
+-- D76-09 · PASO 5 — Rollback. NO EJECUTAR sin autorización. Preferir SIEMPRE el nivel 1 (4c: modo 'off').
 --
 -- NIVEL 1 (preferido, instantáneo, sin DDL): desactiva rechazos y la guarda de borrado. Los clientes nuevos leen modo='off' y
 -- devuelven su cuarentena a pendientes (movimiento, nunca borrado).
@@ -23,3 +23,11 @@ drop function if exists public.it_vinculo_aprobar(uuid, uuid);
 drop schema if exists it_private cascade;
 notify pgrst, 'reload schema';
 commit;
+
+-- Verificación del rollback nivel 2 (SOLO LECTURA; ejecutar aparte). Esperado: sin_it_private=true, rpc=0, triggers=0, columnas=8.
+-- select to_regnamespace('it_private') is null as sin_it_private,
+--        (select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname in ('it_historial_sello','it_limpiar_historial_alumno',
+--           'it_historial_reingresar','it_vinculo_solicitar','it_vinculo_aprobar')) as rpc,
+--        (select count(*) from pg_trigger where not tgisinternal and tgname like 'it\_%') as triggers,
+--        (select count(*) from information_schema.columns where table_schema = 'public' and table_name in ('progreso','sesiones')
+--           and column_name in ('historial_token','historial_epoch','reingreso_de_epoch','reingreso_at')) as columnas;

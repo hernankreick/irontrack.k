@@ -12,7 +12,6 @@ export const DATA = "/tmp/it_d7609_go1/data";
 export const PORT = 5499;
 export const DB = "it_d7609_test";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const COACH_FICTICIO = "c0000000-0000-4000-8000-000000000001";
 
 export function cargarPg() {
   if (!process.env.RUNNER) throw new Error("falta RUNNER (directorio con node_modules/pg)");
@@ -68,10 +67,11 @@ async function main() {
   // 3) Mock (datos ficticios) y migración, con el UID FICTICIO del entrenador reemplazado en memoria (el archivo no se toca).
   await c.query(readFileSync(path.join(HERE, "03_mock_supabase_local.sql"), "utf8"));
   console.log("[03] mock aplicado");
-  const mig = readFileSync(path.join(HERE, "..", "01_migracion_d76_09.sql"), "utf8");   // docs/d76-09/01_migracion_d76_09.sql
-  const marcador = "declare v_uid uuid := '00000000-0000-0000-0000-000000000000';";
-  if (mig.split(marcador).length !== 2) throw new Error("no se encontró el marcador del UID en 01");
-  await c.query(mig.replace(marcador, "declare v_uid uuid := '" + COACH_FICTICIO + "';"));
+  const mig = readFileSync(path.join(HERE, "..", "2_migracion_d76_09.sql"), "utf8");
+  // El entrenador se resuelve por su email de Auth: en la base ficticia es coach@ficticio.test (reemplazo SOLO en memoria).
+  const marcador = "declare v_email text := 'entrenador@irontrack.app';";
+  if (mig.split(marcador).length !== 2) throw new Error("no se encontró el marcador del email del entrenador en la migración");
+  await c.query(mig.replace(marcador, "declare v_email text := 'coach@ficticio.test';"));
   const resumen = (await c.query(`select
       (select count(*) from pg_proc where pronamespace = 'it_private'::regnamespace) as fn_privadas,
       (select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname like 'it\\_%') as rpc_publicas,
