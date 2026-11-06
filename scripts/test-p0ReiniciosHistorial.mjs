@@ -361,12 +361,21 @@ await test("estadisticas del bloque tras reiniciar la semana 2: semana 1 del cic
 });
 
 await test("aviso de series sin finalizar (G4): se detectan, incluido hoy, sin escribir nada", () => {
-  const s = seed();
-  const hoy = new Date(); const fHoy = hoy.getDate() + "/" + (hoy.getMonth() + 1) + "/" + hoy.getFullYear();
-  s.progreso.push(prog("sq", 70, 5, fHoy, 1));
-  const resumen = resumirSeriesSinFinalizar({ progreso: s.progreso, sesiones: s.sesiones, rutina: s.rutinas[0], alumnoId: A, maxAgeDays: 3650 });
-  assert.ok(resumen.series >= 2);
-  assert.ok(resumen.fechas.includes(fHoy));
+  // Determinismo temporal: lib/orphanSessions.js define "hoy" en America/Argentina/Buenos_Aires (p.now). Antes el test tomaba "hoy" con la
+  // fecha LOCAL del runner y el reloj real: en CI (UTC) entre las 00:00 y las 03:00 UTC ambas fechas difieren y fallaba. Ahora se pasa un
+  // instante fijo y "hoy" se calcula en la zona de Argentina; se prueba un instante normal y dos que cruzan la medianoche UTC/Argentina.
+  const fechaAR = (d) => d.toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" });
+  for (const iso of ["2026-11-06T15:00:00Z", "2026-11-06T01:30:00Z", "2026-11-06T03:30:00Z"]) {
+    const s = seed();
+    const now = new Date(iso);
+    const fHoy = fechaAR(now);
+    s.progreso.push(prog("sq", 70, 5, fHoy, 1));
+    const resumen = resumirSeriesSinFinalizar({ progreso: s.progreso, sesiones: s.sesiones, rutina: s.rutinas[0], alumnoId: A, maxAgeDays: 3650, now });
+    assert.ok(resumen.series >= 2, iso);
+    assert.ok(resumen.fechas.includes(fHoy), iso + ": incluye hoy (" + fHoy + ", Argentina)");
+  }
+  assert.equal(fechaAR(new Date("2026-11-06T01:30:00Z")), "5/11/2026", "01:30 UTC sigue siendo el 5/11 en Argentina");
+  assert.equal(fechaAR(new Date("2026-11-06T03:30:00Z")), "6/11/2026");
 });
 
 await test("SIN la migracion (PostgREST responde PGRST202): guardar y avanzar siguen funcionando; reiniciar se rechaza sin escribir", async () => {

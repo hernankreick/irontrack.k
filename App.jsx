@@ -147,6 +147,8 @@ import { updateRutinaPreservingOperational, withInitialSemanaActiva } from './li
 import { reconcileCurrentRoutineForAlumno } from './lib/reconcileCurrentRoutine.js';
 import { reiniciarRutinaCiclo as reiniciarRutinaCicloLib } from './lib/reiniciarRutinaCiclo.js';
 import { readCicloActual, tipoReinicioVigente, TIPO_REINICIO } from './lib/rutinaCiclo.js';
+// D76-05: fecha estable del entrenamiento activo (medianoche / recarga de Safari).
+import { fechaDeSesion, prepararInicioEntrenamiento } from './lib/workoutSessionDate.js';
 import { resumirSeriesSinFinalizar } from './lib/orphanSessions.js';
 import { textoErrorReinicio, textoPlanReiniciado, textoSeriesSinFinalizar } from './lib/reinicioMensajes.js';
 import RoutineRestartModal from './components/routines/RoutineRestartModal.jsx';
@@ -2084,7 +2086,8 @@ function GymApp() {
     if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.trigger('session');
   }, [readOnly, sessionData?.role, sessionData?.alumnoId]);
   const logSet = (exId, kg, reps, note, rpe, weekOverride, opIdIntento) => {
-    const d = new Date().toLocaleDateString("es-AR");
+    // D76-05: fecha del entrenamiento (fijada al iniciar), no la del reloj: tras medianoche las series siguen en el mismo dia.
+    const d = fechaDeSesion(session, Date.now());
     // Mismo criterio que al finalizar una sesión: si la rutina tiene una semana persistida
     // en el servidor, es la fuente de verdad por sobre el currentWeek local (que puede
     // haber quedado desincronizado), para no taggear cada serie con la semana equivocada.
@@ -2094,11 +2097,12 @@ function GymApp() {
       : currentWeek;
     const weekForSet = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : effectiveCurrentWeek;
     const cicloForSet = readCicloActual(routines[0] && routines[0].datos);
-    // D7.1: la serie local guarda su ciclo (el mismo que va a Supabase) para no mezclarla con el ciclo nuevo tras un reinicio.
-    const newSet = buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe, cicloForSet);
-    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     // D76-03: el panel pasa el opId del intento (lib/setLogGuard.js): el reintento del MISMO registro tras un error reutiliza el mismo id.
     const opId = isUuid(opIdIntento) ? opIdIntento : generateOpId();   // identidad estable de esta serie: progreso.id en el POST y en todos los reintentos
+    // D7.1: la serie local guarda su ciclo (el mismo que va a Supabase) para no mezclarla con el ciclo nuevo tras un reinicio.
+    // D76-04: y su opId (= progreso.id), para reconciliarla con la fila hidratada por identidad y no solo por valores.
+    const newSet = Object.assign(buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe, cicloForSet), { id: opId });
+    const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     // D76-01 (write-ahead): la serie se persiste como pendiente ANTES de mostrarla y de enviarla. Si Safari descarta la pestaña durante el
     // envio, el pendiente sigue en el dispositivo y el proximo flush lo reenvia con el mismo id. Si no se puede persistir, no se registra.
     if(alumnoIdSync) {
@@ -2352,16 +2356,29 @@ function GymApp() {
   const startStudentWorkout = function (nextSession) {
     if (weekGate.active) return false;
     if (!puedeIniciarEntrenamientoAlumno({ esAlumno: esAlumno, readOnly: readOnly, lectura: sesionesLectura, weekGateActivo: weekGate.active })) return false;
+    // D76-05: la sesion se inicia con su fecha fija (session.fecha) y, para el alumno, con un ancla local que permite continuar el mismo
+    // entrenamiento (misma fecha) tras una recarga de Safari. Sin informacion confiable se inicia una sesion nueva (no se re-fecha nada).
+    var iniciar = function () {
+      nextSession = prepararInicioEntrenamiento({
+        storage: localStorage,
+        session: nextSession,
+        alumnoId: (esAlumno && !readOnly && !sharedParam) ? sessionData?.alumnoId : null,
+        ciclo: readCicloActual((routines.find(function (r) { return String(r.id) === String(nextSession.rId); }) || {}).datos),
+        semana: studentCurrentWeek,
+        now: Date.now(),
+      }).session;
+      setSession(nextSession);
+    };
     var check = checkCicloAlumnoRef.current;
     if (!esAlumno || readOnly || !isOnline || typeof check !== "function") {
-      setSession(nextSession);
+      iniciar();
       return true;
     }
     if (startingWorkoutRef.current) return false;
     startingWorkoutRef.current = true;
     Promise.resolve(check({ force: true }))
-      .then(function (estado) { if (estado !== "actualizado") setSession(nextSession); })
-      .catch(function () { setSession(nextSession); })
+      .then(function (estado) { if (estado !== "actualizado") iniciar(); })
+      .catch(function () { iniciar(); })
       .finally(function () { startingWorkoutRef.current = false; });
     return true;
   };
