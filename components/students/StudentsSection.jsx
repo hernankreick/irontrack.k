@@ -10,6 +10,7 @@ import StudentOrphanSession from './StudentOrphanSession.jsx';
 import ManualSessionValidationModal from './ManualSessionValidationModal.jsx';
 import StudentsSectionStates from './StudentsSectionStates.jsx';
 import useDialogA11y from '../modals/useDialogA11y.js';
+import { crearEnviosNota, notaVisible, debeDescartarBorrador, decidirResultadoNota } from './notaDelDia.js';
 
 export default function StudentsSection(props) {
   const {
@@ -46,6 +47,69 @@ export default function StudentsSection(props) {
   const newAlumnoPristine = !((newAlumnoData.nombre || "").trim() || (newAlumnoData.email || "").trim());
   useDialogA11y({ open: !!newAlumnoForm, containerRef: newAlumnoDialogRef, onEscape: newAlumnoPristine && !creatingAlumno ? closeNewAlumnoForm : undefined });
   const [manualValidate, setManualValidate] = React.useState(null);
+  // «Nota del día»: el borrador (notaDiaInput, estado de App) pertenece al alumno para el que se escribió (notaDueno). Solo se muestra
+  // y se envía en SU ficha; al abrir la ficha de otro alumno se descarta (contraer/expandir la misma ficha lo conserva). El envío tiene
+  // candado síncrono por alumno, y su resultado tardío nunca toca la ficha de otro alumno. Reglas y contrato de sb.setNota: notaDelDia.js.
+  const [notaDueno, setNotaDueno] = React.useState(null);
+  const [notaEnviando, setNotaEnviando] = React.useState({});
+  const [notaError, setNotaError] = React.useState(null);
+  const enviosNotaRef = React.useRef(null);
+  if (!enviosNotaRef.current) enviosNotaRef.current = crearEnviosNota();
+  const notaVistaRef = React.useRef({ abierto: null, dueno: null });
+  const alumnoActivoIdStr = alumnoActivo && alumnoActivo.id != null ? String(alumnoActivo.id) : null;
+  notaVistaRef.current = { abierto: alumnoActivoIdStr, dueno: notaDueno };
+  React.useEffect(function () {
+    // Al montar, no hay dueño conocido: un texto que haya quedado en App no se muestra ni se envía a nadie.
+    if (typeof setNotaDiaInput === "function") setNotaDiaInput("");
+  }, []);
+  React.useEffect(function () {
+    if (debeDescartarBorrador(notaVistaRef.current.dueno, alumnoActivoIdStr)) {
+      notaVistaRef.current = { abierto: alumnoActivoIdStr, dueno: null };
+      setNotaDueno(null);
+      if (typeof setNotaDiaInput === "function") setNotaDiaInput("");
+    }
+    if (alumnoActivoIdStr != null) setNotaError(function (prev) { return prev && prev.alumnoId !== alumnoActivoIdStr ? null : prev; });
+  }, [alumnoActivoIdStr]);
+  const cambiarNota = function (a, texto) {
+    const id = String(a.id);
+    notaVistaRef.current = { abierto: notaVistaRef.current.abierto, dueno: id };
+    setNotaDueno(id);
+    setNotaDiaInput(texto);
+    setNotaError(function (prev) { return prev && prev.alumnoId === id ? null : prev; });
+  };
+  const enviarNota = function (a) {
+    const id = String(a.id);
+    const quien = a.nombre || a.email || "";
+    return enviosNotaRef.current.enviar({
+      alumnoId: id,
+      texto: notaVisible(notaDiaInput, notaDueno, id),
+      ejecutar: function (texto) {
+        return sb.setNota({
+          alumno_id: a.id,
+          entrenador_id: ENTRENADOR_ID,
+          contenido: texto,
+          texto: texto,
+          fecha: new Date().toLocaleDateString("es-AR"),
+        });
+      },
+      onInicio: function () {
+        setNotaError(function (prev) { return prev && prev.alumnoId === id ? null : prev; });
+        setNotaEnviando(function (prev) { return Object.assign({}, prev, { [id]: true }); });
+      },
+      onResultado: function (_id, r) {
+        setNotaEnviando(function (prev) { const n = Object.assign({}, prev); delete n[id]; return n; });
+        if (!r.ok) console.error("[nota del día]", r.motivo, r.error || "");
+        const d = decidirResultadoNota({ alumnoId: id, resultado: r, vista: notaVistaRef.current, quien: quien, msg: msg });
+        if (d.limpiarBorrador) {
+          notaVistaRef.current = { abierto: notaVistaRef.current.abierto, dueno: null };
+          setNotaDueno(null);
+          setNotaDiaInput("");
+        }
+        if (d.error) setNotaError(d.error);
+        toast2(d.aviso);
+      },
+    });
+  };
   // D7.3: carga de la ficha del alumno `a` (VER y Reintentar). Vacia lo anterior, solo la carga vigente escribe y apaga «cargando»,
   // y si falla la red queda el estado de error de ESE alumno (nunca datos de otro).
   const cargarFichaDe = async function (a) {
@@ -466,7 +530,7 @@ export default function StudentsSection(props) {
                     completedDays={completedDays}
                     coachRutinaMenuOpen={coachRutinaMenuOpen}
                     coachDiaSecsOpen={coachDiaSecsOpen}
-                    notaDiaInput={notaDiaInput}
+                    notaDiaInput={notaVisible(notaDiaInput, notaDueno, a.id)}
                     darkMode={darkMode}
                     es={es}
                     msg={msg}
@@ -511,21 +575,10 @@ export default function StudentsSection(props) {
                       var el=document.getElementById(sugKey);
                       if(el){el.style.opacity="0";el.style.height="0";el.style.padding="0";el.style.margin="0";el.style.overflow="hidden";el.style.transition="all .3s ease";}
                     }}
-                    onNotaChange={function(e){ setNotaDiaInput(e.target.value); }}
-                    onEnviarNota={async function(){
-                      if(!notaDiaInput.trim()) return;
-                      try{
-                        await sb.setNota({
-                          alumno_id:a.id,
-                          entrenador_id:ENTRENADOR_ID,
-                          contenido:notaDiaInput.trim(),
-                          texto:notaDiaInput.trim(),
-                          fecha:new Date().toLocaleDateString("es-AR")
-                        });
-                        toast2(msg("Nota enviada ✓", "Note sent ✓"));
-                        setNotaDiaInput("");
-                      }catch(e){toast2("Error al enviar nota");}
-                    }}
+                    onNotaChange={function(e){ cambiarNota(a, e.target.value); }}
+                    onEnviarNota={function(){ enviarNota(a); }}
+                    notaEnviando={!!notaEnviando[String(a.id)]}
+                    notaError={notaError && notaError.alumnoId === String(a.id) ? notaError.texto : null}
                   />
                 )}
               </StudentCard>

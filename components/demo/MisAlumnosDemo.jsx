@@ -17,7 +17,7 @@ import { EX } from '../../lib/exerciseStaticData.js';
 import { normalizeLibraryExercise } from '../../lib/exerciseResolve.js';
 import { alumnosPaleta } from '../students/alumnosPaleta.js';
 import {
-  DEMO_MA_ALUMNOS, DEMO_MA_ENTRENADOR_ID, DEMO_MA_RUTINAS_LOCALES, createDemoMaSb, demoMaRutinas, demoMaSesiones,
+  DEMO_MA_ALUMNOS, DEMO_MA_ENTRENADOR_ID, DEMO_MA_NOTA_MODOS, DEMO_MA_RUTINAS_LOCALES, createDemoMaSb, demoMaRutinas, demoMaSesiones,
 } from './misAlumnosDemoData.js';
 
 const DEMO = "DEMO · ";
@@ -26,7 +26,7 @@ const DEMO = "DEMO · ";
  * Demostracion de «Mis alumnos» del entrenador con el componente REAL (CoachStudentsMain -> StudentsSection), para que se apliquen las
  * sobrescrituras de paleta. Solo existe en builds de Preview (vite.config.js). Datos ficticios en memoria: sin Supabase, sin red y sin
  * la sesion de IronTrack. Toda accion que en la app escribiria algo (asignar, crear, pago) se reemplaza por un aviso "DEMO".
- * Controles: tema oscuro / claro, escenario «Muchos alumnos» / «Lista vacia» y Reiniciar.
+ * Controles: tema oscuro / claro, escenario «Muchos alumnos» / «Lista vacia», Reiniciar y la respuesta simulada de «Nota del día».
  */
 export default function MisAlumnosDemo() {
   const [darkMode, setDarkMode] = React.useState(true);
@@ -39,7 +39,19 @@ export default function MisAlumnosDemo() {
   const ui = useCoachUIState();
   // D7.2: la validacion manual se simula en memoria y se refleja en la lista (sesionesGlobales).
   const onInsertDemo = React.useRef(null);
-  const sb = React.useMemo(function () { return createDemoMaSb(undefined, { onInsert: function (row) { if (onInsertDemo.current) onInsertDemo.current(row); } }); }, []);
+  // «Nota del día»: modo del servidor simulado (OK / error HTTP / sin red / sin confirmar) y notas que "recibió", para verificar a quién
+  // llegó cada nota y que un doble toque genera un solo envío.
+  const [notaModo, setNotaModo] = React.useState("ok");
+  const notaModoRef = React.useRef("ok");
+  notaModoRef.current = notaModo;
+  const [notasRecibidas, setNotasRecibidas] = React.useState([]);
+  const sb = React.useMemo(function () {
+    return createDemoMaSb(undefined, {
+      onInsert: function (row) { if (onInsertDemo.current) onInsertDemo.current(row); },
+      notaModo: function () { return notaModoRef.current; },
+      onNota: function (row) { setNotasRecibidas(function (prev) { return prev.concat([row]); }); },
+    });
+  }, []);
   const allEx = React.useMemo(function () { return EX.map(function (e) { return normalizeLibraryExercise(e, { catalog: true }); }); }, []);
 
   const [toast, setToast] = React.useState(null);
@@ -124,6 +136,21 @@ export default function MisAlumnosDemo() {
           <button type="button" data-demo-scenario="vacia" aria-pressed={escenario === "vacia"} onClick={function () { cambiarEscenario("vacia"); }} style={barBtn(escenario === "vacia")}>Lista vacía</button>
         </div>
       </div>
+
+      <section aria-label="Servidor simulado de notas" data-demo-notas style={{ padding: "12px 16px", borderBottom: "1px solid #f59e0b", background: darkMode ? "#1c1406" : "#fffbeb" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: darkMode ? "#fde68a" : "#78350f", marginBottom: 8 }}>Nota del día · respuesta del servidor simulado (tarda 1,5 s)</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {DEMO_MA_NOTA_MODOS.map(function (m) {
+            var on = notaModo === m.k;
+            return <button key={m.k} type="button" data-demo-nota-modo={m.k} aria-pressed={on} onClick={function () { setNotaModo(m.k); }} style={Object.assign(barBtn(on), { color: darkMode ? "#fde68a" : "#78350f" })}>{m.label}</button>;
+          })}
+        </div>
+        <div data-demo-notas-recibidas={notasRecibidas.length} style={{ marginTop: 8, fontSize: 13, color: darkMode ? "#fde68a" : "#78350f", lineHeight: 1.4, overflowWrap: "anywhere" }}>
+          {notasRecibidas.length === 0
+            ? "Notas recibidas: 0"
+            : "Notas recibidas: " + notasRecibidas.length + " · última → " + ((alumnos.find(function (a) { return String(a.id) === String(notasRecibidas[notasRecibidas.length - 1].alumno_id); }) || {}).nombre || notasRecibidas[notasRecibidas.length - 1].alumno_id) + ": «" + notasRecibidas[notasRecibidas.length - 1].contenido + "»"}
+        </div>
+      </section>
 
       {/* Mismo contenedor que CoachSectionRenderer para la pestana Alumnos (la barra superior de la app no existe aqui). */}
       <div className="alu-page" style={{ paddingTop: 20, boxSizing: "border-box", background: pal.coachAluShell }}>
