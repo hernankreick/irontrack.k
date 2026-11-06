@@ -172,9 +172,11 @@ await test("cableado: App usa el loader (completo + incremental cada 30 s); Prog
   const dash = readFileSync(new URL("../components/CoachDashboard.jsx", import.meta.url), "utf8");
   assert.match(dash, /historiaCompleta=\{historiaCompleta\}/);
 });
-await test("lecturas del alumno: getSesiones igual que en E0; getProgreso pagina el historial completo (D7.5)", () => {
+await test("lecturas del alumno: getSesiones pagina el historial completo (D7.6); getProgreso pagina el historial completo (D7.5)", () => {
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
-  assert.ok(app.includes('getSesiones: (alumnoId) => sbFetch("sesiones?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=10"),'));
+  // D7.6: antes `sesiones?...&limit=10` (vistas del alumno cortadas en 10 sesiones); ahora lib/sesionesHistorial.js
+  assert.ok(app.includes('getSesiones: (alumnoId) => getSesionesCompletas(sbRequestStatus, alumnoId),'));
+  assert.ok(!/sesiones\?[^"]*limit=10/.test(app), "ninguna consulta de sesiones con limit=10");
   // D7.5: antes una sola consulta que PostgREST cortaba en su tope de filas; ahora las mismas paginas de E0 (lib/alumnoHistoryLoader.js)
   assert.match(app, /getProgreso: async \(alumnoId\) => \(await cargarHistorialProgreso\(sbFetch, alumnoId\)\)\.rows,/);
   assert.match(app, /getHistorialProgreso: \(alumnoId, opts\) => obtenerHistorialProgreso\(sbFetch, alumnoId, opts\),/);

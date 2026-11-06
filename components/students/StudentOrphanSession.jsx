@@ -37,7 +37,7 @@ export default function StudentOrphanSession({
   const [error, setError] = React.useState("");
 
   const days = (rutina && rutina.datos && Array.isArray(rutina.datos.days)) ? rutina.datos.days : [];
-  // Candidatos con los datos locales (acotados: getSesiones limit 10, lista global 500). Solo se muestran los que la DB confirma como
+  // Candidatos con los datos locales (pueden estar desactualizados). Solo se muestran los que la DB confirma como
   // huerfanos, asi un roster grande no produce avisos falsos sobre sesiones ya finalizadas. Si la lectura falla, no se muestra nada.
   const candidates = React.useMemo(function () {
     return detectOrphanSessions({ progreso: progreso, sesiones: sesiones, rutina: rutina, alumnoId: alumno && alumno.id });
@@ -105,8 +105,7 @@ export default function StudentOrphanSession({
         orphan: current,
         diaIdx: Number(diaSel),
       });
-      // getSesiones del alumno ordena por created_at y corta en 10: la fila validada lleva created_at del dia entrenado y podria quedar
-      // fuera de esa pagina, asi que se incorpora al estado en vez de re-pedir la lista.
+      // La fila validada se incorpora al estado en vez de re-pedir la lista (sin una lectura extra; D7.6: getSesiones ya lee todo).
       const quien = alumno.nombre || alumno.email || "";
       aplicarSesionesValidadas({ rows: res.status === "saved" ? [res.row] : res.rows, enVista: enVista, setAlumnoSesiones: setAlumnoSesiones, setSesionesGlobales: setSesionesGlobales });
       if (res.status === "saved") {

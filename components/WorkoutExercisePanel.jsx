@@ -9,6 +9,7 @@ import { createRepsSwipeHandlers } from '../lib/repsSwipe.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
 import { generateOpId } from '../lib/pendingSyncQueue.js';
 import { createSetLogGuard } from '../lib/setLogGuard.js';
+import { validarKgEntrada } from '../lib/cargaSerie.js';
 import {
   calculateNewWeightPR,
   calculateSetsVolume,
@@ -129,6 +130,8 @@ export function WorkoutExercisePanel(props) {
   const pendingPR = hasSuggestedLoad ? calculateNewWeightPR({ max: pr }, kg) : null;
   const isPR = !!pendingPR;
   const canLogSet = canLogWorkoutSet(validationExercise, kg, reps);
+  // D7.6: kg invalido (negativo, texto, infinito o fuera del techo tecnico): se explica por que REGISTRAR queda deshabilitado.
+  const kgInvalido = !validarKgEntrada(kg).ok;
   // Contraste del panel en modo oscuro: los grises fijos (#475569/#374151) quedaban en 1.35-1.84:1 sobre la tarjeta.
   const labelCol = darkMode ? textMuted : "#475569";
   const hintCol = darkMode ? textMuted : "#374151";
@@ -400,6 +403,7 @@ export function WorkoutExercisePanel(props) {
                 >+</button>
               </div>
               <div style={{fontSize:9,color:hintCol,marginTop:3}}>{es?"Tocá ±1 kg · mantené ±5 kg":"Tap ±1 kg · hold ±5 kg"}</div>
+              {kgInvalido&&<div role="alert" data-qa="kg-invalido" style={{fontSize:11,fontWeight:700,color:"#F87171",marginTop:4}}>{es?"Peso no válido: usá un número de 0 en adelante (ej. 82,5).":"Invalid weight: use a number from 0 up (e.g. 82.5)."}</div>}
             </div>
 
             {/* REPS - pills dinámicas extendidas */}
