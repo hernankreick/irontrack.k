@@ -387,6 +387,10 @@ await t("13. WorkoutScreen y logSet ya no usan la fecha del reloj para hoy/hoyFi
   const logSet = app.slice(app.indexOf("const logSet = ("), app.indexOf("const logSet = (") + 600);
   assert.doesNotMatch(logSet, /new Date\(\)\.toLocaleDateString/);
   assert.match(logSet, /const d = fechaDeSesion\(session, Date\.now\(\)\);/);
+  // D76-04 (hueco detectado por irontrack-qa): la serie local de logSet lleva su opId como id (reconciliacion por identidad).
+  const logSetBody = app.slice(app.indexOf("const logSet = ("), app.indexOf("const logSet = (") + 2500);
+  assert.match(logSetBody, /const newSet = Object\.assign\(buildExerciseSetRecord\(kg, reps, d, weekForSet, note, rpe, cicloForSet\), \{ id: opId \}\);/);
+  assert.ok(logSetBody.indexOf("const opId =") < logSetBody.indexOf("const newSet ="), "opId se calcula antes de newSet");
   const start = app.slice(app.indexOf("const startStudentWorkout = function"), app.indexOf("const alumnoPlanHeaderDayNum"));
   assert.match(start, /prepararInicioEntrenamiento\(/);
   assert.equal((start.match(/setSession\(/g) || []).length, 1, "un solo setSession, dentro de iniciar()");
