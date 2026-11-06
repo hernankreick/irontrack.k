@@ -510,7 +510,9 @@ test("C2 caso 9: los campos NO llegan a Supabase (payload remoto y cola offline)
   assert.ok(!JSON.stringify(payload).includes("session_") && !JSON.stringify(pending).includes("session_"));
   // el POST de logSet usa buildProgressPayload con argumentos explicitos, no el set
   const app = readFileSync(new URL("../App.jsx", import.meta.url), "utf8");
-  assert.ok(app.includes("sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId))"));
+  // D76-09: + el sello leido AL REGISTRAR (selloSet), el mismo que queda en el pendiente.
+  assert.ok(app.includes("sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId, selloSet))"));
+  assert.ok(app.includes("buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, cicloForSet, alumnoIdSync, opId, selloSet, epochVisto)"));
   assert.ok(!/addProgreso(Idempotente)?\([^)]*newSet/.test(app));
   const lib = readFileSync(new URL("../lib/workoutSession.js", import.meta.url), "utf8");
   assert.ok(!lib.includes("session_dia_idx") && !lib.includes("session_rutina_id"));

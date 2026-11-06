@@ -23,9 +23,9 @@ export function getCoachDialogModalConfig(coachDialog, msg, es) {
       tone: 'danger',
       title: msg('Limpiar historial de progreso', 'Clear progress history', 'Limpar histórico de progresso'),
       message: msg(
-        'Esta acción eliminará los PRs, sesiones completadas, volumen, tonelaje y métricas de progreso de este alumno. La rutina asignada y los datos personales se mantendrán. Esta acción no se puede deshacer.',
-        'This action will delete this athlete’s PRs, completed sessions, volume, tonnage, and progress metrics. The assigned routine and personal data will be kept. This action cannot be undone.',
-        'Esta ação eliminará os PRs, sessões concluídas, volume, tonelagem e métricas de progresso deste aluno. A rotina atribuída e os dados pessoais serão mantidos. Esta ação não pode ser desfeita.'
+        'Esta acción eliminará los PRs, sesiones completadas, volumen, tonelaje y métricas de progreso de este alumno. La rutina asignada y los datos personales se mantendrán. Las series que el alumno tenga sin sincronizar en su teléfono no volverán a subirse solas: quedarán en revisión. Esta acción no se puede deshacer.',
+        'This action will delete this athlete’s PRs, completed sessions, volume, tonnage, and progress metrics. The assigned routine and personal data will be kept. Sets still unsynced on the athlete’s phone will not be uploaded again automatically: they will be kept for review. This action cannot be undone.',
+        'Esta ação eliminará os PRs, sessões concluídas, volume, tonelagem e métricas de progresso deste aluno. A rotina atribuída e os dados pessoais serão mantidos. As séries ainda não sincronizadas no telefone do aluno não serão reenviadas automaticamente: ficarão em revisão. Esta ação não pode ser desfeita.'
       ),
       subjectName: c.a && (c.a.nombre || c.a.email),
       confirmLabel: msg('Limpiar historial', 'Clear history', 'Limpar histórico'),
@@ -37,6 +37,36 @@ export function getCoachDialogModalConfig(coachDialog, msg, es) {
         'I understand this action cannot be undone',
         'Entendo que esta ação não pode ser desfeita'
       ),
+    };
+  }
+  if (c.t === 'clearProgressSinVinculo' && c.a) {
+    // D76-09: el alumno no tiene su cuenta de la app vinculada. Sin vinculo no puede recibir el sello nuevo del historial: todo lo que
+    // registre despues del borrado quedaria en revision en su telefono. Si pidio el vinculo desde la app, se aprueba (verificado por el servidor).
+    var sol = c.solicitud && c.solicitud.auth_uid ? c.solicitud : null;
+    return {
+      tone: 'danger',
+      title: msg('Cuenta del alumno sin vincular', 'Athlete account not linked', 'Conta do aluno não vinculada'),
+      message: sol
+        ? msg(
+          'La cuenta de este alumno todavía no está vinculada. Desde la app pidió vincular la cuenta ' + (sol.email || '') + '. Si es su cuenta, al confirmar se aprueba el vínculo y se limpia el historial.',
+          'This athlete’s account is not linked yet. From the app they asked to link the account ' + (sol.email || '') + '. If it is their account, confirming approves the link and clears the history.',
+          'A conta deste aluno ainda não está vinculada. Pelo app, ele pediu para vincular a conta ' + (sol.email || '') + '. Se for a conta dele, ao confirmar o vínculo é aprovado e o histórico é limpo.'
+        )
+        : msg(
+          'La cuenta de este alumno todavía no está vinculada: pedile que inicie sesión en la app y volvé a intentar. Si limpiás igual, lo que registre después quedará en revisión en su teléfono hasta vincular la cuenta.',
+          'This athlete’s account is not linked yet: ask them to sign in to the app and try again. If you clear anyway, whatever they log afterwards will stay for review on their phone until the account is linked.',
+          'A conta deste aluno ainda não está vinculada: peça para ele entrar no app e tente novamente. Se você limpar mesmo assim, o que ele registrar depois ficará em revisão no telefone dele até vincular a conta.'
+        ),
+      subjectName: c.a.nombre || c.a.email,
+      confirmLabel: sol
+        ? msg('Vincular y limpiar', 'Link and clear', 'Vincular e limpar')
+        : msg('Limpiar igual', 'Clear anyway', 'Limpar mesmo assim'),
+      useLogoutIcon: false,
+      loadingLabel: msg('Procesando…', 'Processing…', 'Processando…'),
+      requireAcknowledge: true,
+      acknowledgeLabel: sol
+        ? msg('Confirmo que ' + (sol.email || 'esa') + ' es la cuenta de este alumno', 'I confirm ' + (sol.email || 'that') + ' is this athlete’s account', 'Confirmo que ' + (sol.email || 'essa') + ' é a conta deste aluno')
+        : msg('Entiendo que esta acción no se puede deshacer', 'I understand this action cannot be undone', 'Entendo que esta ação não pode ser desfeita'),
     };
   }
   if (c.t === 'quitarRut') {

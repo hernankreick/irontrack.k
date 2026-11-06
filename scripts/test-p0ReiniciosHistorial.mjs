@@ -140,7 +140,7 @@ await test("C-1/C-2 estatico: no quedan rutas de reinicio que borren historial e
   });
   assert.match(app, /onResetRoutine|resetRoutine/);
   // "Limpiar historial" y "Eliminar alumno" quedan como acciones independientes (fuera de este P0)
-  assert.ok(app.includes("async function clearAlumnoProgressHistory(alumnoId)"));
+  assert.ok(app.includes("async function clearAlumnoProgressHistory(alumnoId"));
   const lib = readFileSync(new URL("../lib/reiniciarRutinaCiclo.js", import.meta.url), "utf8");
   assert.ok(!/\.delete\(|\.update\(|\.insert\(/.test(lib), "el reinicio solo lee y llama la RPC atomica");
 });

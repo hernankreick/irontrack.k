@@ -21,6 +21,7 @@ import {
 import { readCicloActual, tipoReinicioVigente } from '../lib/rutinaCiclo.js';
 import { textoSesionTrasReinicio } from '../lib/reinicioMensajes.js';
 import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
+import { guardarSesionEnCuarentena } from '../lib/historialCuarentena.js';
 // D76-05: fecha estable del entrenamiento activo (medianoche / recarga de Safari).
 import { cerrarSesionActiva, claveDiaDeSesion, fechaDeSesion } from '../lib/workoutSessionDate.js';
 
@@ -31,7 +32,7 @@ export function WorkoutScreen(props) {
     preSessionPRs, setResumenSesion, readOnly, sharedParam, sb, es, darkMode,
     prCelebration, setPrCelebration, activeExIdx, setActiveExIdx, sessionData,
     onSesionGuardada, sessionPRList, videoOverrides, setVideoModal, toast2, onWeekAdvanced, onCicloCambiado,
-    pendingSyncState, onPendingSyncRetry,
+    pendingSyncState, onPendingSyncRetry, onRevisarCuarentena, onCuarentenaCambiada,
   } = props;
 
   const [exitWorkoutOpen, setExitWorkoutOpen] = useState(false);
@@ -188,6 +189,7 @@ export function WorkoutScreen(props) {
           time: horaFin,
           includeRoutineId: true,
           ciclo: cicloActual,
+          historialToken: session.historialToken,   // D76-09: sello con el que EMPEZO el entrenamiento
         }));
         const outcome = await finalizeStudentSession({
           sb: sb,
@@ -212,6 +214,20 @@ export function WorkoutScreen(props) {
           },
         });
 
+        if (outcome.status !== "saved" && outcome.reason === FINALIZE_FAILURE.HISTORIAL_REINICIADO) {
+          // D76-09: el entrenador reinicio el historial despues de que empezara este entrenamiento. La sesion NO se pierde: queda en
+          // revision (cuarentena) en este telefono y se puede «subir igual» con confirmacion. El entrenamiento se cierra sin marcar el dia.
+          const q = guardarSesionEnCuarentena(localStorage, sesionPayload, { motivo: outcome.rechazo && outcome.rechazo.motivo, epochVigente: outcome.rechazo && outcome.rechazo.epochVigente });
+          if (!q.ok) {
+            setFinalizeError(es ? "Tu entrenador reinició tu historial y no pudimos guardar esta sesión en el teléfono. Tu entrenamiento sigue abierto: liberá espacio e intentá de nuevo." : "Your coach reset your history and we could not keep this workout on the phone. It is still open: free up space and try again.");
+            return;
+          }
+          try { cerrarSesionActiva(localStorage, { alumnoId: sessionData.alumnoId, session: session }); } catch (e) {}
+          setSession(null);
+          if (typeof toast2 === "function") toast2(es ? "Tu entrenador reinició tu historial: este entrenamiento quedó en revisión en tu teléfono" : "Your coach reset your history: this workout is kept for review on your phone");
+          if (typeof onCuarentenaCambiada === "function") onCuarentenaCambiada();
+          return;
+        }
         if (outcome.status !== "saved") {
           const offline = outcome.reason === FINALIZE_FAILURE.OFFLINE;
           const text = offline
@@ -372,7 +388,7 @@ export function WorkoutScreen(props) {
       <div onScroll={handleWorkoutScroll} style={{ flex:1, minHeight:0, overflowY:"auto", padding:"10px 16px 0", paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))", WebkitOverflowScrolling:"touch" }}>
 
         {/* D76-08: series pendientes de sincronizar (el banner global de App queda tapado por esta pantalla). */}
-        <PendingSyncIndicator variant="inline" state={pendingSyncState} onRetry={onPendingSyncRetry} es={es} darkMode={_dm}
+        <PendingSyncIndicator variant="inline" state={pendingSyncState} onRetry={onPendingSyncRetry} onReviewQuarantine={onRevisarCuarentena} es={es} darkMode={_dm}
           nombreEjercicio={function (id) { var e = (allEx || []).find(function (x) { return x && x.id === id; }); return e ? (es ? e.name : (e.nameEn || e.name)) : ''; }} />
 
         {ex && (
