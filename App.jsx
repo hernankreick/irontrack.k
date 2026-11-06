@@ -29,6 +29,7 @@ import {
 import { alumnosIdsKey } from './lib/coachAlumnosLoad.js';
 import { syncCoachHistory, groupByAlumno } from './lib/coachHistoryLoader.js';
 import { cargarHistorialProgreso, obtenerHistorialProgreso, invalidarHistorialProgreso } from './lib/alumnoHistoryLoader.js';
+import { getSesionesCompletas, leerSesionesAlumnoCompletas } from './lib/sesionesHistorial.js';
 import { crearControladorSesiones, necesitaReintento, estadoPlanAlumno, puedeIniciarEntrenamientoAlumno, manejarSesionGuardada } from './lib/sesionesLectura.js';
 import { getYTVideoId } from './lib/getYTVideoId.js';
 import { createPortal } from 'react-dom';
@@ -169,6 +170,7 @@ import {
   updateExerciseKgInRoutines,
 } from './lib/workoutSession.js';
 import { postProgressIdempotent } from './lib/progressInsert.js';
+import { serieRegistrable } from './lib/cargaSerie.js';
 import { nuevaCargaFicha, observarCargaFicha, sincronizarVistaFicha, capturarVistaFicha, filasDelAlumno } from './lib/studentFicha.js';
 import {
   generateOpId,
@@ -432,9 +434,12 @@ const sb = {
     if (error) throw error;
     return true;
   },
-  getSesiones: (alumnoId) => sbFetch("sesiones?alumno_id=eq."+alumnoId+"&select=*&order=created_at.desc&limit=10"),
-  // D76-02: misma consulta que getSesiones, pero devuelve { ok, status, data } para no confundir una lectura fallida con "cero sesiones".
-  getSesionesDetallado: (alumnoId) => sbRequestStatus("sesiones?alumno_id=eq."+encodeURIComponent(alumnoId)+"&select=*&order=created_at.desc&limit=10", "GET", null),
+  // D7.6: historial COMPLETO de sesiones del alumno, paginado (antes limit=10: contador, racha, logros e historial por semanas se cortaban
+  // en las 10 mas recientes). Una pagina fallida hace fallar la lectura entera: nunca se entrega un historial parcial como completo.
+  // Ver lib/sesionesHistorial.js. getSesiones: array, o null si no se pudo leer (lanza ante error de red, como sbFetch).
+  getSesiones: (alumnoId) => getSesionesCompletas(sbRequestStatus, alumnoId),
+  // D76-02: misma lectura que getSesiones, pero devuelve { ok, status, data } para no confundir una lectura fallida con "cero sesiones".
+  getSesionesDetallado: (alumnoId) => leerSesionesAlumnoCompletas(sbRequestStatus, alumnoId),
   addSesion: (data) => sbFetch("sesiones", "POST", data),
   deleteSesionesByAlumno: async (alumnoId) => {
     const { error } = await supabase.from("sesiones").delete().eq("alumno_id", String(alumnoId));
@@ -2088,6 +2093,11 @@ function GymApp() {
   const logSet = (exId, kg, reps, note, rpe, weekOverride, opIdIntento) => {
     // D76-05: fecha del entrenamiento (fijada al iniciar), no la del reloj: tras medianoche las series siguen en el mismo dia.
     const d = fechaDeSesion(session, Date.now());
+    // D7.6: serie invalida (kg negativo/NaN/infinito/fuera de techo, reps fuera de rango): no se registra ni envia (lib/cargaSerie.js).
+    if (!serieRegistrable(kg, reps)) {
+      toast2(es ? "Revisá el peso y las repeticiones: el valor no es válido." : "Check the weight and reps: the value is not valid.");
+      return false;
+    }
     // Mismo criterio que al finalizar una sesión: si la rutina tiene una semana persistida
     // en el servidor, es la fuente de verdad por sobre el currentWeek local (que puede
     // haber quedado desincronizado), para no taggear cada serie con la semana equivocada.
@@ -3566,6 +3576,7 @@ function GymApp() {
         // Durante el entrenamiento (session&&activeDay) solo queda el indicador inline de WorkoutScreen: una sola region aria-live.
         session&&activeDay ? null : (
           <PendingSyncIndicator variant="banner" state={pendingSyncState} es={es} darkMode={darkMode}
+            nombreEjercicio={function (id) { var e = (allEx || []).find(function (x) { return x && x.id === id; }); return e ? (es ? e.name : (e.nameEn || e.name)) : ''; }}
             onRetry={function () { if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.retryNow(); }} />
         )
       ) : !isOnline&&(

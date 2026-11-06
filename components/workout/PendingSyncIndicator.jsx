@@ -53,6 +53,28 @@ export function describePendingSync(state, es) {
   };
 }
 
+/**
+ * D7.6: aviso de series pendientes con datos invalidos (no se envian, quedan en el dispositivo, sin reintento). Puro (se prueba en node).
+ * nombreEjercicio(exId) opcional para mostrar el nombre. Devuelve { visible, text, items: [texto por serie, max 3], extra }.
+ */
+export function describeInvalidPending(state, es, nombreEjercicio) {
+  var s = state || {};
+  var lista = Array.isArray(s.invalidItems) ? s.invalidItems : [];
+  var n = Math.max(lista.length, Number(s.invalid) || 0);
+  if (!s.alumnoId || n === 0) return { visible: false, text: '', items: [], extra: 0 };
+  var text = es
+    ? n + ' ' + plural(n, 'serie con peso o repeticiones no válidos no se envió', 'series con peso o repeticiones no válidos no se enviaron') +
+      '. ' + plural(n, 'Queda guardada', 'Quedan guardadas') + ' en este dispositivo; avisale a tu entrenador.'
+    : n + ' ' + plural(n, 'set with an invalid weight or reps was not sent', 'sets with an invalid weight or reps were not sent') +
+      '. ' + plural(n, 'It stays', 'They stay') + ' saved on this device; let your coach know.';
+  var items = lista.slice(0, 3).map(function (it) {
+    var nombre = '';
+    try { nombre = typeof nombreEjercicio === 'function' ? (nombreEjercicio(it.exId) || '') : ''; } catch (e) { nombre = ''; }
+    return (nombre || it.exId || (es ? 'Ejercicio' : 'Exercise')) + ' · ' + String(it.kg) + ' kg × ' + String(it.reps) + (it.date ? ' · ' + it.date : '');
+  });
+  return { visible: true, text: text, items: items, extra: Math.max(0, n - items.length) };
+}
+
 // Colores con contraste AA (texto >= 4.5:1 sobre su fondo) en claro y oscuro.
 var PALETTE = {
   dark: {
@@ -69,12 +91,16 @@ var PALETTE = {
 
 var CSS = '.it-psync-btn:focus-visible{outline:3px solid #60A5FA;outline-offset:2px}.it-psync-btn:disabled{opacity:.6;cursor:default}';
 
-export default function PendingSyncIndicator({ state, onRetry, es = true, darkMode = true, variant = 'inline' }) {
+export default function PendingSyncIndicator({ state, onRetry, es = true, darkMode = true, variant = 'inline', nombreEjercicio }) {
   var d = describePendingSync(state, es);
-  if (!d.visible) return null;
-  var c = PALETTE[darkMode === false ? 'light' : 'dark'][d.tone];
+  var inv = describeInvalidPending(state, es, nombreEjercicio);
+  if (!d.visible && !inv.visible) return null;
   var banner = variant === 'banner';
+  var aviso = inv.visible ? <InvalidPendingNotice inv={inv} es={es} darkMode={darkMode} banner={banner} /> : null;
+  if (!d.visible) return aviso;
+  var c = PALETTE[darkMode === false ? 'light' : 'dark'][d.tone];
   return (
+    <>
     <div
       role="status"
       aria-live="polite"
@@ -127,6 +153,42 @@ export default function PendingSyncIndicator({ state, onRetry, es = true, darkMo
           {d.actionLabel}
         </button>
       ) : null}
+    </div>
+    {aviso}
+    </>
+  );
+}
+
+// D7.6: series que no se enviaran por datos invalidos. Sin boton de reintento (reintentar no las corrige); se listan para identificarlas.
+// role="note" sin aria-live: aviso persistente; la unica region aria-live sigue siendo la del indicador de pendientes.
+function InvalidPendingNotice({ inv, es, darkMode, banner }) {
+  var c = PALETTE[darkMode === false ? 'light' : 'dark'].error;
+  return (
+    <div
+      role="note"
+      data-qa-pending-invalid={inv.items.length + inv.extra}
+      style={{
+        background: c.bg,
+        border: banner ? 'none' : '1px solid ' + c.border,
+        borderBottom: '1px solid ' + c.border,
+        borderRadius: banner ? 0 : 12,
+        padding: banner ? '6px 16px' : '8px 12px',
+        margin: banner ? 0 : '0 0 10px',
+        color: c.text,
+        fontSize: 14,
+        fontWeight: 600,
+        lineHeight: 1.35,
+        minWidth: 0,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+        overflowWrap: 'anywhere',
+      }}
+    >
+      <div>{inv.text}</div>
+      <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontWeight: 500 }}>
+        {inv.items.map(function (t, i) { return <li key={i}>{t}</li>; })}
+        {inv.extra > 0 ? <li>{(es ? 'y ' : 'and ') + inv.extra + (es ? ' más' : ' more')}</li> : null}
+      </ul>
     </div>
   );
 }
