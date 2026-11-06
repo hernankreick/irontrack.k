@@ -294,6 +294,8 @@ await t("10. aviso: identifica cada serie (ejercicio, kg, reps, fecha), sin boto
   assert.match(ambos, /2 series pendientes de sincronizar/);
   assert.match(ambos, /data-qa-pending-invalid/);
   assert.equal((ambos.match(/<button/g) || []).length, 1);
+  assert.equal((ambos.match(/aria-live=/g) || []).length, 1, "una sola region aria-live (no se anuncia dos veces)");
+  assert.match(html, /role="note"/);
   assert.equal(render({ alumnoId: A, pending: 0, status: "idle", invalid: 0, invalidItems: [] }), "", "sin nada: no se muestra");
 });
 

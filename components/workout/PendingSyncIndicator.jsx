@@ -160,12 +160,12 @@ export default function PendingSyncIndicator({ state, onRetry, es = true, darkMo
 }
 
 // D7.6: series que no se enviaran por datos invalidos. Sin boton de reintento (reintentar no las corrige); se listan para identificarlas.
+// role="note" sin aria-live: aviso persistente; la unica region aria-live sigue siendo la del indicador de pendientes.
 function InvalidPendingNotice({ inv, es, darkMode, banner }) {
   var c = PALETTE[darkMode === false ? 'light' : 'dark'].error;
   return (
     <div
-      role="status"
-      aria-live="polite"
+      role="note"
       data-qa-pending-invalid={inv.items.length + inv.extra}
       style={{
         background: c.bg,
