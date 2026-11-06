@@ -3576,6 +3576,7 @@ function GymApp() {
         // Durante el entrenamiento (session&&activeDay) solo queda el indicador inline de WorkoutScreen: una sola region aria-live.
         session&&activeDay ? null : (
           <PendingSyncIndicator variant="banner" state={pendingSyncState} es={es} darkMode={darkMode}
+            nombreEjercicio={function (id) { var e = (allEx || []).find(function (x) { return x && x.id === id; }); return e ? (es ? e.name : (e.nameEn || e.name)) : ''; }}
             onRetry={function () { if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.retryNow(); }} />
         )
       ) : !isOnline&&(

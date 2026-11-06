@@ -372,7 +372,8 @@ export function WorkoutScreen(props) {
       <div onScroll={handleWorkoutScroll} style={{ flex:1, minHeight:0, overflowY:"auto", padding:"10px 16px 0", paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))", WebkitOverflowScrolling:"touch" }}>
 
         {/* D76-08: series pendientes de sincronizar (el banner global de App queda tapado por esta pantalla). */}
-        <PendingSyncIndicator variant="inline" state={pendingSyncState} onRetry={onPendingSyncRetry} es={es} darkMode={_dm} />
+        <PendingSyncIndicator variant="inline" state={pendingSyncState} onRetry={onPendingSyncRetry} es={es} darkMode={_dm}
+          nombreEjercicio={function (id) { var e = (allEx || []).find(function (x) { return x && x.id === id; }); return e ? (es ? e.name : (e.nameEn || e.name)) : ''; }} />
 
         {ex && (
           <WorkoutExercisePanel
