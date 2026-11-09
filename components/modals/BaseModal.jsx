@@ -17,6 +17,7 @@ export default function BaseModal({
   overlayStyle,
   contentStyle,
   contentProps,
+  darkMode,
 }) {
   const [shouldRender, setShouldRender] = useState(!!open);
 
@@ -63,7 +64,10 @@ export default function BaseModal({
       ? storedDark !== 'false'
       : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   } catch (e) {}
+  // `darkMode` (opcional): el tema de la app manda sobre localStorage/sistema; sin la prop se conserva la deteccion de siempre.
+  if (typeof darkMode === 'boolean') prefersDark = darkMode;
   var modalBg = prefersDark ? '#0d1424' : '#FFFFFF';
+  var modalBorder = typeof darkMode === 'boolean' && !darkMode ? '#cbd5e1' : 'var(--it-modal-border, #2D4057)';
 
   return createPortal(
     <div
@@ -97,7 +101,7 @@ export default function BaseModal({
           padding: 20,
           width: '90%',
           maxWidth: cardMaxWidth,
-          border: '1px solid var(--it-modal-border, #2D4057)',
+          border: '1px solid ' + modalBorder,
           boxShadow: '0 24px 80px rgba(0,0,0,.45)',
           transform: isClosing ? 'scale(0.96) translateY(10px)' : 'scale(1) translateY(0)',
           opacity: isClosing ? 0 : 1,

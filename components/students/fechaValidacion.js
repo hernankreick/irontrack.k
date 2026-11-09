@@ -32,3 +32,14 @@ export function fechaLimites(rutinaOCreatedAt, now) {
     : { created_at: rutinaOCreatedAt };
   return limitesFechaValidacion(rutina, now);
 }
+
+/**
+ * H5: por que la fecha elegida no sirve, con LAS MISMAS comparaciones que deshabilitan «Confirmar» (iso < min / iso > max).
+ * "antes" | "despues" | null (valida o sin seleccion: no hay nada que explicar todavia).
+ */
+export function fechaFueraDeRango(iso, limites) {
+  if (!iso || !limites) return null;
+  if (iso < limites.min) return "antes";
+  if (iso > limites.max) return "despues";
+  return null;
+}
