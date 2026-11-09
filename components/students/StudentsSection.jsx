@@ -7,6 +7,8 @@ import { CICLO_CARGAS, readCicloBase, readCicloCargas, rowCiclo } from '../../li
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
 import StudentOrphanSession from './StudentOrphanSession.jsx';
+import { DeleteConfirmModal } from '../DeleteConfirmModal.jsx';
+import { registrarPagoAlumno, nombreAlumno } from './pagoAlumno.js';
 import ManualSessionValidationModal from './ManualSessionValidationModal.jsx';
 import StudentsSectionStates from './StudentsSectionStates.jsx';
 import useDialogA11y from '../modals/useDialogA11y.js';
@@ -47,6 +49,29 @@ export default function StudentsSection(props) {
   const newAlumnoPristine = !((newAlumnoData.nombre || "").trim() || (newAlumnoData.email || "").trim());
   useDialogA11y({ open: !!newAlumnoForm, containerRef: newAlumnoDialogRef, onEscape: newAlumnoPristine && !creatingAlumno ? closeNewAlumnoForm : undefined });
   const [manualValidate, setManualValidate] = React.useState(null);
+  // «Marcar pagado» (H6): confirmacion previa. El destinatario es una COPIA (id y nombre) tomada al abrir el dialogo: cambiar de ficha
+  // mientras se guarda no lo cambia. `pagoEnCurso` es el candado sincrono contra el doble toque (el estado `busy` llega un render tarde).
+  const [pagoDialog, setPagoDialog] = React.useState(null);
+  const pagoEnCurso = React.useRef(false);
+  const cerrarPagoDialog = function () { if (pagoEnCurso.current) return; setPagoDialog(null); };
+  const confirmarPago = async function () {
+    if (pagoEnCurso.current || !pagoDialog) return;
+    pagoEnCurso.current = true;
+    const dest = pagoDialog;
+    setPagoDialog({ id: dest.id, nombre: dest.nombre, busy: true, error: "" });
+    const res = await registrarPagoAlumno(sb, { id: dest.id }, new Date());
+    pagoEnCurso.current = false;
+    if (!res.ok) {
+      setPagoDialog({ id: dest.id, nombre: dest.nombre, busy: false, error: res.motivo === "red"
+        ? t("No se pudo registrar el pago: revisá tu conexión e intentá de nuevo.", "Could not register the payment: check your connection and try again.")
+        : t("No se pudo registrar el pago. Intentá de nuevo.", "Could not register the payment. Please try again.") });
+      return;
+    }
+    // Solo con el guardado confirmado: se refleja en la lista (por id, nunca en otra ficha) y se avisa nombrando al alumno.
+    setAlumnos(function (prev) { return prev.map(function (al) { return String(al.id) === String(dest.id) ? {...al, ultimo_pago_confirmado: res.ahora} : al; }); });
+    setPagoDialog(null);
+    toast2(t("Pago registrado ✓", "Payment registered ✓") + (dest.nombre ? " · " + dest.nombre : ""));
+  };
   // «Nota del día»: el borrador (notaDiaInput, estado de App) pertenece al alumno para el que se escribió (notaDueno). Solo se muestra
   // y se envía en SU ficha; al abrir la ficha de otro alumno se descarta (contraer/expandir la misma ficha lo conserva). El envío tiene
   // candado síncrono por alumno, y su resultado tardío nunca toca la ficha de otro alumno. Reglas y contrato de sb.setNota: notaDelDia.js.
@@ -464,17 +489,9 @@ export default function StudentsSection(props) {
                   setCoachCardMenuId(null);
                   setCoachDialog({ t: 'deleteAlumno', a: a });
                 }}
-                onMarkPaid={async function () {
+                onMarkPaid={function () {
                   setCoachCardMenuId(null);
-                  try {
-                    const now = new Date().toISOString();
-                    const updated = await sb.updateAlumno(a.id, { ultimo_pago_confirmado: now });
-                    if (!updated) { toast2(msg("Error al registrar el pago", "Error registering payment")); return; }
-                    setAlumnos(function (prev) { return prev.map(function (al) { return al.id === a.id ? {...al, ultimo_pago_confirmado: now} : al; }); });
-                    toast2(msg("Pago registrado ✓", "Payment registered ✓"));
-                  } catch (e) {
-                    toast2(msg("Error al registrar el pago", "Error registering payment"));
-                  }
+                  setPagoDialog({ id: a.id, nombre: nombreAlumno(a), busy: false, error: "" });
                 }}
                 onAsignarRutina={function () {}}
               >
@@ -584,6 +601,22 @@ export default function StudentsSection(props) {
                 )}
               </StudentCard>
             )})}
+            <DeleteConfirmModal
+              open={!!pagoDialog}
+              onCancel={cerrarPagoDialog}
+              onConfirm={confirmarPago}
+              tone="neutral"
+              compact
+              confirmStyleOverride={{ background: "#15803d", boxShadow: "0 10px 28px rgba(21,128,61,0.35)" }}
+              title={t("Confirmar pago", "Confirm payment")}
+              message={t("¿Querés marcar como pagado a " + (pagoDialog && pagoDialog.nombre ? pagoDialog.nombre : "este alumno") + "?\nEsta acción actualizará su estado de pago.", "Do you want to mark " + (pagoDialog && pagoDialog.nombre ? pagoDialog.nombre : "this athlete") + " as paid?\nThis will update their payment status.")}
+              confirmLabel={pagoDialog && pagoDialog.error ? t("Reintentar pago", "Retry payment") : t("Confirmar pago", "Confirm payment")}
+              cancelLabel={t("Cancelar", "Cancel")}
+              loading={!!(pagoDialog && pagoDialog.busy)}
+              loadingLabel={t("Registrando…", "Registering…")}
+              errorText={pagoDialog ? pagoDialog.error : ""}
+              darkMode={darkMode}
+            />
             <ManualSessionValidationModal
               open={!!manualValidate}
               onClose={function(){ setManualValidate(null); }}

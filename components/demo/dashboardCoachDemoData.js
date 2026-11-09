@@ -75,6 +75,7 @@ export const DEMO_DASH_RUTINA_LOCAL = { id: "demo-rt-local", name: "Rutina inici
 export function createDemoDashSb(hoy, opts) {
   var o = opts || {};
   var simSeq = 0;
+  var pagoIntentos = {};
   var rutinas = o.extra ? demoDashRutinas(hoy).concat(demoDashRutinasExtra(hoy)) : demoDashRutinas(hoy);
   var sesiones = o.extra ? demoDashSesiones(hoy).concat(demoDashSesionesExtra(hoy)) : demoDashSesiones(hoy);
   var clone = function (x) { return JSON.parse(JSON.stringify(x)); };
@@ -93,6 +94,21 @@ export function createDemoDashSb(hoy, opts) {
       sesiones = [row].concat(sesiones);
       if (o.onInsert) o.onInsert(clone(row));
       return [clone(row)];
+    },
+    // H6: «Marcar pagado» en la demo, solo en memoria. Escenarios (`?pago=`): ok (por defecto), `error` (el servidor responde error: null),
+    // `red` (falla de red: lanza) y `vacio` (200 sin filas: el pago no quedo guardado). En los tres, la PRIMERA vez de cada alumno falla y el
+    // reintento funciona. Cada guardado exitoso avisa a la demo (o.onPago) para poder comprobar que se registro exactamente una vez.
+    updateAlumno: async function (id, data) {
+      await new Promise(function (r) { setTimeout(r, 700); });
+      var esc = o.pago || "ok";
+      pagoIntentos[String(id)] = (pagoIntentos[String(id)] || 0) + 1;
+      if (esc !== "ok" && pagoIntentos[String(id)] === 1) {
+        if (esc === "error") return null;
+        if (esc === "red") throw new TypeError("Failed to fetch");
+        if (esc === "vacio") return [];
+      }
+      if (o.onPago) o.onPago(String(id), data);
+      return [Object.assign({ id: id }, data)];
     },
   };
 }

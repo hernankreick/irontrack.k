@@ -28,6 +28,12 @@ export function DeleteConfirmModal({
   zIndex = 10000,
   /** Confirmaciones livianas (no destructivas): card chica, ícono reducido, botones en fila. */
   compact = false,
+  /** Error de la accion (opcional): se muestra dentro del dialogo con role=alert para poder reintentar. */
+  errorText = '',
+  /** Estilo del boton de confirmar (opcional): p. ej. un fondo solido con contraste AA. Sin la prop, no cambia nada. */
+  confirmStyleOverride = null,
+  /** Tema de la app (opcional). false = paleta clara; sin la prop (o true) se conserva la paleta oscura de siempre. */
+  darkMode,
 }) {
   const cancelRef = useRef(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -85,6 +91,19 @@ export function DeleteConfirmModal({
   var isNeutral = tone === 'neutral';
   var isWorkoutExit = variant === 'workoutExit';
   var isLogout = isNeutral && useLogoutIcon;
+  // Paleta por tema: el panel era siempre oscuro (colores fijos) y, al ir por portal, no heredaba el tema de la app.
+  var light = darkMode === false;
+  var pal = light
+    ? {
+        overlay: 'rgba(15, 23, 42, 0.45)', panelBg: '#ffffff', panelBorder: '1px solid #cbd5e1', panelShadow: '0 24px 60px rgba(15,23,42,.22)',
+        title: '#0f172a', message: '#334155', chipBg: '#f1f5f9', chipBorder: '1px solid #e2e8f0', chipText: '#0f172a',
+        error: '#b91c1c', ack: '#0f172a', cancelBorder: '1px solid #94a3b8', cancelBg: '#ffffff', cancelText: '#0f172a',
+      }
+    : {
+        overlay: null, panelBg: 'rgba(15, 23, 42, 0.92)', panelBorder: '1px solid rgba(148, 163, 184, 0.28)', panelShadow: null,
+        title: '#fff', message: null, chipBg: 'rgba(148, 163, 184, 0.12)', chipBorder: '1px solid rgba(148, 163, 184, 0.18)', chipText: 'rgba(241, 245, 249, 0.95)',
+        error: '#fca5a5', ack: 'rgba(241, 245, 249, 0.92)', cancelBorder: null, cancelBg: null, cancelText: null,
+      };
 
   var iconWrap = { bg: 'rgba(239,68,68,.18)', color: '#fb7185' };
   var Icon = Trash2;
@@ -97,6 +116,12 @@ export function DeleteConfirmModal({
     iconWrap = { bg: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa' };
     Icon = HelpCircle;
     iconPx = 28;
+  }
+
+  if (light && !isWorkoutExit) {
+    if (isDanger) iconWrap = { bg: 'rgba(220,38,38,.10)', color: '#dc2626' };
+    else if (isCaution) iconWrap = { bg: 'rgba(180,83,9,.10)', color: '#b45309' };
+    else iconWrap = { bg: 'rgba(37,99,235,.10)', color: '#2563eb' };
   }
 
   var confirmStyle = isDanger
@@ -149,10 +174,11 @@ export function DeleteConfirmModal({
       }}
       maxWidth={maxW}
       closeOnOutside={!loading}
+      darkMode={typeof darkMode === 'boolean' ? darkMode : undefined}
       zIndex={zIndex}
       overlayStyle={{
         padding: narrow ? 16 : 24,
-        background: isWorkoutExit ? 'rgba(2, 6, 23, 0.62)' : 'rgba(2, 6, 23, 0.72)',
+        background: pal.overlay || (isWorkoutExit ? 'rgba(2, 6, 23, 0.62)' : 'rgba(2, 6, 23, 0.72)'),
         backdropFilter: isWorkoutExit ? 'blur(4px)' : 'blur(8px)',
         WebkitBackdropFilter: isWorkoutExit ? 'blur(4px)' : 'blur(8px)',
       }}
@@ -166,10 +192,10 @@ export function DeleteConfirmModal({
           width: (isLogout || compact) ? 'min(' + maxW + 'px, calc(100vw - 48px))' : 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
           maxWidth: (isLogout || compact) ? maxW : 'min(' + maxW + 'px, calc(100vw - ' + (isWorkoutExit ? '48px' : '32px') + '))',
           margin: (isLogout || compact) ? '0 auto' : undefined,
-          background: 'rgba(15, 23, 42, 0.92)',
-          border: '1px solid rgba(148, 163, 184, 0.28)',
+          background: pal.panelBg,
+          border: pal.panelBorder,
           borderRadius: compact ? 18 : isLogout ? 20 : isWorkoutExit ? 22 : 24,
-          boxShadow: isWorkoutExit ? '0 18px 60px rgba(0,0,0,.38)' : '0 24px 80px rgba(0,0,0,.45)',
+          boxShadow: pal.panelShadow || (isWorkoutExit ? '0 18px 60px rgba(0,0,0,.38)' : '0 24px 80px rgba(0,0,0,.45)'),
           padding: compact ? '24px 20px' : isLogout ? '28px 24px' : py,
           fontFamily: 'Inter, system-ui, sans-serif',
           ...(isWorkoutExit ? { animation: 'it-workout-exit-card-in 200ms ease-out both' } : {}),
@@ -198,7 +224,7 @@ export function DeleteConfirmModal({
               margin: 0,
               fontSize: titleFont,
               fontWeight: isWorkoutExit ? 600 : 800,
-              color: '#fff',
+              color: pal.title,
               lineHeight: 1.2,
             }}
           >
@@ -211,7 +237,7 @@ export function DeleteConfirmModal({
                 margin: isWorkoutExit ? 0 : '14px 0 0',
                 fontSize: isWorkoutExit ? 14 : 15,
                 fontWeight: 500,
-                color: isWorkoutExit ? 'rgb(148, 163, 184)' : 'rgba(226, 232, 240, 0.82)',
+                color: pal.message || (isWorkoutExit ? 'rgb(148, 163, 184)' : 'rgba(226, 232, 240, 0.82)'),
                 lineHeight: isWorkoutExit ? 1.55 : 1.5,
                 maxWidth: isWorkoutExit ? 280 : 440,
                 whiteSpace: 'pre-line',
@@ -226,18 +252,23 @@ export function DeleteConfirmModal({
                 marginTop: 16,
                 display: 'inline-block',
                 maxWidth: '100%',
-                background: 'rgba(148, 163, 184, 0.12)',
-                border: '1px solid rgba(148, 163, 184, 0.18)',
+                background: pal.chipBg,
+                border: pal.chipBorder,
                 borderRadius: 14,
                 padding: '10px 14px',
                 fontSize: 15,
                 fontWeight: 700,
-                color: 'rgba(241, 245, 249, 0.95)',
+                color: pal.chipText,
                 wordBreak: 'break-word',
               }}
             >
               {subjectName}
             </div>
+          ) : null}
+          {errorText ? (
+            <p role="alert" style={{ margin: '14px 0 0', fontSize: 14, fontWeight: 700, color: pal.error, lineHeight: 1.45, maxWidth: 440 }}>
+              <span aria-hidden="true">⚠ </span>{errorText}
+            </p>
           ) : null}
           {requireAcknowledge ? (
             <label
@@ -249,7 +280,7 @@ export function DeleteConfirmModal({
                 alignItems: 'flex-start',
                 gap: 10,
                 textAlign: 'left',
-                color: 'rgba(241, 245, 249, 0.92)',
+                color: pal.ack,
                 fontSize: 14,
                 fontWeight: 700,
                 lineHeight: 1.4,
@@ -296,9 +327,9 @@ export function DeleteConfirmModal({
               width: isWorkoutExit ? '100%' : undefined,
               minHeight: isWorkoutExit ? 44 : compact ? 48 : 52,
               borderRadius: compact ? 12 : isLogout ? 12 : isWorkoutExit ? 14 : 16,
-              border: isWorkoutExit ? '1px solid rgb(71, 85, 105)' : '1px solid rgba(148, 163, 184, 0.32)',
-              background: isWorkoutExit ? 'transparent' : 'rgba(148, 163, 184, 0.08)',
-              color: isWorkoutExit ? 'rgb(203, 213, 225)' : '#fff',
+              border: isWorkoutExit ? '1px solid rgb(71, 85, 105)' : (pal.cancelBorder || '1px solid rgba(148, 163, 184, 0.32)'),
+              background: isWorkoutExit ? 'transparent' : (pal.cancelBg || 'rgba(148, 163, 184, 0.08)'),
+              color: isWorkoutExit ? 'rgb(203, 213, 225)' : (pal.cancelText || '#fff'),
               fontSize: compact ? 14 : isLogout ? 14 : 15,
               fontWeight: isWorkoutExit ? 500 : 800,
               padding: isLogout ? '14px 0' : undefined,
@@ -326,6 +357,7 @@ export function DeleteConfirmModal({
               cursor: loading ? 'wait' : confirmDisabled ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
               ...confirmStyle,
+              ...(confirmStyleOverride || {}),
               opacity: confirmDisabled ? 0.55 : 1,
               transition: isWorkoutExit ? 'background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease' : undefined,
             }}
