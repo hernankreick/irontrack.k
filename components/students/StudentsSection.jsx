@@ -615,6 +615,7 @@ export default function StudentsSection(props) {
               loading={!!(pagoDialog && pagoDialog.busy)}
               loadingLabel={t("Registrando…", "Registering…")}
               errorText={pagoDialog ? pagoDialog.error : ""}
+              darkMode={darkMode}
             />
             <ManualSessionValidationModal
               open={!!manualValidate}

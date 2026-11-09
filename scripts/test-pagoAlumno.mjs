@@ -78,6 +78,21 @@ await test("Dialogo: reutiliza DeleteConfirmModal (alertdialog, titulo, descripc
   assert.match(src, /background: "#15803d"/);
 });
 
+await test("Tema: el dialogo sigue el tema de la app (causa raiz: paleta oscura fija en DeleteConfirmModal)", () => {
+  const dlg = rd("components/DeleteConfirmModal.jsx");
+  assert.match(dlg, /darkMode,\n\}\) \{/, "acepta darkMode");
+  assert.match(dlg, /var light = darkMode === false;/, "solo darkMode === false activa la paleta clara: sin la prop no cambia nada");
+  assert.match(dlg, /panelBg: '#ffffff'/);
+  assert.match(dlg, /panelBg: 'rgba\(15, 23, 42, 0\.92\)'/, "paleta oscura original intacta");
+  for (const k of ["title", "message", "chipBg", "error", "ack", "cancelBg", "cancelText", "overlay", "panelBorder"]) assert.match(dlg, new RegExp("pal\\." + k), "usa pal." + k);
+  assert.match(rd("components/students/StudentsSection.jsx"), /errorText=\{pagoDialog \? pagoDialog\.error : ""\}\s*darkMode=\{darkMode\}/);
+  // contraste de la paleta clara (texto sobre #fff)
+  const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const cr = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  for (const fg of ["#0f172a", "#334155", "#b91c1c"]) assert.ok(cr(fg, "#ffffff") >= 4.5, fg);
+  assert.ok(cr("#ffffff", "#15803d") >= 4.5);
+});
+
 await test("Menu de acciones: las otras acciones siguen igual", () => {
   const m = rd("components/students/StudentActionsMenu.jsx");
   for (const h of ["onEdit", "onChat", "onMarkPaid", "onClearProgress", "onDelete"]) assert.match(m, new RegExp("onClick=\\{" + h + "\\}"), h);

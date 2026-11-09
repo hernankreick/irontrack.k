@@ -47,6 +47,14 @@ const dialogo = (page) => page.evaluate((sel) => {
     alerta: (d.querySelector('[role="alert"]') || {}).innerText || null,
     cancelar: btn(/^Cancelar$/), confirmar: btn(/^(Confirmar pago|Reintentar pago|Registrando…)$/),
     foco: document.activeElement ? (document.activeElement.innerText || "").trim() : "",
+    lumFondo: (() => {
+      const parse = (x) => { const m = (x || "").match(/[\d.]+/g) || []; return { r: +m[0], g: +m[1], b: +m[2], a: m.length > 3 ? +m[3] : 1 }; };
+      const over = (f, b) => ({ r: f.r * f.a + b.r * (1 - f.a), g: f.g * f.a + b.g * (1 - f.a), b: f.b * f.a + b.b * (1 - f.a), a: 1 });
+      const ch = []; for (let n = d; n; n = n.parentElement) ch.unshift(n);
+      let bg = { r: 255, g: 255, b: 255, a: 1 }; for (const n of ch) { const c = parse(getComputedStyle(n).backgroundColor); if (c.a > 0) bg = over(c, bg); }
+      const k = [bg.r, bg.g, bg.b].map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * k[0] + 0.7152 * k[1] + 0.0722 * k[2];
+    })(),
     scrollH: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     dentro: (() => { const r = d.getBoundingClientRect(); return r.left >= -0.5 && r.right <= window.innerWidth + 0.5; })(),
   };
@@ -91,14 +99,32 @@ const abrirMenuPago = async (page, nombre) => {
 };
 const clic = (page, re) => page.evaluate(([sel, src]) => { const d = document.querySelector(sel); const rx = new RegExp(src); const b = d && [...d.querySelectorAll("button")].find((x) => rx.test((x.innerText || "").trim())); if (b) b.click(); return !!b; }, [DLG, re.source]);
 
+// Verifica el dialogo ABIERTO en un estado: fondo acorde al tema de la app (no al del sistema), todo el texto >= 4,5:1, botones >= 44 px,
+// sin desbordamiento y captura. `claro` = tema de la demo.
+async function verificarEstado(page, tag, estado, claro, slug) {
+  const d = await dialogo(page);
+  check(!!d, tag + " [" + estado + "] el dialogo esta abierto");
+  if (!d) return null;
+  check(claro ? d.lumFondo > 0.5 : d.lumFondo < 0.1, tag + " [" + estado + "] fondo del dialogo acorde al tema " + (claro ? "claro" : "oscuro") + " (luminancia " + d.lumFondo.toFixed(3) + ")");
+  const m = await medir(page);
+  const malos = m.filter((t) => !t.dis && t.ratio < 4.5);
+  check(m.length >= 4 && malos.length === 0, tag + " [" + estado + "] todo el texto >= 4,5:1; fallan: " + malos.map((t) => "«" + t.txt + "» " + t.ratio.toFixed(2)).join(", "));
+  check(d.cancelar && d.confirmar && d.cancelar.h >= 43.5 && d.confirmar.h >= 43.5, tag + " [" + estado + "] botones >= 44 px");
+  check(!d.scrollH && d.dentro, tag + " [" + estado + "] sin desbordamiento horizontal");
+  if (o.out) await page.screenshot({ path: path.join(o.out, "pago_" + estado + "_" + slug + ".png") });
+  return d;
+}
+
 const MATRIZ = [];
-for (const width of [375, 390, 430]) for (const tema of ["claro", "oscuro"]) MATRIZ.push({ width, tema });
+// tema de la demo x esquema del sistema (las combinaciones cruzadas son las que fallaron en el iPhone) x viewport
+for (const width of [375, 390, 430]) for (const [tema, sistema] of [["claro", "dark"], ["claro", "light"], ["oscuro", "light"], ["oscuro", "dark"]]) MATRIZ.push({ width, tema, sistema, cruzado: (tema === "claro") === (sistema === "dark") });
 
 for (const cfg of MATRIZ) {
-  const base = "@" + cfg.width + "/" + cfg.tema;
+  const base = "@" + cfg.width + "/demo " + cfg.tema + "/sistema " + cfg.sistema;
+  const claro = cfg.tema === "claro";
   const q = (pago) => "?" + (cfg.tema === "claro" ? "tema=claro&" : "") + "pago=" + pago;
-  const slug = cfg.width + "_" + cfg.tema;
-  const ctx = await browser.newContext({ viewport: { width: cfg.width, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, colorScheme: cfg.tema === "claro" ? "dark" : "light" });
+  const slug = cfg.width + "_demo-" + cfg.tema + "_sis-" + cfg.sistema;
+  const ctx = await browser.newContext({ viewport: { width: cfg.width, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, colorScheme: cfg.sistema });
   await ctx.route("**/*", (route) => { const u = new URL(route.request().url()); if (u.hostname === "127.0.0.1" && String(u.port) === String(port)) return route.continue(); return route.abort(); });
 
   // ── escenario ok: abrir sin escribir, cancelar, Escape, doble toque, exito ──
@@ -120,8 +146,8 @@ for (const cfg of MATRIZ) {
       const m = await medir(page);
       const malos = m.filter((t) => !t.dis && t.ratio < 4.5);
       check(m.length >= 4 && malos.length === 0, tag + " todo el texto del dialogo >= 4,5:1; fallan: " + malos.map((t) => "«" + t.txt + "» " + t.ratio.toFixed(2)).join(", "));
-      if (o.out) await page.screenshot({ path: path.join(o.out, "pago_confirmacion_" + slug + ".png") });
     }
+    await verificarEstado(page, tag, "inicial", claro, slug);
     // cancelar
     await clic(page, /^Cancelar$/);
     await page.waitForTimeout(500);
@@ -136,7 +162,7 @@ for (const cfg of MATRIZ) {
     await page.waitForTimeout(150);
     d = await dialogo(page);
     check(!!d && d.confirmar && /Registrando/.test(d.confirmar.txt) && d.confirmar.dis && d.cancelar.dis, tag + " mientras guarda: «Registrando…» y controles deshabilitados");
-    if (o.out && d) await page.screenshot({ path: path.join(o.out, "pago_procesando_" + slug + ".png") });
+    await verificarEstado(page, tag, "procesando", claro, slug);
     await page.keyboard.press("Escape"); await page.waitForTimeout(100);
     check(!!(await dialogo(page)), tag + " Escape no cierra mientras guarda");
     await page.waitForTimeout(1100);
@@ -150,7 +176,7 @@ for (const cfg of MATRIZ) {
   }
 
   // ── escenarios con falla en el primer intento: error visible, sin exito falso, reintento ──
-  for (const esc of ["error", "red", "vacio"]) {
+  for (const esc of (cfg.cruzado ? ["error", "red", "vacio"] : ["error"])) {
     const tag = base + " [" + esc + "]";
     const page = await abrirPagina(ctx, q(esc));
     await abrirMenuPago(page, "Beto Baja"); await page.waitForTimeout(400);
@@ -167,9 +193,11 @@ for (const cfg of MATRIZ) {
       check(malos.length === 0, tag + " texto (incluido el error) >= 4,5:1; fallan: " + malos.map((t) => "«" + t.txt + "» " + t.ratio.toFixed(2)).join(", "));
       check(!d.scrollH && d.dentro, tag + " sin desbordamiento horizontal con el error");
     }
-    if (o.out && esc === "error") await page.screenshot({ path: path.join(o.out, "pago_error_" + slug + ".png") });
+    await verificarEstado(page, tag, "error-" + esc, claro, slug);
     await clic(page, /^Reintentar pago$/);
-    await page.waitForTimeout(1100);
+    await page.waitForTimeout(150);
+    await verificarEstado(page, tag, "reintento-procesando-" + esc, claro, slug);
+    await page.waitForTimeout(950);
     const p = await pagos(page);
     check(p.n === 1 && /Beto Baja/.test(p.txt) && !(await dialogo(page)), tag + " el reintento registra exactamente un pago y cierra");
     check(/Pago registrado ✓ · Beto Baja/.test(await page.evaluate(() => document.body.innerText)), tag + " exito tras el reintento");
@@ -178,7 +206,7 @@ for (const cfg of MATRIZ) {
   }
 
   // ── identidad: cambiar de ficha mientras guarda no cambia el destinatario ──
-  {
+  if (cfg.cruzado) {
     const tag = base + " [identidad]";
     const page = await abrirPagina(ctx, q("ok"));
     await abrirMenuPago(page, "Eli Regular"); await page.waitForTimeout(400);
@@ -198,7 +226,7 @@ for (const cfg of MATRIZ) {
   }
 
   // ── otras acciones del menu: sin regresiones ──
-  if (cfg.width === 390) {
+  if (cfg.width === 390 && cfg.cruzado) {
     const tag = base + " [otras acciones]";
     const page = await abrirPagina(ctx, q("ok"));
     const abrirItem = async (re) => {
