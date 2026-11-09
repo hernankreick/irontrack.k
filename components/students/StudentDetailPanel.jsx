@@ -62,6 +62,8 @@ export default function StudentDetailPanel({
   onIgnoreSuggestion,
   onNotaChange,
   onEnviarNota,
+  notaEnviando = false,
+  notaError = null,
 }) {
   if(!rutinaActiva) {
     return (
@@ -88,6 +90,9 @@ export default function StudentDetailPanel({
           border={border}
           onChange={onNotaChange}
           onSave={onEnviarNota}
+          saving={notaEnviando}
+          error={notaError}
+          darkMode={darkMode}
         />
       </div>
     );
@@ -172,6 +177,9 @@ export default function StudentDetailPanel({
         border={border}
         onChange={onNotaChange}
         onSave={onEnviarNota}
+        saving={notaEnviando}
+        error={notaError}
+        darkMode={darkMode}
       />
     </div>
   );
