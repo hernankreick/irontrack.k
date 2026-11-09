@@ -97,5 +97,16 @@ await test("H5: limites y logica de validacion/guardado sin cambios", () => {
   assert.match(modal, /advanceWeekAfterValidation\(/);
 });
 
+await test("Tema: el modal usa el tema de la app (causa raiz: BaseModal leia solo localStorage/sistema)", () => {
+  const base = rd("components/modals/BaseModal.jsx");
+  assert.match(base, /darkMode,\n\}\) \{/, "BaseModal acepta darkMode");
+  assert.match(base, /if \(typeof darkMode === 'boolean'\) prefersDark = darkMode;/);
+  assert.match(base, /localStorage\.getItem\('it_dark'\)/, "sin la prop, se conserva la deteccion de siempre para los demas modales");
+  assert.match(modal, /<BaseModal [^>]*darkMode=\{dm\}>/);
+  assert.match(orphan, /<BaseModal [^>]*darkMode=\{darkMode !== false\}>/);
+  assert.match(rd("components/students/StudentsSection.jsx"), /<StudentOrphanSession[\s\S]*?darkMode=\{darkMode\}\s*\/>/);
+  assert.match(modal, /colorScheme: dm \? "dark" : "light"/, "icono nativo del calendario acorde al tema");
+});
+
 if (fails) { console.error(fails + " fallo(s)"); process.exit(1); }
 console.log("VALIDACION MANUAL A11Y (H4+H5): todo OK");

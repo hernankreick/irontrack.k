@@ -111,7 +111,7 @@ export default function ManualSessionValidationModal({
   const title = msg("Validar sesión manualmente", "Validate session manually");
 
   return (
-    <BaseModal open={!!open} onClose={close} maxWidth={440} ariaLabel={title}>
+    <BaseModal open={!!open} onClose={close} maxWidth={440} ariaLabel={title} darkMode={dm}>
       {open && rutina && (
         <div>
           <div style={{ fontSize: 18, fontWeight: 900, color: textMain, marginBottom: 4 }}>{title}</div>
@@ -177,7 +177,7 @@ export default function ManualSessionValidationModal({
                 aria-invalid={fechaError ? "true" : undefined}
                 aria-describedby={fechaError ? "msv-fecha-error" : undefined}
                 onChange={function (e) { setFechaIso(e.target.value); }}
-                style={{ boxSizing: "border-box", width: "100%", maxWidth: "100%", minHeight: 44, padding: "8px 12px", borderRadius: 10, fontFamily: "inherit", fontSize: 16, color: textMain, background: coachAluSurface, border: "1px solid " + coachAluBorderSoft }}
+                style={{ colorScheme: dm ? "dark" : "light", boxSizing: "border-box", width: "100%", maxWidth: "100%", minHeight: 44, padding: "8px 12px", borderRadius: 10, fontFamily: "inherit", fontSize: 16, color: textMain, background: coachAluSurface, border: "1px solid " + coachAluBorderSoft }}
               />
               {fechaError && (
                 <div id="msv-fecha-error" role="alert" style={{ fontSize: 13, fontWeight: 700, color: fechaErrorColor, margin: "8px 0 0", lineHeight: 1.4 }}>

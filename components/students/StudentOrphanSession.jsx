@@ -29,6 +29,7 @@ export default function StudentOrphanSession({
   textMuted,
   coachAluSurface,
   coachAluBorderSoft,
+  darkMode,
 }) {
   const [, bump] = React.useState(0);
   const [openKey, setOpenKey] = React.useState(null);
@@ -159,7 +160,7 @@ export default function StudentOrphanSession({
         );
       })}
 
-      <BaseModal open={!!current} onClose={close} maxWidth={440} ariaLabel={msg("Validar sesión no finalizada", "Validate unfinished session")}>
+      <BaseModal open={!!current} onClose={close} maxWidth={440} ariaLabel={msg("Validar sesión no finalizada", "Validate unfinished session")} darkMode={darkMode !== false}>
         {current && (
           <div>
             <div style={{ fontSize: 18, fontWeight: 900, color: textMain, marginBottom: 4 }}>{msg("Validar sesión no finalizada", "Validate unfinished session")}</div>
