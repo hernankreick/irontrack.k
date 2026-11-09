@@ -133,7 +133,7 @@ export default function StudentOrphanSession({
     var sets = current.sets.filter(function (s) { return s.ejercicio_id === id; });
     return { id: id, sets: sets };
   }) : [];
-  const btn = { border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" };
+  const btn = { border: "none", borderRadius: 10, padding: "10px 16px", minHeight: 44, fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" };
 
   return (
     <div style={{ marginBottom: 8 }}>
@@ -198,7 +198,7 @@ export default function StudentOrphanSession({
               <button type="button" disabled={busy} onClick={discard} style={Object.assign({}, btn, { background: "transparent", color: textMuted, border: "1px solid " + coachAluBorderSoft })}>
                 {msg("Ocultar por ahora", "Hide for now")}
               </button>
-              <button type="button" disabled={busy || diaSel === ""} onClick={validate} style={Object.assign({}, btn, { background: "#22c55e", color: "#fff", opacity: busy || diaSel === "" ? 0.6 : 1 })}>
+              <button type="button" disabled={busy || diaSel === ""} onClick={validate} style={Object.assign({}, btn, { background: "#15803d", color: "#fff", opacity: busy || diaSel === "" ? 0.6 : 1 })}>
                 {busy ? msg("Validando…", "Validating…") : msg("Validar", "Validate")}
               </button>
             </div>

@@ -600,6 +600,7 @@ export default function StudentsSection(props) {
               textMuted={textMuted}
               coachAluSurface={coachAluSurface}
               coachAluBorderSoft={coachAluBorderSoft}
+              darkMode={darkMode}
             />
           </div>
   );

@@ -48,7 +48,7 @@ const abrirModal = async (page) => {
   return page.evaluate(() => { const it = [...document.querySelectorAll("button,[role=menuitem]")].find((b) => /Validar sesión manualmente/.test(b.innerText)); if (!it) return false; it.click(); return true; });
 };
 
-for (const [width, tema] of [[320, "oscuro"], [390, "claro"]]) {
+for (const [width, tema] of [[320, "oscuro"], [375, "claro"], [390, "oscuro"], [390, "claro"], [430, "claro"], [430, "oscuro"]]) {
   const tag = "@" + width + "/" + tema;
   const ctx = await browser.newContext({ viewport: { width, height: 760 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, colorScheme: tema === "claro" ? "light" : "dark" });
   const external = new Set(), errors = [];
@@ -82,6 +82,51 @@ for (const [width, tema] of [[320, "oscuro"], [390, "claro"]]) {
   const confirmarDeshab = await page.evaluate((sel) => { const b = [...document.querySelectorAll(sel + " button")].find((x) => (x.innerText || "").trim() === "Confirmar"); return b ? b.disabled : null; }, DLG);
   check(confirmarDeshab === true, tag + " fecha fuera de rango deshabilita «Confirmar» (" + confirmarDeshab + ")");
   void dis;
+  // H5: mensaje de fecha (anterior al minimo / posterior al maximo), asociado al campo; oculto con fecha valida.
+  const estadoFecha = (sel) => page.evaluate((s) => {
+    const i = document.querySelector(s + ' input[type="date"]');
+    const id = (i.getAttribute("aria-describedby") || "").split(/\s+/).find((x) => x === "msv-fecha-error");
+    const m = id ? document.getElementById(id) : null;
+    const b = [...document.querySelectorAll(s + " button")].find((x) => (x.innerText || "").trim() === "Confirmar");
+    return { msg: m ? m.innerText : null, role: m ? m.getAttribute("role") : null, invalid: i.getAttribute("aria-invalid"), disabled: b ? b.disabled : null, anyMsg: !!document.querySelector(s + " #msv-fecha-error") };
+  }, sel);
+  const setFecha = async (v) => { await page.evaluate(([s, val]) => { const i = document.querySelector(s + ' input[type="date"]'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; set.call(i, val); i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true })); }, [DLG, v]); await page.waitForTimeout(200); };
+  const fAntes = await estadoFecha(DLG);
+  check(/anterior al mínimo permitido/.test(fAntes.msg || "") && /entre el \d+\/\d+\/\d{4} y el \d+\/\d+\/\d{4}/.test(fAntes.msg || ""), tag + " mensaje de fecha anterior al mínimo con límites (" + fAntes.msg + ")");
+  check(fAntes.role === "alert" && fAntes.invalid === "true", tag + " mensaje con role=alert, campo aria-invalid y aria-describedby");
+  if (o.out) await page.screenshot({ path: path.join(o.out, "validacion_fecha_anterior_" + tema + "_" + width + ".png") });
+  await setFecha("2099-01-01");
+  const despues2 = await estadoFecha(DLG);
+  check(/posterior al máximo permitido/.test(despues2.msg || "") && despues2.disabled === true, tag + " mensaje de fecha posterior al máximo y «Confirmar» deshabilitado (" + despues2.msg + ")");
+  if (o.out) await page.screenshot({ path: path.join(o.out, "validacion_fecha_posterior_" + tema + "_" + width + ".png") });
+  await setFecha(lim.max);
+  const ok = await estadoFecha(DLG);
+  check(!ok.anyMsg && ok.invalid === null && ok.disabled === false, tag + " fecha válida: sin mensaje, sin aria-invalid, «Confirmar» habilitado");
+  // H4: contraste calculado del «Confirmar» (blanco/verde) y area tactil; mensaje de error sobre el fondo real del modal.
+  const lumi = (rgb) => { const c = rgb.map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const x = lumi(a), y = lumi(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const parse = (s) => (s.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+  const conf = await page.evaluate((s) => { const b = [...document.querySelectorAll(s + " button")].find((x) => (x.innerText || "").trim() === "Confirmar"); const cs = getComputedStyle(b); const r = b.getBoundingClientRect(); return { bg: cs.backgroundColor, fg: cs.color, h: r.height, w: r.width }; }, DLG);
+  check(ratio(parse(conf.fg), parse(conf.bg)) >= 4.5, tag + " contraste de «Confirmar» " + ratio(parse(conf.fg), parse(conf.bg)).toFixed(2) + ":1 (" + conf.fg + " sobre " + conf.bg + ")");
+  check(conf.h >= 43.5 && conf.w >= 43.5, tag + " «Confirmar» >= 44 px (" + conf.w + "x" + conf.h + ")");
+  await setFecha("2000-01-01");
+  const err = await page.evaluate((s) => { const m = document.querySelector(s + " #msv-fecha-error"); const d = document.querySelector(s); let bgc = "rgba(0, 0, 0, 0)"; for (let n = m; n; n = n.parentElement) { const c = getComputedStyle(n).backgroundColor; if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) { bgc = c; break; } } return { fg: getComputedStyle(m).color, bg: bgc }; }, DLG);
+  check(ratio(parse(err.fg), parse(err.bg)) >= 4.5, tag + " contraste del mensaje de fecha " + ratio(parse(err.fg), parse(err.bg)).toFixed(2) + ":1 (" + err.fg + " sobre " + err.bg + ")");
+  await setFecha(lim.max);
+  // H4: contraste de «Pendiente» en la lista de dias (se abre desde «Volver»).
+  await page.evaluate((sel) => { const b = [...document.querySelectorAll(sel + " button")].find((x) => (x.innerText || "").trim() === "Volver"); if (b) b.click(); }, DLG);
+  await page.waitForTimeout(300);
+  const pend = await page.evaluate((sel) => {
+    const sp = [...document.querySelectorAll(sel + " button span")].find((x) => (x.innerText || "").trim() === "Pendiente");
+    if (!sp) return null;
+    let bgc = "rgb(255, 255, 255)"; for (let n = sp.parentElement; n; n = n.parentElement) { const c = getComputedStyle(n).backgroundColor; if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) { bgc = c; break; } }
+    return { fg: getComputedStyle(sp).color, bg: bgc };
+  }, DLG);
+  check(!!pend, tag + " hay un día «Pendiente» en la lista");
+  if (pend) check(ratio(parse(pend.fg), parse(pend.bg)) >= 4.5, tag + " contraste de «Pendiente» " + ratio(parse(pend.fg), parse(pend.bg)).toFixed(2) + ":1 (" + pend.fg + " sobre " + pend.bg + ")");
+  if (o.out) await page.screenshot({ path: path.join(o.out, "validacion_pendiente_" + tema + "_" + width + ".png") });
+  await page.evaluate((sel) => { const d = [...document.querySelectorAll(sel + " button")].find((b) => /Día 3/.test(b.innerText) && /pendiente/i.test(b.getAttribute("aria-label") || "")); if (d) d.click(); }, DLG);
+  await page.waitForTimeout(300);
   // fecha valida (hoy, maximo permitido)
   await page.fill(DLG + ' input[type="date"]', lim.max);
   await page.waitForTimeout(300);

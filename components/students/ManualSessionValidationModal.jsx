@@ -3,7 +3,7 @@ import BaseModal from '../modals/BaseModal.jsx';
 import { loadWeekCompletion, validateManualSession } from '../../lib/manualSessionValidation.js';
 import { advanceWeekAfterValidation } from '../../lib/orphanSessions.js';
 import { capturarVistaFicha, aplicarSesionesValidadas, aplicarAvanceSemana } from '../../lib/studentFicha.js';
-import { isoDateAR, isoToFechaAR, fechaLimites } from './fechaValidacion.js';
+import { isoDateAR, isoToFechaAR, fechaLimites, fechaFueraDeRango } from './fechaValidacion.js';
 
 /**
  * "Validar sesión manualmente" (menú ⋮ de la rutina, ficha del alumno): el entrenador marca como completado un día pendiente de la
@@ -26,6 +26,7 @@ export default function ManualSessionValidationModal({
   textMuted,
   coachAluSurface,
   coachAluBorderSoft,
+  darkMode,
 }) {
   const [loading, setLoading] = React.useState(false);
   const [completed, setCompleted] = React.useState([]);
@@ -37,6 +38,14 @@ export default function ManualSessionValidationModal({
 
   const limites = fechaLimites(rutina);
   const [fechaIso, setFechaIso] = React.useState(function () { return isoDateAR(new Date()); });
+
+  const fechaError = fechaFueraDeRango(fechaIso, limites);
+  const dm = darkMode !== false;
+  // H4 (contraste WCAG AA >= 4.5:1): «Pendiente» #f59e0b sobre blanco era 2,15:1 -> #b45309 (4,80:1 sobre #f8fafc); en oscuro #f59e0b ya da 8,5:1.
+  // «Confirmar»: blanco sobre #22c55e era 2,28:1 -> #15803d (5,02:1). Texto de error de fecha: #b91c1c claro / #f87171 oscuro.
+  const pendingColor = dm ? "#f59e0b" : "#b45309";
+  const doneColor = dm ? "#22c55e" : "#15803d";
+  const fechaErrorColor = dm ? "#f87171" : "#b91c1c";
 
   const days = (rutina && rutina.datos && Array.isArray(rutina.datos.days)) ? rutina.datos.days : [];
   const alumnoId = alumno && alumno.id;
@@ -132,7 +141,7 @@ export default function ManualSessionValidationModal({
                     }}
                   >
                     <span>{(i + 1) + ". " + dayLabel(i)}</span>
-                    <span style={{ fontSize: 12, fontWeight: 800, whiteSpace: "nowrap", color: done ? "#22c55e" : "#f59e0b" }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, whiteSpace: "nowrap", color: done ? doneColor : pendingColor }}>
                       {done ? msg("✓ Completado", "✓ Completed") : msg("Pendiente", "Pending")}
                     </span>
                   </button>
@@ -165,15 +174,26 @@ export default function ManualSessionValidationModal({
                 min={limites.min}
                 max={limites.max}
                 disabled={busy}
+                aria-invalid={fechaError ? "true" : undefined}
+                aria-describedby={fechaError ? "msv-fecha-error" : undefined}
                 onChange={function (e) { setFechaIso(e.target.value); }}
                 style={{ boxSizing: "border-box", width: "100%", maxWidth: "100%", minHeight: 44, padding: "8px 12px", borderRadius: 10, fontFamily: "inherit", fontSize: 16, color: textMain, background: coachAluSurface, border: "1px solid " + coachAluBorderSoft }}
               />
+              {fechaError && (
+                <div id="msv-fecha-error" role="alert" style={{ fontSize: 13, fontWeight: 700, color: fechaErrorColor, margin: "8px 0 0", lineHeight: 1.4 }}>
+                  <span aria-hidden="true">⚠ </span>
+                  {(fechaError === "antes"
+                    ? msg("La fecha es anterior al mínimo permitido.", "The date is before the earliest allowed date.")
+                    : msg("La fecha es posterior al máximo permitido.", "The date is after the latest allowed date.")) + " "}
+                  {msg("Elegí una fecha entre el ", "Choose a date between ") + isoToFechaAR(limites.min) + msg(" y el ", " and ") + isoToFechaAR(limites.max) + "."}
+                </div>
+              )}
               {error && <div role="alert" style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", margin: "8px 0" }}>{error}</div>}
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14, flexWrap: "wrap" }}>
                 <button type="button" disabled={busy} onClick={function () { setSelected(null); setError(""); }} style={Object.assign({}, btn, { background: "transparent", color: textMuted, border: "1px solid " + coachAluBorderSoft })}>
                   {msg("Volver", "Back")}
                 </button>
-                <button type="button" disabled={busy || !fechaIso || fechaIso < limites.min || fechaIso > limites.max} onClick={confirm} style={Object.assign({}, btn, { background: "#22c55e", color: "#fff", opacity: busy ? 0.6 : 1 })}>
+                <button type="button" disabled={busy || !fechaIso || fechaIso < limites.min || fechaIso > limites.max} onClick={confirm} style={Object.assign({}, btn, { background: "#15803d", color: "#fff", opacity: busy || !fechaIso || fechaError ? 0.6 : 1 })}>
                   {busy ? msg("Validando…", "Validating…") : msg("Confirmar", "Confirm")}
                 </button>
               </div>
