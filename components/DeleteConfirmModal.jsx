@@ -28,6 +28,10 @@ export function DeleteConfirmModal({
   zIndex = 10000,
   /** Confirmaciones livianas (no destructivas): card chica, ícono reducido, botones en fila. */
   compact = false,
+  /** Error de la accion (opcional): se muestra dentro del dialogo con role=alert para poder reintentar. */
+  errorText = '',
+  /** Estilo del boton de confirmar (opcional): p. ej. un fondo solido con contraste AA. Sin la prop, no cambia nada. */
+  confirmStyleOverride = null,
 }) {
   const cancelRef = useRef(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -239,6 +243,11 @@ export function DeleteConfirmModal({
               {subjectName}
             </div>
           ) : null}
+          {errorText ? (
+            <p role="alert" style={{ margin: '14px 0 0', fontSize: 14, fontWeight: 700, color: '#fca5a5', lineHeight: 1.45, maxWidth: 440 }}>
+              <span aria-hidden="true">⚠ </span>{errorText}
+            </p>
+          ) : null}
           {requireAcknowledge ? (
             <label
               style={{
@@ -326,6 +335,7 @@ export function DeleteConfirmModal({
               cursor: loading ? 'wait' : confirmDisabled ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
               ...confirmStyle,
+              ...(confirmStyleOverride || {}),
               opacity: confirmDisabled ? 0.55 : 1,
               transition: isWorkoutExit ? 'background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease' : undefined,
             }}

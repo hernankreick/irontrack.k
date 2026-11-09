@@ -26,6 +26,8 @@ import {
 const DEMO_PARAMS = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams("");
 const DEMO_MUCHAS = DEMO_PARAMS.get("alertas") === "muchas";
 const DEMO_OSCURO = DEMO_PARAMS.get("tema") !== "claro";
+// H6: `?pago=error|red|vacio` simula que el primer intento de «Marcar pagado» de cada alumno falle (ver createDemoDashSb).
+const DEMO_PAGO = DEMO_PARAMS.get("pago") || "ok";
 
 const DEMO = "DEMO · ";
 const HISTORIA_COMPLETA = { sesiones: true, progreso: true };
@@ -45,7 +47,8 @@ export default function DashboardCoachDemo() {
   const ui = useCoachUIState();
   // D7.2: la validacion manual se simula en memoria y se refleja en los indicadores (sesionesGlobales).
   const onInsertDemo = React.useRef(null);
-  const sb = React.useMemo(function () { return createDemoDashSb(undefined, { extra: DEMO_MUCHAS, onInsert: function (row) { if (onInsertDemo.current) onInsertDemo.current(row); } }); }, []);
+  const [pagosDemo, setPagosDemo] = React.useState([]);
+  const sb = React.useMemo(function () { return createDemoDashSb(undefined, { extra: DEMO_MUCHAS, pago: DEMO_PAGO, onPago: function (id) { setPagosDemo(function (prev) { return prev.concat([id]); }); }, onInsert: function (row) { if (onInsertDemo.current) onInsertDemo.current(row); } }); }, []);
   const allEx = React.useMemo(function () { return EX.map(function (e) { return normalizeLibraryExercise(e, { catalog: true }); }); }, []);
 
   const [toast, setToast] = React.useState(null);
@@ -145,6 +148,9 @@ export default function DashboardCoachDemo() {
         <div style={{ display: "flex", gap: 8, padding: "0 16px 8px", background: T.bg }}>
           {navBtn("plan", "Dashboard")}
           {navBtn("alumnos", "Alumnos")}
+        </div>
+        <div data-demo-pagos={pagosDemo.length} aria-live="polite" style={{ padding: "0 16px 8px", background: T.bg, fontSize: 12, fontWeight: 700, color: T.textMuted }}>
+          {"Pagos simulados registrados: " + pagosDemo.length + (pagosDemo.length ? " (" + pagosDemo.map(nombreDe).join(", ") + ")" : "")}
         </div>
       </div>
 
