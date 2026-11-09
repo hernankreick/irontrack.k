@@ -75,6 +75,23 @@ export function describeInvalidPending(state, es, nombreEjercicio) {
   return { visible: true, text: text, items: items, extra: Math.max(0, n - items.length) };
 }
 
+/**
+ * D76-09: registros en revision (cuarentena) por un borrado de historial. Puro (se prueba en node).
+ * Devuelve { visible, text, actionLabel }.
+ */
+export function describeQuarantine(state, es) {
+  var s = state || {};
+  var n = Math.max(0, Number(s.quarantined) || 0, Array.isArray(s.quarantinedItems) ? s.quarantinedItems.length : 0);
+  if (!s.alumnoId || n === 0) return { visible: false, text: '', actionLabel: null };
+  return {
+    visible: true,
+    text: es
+      ? 'Tu entrenador reinició tu historial. ' + n + ' ' + plural(n, 'registro de este teléfono quedó', 'registros de este teléfono quedaron') + ' en revisión y no se subieron.'
+      : 'Your coach reset your history. ' + n + ' ' + plural(n, 'record on this phone is', 'records on this phone are') + ' kept for review and were not uploaded.',
+    actionLabel: es ? 'Revisar' : 'Review',
+  };
+}
+
 // Colores con contraste AA (texto >= 4.5:1 sobre su fondo) en claro y oscuro.
 var PALETTE = {
   dark: {
@@ -91,12 +108,18 @@ var PALETTE = {
 
 var CSS = '.it-psync-btn:focus-visible{outline:3px solid #60A5FA;outline-offset:2px}.it-psync-btn:disabled{opacity:.6;cursor:default}';
 
-export default function PendingSyncIndicator({ state, onRetry, es = true, darkMode = true, variant = 'inline', nombreEjercicio }) {
+export default function PendingSyncIndicator({ state, onRetry, onReviewQuarantine, es = true, darkMode = true, variant = 'inline', nombreEjercicio }) {
   var d = describePendingSync(state, es);
   var inv = describeInvalidPending(state, es, nombreEjercicio);
-  if (!d.visible && !inv.visible) return null;
+  var qr = describeQuarantine(state, es);
+  if (!d.visible && !inv.visible && !qr.visible) return null;
   var banner = variant === 'banner';
-  var aviso = inv.visible ? <InvalidPendingNotice inv={inv} es={es} darkMode={darkMode} banner={banner} /> : null;
+  var aviso = (inv.visible || qr.visible) ? (
+    <>
+      {qr.visible ? <QuarantineNotice qr={qr} darkMode={darkMode} banner={banner} onReview={onReviewQuarantine} /> : null}
+      {inv.visible ? <InvalidPendingNotice inv={inv} es={es} darkMode={darkMode} banner={banner} /> : null}
+    </>
+  ) : null;
   if (!d.visible) return aviso;
   var c = PALETTE[darkMode === false ? 'light' : 'dark'][d.tone];
   return (
@@ -156,6 +179,49 @@ export default function PendingSyncIndicator({ state, onRetry, es = true, darkMo
     </div>
     {aviso}
     </>
+  );
+}
+
+// D76-09: aviso persistente de registros en revision, con boton para abrir la revision (conservar / descartar / subir igual).
+function QuarantineNotice({ qr, darkMode, banner, onReview }) {
+  var c = PALETTE[darkMode === false ? 'light' : 'dark'].warn;
+  return (
+    <div
+      role="note"
+      data-qa-quarantine="1"
+      style={{
+        background: c.bg,
+        border: banner ? 'none' : '1px solid ' + c.border,
+        borderBottom: '1px solid ' + c.border,
+        borderRadius: banner ? 0 : 12,
+        padding: banner ? '6px 16px' : '8px 12px',
+        margin: banner ? 0 : '0 0 10px',
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 8,
+        color: c.text,
+        fontSize: 14,
+        fontWeight: 600,
+        lineHeight: 1.35,
+        minWidth: 0,
+        maxWidth: '100%',
+        boxSizing: 'border-box',
+      }}
+    >
+      <style>{CSS}</style>
+      <span style={{ flex: '1 1 12rem', minWidth: 0, overflowWrap: 'anywhere' }}>{qr.text}</span>
+      {typeof onReview === 'function' ? (
+        <button
+          type="button"
+          className="it-psync-btn"
+          onClick={function () { onReview(); }}
+          style={{ minHeight: 44, minWidth: 44, padding: '0 14px', borderRadius: 10, border: 'none', background: c.btnBg, color: c.btnText, font: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer', flexShrink: 0, maxWidth: '100%', whiteSpace: 'normal' }}
+        >
+          {qr.actionLabel}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

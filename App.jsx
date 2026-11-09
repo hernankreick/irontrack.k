@@ -170,6 +170,11 @@ import {
   updateExerciseKgInRoutines,
 } from './lib/workoutSession.js';
 import { postProgressIdempotent } from './lib/progressInsert.js';
+// D76-09: sello del historial + cuarentena de lo rechazado por un borrado de historial.
+import { callRpc } from './lib/rpcClient.js';
+import { RPC_HISTORIAL, obtenerSello, selloParaRegistrar, selloVencido, leerSelloCache, esRechazoHistorial, marcaRechazo, conSello } from './lib/historialSello.js';
+import { liberarSeriesDeCuarentena } from './lib/historialCuarentena.js';
+import HistorialCuarentenaModal from './components/workout/HistorialCuarentenaModal.jsx';
 import { serieRegistrable } from './lib/cargaSerie.js';
 import { nuevaCargaFicha, observarCargaFicha, sincronizarVistaFicha, capturarVistaFicha, filasDelAlumno } from './lib/studentFicha.js';
 import {
@@ -194,6 +199,16 @@ function readVisiblePending() {
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// D76-09: ¿la sesion local es del entrenador? (decide si addSesion sella con el sello vigente del alumno).
+function sesionLocalEsEntrenador() {
+  try {
+    var s = JSON.parse(localStorage.getItem("it_session") || "null");
+    return !!s && s.role === "entrenador";
+  } catch (e) {
+    return false;
+  }
+}
 
 function getStoredEntrenadorId() {
   try {
@@ -429,23 +444,29 @@ const sb = {
     post: (p) => sbRequestStatus("progreso", "POST", p),
     getById: (id) => sbRequestStatus("progreso?id=eq." + encodeURIComponent(id) + "&select=id,alumno_id,ejercicio_id,kg,reps,semana,nota", "GET", null),
   }, data),
-  deleteProgresoByAlumno: async (alumnoId) => {
-    const { error } = await supabase.from("progreso").delete().eq("alumno_id", String(alumnoId));
-    if (error) throw error;
-    return true;
-  },
+
   // D7.6: historial COMPLETO de sesiones del alumno, paginado (antes limit=10: contador, racha, logros e historial por semanas se cortaban
   // en las 10 mas recientes). Una pagina fallida hace fallar la lectura entera: nunca se entrega un historial parcial como completo.
   // Ver lib/sesionesHistorial.js. getSesiones: array, o null si no se pudo leer (lanza ante error de red, como sbFetch).
   getSesiones: (alumnoId) => getSesionesCompletas(sbRequestStatus, alumnoId),
   // D76-02: misma lectura que getSesiones, pero devuelve { ok, status, data } para no confundir una lectura fallida con "cero sesiones".
   getSesionesDetallado: (alumnoId) => leerSesionesAlumnoCompletas(sbRequestStatus, alumnoId),
-  addSesion: (data) => sbFetch("sesiones", "POST", data),
-  deleteSesionesByAlumno: async (alumnoId) => {
-    const { error } = await supabase.from("sesiones").delete().eq("alumno_id", String(alumnoId));
-    if (error) throw error;
-    return true;
+  // D76-09: no hay DELETE directo de progreso/sesiones: el historial solo se borra con la RPC atomica it_limpiar_historial_alumno.
+  // D76-09: la sesion lleva el sello del historial. El alumno lo trae en el payload (sello con el que INICIO el entrenamiento); para el
+  // entrenador (validaciones) se sella con el vigente, leido en el momento. Un rechazo IT409 devuelve la marca de lib/historialSello.js.
+  addSesion: async (data) => {
+    var payload = data;
+    if (payload && !Object.prototype.hasOwnProperty.call(payload, "historial_token") && sesionLocalEsEntrenador() && payload.alumno_id != null) {
+      var st = await obtenerSello({ rpc: function (n, a) { return callRpc(supabase, n, a); }, alumnoId: payload.alumno_id, cachear: false });
+      if (st.ok) payload = conSello(payload, st.estado.sello);
+    }
+    var r = await sbRequestStatus("sesiones", "POST", payload);
+    if (esRechazoHistorial(r)) return marcaRechazo(r);
+    return r.ok ? r.data : null;
   },
+  // D76-09: RPC del historial (sello, borrado atomico, reingreso, vinculo). Devuelve { data, error, missing } y nunca lanza.
+  rpcHistorial: (name, args) => callRpc(supabase, name, args),
+
   getSesionesByAlumnoRutinaSemana: async (alumnoId, rutinaId, rutinaNombre, semana) => {
     var aid = String(alumnoId);
     var rid = rutinaId != null && rutinaId !== "" ? String(rutinaId) : "";
@@ -2056,6 +2077,36 @@ function GymApp() {
   const syncToastRef = React.useRef(null); syncToastRef.current = toast2;
   const [pendingSyncState, setPendingSyncState] = useState(null);
   const pendingSyncCtlRef = React.useRef(null);
+  // D76-09: refresco del sello del historial del alumno (eventos del navegador, vencido o tras un rechazo). Si la cuenta no esta vinculada
+  // (42501), se pide el vinculo seguro una vez por carga (lo aprueba el entrenador). Si el servidor esta en modo 'off', la cuarentena
+  // vuelve a pendientes (movimiento, nunca borrado).
+  const selloEnCursoRef = React.useRef(false);
+  const vinculoPedidoRef = React.useRef({});
+  const refrescarSelloRef = React.useRef(null);
+  refrescarSelloRef.current = async function (aid, reason, forzar) {
+    if (!aid || readOnly || sharedParam) return;
+    var porEvento = reason === "session" || reason === "online" || reason === "visible" || reason === "pageshow";
+    if (!forzar && !porEvento && !selloVencido(localStorage, aid)) return;
+    if (selloEnCursoRef.current) return;
+    selloEnCursoRef.current = true;
+    try {
+      var r = await obtenerSello({ rpc: sb.rpcHistorial, storage: localStorage, alumnoId: aid });
+      if (r.sinPermiso && !vinculoPedidoRef.current[aid]) {
+        vinculoPedidoRef.current[aid] = true;
+        await sb.rpcHistorial(RPC_HISTORIAL.VINCULO_SOLICITAR, { p_alumno_id: String(aid) });
+      }
+      if (r.ok && r.estado.modo === "off" && liberarSeriesDeCuarentena(localStorage, aid) > 0) {
+        setPendingSync(readVisiblePending());
+        if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.trigger("retry");
+      }
+    } catch (e) {
+      console.error("[historial] refresco del sello", e);
+    } finally {
+      selloEnCursoRef.current = false;
+      if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.refresh();
+    }
+  };
+  const [cuarentenaAbierta, setCuarentenaAbierta] = useState(false);
   if (!pendingSyncCtlRef.current && typeof window !== "undefined") {
     pendingSyncCtlRef.current = createPendingSyncController({
       storage: localStorage,
@@ -2063,11 +2114,17 @@ function GymApp() {
       isOnline: function () { return typeof navigator === "undefined" || navigator.onLine !== false; },
       isInFlight: isSetSendInFlight,
       // Mismo payload que antes; el opId viaja como progreso.id en todos los reintentos.
-      sendItem: function (item, alumnoIdSync) { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo, item.opId)); },
+      // D76-09: el sello es el que la serie tenia AL REGISTRARSE (item.historial_token); nunca el vigente.
+      sendItem: function (item, alumnoIdSync) { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo, item.opId, item.historial_token)); },
+      onTrigger: function (aid, reason) { var f = refrescarSelloRef.current; return f ? f(aid, reason) : null; },
       onChange: function (st) { setPendingSyncState(st); },
       onResult: function (r) {
         setPendingSync(readVisiblePending());
         if (r.sent > 0 && syncToastRef.current) syncToastRef.current(r.sent+' set'+(r.sent>1?'s':'')+' sincronizados ✓');
+        if (r.quarantined > 0) {
+          if (syncToastRef.current) syncToastRef.current(r.quarantined + (r.quarantined > 1 ? ' series quedaron' : ' serie quedó') + ' en revisión: tu entrenador reinició tu historial');
+          var f = refrescarSelloRef.current; if (f) f(r.alumnoId, "rechazo", true);
+        }
       },
     });
   }
@@ -2115,8 +2172,15 @@ function GymApp() {
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
     // D76-01 (write-ahead): la serie se persiste como pendiente ANTES de mostrarla y de enviarla. Si Safari descarta la pestaña durante el
     // envio, el pendiente sigue en el dispositivo y el proximo flush lo reenvia con el mismo id. Si no se puede persistir, no se registra.
+    // D76-09: sello del historial vigente AL REGISTRAR (solo alumno con sesion propia; enlace compartido / solo lectura: sin sello).
+    const selloSet = (alumnoIdSync && !readOnly && !sharedParam) ? selloParaRegistrar(localStorage, alumnoIdSync) : null;
+    const cacheSello = (alumnoIdSync && !readOnly && !sharedParam) ? leerSelloCache(localStorage, alumnoIdSync) : null;
+    const epochVisto = cacheSello && cacheSello.capacidad === true && !cacheSello.sinPermiso ? cacheSello.epoch : null;
+    if (alumnoIdSync && !readOnly && !sharedParam && isOnline && selloVencido(localStorage, alumnoIdSync) && refrescarSelloRef.current) {
+      refrescarSelloRef.current(String(alumnoIdSync), "logSet");   // solo afecta a las series SIGUIENTES
+    }
     if(alumnoIdSync) {
-      const pendingItem = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, cicloForSet, alumnoIdSync, opId);
+      const pendingItem = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, cicloForSet, alumnoIdSync, opId, selloSet, epochVisto);
       const wa = writeAheadPendingSet(localStorage, pendingItem, Date.now());
       if(!wa.ok) {
         console.error("[PROGRESO] no se pudo persistir la serie en el dispositivo (" + wa.reason + "); no se registra");
@@ -2141,12 +2205,18 @@ function GymApp() {
       sendWriteAheadSet({
         storage: localStorage,
         opId: opId,
-        send: function () { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId)); },
+        send: function () { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId, selloSet)); },
       }).then(function (res) {
         setPendingSync(readVisiblePending());
         if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.refresh();
         if (res.confirmed) {
           toast2(es?'Serie guardada ✓':'Set saved ✓');
+          return;
+        }
+        if (res.reason === "historial_reiniciado") {
+          // D76-09: la serie queda en revision (cuarentena) en este telefono; no se reintenta. Se refresca el sello para las siguientes.
+          toast2(es ? 'Tu entrenador reinició tu historial: esta serie quedó en revisión en este teléfono' : 'Your coach reset your history: this set is kept for review on this phone');
+          if (refrescarSelloRef.current) refrescarSelloRef.current(String(alumnoIdSync), "rechazo", true);
           return;
         }
         console.error("[PROGRESO] serie no confirmada por el servidor (" + res.reason + "); queda en cola para reintentar");
@@ -2369,10 +2439,12 @@ function GymApp() {
     // D76-05: la sesion se inicia con su fecha fija (session.fecha) y, para el alumno, con un ancla local que permite continuar el mismo
     // entrenamiento (misma fecha) tras una recarga de Safari. Sin informacion confiable se inicia una sesion nueva (no se re-fecha nada).
     var iniciar = function () {
+      var aidInicio = (esAlumno && !readOnly && !sharedParam) ? sessionData?.alumnoId : null;
       nextSession = prepararInicioEntrenamiento({
         storage: localStorage,
-        session: nextSession,
-        alumnoId: (esAlumno && !readOnly && !sharedParam) ? sessionData?.alumnoId : null,
+        // D76-09: la sesion se sella con el sello vigente AL INICIAR (se conserva en el ancla si Safari recarga)
+        session: aidInicio ? Object.assign({}, nextSession, { historialToken: selloParaRegistrar(localStorage, aidInicio) }) : nextSession,
+        alumnoId: aidInicio,
         ciclo: readCicloActual((routines.find(function (r) { return String(r.id) === String(nextSession.rId); }) || {}).datos),
         semana: studentCurrentWeek,
         now: Date.now(),
@@ -2671,16 +2743,28 @@ function GymApp() {
     }
   }
 
-  async function clearAlumnoProgressHistory(alumnoId) {
+  // D76-09: el borrado es UNA operacion atomica del servidor (RPC it_limpiar_historial_alumno): sube la epoca del historial, cambia el
+  // sello y borra progreso + sesiones juntos. Asi las series anteriores que sigan en el telefono del alumno no vuelven a insertarse
+  // (quedan en cuarentena en su dispositivo). Sin la migracion NO se borra (no hay vuelta a los DELETE directos, que no protegen nada).
+  // opts.confirmarSinVinculo: el entrenador confirmo borrar aunque el alumno no tenga su cuenta vinculada.
+  // Devuelve { ok: true } | { ok: false, reason: 'alumno_sin_vinculo' | 'conflicto_epoch' | 'migracion_pendiente' | 'sin_permiso' | 'error' }.
+  async function clearAlumnoProgressHistory(alumnoId, opts) {
     var aid = alumnoId != null ? String(alumnoId) : "";
     if (!aid) throw new Error("alumnoId requerido");
+    var o = opts || {};
     // D7.3: si al terminar la ficha muestra a otro alumno (o se cerro), su estado visual no se toca; las listas globales si se limpian
     var fichaDelBorrado = capturarVistaFicha(aid);
 
-    await Promise.all([
-      sb.deleteProgresoByAlumno(aid),
-      sb.deleteSesionesByAlumno(aid),
-    ]);
+    // Epoca que ve el entrenador AHORA: si otro dispositivo borra en el medio, el servidor responde conflicto_epoch y no borra dos veces.
+    var est = await obtenerSello({ rpc: sb.rpcHistorial, alumnoId: aid, cachear: false });
+    if (!est.ok) {
+      return { ok: false, reason: est.capacidad === false ? "migracion_pendiente" : est.sinPermiso ? "sin_permiso" : "error" };
+    }
+    var rr = await sb.rpcHistorial(RPC_HISTORIAL.LIMPIAR, { p_alumno_id: aid, p_epoch_esperado: est.estado.epoch, p_confirmar_sin_vinculo: !!o.confirmarSinVinculo });
+    if (rr.missing) return { ok: false, reason: "migracion_pendiente" };
+    if (rr.error) return { ok: false, reason: String(rr.error.code || "") === "42501" ? "sin_permiso" : "error" };
+    var res0 = rr.data && rr.data[0];
+    if (!res0 || res0.ok !== true) return { ok: false, reason: (res0 && res0.reason) || "error", solicitud: est.estado.solicitud_vinculo || null };
 
     if (fichaDelBorrado()) {
       setAlumnoProgreso([]);
@@ -2745,13 +2829,21 @@ function GymApp() {
     }
 
     cargarSesionesGlobales();
-    return true;
+    return { ok: true };
+  }
+
+  // D76-09: textos del resultado de un borrado de historial que no se ejecuto.
+  function textoBorradoNoEjecutado(reason) {
+    if (reason === 'migracion_pendiente') return msg('No se limpió el historial: falta actualizar el servidor (migración D76-09 pendiente).', 'History was not cleared: the server update (D76-09 migration) is pending.', 'O histórico não foi limpo: falta atualizar o servidor (migração D76-09 pendente).');
+    if (reason === 'conflicto_epoch') return msg('El historial cambió desde otro dispositivo. No se borró nada: revisalo y volvé a intentar.', 'The history changed on another device. Nothing was deleted: review it and try again.', 'O histórico mudou em outro dispositivo. Nada foi apagado: revise e tente novamente.');
+    if (reason === 'sin_permiso') return msg('No tenés permiso para limpiar el historial de este alumno.', 'You are not allowed to clear this athlete’s history.', 'Você não tem permissão para limpar o histórico deste aluno.');
+    return msg('No se pudo limpiar el historial.', 'Could not clear the history.', 'Não foi possível limpar o histórico.');
   }
 
   async function confirmCoachDialog() {
     var c = coachDialog;
     if (c.t === 'none') return;
-    setCoachDialogLoading(c.t === 'deleteAlumno' || c.t === 'quitarRut' || c.t === 'assignRut' || c.t === 'clearProgress' || c.t === 'resetWeek');
+    setCoachDialogLoading(c.t === 'deleteAlumno' || c.t === 'quitarRut' || c.t === 'assignRut' || c.t === 'clearProgress' || c.t === 'clearProgressSinVinculo' || c.t === 'resetWeek');
     try {
       if (c.t === 'deleteAlumno' && c.a) {
         if (typeof sb.deleteAlumno === 'function') {
@@ -2767,8 +2859,33 @@ function GymApp() {
         return;
       }
       if (c.t === 'clearProgress' && c.a) {
-        await clearAlumnoProgressHistory(c.a.id);
-        toast2(msg('Historial de progreso limpiado', 'Progress history cleared', 'Histórico de progresso limpo'));
+        var resLimpiar = await clearAlumnoProgressHistory(c.a.id);
+        if (resLimpiar && resLimpiar.ok) {
+          toast2(msg('Historial de progreso limpiado', 'Progress history cleared', 'Histórico de progresso limpo'));
+          setCoachDialog({ t: 'none' });
+        } else if (resLimpiar && resLimpiar.reason === 'alumno_sin_vinculo') {
+          // D76-09: el alumno no tiene su cuenta vinculada: se ofrece aprobar su solicitud (si la hizo desde la app) o limpiar igual.
+          setCoachDialog({ t: 'clearProgressSinVinculo', a: c.a, solicitud: resLimpiar.solicitud || null });
+        } else {
+          toast2(textoBorradoNoEjecutado(resLimpiar && resLimpiar.reason));
+          setCoachDialog({ t: 'none' });
+        }
+        return;
+      }
+      if (c.t === 'clearProgressSinVinculo' && c.a) {
+        // Con solicitud: se aprueba el vinculo (el servidor re-verifica email confirmado y cuenta) y se limpia normalmente.
+        // Sin solicitud: el entrenador confirmo limpiar igual; lo que el alumno registre despues queda en revision en su telefono.
+        if (c.solicitud && c.solicitud.auth_uid) {
+          var rv = await sb.rpcHistorial(RPC_HISTORIAL.VINCULO_APROBAR, { p_alumno_id: String(c.a.id), p_auth_uid: String(c.solicitud.auth_uid) });
+          var dv = rv && rv.data && rv.data[0];
+          if (!dv || dv.ok !== true) {
+            toast2(msg('No se pudo vincular la cuenta del alumno (' + ((dv && dv.reason) || 'error') + '). No se borró nada.', 'Could not link the athlete account. Nothing was deleted.', 'Não foi possível vincular a conta do aluno. Nada foi apagado.'));
+            setCoachDialog({ t: 'none' });
+            return;
+          }
+        }
+        var resSv = await clearAlumnoProgressHistory(c.a.id, { confirmarSinVinculo: !(c.solicitud && c.solicitud.auth_uid) });
+        toast2(resSv && resSv.ok ? msg('Historial de progreso limpiado', 'Progress history cleared', 'Histórico de progresso limpo') : textoBorradoNoEjecutado(resSv && resSv.reason));
         setCoachDialog({ t: 'none' });
         return;
       }
@@ -2970,7 +3087,7 @@ function GymApp() {
       }
     } catch (e1) {
       console.error('[confirmCoachDialog]', e1);
-      if (c.t === 'clearProgress') {
+      if (c.t === 'clearProgress' || c.t === 'clearProgressSinVinculo') {
         toast2(msg('No se pudo limpiar el historial.', 'Could not clear the history.', 'Não foi possível limpar o histórico.'));
       }
       if (c.t === 'resetWeek') {
@@ -3569,6 +3686,23 @@ function GymApp() {
       flexDirection: alumnoFullScreenShell ? "column" : undefined,
     }}>
       <AppGlobalStyles darkMode={darkMode} bgSub={bgSub} textMain={textMain} border={border} />
+      {cuarentenaAbierta && pendingSyncState && pendingSyncState.alumnoId ? (
+        // D76-09: revision de lo rechazado por un borrado de historial (conservar / descartar / «subir igual» con confirmacion).
+        <HistorialCuarentenaModal
+          alumnoId={pendingSyncState.alumnoId}
+          storage={localStorage}
+          rpc={sb.rpcHistorial}
+          addSesion={sb.addSesion}
+          es={es}
+          darkMode={darkMode}
+          nombreEjercicio={function (id) { var e = (allEx || []).find(function (x) { return x && x.id === id; }); return e ? (es ? e.name : (e.nameEn || e.name)) : ''; }}
+          onCambio={function () {
+            setPendingSync(readVisiblePending());
+            if (pendingSyncCtlRef.current) { pendingSyncCtlRef.current.refresh(); pendingSyncCtlRef.current.trigger("retry"); }
+          }}
+          onClose={function () { setCuarentenaAbierta(false); }}
+        />
+      ) : null}
 
       <div className="app-inner" style={alumnoFullScreenShell ? {display:"flex",flexDirection:"column",flex:1,minHeight:0} : showCoachDesktopShell ? {display:"flex",flexDirection:"column",minHeight:"100vh",width:"100%",flex:1,maxWidth:"none",margin:0} : undefined}>
       {pendingSyncState&&pendingSyncState.alumnoId ? (
@@ -3577,7 +3711,8 @@ function GymApp() {
         session&&activeDay ? null : (
           <PendingSyncIndicator variant="banner" state={pendingSyncState} es={es} darkMode={darkMode}
             nombreEjercicio={function (id) { var e = (allEx || []).find(function (x) { return x && x.id === id; }); return e ? (es ? e.name : (e.nameEn || e.name)) : ''; }}
-            onRetry={function () { if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.retryNow(); }} />
+            onRetry={function () { if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.retryNow(); }}
+            onReviewQuarantine={function () { setCuarentenaAbierta(true); }} />
         )
       ) : !isOnline&&(
         <OfflineSyncBanner
@@ -4565,6 +4700,8 @@ function GymApp() {
           toast2={toast2}
           pendingSyncState={pendingSyncState}
           onPendingSyncRetry={function () { if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.retryNow(); }}
+          onRevisarCuarentena={function () { setCuarentenaAbierta(true); }}
+          onCuarentenaCambiada={function () { if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.refresh(); var f = refrescarSelloRef.current; if (f && sessionData && sessionData.alumnoId) f(String(sessionData.alumnoId), "rechazo", true); }}
           onCicloCambiado={function () {
             // La sesion termino despues de un reinicio: recargar el plan del ciclo nuevo sin repetir el aviso (ya lo muestra el resumen).
             var f = checkCicloAlumnoRef.current;
