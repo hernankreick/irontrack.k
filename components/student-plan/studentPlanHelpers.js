@@ -48,7 +48,7 @@ export function estimateDayMinutes(day, currentWeek) {
   main.forEach(function (ex) {
     const w = ((ex.weeks || [])[currentWeek]) || {};
     const sets = parseInt(String(w.sets || ex.sets), 10) || 3;
-    const pause = parsePauseSeconds(ex.pause);
+    const pause = parsePauseSeconds(w.pausa || ex.pause);
     sec += sets * 2.5 * 60 + Math.max(0, sets - 1) * pause;
   });
   return Math.max(1, Math.round(sec / 60));
