@@ -1,5 +1,7 @@
 import React from 'react';
 import { Ic } from './Ic.jsx';
+import ExerciseWeekNote from './student-plan/ExerciseWeekNote.jsx';
+import { getExerciseWeekNote } from './student-plan/studentPlanHelpers.js';
 import { ExerciseVideoPlayButton } from './ExerciseVideoPlayButton.jsx';
 import { WorkoutExerciseCompletedState } from './workout/WorkoutExerciseCompletedState.jsx';
 import { WorkoutTodaySetsList } from './workout/WorkoutTodaySetsList.jsx';
@@ -278,6 +280,8 @@ export function WorkoutExercisePanel(props) {
             </span>}
           </div>
         )}
+        {/* Nota del entrenador de la SEMANA ACTIVA del ejercicio (solo si existe). No es la «Nota del día». */}
+        <ExerciseWeekNote note={getExerciseWeekNote(ex, currentWeek)} msg={function(a,b){return es?a:b;}} dark={darkMode!==false} />
       </div>
       {setsHoy.length>0&&(
         <WorkoutTodaySetsList
