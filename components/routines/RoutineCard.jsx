@@ -10,6 +10,9 @@ import {
   updateConfirmed,
   createConfirmed,
   sameIdSet,
+  carryCardState,
+  peekCardState,
+  consumeCardState,
 } from './rutinaSaveContract.js';
 import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
 import { toTitleCase, initialsOf } from '../../lib/textFormat.js';
@@ -76,12 +79,14 @@ export function RoutineCard({
   setRutinasSBEntrenador,
   rutinasSBEntrenador = [],
   onRestartRoutine,
+  onRoutinePersisted,
 }) {
   const isUnder768 = useIsUnder768();
   const T = isUnder768 ? coachTypeMobile : coachType;
   const S = isUnder768 ? coachSpaceMobile : coachSpace;
   const [collapsed, setCollapsed] = useState(!!r.collapsed);
   const [saving, setSaving] = useState(false);
+  const selectedRef = useRef([]);
   const [lastSaved, setLastSaved] = useState(null);
   const [editandoNombre, setEditandoNombre] = useState(false);
   const [nombreLocal, setNombreLocal] = useState(r.name);
@@ -101,32 +106,50 @@ export function RoutineCard({
   const assignPopoverRef = useRef(null);
   const [assignPopCoords, setAssignPopCoords] = useState(null);
   const [selectedAlumnoIds, setSelectedAlumnoIds] = useState(function () {
+    var c = peekCardState(r.id);
+    if (c && c.selected) return c.selected;
     return r.alumno_id != null && r.alumno_id !== '' ? [String(r.alumno_id)] : [];
   });
   // Último alumno guardado (para el estado "dirty" del botón Guardar).
   const [savedAlumnoIds, setSavedAlumnoIds] = useState(function () {
+    var c = peekCardState(r.id);
+    if (c && c.savedAlumnos) return c.savedAlumnos;
     return r.alumno_id != null && r.alumno_id !== '' ? [String(r.alumno_id)] : [];
   });
-  const [saveError, setSaveError] = useState('');
+  const [saveError, setSaveError] = useState(function () {
+    var c = peekCardState(r.id);
+    return c && c.error ? c.error : '';
+  });
   // Firma del contenido (nombre/días/nota) en el último guardado, para no perder
   // la posibilidad de guardar ediciones de días aunque el alumno no cambie.
   const contentSig = JSON.stringify([r.name, r.days, r.note || '']);
-  const savedContentSigRef = useRef(contentSig);
-  const pendingSelectionRef = useRef(null);
+  const savedContentSigRef = useRef(
+    (function () {
+      var c = peekCardState(r.id);
+      return c && c.sig ? c.sig : contentSig;
+    })()
+  );
+  useEffect(function () {
+    consumeCardState(r.id);
+  }, []);
 
+  const firstIdEffectRef = useRef(true);
   useEffect(
     function () {
+      // El montaje inicial ya parte del estado correcto (incluido el que viaja por carryCardState tras crear la rutina).
+      if (firstIdEffectRef.current) {
+        firstIdEffectRef.current = false;
+        return;
+      }
       var ids = r.alumno_id != null && r.alumno_id !== '' ? [String(r.alumno_id)] : [];
-      // Tras un guardado multiple parcial, se conservan los alumnos que faltan para poder reintentar.
-      var pending = pendingSelectionRef.current;
-      pendingSelectionRef.current = null;
-      setSelectedAlumnoIds(pending || ids);
+      setSelectedAlumnoIds(ids);
       setSavedAlumnoIds(ids);
       savedContentSigRef.current = JSON.stringify([r.name, r.days, r.note || '']);
     },
     [r.id]
   );
 
+  selectedRef.current = selectedAlumnoIds;
   var alumnoDirty =
     selectedAlumnoIds.length !== savedAlumnoIds.length ||
     selectedAlumnoIds.some(function (id) {
@@ -359,6 +382,22 @@ export function RoutineCard({
       var primaryName = alumnoNombreById(primary);
       var currentId = rActual.id;
       var isSaved = !!rActual.saved;
+      var createdRow = null;
+      var swapDone = false;
+      // Cambiar el id remonta la tarjeta (key={r.id}): el estado que debe sobrevivir viaja por carryCardState.
+      var swapId = function (carry) {
+        if (!createdRow || swapDone) return;
+        swapDone = true;
+        carryCardState(createdRow.id, carry);
+        setRoutines(function (p) {
+          return p.map(function (rr) {
+            return String(rr.id) === String(rActual.id)
+              ? Object.assign({}, rr, { id: createdRow.id, alumno_id: primary || null, alumno: primaryName, saved: true })
+              : rr;
+          });
+        });
+        if (onRoutinePersisted) onRoutinePersisted(rActual.id, createdRow.id, rActual, primary || null, primaryName);
+      };
       // Firma de lo que se guarda: ediciones hechas durante el guardado quedan pendientes.
       var savedSig = JSON.stringify([rActual.name, rActual.days, rActual.note || '']);
 
@@ -389,23 +428,13 @@ export function RoutineCard({
               : rr;
           });
         });
+        if (onRoutinePersisted) onRoutinePersisted(currentId, currentId, rActual, primary || null, primaryName);
       } else {
         var cre = await createConfirmed(sb, Object.assign({}, primaryPayload, { fecha_inicio: fechaInicio }));
         if (!cre.ok) throw new Error('create ' + cre.reason);
         currentId = cre.row.id;
         isSaved = true;
-        setRoutines(function (p) {
-          return p.map(function (rr) {
-            return String(rr.id) === String(rActual.id)
-              ? Object.assign({}, rr, {
-                  id: cre.row.id,
-                  alumno_id: primary || null,
-                  alumno: primaryName,
-                  saved: true,
-                })
-              : rr;
-          });
-        });
+        createdRow = cre.row;
       }
 
       var newCards = [];
@@ -452,22 +481,23 @@ export function RoutineCard({
       if (failedExtraIds.length) {
         // Guardado parcial: NO es exito. Los alumnos que faltan quedan seleccionados; reintentar solo crea esos (sin duplicar los ya creados).
         var pendingSel = [String(primary)].concat(failedExtraIds);
-        // Si el id cambia (rutina recien creada), el efecto de [r.id] reinicia la seleccion: se le pasa la que debe conservar.
-        if (String(currentId) !== String(rActual.id)) pendingSelectionRef.current = pendingSel;
-        setSelectedAlumnoIds(pendingSel);
-        setSavedAlumnoIds(primary ? [String(primary)] : []);
-        savedContentSigRef.current = savedSig;
         failMsg = M(
           lang,
           'Guardado parcial: faltan ' + failedExtraIds.length + ' alumno(s). Reintentá.',
           'Partially saved: ' + failedExtraIds.length + ' athlete(s) missing. Retry.',
           'Salvo parcialmente: faltam ' + failedExtraIds.length + ' aluno(s). Tente novamente.'
         );
+        swapId({ selected: pendingSel, savedAlumnos: primary ? [String(primary)] : [], sig: savedSig, error: failMsg });
+        setSelectedAlumnoIds(pendingSel);
+        setSavedAlumnoIds(primary ? [String(primary)] : []);
+        savedContentSigRef.current = savedSig;
         throw new Error('partial');
       }
 
       // Si el usuario cambio la seleccion durante el guardado, se respeta su version mas nueva.
       var savedSel = primary ? [String(primary)] : [];
+      var curSel = selectedRef.current;
+      swapId({ selected: sameIdSet(curSel, ids) ? savedSel : curSel, savedAlumnos: savedSel, sig: savedSig });
       setSelectedAlumnoIds(function (cur) {
         return sameIdSet(cur, ids) ? savedSel : cur;
       });
@@ -490,6 +520,8 @@ export function RoutineCard({
       setSaveError(failMsg);
       toast2(failMsg);
     } finally {
+      // si algo falló después de crear la fila, igual se adopta el id nuevo (si no, un reintento la crearía otra vez)
+      if (typeof swapId === 'function') swapId({ selected: selectedRef.current, savedAlumnos: [], sig: undefined, error: saveFailedMsg });
       release();
       setSaving(false);
     }

@@ -66,7 +66,7 @@ async function main() {
         const ex = (r) => r && r.days[0].exercises.map((e) => e.name + ":" + e.kg).join(",");
         return {
           inserts: d.servidor.inserts, updates: d.servidor.updates, log: d.servidor.log.map((l) => l.op + ":" + l.res),
-          filas: Object.values(d.servidor.filas).map((f) => ({ id: f.id, nombre: f.nombre, ex: ex({ days: f.datos.days }) })),
+          filas: Object.values(d.servidor.filas).map((f) => ({ id: f.id, alumno: f.alumno_id, nombre: f.nombre, ex: ex({ days: f.datos.days }) })),
           local: d.routines.map((r) => ({ id: r.id, name: r.name, saved: r.saved, ex: ex(r) })),
           barra: !!bar && bar.classList.contains("is-visible"),
           barraTexto: bar ? bar.innerText.replace(/\s+/g, " ") : "",
@@ -238,6 +238,46 @@ async function main() {
     await t.esperar(4500); // la tarjeta guarda 1 rutina (3 s); la barra no puede arrancar mientras tanto
     const s = await t.estado();
     check(14, "operaciones concurrentes: exactamente 1 creación de la rutina nueva", s.inserts === 1 && s.filas.filter((f) => f.nombre === "Rutina nueva Caro").length === 1, { inserts: s.inserts, filas: s.filas });
+    await t.ctx.close();
+  }
+
+  // ── 15 guardado múltiple parcial en una rutina NUEVA (la tarjeta se remonta al cambiar el id) + reintento ──
+  {
+    const t = await nueva();
+    await t.modo("Falla asignar a Beto");
+    await t.page.evaluate(() => {
+      const card = [...document.querySelectorAll("div")].filter((d) => d.innerText && d.innerText.includes("Rutina nueva Caro") && d.querySelector("[aria-haspopup=listbox]")).pop();
+      card.querySelector("[aria-haspopup=listbox]").click();
+    });
+    await t.esperar(200);
+    await t.page.getByRole("checkbox", { name: /Beto/ }).check();
+    await t.esperar(100);
+    await t.clics("button", "^\\s*Guardar\\s*$", 1); await t.esperar(500);
+    let s = await t.estado();
+    check(15, "parcial: se crea la rutina de Caro y falla la de Beto (sin éxito falso)", s.inserts === 2 && /Guardado parcial/.test(s.toast) && !/guardada ✓|asignada/i.test(s.toast), { inserts: s.inserts, toast: s.toast });
+    const seleccion = await t.page.evaluate(() => [...document.querySelectorAll("input[type=checkbox]")].length);
+    check(15, "tras el remount la tarjeta nueva sigue mostrando el error y permite reintentar", /Guardado parcial|Error al guardar/.test(await t.page.evaluate(() => document.body.innerText)), seleccion);
+    await t.modo("Guardado correcto");
+    await t.clics("button", "^\\s*Guardar\\s*$", 1); await t.esperar(500);
+    s = await t.estado();
+    check(15, "el reintento crea SOLO la rutina que faltaba (Beto): 3 creaciones en total, Caro sin duplicar", s.inserts === 3 && s.filas.filter((f) => f.alumno === "al-3").length === 1 && s.filas.filter((f) => f.alumno === "al-2" && /nueva Caro/.test(f.nombre)).length === 1, { inserts: s.inserts, filas: s.filas });
+    await t.ctx.close();
+  }
+
+  // ── 16 Descartar tras un guardado parcial no reintroduce duplicados ──────
+  {
+    const t = await nueva();
+    await t.modo("Falla solo Rutina Beto");
+    await t.editar("Sentadilla", 100);
+    await t.guardarTodo(); await t.esperar(500);
+    await t.clics(".it-routines-unsaved button", "^\\s*Descartar", 1); await t.esperar(200);
+    await t.page.evaluate(() => { const b = [...document.querySelectorAll("[role=dialog] button, button")].filter((e) => /^\s*Descartar\s*$/.test(e.innerText)).pop(); b.click(); });
+    await t.esperar(300);
+    await t.modo("Guardado correcto");
+    await t.editar("Press banca", 50);
+    await t.guardarTodo(); await t.esperar(500);
+    const s = await t.estado();
+    check(16, "Descartar tras un parcial + guardar de nuevo: Caro se creó UNA sola vez", s.inserts === 1 && s.filas.length === 3, { inserts: s.inserts, filas: s.filas });
     await t.ctx.close();
   }
 

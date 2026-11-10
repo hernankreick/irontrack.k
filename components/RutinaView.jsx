@@ -15,6 +15,7 @@ import {
   updateConfirmed,
   createConfirmed,
   canClearUnsaved,
+  carryCardState,
 } from './routines/rutinaSaveContract.js';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import './routines/routines-ui.css';
@@ -54,6 +55,16 @@ export function RutinaView(props) {
   const [saveAllError, setSaveAllError] = useState('');
   // Revision de ediciones locales: cada edicion la incrementa (via markUnsaved). Permite saber si hubo ediciones durante un guardado.
   const revisionRef = useRef(0);
+  // Tras una escritura CONFIRMADA, la copia base de «Descartar» adopta lo guardado (y el id del servidor): si no, Descartar
+  // devolvería una rutina ya creada como «nueva» y el siguiente guardado la insertaría otra vez.
+  const syncBaseline = useCallback(function (oldId, newId, snapshot, alumnoId, alumnoName) {
+    try {
+      const b = baselineRef.current;
+      if (!Array.isArray(b)) return;
+      const saved = JSON.parse(JSON.stringify(Object.assign({}, snapshot, { id: newId, saved: true, alumno_id: alumnoId, alumno: alumnoName })));
+      baselineRef.current = b.map((x) => (String(x.id) === String(oldId) ? saved : x));
+    } catch (_e) {}
+  }, []);
   const markUnsaved = useCallback(function () {
     revisionRef.current += 1;
     setHasUnsaved(true);
@@ -211,13 +222,17 @@ export function RutinaView(props) {
           };
           if (r.saved) {
             outcome = await updateConfirmed(sb, r.id, payload);
+            if (outcome.ok) syncBaseline(r.id, r.id, r, r.alumno_id || null, r.alumno || '');
           } else {
             outcome = await createConfirmed(sb, Object.assign({}, payload, { fecha_inicio: fechaInicio }));
             if (outcome.ok) {
+              // la tarjeta se remonta con el id nuevo: que no dé por guardado lo editado durante el guardado
+              carryCardState(outcome.row.id, { sig: JSON.stringify([r.name, r.days, r.note || '']) });
               // functional update: no pisa ediciones hechas mientras se guardaba
               setRoutines((p) =>
                 p.map((rr) => (rr.id === r.id ? { ...rr, id: outcome.row.id, saved: true } : rr))
               );
+              syncBaseline(r.id, outcome.row.id, r, r.alumno_id || null, r.alumno || '');
             }
           }
         } catch (e) {
@@ -486,6 +501,7 @@ export function RutinaView(props) {
               setRutinasSBEntrenador={setRutinasSBEntrenador}
               rutinasSBEntrenador={rutinasSBEntrenador}
               onRestartRoutine={onRestartRoutine}
+              onRoutinePersisted={syncBaseline}
             />
           ))
         )}

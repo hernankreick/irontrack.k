@@ -174,7 +174,7 @@ await test("estructura: RoutineCard toma el candado antes de cualquier await y l
   const fn = src.slice(src.indexOf("const handleSave = async"), src.indexOf("const openEditRoutine"));
   assert.ok(fn.indexOf("acquireSaveLocks([r.id])") > -1 && fn.indexOf("acquireSaveLocks([r.id])") < fn.indexOf("await "), "candado antes del primer await");
   assert.ok(fn.indexOf("acquireSaveLocks([r.id])") < fn.indexOf("setSaving(true)"), "candado antes de cualquier setState");
-  assert.match(fn, /finally \{\s*release\(\);\s*setSaving\(false\);/);
+  assert.match(fn, /finally \{[\s\S]*?release\(\);\s*setSaving\(false\);/);
   assert.doesNotMatch(fn, /await sb\./);
   assert.match(fn, /updateConfirmed\(sb,/); assert.match(fn, /createConfirmed\(sb,/);
   // el éxito se anuncia después de comprobar fallos parciales
@@ -185,6 +185,13 @@ await test("estructura: RoutineCard toma el candado antes de cualquier await y l
 await test("estructura: UnsavedChangesBar muestra «Guardando…», deshabilita y muestra el error persistente con «Reintentar»", () => {
   const src = read("components/routines/UnsavedChangesBar.jsx");
   assert.match(src, /disabled=\{saving\}/); assert.match(src, /Reintentar/); assert.match(src, /role="alert"/); assert.match(src, /Guardando…/);
+});
+
+await test("remount por key={r.id}: el estado de reintento viaja por carryCardState y el montaje inicial no lo pisa", () => {
+  const src = read("components/routines/RoutineCard.jsx");
+  assert.match(src, /carryCardState\(createdRow\.id/); assert.match(src, /peekCardState\(r\.id\)/); assert.match(src, /firstIdEffectRef/);
+  assert.doesNotMatch(src, /pendingSelectionRef/);
+  assert.match(read("components/RutinaView.jsx"), /onRoutinePersisted=\{syncBaseline\}/);
 });
 
 await test("alcance: la fase 1 no toca App.jsx, lib/, SQL, Supabase, dependencias ni persistencia de borradores", () => {

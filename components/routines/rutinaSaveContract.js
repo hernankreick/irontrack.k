@@ -84,3 +84,16 @@ export function sameIdSet(a, b) {
 export function canClearUnsaved(startRevision, currentRevision) {
   return startRevision === currentRevision;
 }
+
+// Estado de una tarjeta que debe sobrevivir al remount que provoca el cambio de id al crear la rutina (RutinaView usa key={r.id}).
+// Se escribe ANTES de cambiar el id y la tarjeta nueva lo lee al montarse (peek) y lo borra después (consume).
+var carried = new Map();
+export function carryCardState(newId, state) {
+  carried.set(String(newId), state);
+}
+export function peekCardState(id) {
+  return carried.get(String(id)) || null;
+}
+export function consumeCardState(id) {
+  carried.delete(String(id));
+}

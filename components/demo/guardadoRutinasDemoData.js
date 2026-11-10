@@ -29,6 +29,7 @@ export const MODOS = [
   ['permisos', 'Error de permisos'],
   ['cero', 'Cero filas actualizadas'],
   ['parcial', 'Falla solo Rutina Beto'],
+  ['extra', 'Falla asignar a Beto'],
 ];
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -48,8 +49,10 @@ export function crearServidor(onChange) {
       s.log = []; s.inserts = 0; s.updates = 0; s.notify();
     },
   };
-  // Decide el resultado de una escritura segun el modo. nombre: para el modo "parcial".
-  function resultado(nombre) {
+  // Decide el resultado de una escritura segun el modo ("parcial": falla la rutina de Beto; "extra": falla crear para el alumno al-2).
+  function resultado(fila, esInsert) {
+    const nombre = fila && fila.nombre;
+    if (s.modo === 'extra') return esInsert && fila.alumno_id === 'al-2' ? 'permisos' : 'ok';
     if (s.modo === 'red') return 'red';
     if (s.modo === 'permisos') return 'permisos';
     if (s.modo === 'cero') return 'cero';
@@ -59,7 +62,7 @@ export function crearServidor(onChange) {
   const cliente = {
     async rpc(_name, args) {
       const fila = args.p_fila || {};
-      const res = resultado(fila.nombre);
+      const res = resultado(fila, false);
       s.log.push({ op: 'update', id: args.p_rutina_id, nombre: fila.nombre, res }); s.updates++; s.notify();
       if (s.latenciaMs) await wait(s.latenciaMs);
       if (res === 'red') throw new TypeError('Failed to fetch');
@@ -74,7 +77,7 @@ export function crearServidor(onChange) {
       return {
         async select() {
           const fila = rows[0];
-          const res = resultado(fila.nombre);
+          const res = resultado(fila, true);
           s.log.push({ op: 'insert', nombre: fila.nombre, res }); s.inserts++; s.notify();
           if (s.latenciaMs) await wait(s.latenciaMs);
           if (res === 'red') throw new TypeError('Failed to fetch');
