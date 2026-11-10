@@ -37,7 +37,7 @@ import { resolveExerciseTitle, resolveVideoUrl, normalizeLibraryExercise, pickVi
 import { fmt, fmtP } from './lib/timeFormat.js';
 import { getAppThemeTokens } from './lib/appThemeTokens.js';
 import { shareSessionSummaryImageUi } from './lib/sessionSummaryShare.js';
-import { exportRoutinePdfHtml } from './lib/routinePdfExport.js';
+import { exportRoutinePdfHtml, buildRoutinePdfRows } from './lib/routinePdfExport.js';
 import { generarSugerenciasAlumno } from './lib/sugerenciasAlumno.js';
 import {
   BLUE_GRAD,
@@ -2533,39 +2533,8 @@ function GymApp() {
 
   /** Filas del plan para imprimir/PDF — misma estructura que antes; el HTML se arma en `exportRoutinePdfHtml` (sin vista previa en pantalla). */
   const downloadRoutinePdf = (r) => {
-    const patColors = {pierna:"#22C55E",empuje:"#2563EB",traccion:"#2563EB",core:"#8B9AB2",movil:"#8B9AB2"};
-    const weeks4 = [0,1,2,3];
-    let rows = [];
-    r.days.forEach((d,di) => {
-      rows.push({type:"day", label:"DIA "+(di+1)+(d.label&&d.label!=="Dia "+(di+1)?" — "+d.label:""), di});
-      if(d.warmup && d.warmup.length>0) {
-        rows.push({type:"warmup-header"});
-        d.warmup.forEach((ex,ei) => {
-          const inf = allEx.find(e=>e.id===ex.id);
-          const exName = resolveExerciseTitle(inf || null, ex, es);
-          const wks = weeks4.map(wi => {
-            const w = (ex.weeks||[])[wi]||{};
-            return {s:w.sets||ex.sets||"-", r:w.reps||ex.reps||"-", kg:w.kg||ex.kg||"", note:w.note||"", filled:!!(w.sets||w.reps||w.kg), active:wi===currentWeek};
-          });
-          rows.push({type:"warmup-ex", exName, ex, wks});
-        });
-      }
-      if(d.exercises && d.exercises.length>0) {
-        rows.push({type:"main-header"});
-        d.exercises.forEach((ex,ei) => {
-          const inf = allEx.find(e=>e.id===ex.id);
-          const pat = inf?.pattern||"empuje";
-          const col = patColors[pat]||"#2563EB";
-          const exName = resolveExerciseTitle(inf || null, ex, es);
-          const wks = weeks4.map(wi => {
-            const w = (ex.weeks||[])[wi]||{};
-            return {s:w.sets||ex.sets||"-", r:w.reps||ex.reps||"-", kg:w.kg||ex.kg||"", note:w.note||"", filled:!!(w.sets||w.reps||w.kg), active:wi===currentWeek};
-          });
-          const lastRpe = progress[ex.id]?.sets?.[0]?.rpe||null;
-          rows.push({type:"ex", exName, info:inf, pat, col, ex, wks, lastRpe});
-        });
-      }
-    });
+    // Las filas (con TODAS las semanas configuradas de cada ejercicio) se arman en lib/routinePdfExport.js: solo lectura.
+    const rows = buildRoutinePdfRows(r, { allEx, es, progress, currentWeek });
     exportRoutinePdfHtml(r, rows, es, toast2, { textMain, bgCard, border, darkMode, textMuted, currentWeek });
   };
 
