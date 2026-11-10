@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useDialogA11y from './modals/useDialogA11y.js';
+import ProgressionWeeksEditor from './routines/ProgressionWeeksEditor.jsx';
+import { initWeeksFull, detectWeekCount, ensureWeeks, weeksForSave, autocompleteWeeks } from './routines/progressionEditorLogic.js';
 
 const METODOS = [
   { id: 'carga',  label: '+ Carga',   desc: 'Subir kg c/semana — completá los valores de cada semana abajo' },
@@ -8,18 +10,6 @@ const METODOS = [
   { id: 'pausa',  label: '− Pausa',   desc: 'Reducir descanso — completá los valores de cada semana abajo' },
   { id: 'manual', label: 'Manual',    desc: 'Definís vos los valores de cada semana' },
 ];
-
-function initWeeks(exercise) {
-  const w = [...(exercise?.weeks || [])];
-  while (w.length < 4) w.push({ sets: '', reps: '', kg: '', note: '', pausa: '' });
-  return w.slice(0, 4).map(wk => ({
-    sets:  wk.sets  ?? '',
-    reps:  wk.reps  ?? '',
-    kg:    wk.kg    ?? '',
-    note:  wk.note  ?? '',
-    pausa: wk.pausa ?? '',
-  }));
-}
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const ACTIVE_COLOR = '#22c55e';
@@ -73,7 +63,10 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
   const [kg,         setKg]         = useState('');
   const [pause,      setPause]      = useState('90');
   const [progresion, setProgresion] = useState('manual');
-  const [weeks,      setWeeks]      = useState(() => initWeeks(null));
+  // `weeks` guarda TODAS las semanas del ejercicio (aunque superen el selector); `weekCount` es lo que se muestra y se guarda.
+  const [weeks,      setWeeks]      = useState(() => initWeeksFull(exercise?.weeks));
+  const [weekCount,  setWeekCount]  = useState(() => detectWeekCount(exercise?.weeks));
+  const [initialWeekCount, setInitialWeekCount] = useState(() => detectWeekCount(exercise?.weeks));
 
   useEffect(() => {
     if (exercise) {
@@ -82,11 +75,15 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
       setKg(String(exercise.kg      ?? ''));
       setPause(String(exercise.pause ?? '90'));
       setProgresion(exercise.progresion ?? 'manual');
-      setWeeks(initWeeks(exercise));
+      setWeeks(initWeeksFull(exercise.weeks));
+      setWeekCount(detectWeekCount(exercise.weeks));
+      setInitialWeekCount(detectWeekCount(exercise.weeks));
     } else {
       setSets('3'); setReps('8-10'); setKg('');
       setPause('90'); setProgresion('manual');
-      setWeeks(initWeeks(null));
+      setWeeks(initWeeksFull(null));
+      setWeekCount(detectWeekCount(null));
+      setInitialWeekCount(detectWeekCount(null));
     }
   }, [exercise]);
 
@@ -94,37 +91,9 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
   const dialogRef = useRef(null);
   useDialogA11y({ open: true, containerRef: dialogRef });
 
-  const updW = (wi, field, val) =>
-    setWeeks(prev => prev.map((w, i) => i === wi ? { ...w, [field]: val } : w));
-
   const autocompletar = () => {
     if (progresion === 'manual') return;
-    setWeeks(prev => prev.map((w, i) => {
-      const p = i > 0 ? prev[i - 1] : null;
-      const base = {
-        sets:  w.sets  || sets,
-        reps:  w.reps  || reps,
-        kg:    w.kg    || kg,
-        note:  w.note,
-        pausa: w.pausa || pause,
-      };
-      if (i === 0) return base;
-      if (progresion === 'carga') {
-        const kgPrev = parseFloat(p.kg || kg || 0);
-        return { ...base, kg: String(Math.round((kgPrev + 2.5) * 10) / 10) };
-      }
-      if (progresion === 'reps') {
-        return { ...base, reps: String(parseInt(p.reps || reps || 8) + 1) };
-      }
-      if (progresion === 'series') {
-        return { ...base, sets: String(parseInt(p.sets || sets || 3) + 1) };
-      }
-      if (progresion === 'pausa') {
-        const pausaPrev = parseInt(p.pausa || pause || 90);
-        return { ...base, pausa: String(Math.max(15, pausaPrev - 15)) };
-      }
-      return base;
-    }));
+    setWeeks(prev => autocompleteWeeks(prev, { sets, reps, kg, pause }, progresion, weekCount));
   };
 
   const handleSave = () => {
@@ -134,7 +103,7 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
       kg,
       pause,
       progresion,
-      weeks: weeks.map(w => ({ ...w, pausa: w.pausa || pause })),
+      weeks: weeksForSave(weeks, weekCount, pause),
     });
   };
 
@@ -163,7 +132,7 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
           borderRadius: 18,
           padding: '20px 16px 24px',
           width: '100%',
-          maxWidth: 480,
+          maxWidth: 1080,
           alignSelf: 'flex-start',
         }}
       >
@@ -188,7 +157,7 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
 
         {/* ══ 1. CONFIGURACIÓN BASE ══ */}
         <div style={sectionLabel}>Configuración Base</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 20 }}>
           <div>
             <span style={fieldLabel}>Series</span>
             <input style={baseInput} value={sets} onChange={e => setSets(e.target.value)} />
@@ -269,70 +238,13 @@ export function EditExerciseModal({ exercise, onSave, onClose, darkMode = true }
         </div>
 
         {/* ══ 3. VALORES POR SEMANA ══ */}
-        <div style={sectionLabel}>Valores por Semana</div>
-        {weeks.map((w, wi) => {
-          // Delta hint vs semana anterior
-          let hint = null;
-          if (wi > 0 && progresion !== 'manual') {
-            const p = weeks[wi - 1];
-            if (progresion === 'carga'  && p.kg    && w.kg)    hint = (parseFloat(w.kg)  - parseFloat(p.kg)  > 0 ? '+' : '') + Math.round((parseFloat(w.kg)  - parseFloat(p.kg))  * 10) / 10 + ' kg';
-            if (progresion === 'reps'   && p.reps  && w.reps)  hint = (parseInt(w.reps)  - parseInt(p.reps)  > 0 ? '+' : '') + (parseInt(w.reps)  - parseInt(p.reps))  + ' reps';
-            if (progresion === 'series' && p.sets  && w.sets)  hint = (parseInt(w.sets)  - parseInt(p.sets)  > 0 ? '+' : '') + (parseInt(w.sets)  - parseInt(p.sets))  + ' series';
-            if (progresion === 'pausa'  && p.pausa && w.pausa) hint = (parseInt(w.pausa) - parseInt(p.pausa) > 0 ? '+' : '') + (parseInt(w.pausa) - parseInt(p.pausa)) + 's pausa';
-          }
-
-          return (
-            <div
-              key={wi}
-              style={{
-                background: BG_WEEK,
-                borderRadius: 12,
-                padding: '12px',
-                marginBottom: 8,
-              }}
-            >
-              {/* Semana header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: ACTIVE_COLOR }}>
-                  SEM {wi + 1}
-                </span>
-                {hint && (
-                  <span style={{ fontSize: 11, color: ACTIVE_COLOR, fontWeight: 700 }}>
-                    {hint}
-                  </span>
-                )}
-              </div>
-
-              {/* Grid 2×2 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                <div>
-                  <span style={fieldLabel}>Series</span>
-                  <input style={baseInput} value={w.sets}  onChange={e => updW(wi, 'sets',  e.target.value)} placeholder={sets} />
-                </div>
-                <div>
-                  <span style={fieldLabel}>Reps</span>
-                  <input style={baseInput} value={w.reps}  onChange={e => updW(wi, 'reps',  e.target.value)} placeholder={reps} />
-                </div>
-                <div>
-                  <span style={fieldLabel}>Kg</span>
-                  <input style={baseInput} value={w.kg}    onChange={e => updW(wi, 'kg',    e.target.value)} placeholder={kg || '—'} />
-                </div>
-                <div>
-                  <span style={fieldLabel}>Pausa</span>
-                  <input style={baseInput} value={w.pausa} onChange={e => updW(wi, 'pausa', e.target.value)} placeholder={pause + 's'} />
-                </div>
-              </div>
-
-              {/* Nota */}
-              <input
-                style={{ ...baseInput, textAlign: 'left', fontSize: 12, color: TEXT_MUTED }}
-                value={w.note}
-                onChange={e => updW(wi, 'note', e.target.value)}
-                placeholder="Nota de semana (opcional)"
-              />
-            </div>
-          );
-        })}
+        <ProgressionWeeksEditor
+          weeks={weeks} count={weekCount} initialCount={initialWeekCount}
+          onWeeksChange={setWeeks}
+          onCountChange={(n) => { setWeeks(prev => ensureWeeks(prev, n)); setWeekCount(n); }}
+          base={{ sets, reps, kg, pause }} method={progresion}
+          theme={{ bg: BG, input: BG, card: BG_CARD, border: BORDER_INACTIVE, text: TEXT_MAIN, muted: TEXT_MUTED, accent: '#2563EB' }}
+        />
 
         {/* ══ 4. BOTONES ══ */}
         <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
