@@ -12,6 +12,8 @@ export function UnsavedChangesBar({
   onDiscard,
   saveBarBox,
   desktopCoachStableLayout,
+  saving = false,
+  errorMessage = '',
 }) {
   return (
     <div
@@ -48,6 +50,11 @@ export function UnsavedChangesBar({
           <div style={{ ...T.control, fontWeight: 800, color: '#f1f5f9', marginBottom: 2 }}>
             {M(lang, 'Tenés cambios sin guardar', 'You have unsaved changes', 'Há alterações não salvas')}
           </div>
+          {errorMessage ? (
+            <div role="alert" style={{ ...T.meta, color: '#fca5a5', lineHeight: 1.35, fontWeight: 700 }}>
+              {errorMessage}
+            </div>
+          ) : null}
           <div style={{ ...T.meta, color: '#94a3b8', lineHeight: 1.35 }}>
             {M(
               lang,
@@ -69,6 +76,7 @@ export function UnsavedChangesBar({
             type="button"
             className="it-routine-btn hov"
             onClick={onDiscard}
+            disabled={saving}
             style={{
               padding: '10px 16px',
               borderRadius: 12,
@@ -88,13 +96,16 @@ export function UnsavedChangesBar({
             type="button"
             className="it-routine-btn hov"
             onClick={onSave}
+            disabled={saving}
+            aria-busy={saving}
             style={{
               padding: '10px 18px',
               borderRadius: 12,
               ...T.control,
               fontWeight: 800,
               fontFamily: 'inherit',
-              cursor: 'pointer',
+              cursor: saving ? 'default' : 'pointer',
+              opacity: saving ? 0.7 : 1,
               border: 'none',
               background: '#22c55e',
               color: '#fff',
@@ -107,7 +118,11 @@ export function UnsavedChangesBar({
             }}
           >
             <Save size={16} />
-            {M(lang, 'Guardar cambios', 'Save changes', 'Salvar alterações')}
+            {saving
+              ? M(lang, 'Guardando…', 'Saving…', 'Salvando…')
+              : errorMessage
+                ? M(lang, 'Reintentar', 'Retry', 'Tentar novamente')
+                : M(lang, 'Guardar cambios', 'Save changes', 'Salvar alterações')}
           </button>
         </div>
       </div>
