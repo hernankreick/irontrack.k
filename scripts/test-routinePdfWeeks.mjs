@@ -181,6 +181,16 @@ await test("aviso de deslizamiento solo cuando hay mas de 4 semanas y solo visib
   assert.match(css, /@media screen and \(max-width:620px\)\{\.itpdf-swipe\{display:block\}/);
 });
 
+await test("tarjetas de ejercicio: sin acento azul lateral; borde exterior uniforme y mismo desplazamiento del contenido", () => {
+  const { html } = render(D.rutinaDeSemanas(4));
+  const rule = html.match(/\.itpdf-card--ex\{[^}]*\}/)[0];
+  assert.doesNotMatch(rule, /border-left/, "sin borde izquierdo propio");
+  assert.match(rule, /border-color:rgba\(80,140,255,0\.22\)/, "conserva el color del borde");
+  assert.match(rule, /padding-left:16px/, "compensa los 2 px para no mover el contenido");
+  assert.match(html, /\.itpdf-card\{[^}]*border:1px solid rgba\(80,140,255,0\.18\);border-radius:14px;padding:12px 14px/, "borde fino, esquinas y padding base intactos");
+  assert.doesNotMatch(html, /ex-accent,/, "ya no se usa el color de acento en el CSS");
+});
+
 await test("alcance: el exportador no usa red, Supabase ni almacenamiento; App.jsx ya no fija 4 semanas", () => {
   const code = read("lib/routinePdfExport.js").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
   assert.doesNotMatch(code, /supabase|fetch\(|localStorage|sessionStorage|XMLHttpRequest/i);
