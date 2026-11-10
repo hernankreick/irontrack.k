@@ -9,6 +9,13 @@ import { RoutineSkeleton } from './routines/RoutineSkeleton.jsx';
 import { UnsavedChangesBar } from './routines/UnsavedChangesBar.jsx';
 import { RoutineCard } from './routines/RoutineCard.jsx';
 import { RoutinesTopSection } from './routines/RoutinesTopSection.jsx';
+import {
+  acquireSaveLocks,
+  SAVE_ALL_KEY,
+  updateConfirmed,
+  createConfirmed,
+  canClearUnsaved,
+} from './routines/rutinaSaveContract.js';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import './routines/routines-ui.css';
 
@@ -43,6 +50,14 @@ export function RutinaView(props) {
   const [routineSearchQuery, setRoutineSearchQuery] = useState('');
   const [routineSort, setRoutineSort] = useState('recientes');
   const [hasUnsaved, setHasUnsaved] = useState(false);
+  const [savingAll, setSavingAll] = useState(false);
+  const [saveAllError, setSaveAllError] = useState('');
+  // Revision de ediciones locales: cada edicion la incrementa (via markUnsaved). Permite saber si hubo ediciones durante un guardado.
+  const revisionRef = useRef(0);
+  const markUnsaved = useCallback(function () {
+    revisionRef.current += 1;
+    setHasUnsaved(true);
+  }, []);
   const [discardModalOpen, setDiscardModalOpen] = useState(false);
   const [editingExercise, setEditingExercise] = useState(null);
   const contentRef = useRef(null);
@@ -172,78 +187,115 @@ export function RutinaView(props) {
       toast2(M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar'));
       return;
     }
+    // Candado SINCRONO (antes de cualquier await/setState): doble o triple toque, o «Guardar» de una tarjeta en curso, no inician otro guardado.
+    const snapshot = routines;
+    const release = acquireSaveLocks(snapshot.map((r) => r.id).concat([SAVE_ALL_KEY]));
+    if (!release) return;
+    // Revision de ediciones al empezar: si cambia mientras guarda, el aviso NO se apaga.
+    const startRevision = revisionRef.current;
+    setSavingAll(true);
+    setSaveAllError('');
     const fechaInicio = new Date().toLocaleDateString('es-AR');
     const results = [];
-    for (const r of routines) {
-      try {
-        const days = sanitizeRoutineDaysForWrite(r.days);
-        const payload = {
-          nombre: r.name,
-          alumno_id: r.alumno_id || null,
-          datos: { days, alumno: r.alumno || '', note: r.note || '' },
-          entrenador_id: 'entrenador_principal',
-          es_plantilla: !!r.es_plantilla,
-        };
-        if (r.saved) {
-          await sb.updateRutina(r.id, payload);
-        } else {
-          const res = await sb.createRutina(
-            Object.assign({}, payload, { fecha_inicio: fechaInicio })
-          );
-          if (res && res[0]) {
-            setRoutines((p) =>
-              p.map((rr) => (rr.id === r.id ? { ...rr, id: res[0].id, saved: true } : rr))
-            );
+    try {
+      for (const r of snapshot) {
+        let outcome;
+        try {
+          const days = sanitizeRoutineDaysForWrite(r.days);
+          const payload = {
+            nombre: r.name,
+            alumno_id: r.alumno_id || null,
+            datos: { days, alumno: r.alumno || '', note: r.note || '' },
+            entrenador_id: 'entrenador_principal',
+            es_plantilla: !!r.es_plantilla,
+          };
+          if (r.saved) {
+            outcome = await updateConfirmed(sb, r.id, payload);
           } else {
-            throw new Error('createRutina failed');
+            outcome = await createConfirmed(sb, Object.assign({}, payload, { fecha_inicio: fechaInicio }));
+            if (outcome.ok) {
+              // functional update: no pisa ediciones hechas mientras se guardaba
+              setRoutines((p) =>
+                p.map((rr) => (rr.id === r.id ? { ...rr, id: outcome.row.id, saved: true } : rr))
+              );
+            }
           }
+        } catch (e) {
+          outcome = { ok: false, reason: 'exception', error: e };
         }
-        results.push({ id: r.id, name: r.name, ok: true });
-      } catch (e) {
-        console.error('[RutinaView] handleSaveAll', r.id, r.name, e);
-        results.push({ id: r.id, name: r.name, ok: false, reason: (e && e.message) || String(e) });
+        if (!outcome.ok) console.error('[RutinaView] handleSaveAll', r.id, r.name, outcome.reason, outcome.error || '');
+        results.push({ id: r.id, name: r.name, ok: outcome.ok, reason: outcome.reason });
       }
+    } catch (e) {
+      // imprevisto: lo que quedó sin intentar cuenta como fallido
+      console.error('[RutinaView] handleSaveAll', e);
+      snapshot.forEach((r) => {
+        if (!results.some((x) => x.id === r.id)) results.push({ id: r.id, name: r.name, ok: false, reason: 'exception' });
+      });
+    } finally {
+      release();
+      setSavingAll(false);
     }
 
     const failed = results.filter((x) => !x.ok);
     if (failed.length === 0) {
-      setHasUnsaved(false);
-      toast2(M(lang, 'Cambios guardados ✓', 'Changes saved ✓', 'Alterações salvas ✓'));
+      if (canClearUnsaved(startRevision, revisionRef.current)) {
+        setHasUnsaved(false);
+        toast2(M(lang, 'Cambios guardados ✓', 'Changes saved ✓', 'Alterações salvas ✓'));
+      } else {
+        // Se guardó la version anterior; la edicion nueva sigue pendiente y no se marca como guardada.
+        toast2(
+          M(
+            lang,
+            'Se guardó la versión anterior. Tenés cambios nuevos sin guardar.',
+            'The previous version was saved. You have new unsaved changes.',
+            'A versão anterior foi salva. Você tem novas alterações não salvas.'
+          )
+        );
+      }
       return;
     }
-    if (failed.length === results.length) {
-      toast2(
-        M(
-          lang,
-          'No se pudo guardar ningún cambio',
-          'Could not save any changes',
-          'Não foi possível salvar nenhuma alteração'
-        )
-      );
-      return;
-    }
+    const names = failed.map((f) => `"${f.name}"`).join(', ');
+    const zeroRows = failed.some((f) => f.reason === 'zero_rows');
     const okCount = results.length - failed.length;
-    const failedDetail = failed.map((f) => `"${f.name}": ${f.reason}`).join(' · ');
-    toast2(
-      M(
-        lang,
-        `${okCount} de ${results.length} guardadas — ${failedDetail}`,
-        `${okCount} of ${results.length} saved — ${failedDetail}`,
-        `${okCount} de ${results.length} salvas — ${failedDetail}`
-      )
-    );
+    const msg =
+      failed.length === results.length
+        ? M(
+            lang,
+            'No se pudo guardar ningún cambio. Revisá tu conexión y permisos.',
+            'Could not save any changes. Check your connection and permissions.',
+            'Não foi possível salvar nenhuma alteração. Verifique sua conexão e permissões.'
+          )
+        : M(
+            lang,
+            `Guardado parcial: ${okCount} de ${results.length}. Falló: ${names}.`,
+            `Partially saved: ${okCount} of ${results.length}. Failed: ${names}.`,
+            `Salvo parcialmente: ${okCount} de ${results.length}. Falhou: ${names}.`
+          );
+    const detail = zeroRows
+      ? M(
+          lang,
+          ' El servidor no confirmó la escritura.',
+          ' The server did not confirm the write.',
+          ' O servidor não confirmou a gravação.'
+        )
+      : '';
+    // hasUnsaved se mantiene: los cambios siguen pendientes y se puede reintentar.
+    setSaveAllError(msg + detail);
+    toast2(msg);
   };
 
   const requestDiscardUnsaved = useCallback(
     function () {
-      if (!hasUnsaved) return;
+      if (!hasUnsaved || savingAll) return;
       setDiscardModalOpen(true);
     },
-    [hasUnsaved]
+    [hasUnsaved, savingAll]
   );
 
   const runDiscardUnsaved = useCallback(
     function () {
+      if (savingAll) return;
       if (!hasUnsaved) {
         setDiscardModalOpen(false);
         return;
@@ -255,9 +307,10 @@ export function RutinaView(props) {
         }
       } catch (_e) {}
       setHasUnsaved(false);
+      setSaveAllError('');
       setDiscardModalOpen(false);
     },
-    [hasUnsaved, setRoutines]
+    [hasUnsaved, savingAll, setRoutines]
   );
 
   const closeEditModal = () => setEditingExercise(null);
@@ -287,7 +340,7 @@ export function RutinaView(props) {
       )
     );
 
-    setHasUnsaved(true);
+    markUnsaved();
     closeEditModal();
   };
 
@@ -426,7 +479,7 @@ export function RutinaView(props) {
               toast2={toast2}
               card={card}
               routines={routines}
-              setHasUnsaved={setHasUnsaved}
+              setHasUnsaved={markUnsaved}
               setEditingExercise={setEditingExercise}
               onOpenLibrary={openLibrary}
               cardIndex={idx}
@@ -454,6 +507,8 @@ export function RutinaView(props) {
         border={border}
         onSave={handleSaveAll}
         onDiscard={requestDiscardUnsaved}
+        saving={savingAll}
+        errorMessage={saveAllError}
         saveBarBox={saveBarBox}
         desktopCoachStableLayout={desktopCoachStableLayout}
       />

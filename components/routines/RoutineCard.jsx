@@ -5,6 +5,12 @@ import { Ic } from '../Ic.jsx';
 import { DaySection } from '../DaySection.jsx';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
 import { coachType, coachSpace, coachTypeMobile, coachSpaceMobile } from '../coachUiScale.js';
+import {
+  acquireSaveLocks,
+  updateConfirmed,
+  createConfirmed,
+  sameIdSet,
+} from './rutinaSaveContract.js';
 import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
 import { toTitleCase, initialsOf } from '../../lib/textFormat.js';
 import RoutineCardActionMenu from './RoutineCardActionMenu.jsx';
@@ -106,11 +112,15 @@ export function RoutineCard({
   // la posibilidad de guardar ediciones de días aunque el alumno no cambie.
   const contentSig = JSON.stringify([r.name, r.days, r.note || '']);
   const savedContentSigRef = useRef(contentSig);
+  const pendingSelectionRef = useRef(null);
 
   useEffect(
     function () {
       var ids = r.alumno_id != null && r.alumno_id !== '' ? [String(r.alumno_id)] : [];
-      setSelectedAlumnoIds(ids);
+      // Tras un guardado multiple parcial, se conservan los alumnos que faltan para poder reintentar.
+      var pending = pendingSelectionRef.current;
+      pendingSelectionRef.current = null;
+      setSelectedAlumnoIds(pending || ids);
       setSavedAlumnoIds(ids);
       savedContentSigRef.current = JSON.stringify([r.name, r.days, r.note || '']);
     },
@@ -332,10 +342,15 @@ export function RoutineCard({
   }
 
   const handleSave = async () => {
+    // Candado SINCRONO por rutina, antes de cualquier await/setState: un doble toque no puede crear dos filas.
+    var release = acquireSaveLocks([r.id]);
+    if (!release) return;
     setSaving(true);
     setSaveError('');
     var saveFailedMsg = M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar');
+    var failMsg = saveFailedMsg;
     try {
+      if (!sb) throw new Error('sin cliente');
       const rActual = routines.find((x) => x.id === r.id) || r;
       var ids = selectedAlumnoIds.map(String).filter(Boolean);
       var primary = ids.length ? ids[0] : null;
@@ -344,6 +359,8 @@ export function RoutineCard({
       var primaryName = alumnoNombreById(primary);
       var currentId = rActual.id;
       var isSaved = !!rActual.saved;
+      // Firma de lo que se guarda: ediciones hechas durante el guardado quedan pendientes.
+      var savedSig = JSON.stringify([rActual.name, rActual.days, rActual.note || '']);
 
       var primaryPayload = {
         nombre: rActual.name,
@@ -358,7 +375,13 @@ export function RoutineCard({
       };
 
       if (isSaved) {
-        await sb.updateRutina(currentId, primaryPayload);
+        var upd = await updateConfirmed(sb, currentId, primaryPayload);
+        if (!upd.ok) {
+          if (upd.reason === 'zero_rows') {
+            failMsg = M(lang, 'El servidor no confirmó el guardado. Reintentá.', 'The server did not confirm the save. Retry.', 'O servidor não confirmou o salvamento. Tente novamente.');
+          }
+          throw new Error('update ' + upd.reason);
+        }
         setRoutines(function (p) {
           return p.map(function (rr) {
             return String(rr.id) === String(currentId)
@@ -367,36 +390,31 @@ export function RoutineCard({
           });
         });
       } else {
-        var res = await sb.createRutina(Object.assign({}, primaryPayload, { fecha_inicio: fechaInicio }));
-        if (res && res[0]) {
-          currentId = res[0].id;
-          isSaved = true;
-          setRoutines(function (p) {
-            return p.map(function (rr) {
-              return String(rr.id) === String(rActual.id)
-                ? Object.assign({}, rr, {
-                    id: res[0].id,
-                    alumno_id: primary || null,
-                    alumno: primaryName,
-                    saved: true,
-                  })
-                : rr;
-            });
+        var cre = await createConfirmed(sb, Object.assign({}, primaryPayload, { fecha_inicio: fechaInicio }));
+        if (!cre.ok) throw new Error('create ' + cre.reason);
+        currentId = cre.row.id;
+        isSaved = true;
+        setRoutines(function (p) {
+          return p.map(function (rr) {
+            return String(rr.id) === String(rActual.id)
+              ? Object.assign({}, rr, {
+                  id: cre.row.id,
+                  alumno_id: primary || null,
+                  alumno: primaryName,
+                  saved: true,
+                })
+              : rr;
           });
-        } else {
-          setSaveError(saveFailedMsg);
-          toast2(saveFailedMsg);
-          setSaving(false);
-          return;
-        }
+        });
       }
 
       var newCards = [];
+      var failedExtraIds = [];
       if (ids.length > 1) {
         var extraResults = await Promise.all(
           ids.slice(1).map(function (xid) {
             var xnm = alumnoNombreById(xid);
-            return sb.createRutina({
+            return createConfirmed(sb, {
               nombre: rActual.name,
               alumno_id: xid,
               datos: { days: daysCopy, alumno: xnm, note: rActual.note || '' },
@@ -409,9 +427,9 @@ export function RoutineCard({
         );
         for (var xi = 0; xi < extraResults.length; xi++) {
           var xr = extraResults[xi];
-          if (xr.res2 && xr.res2[0]) {
+          if (xr.res2.ok) {
             newCards.push({
-              id: xr.res2[0].id,
+              id: xr.res2.row.id,
               name: rActual.name,
               days: rActual.days,
               alumno_id: xr.aid,
@@ -420,6 +438,8 @@ export function RoutineCard({
               saved: true,
               collapsed: true,
             });
+          } else {
+            failedExtraIds.push(xr.aid);
           }
         }
       }
@@ -429,9 +449,30 @@ export function RoutineCard({
         });
       }
 
-      setSelectedAlumnoIds(primary ? [String(primary)] : []);
-      setSavedAlumnoIds(primary ? [String(primary)] : []);
-      savedContentSigRef.current = JSON.stringify([rActual.name, rActual.days, rActual.note || '']);
+      if (failedExtraIds.length) {
+        // Guardado parcial: NO es exito. Los alumnos que faltan quedan seleccionados; reintentar solo crea esos (sin duplicar los ya creados).
+        var pendingSel = [String(primary)].concat(failedExtraIds);
+        // Si el id cambia (rutina recien creada), el efecto de [r.id] reinicia la seleccion: se le pasa la que debe conservar.
+        if (String(currentId) !== String(rActual.id)) pendingSelectionRef.current = pendingSel;
+        setSelectedAlumnoIds(pendingSel);
+        setSavedAlumnoIds(primary ? [String(primary)] : []);
+        savedContentSigRef.current = savedSig;
+        failMsg = M(
+          lang,
+          'Guardado parcial: faltan ' + failedExtraIds.length + ' alumno(s). Reintentá.',
+          'Partially saved: ' + failedExtraIds.length + ' athlete(s) missing. Retry.',
+          'Salvo parcialmente: faltam ' + failedExtraIds.length + ' aluno(s). Tente novamente.'
+        );
+        throw new Error('partial');
+      }
+
+      // Si el usuario cambio la seleccion durante el guardado, se respeta su version mas nueva.
+      var savedSel = primary ? [String(primary)] : [];
+      setSelectedAlumnoIds(function (cur) {
+        return sameIdSet(cur, ids) ? savedSel : cur;
+      });
+      setSavedAlumnoIds(savedSel);
+      savedContentSigRef.current = savedSig;
       setAssignOpen(false);
       setLastSaved(new Date());
       toast2(
@@ -445,10 +486,13 @@ export function RoutineCard({
           : M(lang, 'Rutina guardada ✓', 'Routine saved ✓', 'Rotina salva ✓')
       );
     } catch (e) {
-      setSaveError(saveFailedMsg);
-      toast2(saveFailedMsg);
+      console.error('[RoutineCard] handleSave', e);
+      setSaveError(failMsg);
+      toast2(failMsg);
+    } finally {
+      release();
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const openEditRoutine = useCallback(
