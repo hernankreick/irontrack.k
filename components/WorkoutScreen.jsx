@@ -16,6 +16,7 @@ import {
   getWorkoutExerciseStatus,
   mergeCompletedDay,
   removeUndefinedPayloadFields,
+  resolveExerciseForWeek,
   sessionAlreadyExists,
 } from '../lib/workoutSession.js';
 import { readCicloActual, tipoReinicioVigente } from '../lib/rutinaCiclo.js';
@@ -62,7 +63,9 @@ export function WorkoutScreen(props) {
   // el entrenamiento activo arrancaba directo en el bloque principal y la entrada en
   // calor quedaba imposible de marcar desde esta pantalla.
   const exercises = [...(activeDay?.warmup || []), ...(activeDay?.exercises || [])];
-  const ex        = exercises[activeExIdx];
+  // Prescripción de la SEMANA ACTIVA (series/reps/kg/pausa de ex.weeks[currentWeek], base solo si la semana no define el dato): la misma
+  // que muestra Inicio. Alimenta lo que se ve, el total de series, la precarga y la validación del panel. No toca la rutina ni lo registrado.
+  const ex        = resolveExerciseForWeek(exercises[activeExIdx], currentWeek);
   const info      = ex ? allEx.find(e => e.id === ex.id) : null;
   const pat       = info
     ? ({ empuje:{icon:"E",color:blue}, traccion:{icon:"T",color:blue},
