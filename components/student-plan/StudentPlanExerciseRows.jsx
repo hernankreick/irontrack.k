@@ -1,6 +1,8 @@
 import React from "react";
 import { resolveExerciseTitle } from "../../lib/exerciseResolve.js";
 import { Ic } from "../Ic.jsx";
+import ExerciseWeekNote from "./ExerciseWeekNote.jsx";
+import { getExerciseWeekNote } from "./studentPlanHelpers.js";
 
 function cleanKey(value) {
   return String(value || "")
@@ -87,13 +89,15 @@ export default function StudentPlanExerciseRows({
             var inf = allEx.find(function (e) { return e.id === ex.id; });
             var nombre = resolveExerciseTitle(inf || null, ex, es);
             var imgSrc = images ? resolveExImg(inf || null, ex, images, nombre) : "";
+            var weekNoteW = getExerciseWeekNote(ex, currentWeekForRoutine);
             return (
-              <div key={routineId + "-d" + dayIndex + "-wu-" + (ex.id || "ex") + "-" + ei} style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 0", borderBottom: ei < (day.warmup || []).length - 1 ? "1px solid " + border : "none" }}>
+              <div key={routineId + "-d" + dayIndex + "-wu-" + (ex.id || "ex") + "-" + ei} style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 0", flexWrap: weekNoteW ? "wrap" : undefined, borderBottom: ei < (day.warmup || []).length - 1 ? "1px solid " + border : "none" }}>
                 <div style={{ width: 3, height: 20, borderRadius: 2, background: "#F59E0B44", flexShrink: 0 }} />
                 {images && <ExThumb src={imgSrc} name={nombre} />}
                 <div style={{ flex: 1, fontSize: 16, fontWeight: 700, color: textMain }}>{nombre}</div>
                 <span style={{ fontSize: 13, color: "#A3B4CC", fontWeight: 600 }}>{ex.sets || "-"}×{ex.reps || "-"}</span>
                 {renderExerciseVideoButton(inf, ex, nombre)}
+                <ExerciseWeekNote note={weekNoteW} msg={msg} />
               </div>
             );
           })}
@@ -111,6 +115,7 @@ export default function StudentPlanExerciseRows({
           var s = w.sets || ex.sets || "-";
           var rp = w.reps || ex.reps || "-";
           var kg2 = w.kg || ex.kg || "";
+          var weekNote = getExerciseWeekNote(ex, currentWeekForRoutine);
           var imgSrc = images ? resolveExImg(inf || null, ex, images, nombre) : "";
           return (
             <div key={routineId + "-d" + dayIndex + "-ex-" + (ex.id || "ex") + "-" + ei} style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 0", borderBottom: ei < day.exercises.length - 1 ? "1px solid " + border : "none" }}>
@@ -121,6 +126,7 @@ export default function StudentPlanExerciseRows({
                 <div style={{ fontSize: 13, color: "#A3B4CC", fontWeight: 500, marginTop: 2, display: "flex", gap: 6, flexWrap: "wrap" }}>
                   <span style={{ fontWeight: 700 }}>{s}×{rp}</span>{kg2 && <span>{kg2}kg</span>}{ex.pause && fmtP && <span>⏱ {fmtP(ex.pause)}</span>}
                 </div>
+                <ExerciseWeekNote note={weekNote} msg={msg} />
               </div>
               {renderExerciseVideoButton(inf, ex, nombre)}
             </div>
