@@ -15,6 +15,24 @@ export function parsePauseSeconds(pause) {
 }
 
 /**
+ * Nota del entrenador para la SEMANA indicada de un ejercicio (ex.weeks[weekIndex].note), tal como se escribió.
+ * Devuelve "" si no hay nota (vacía o solo espacios), si la semana no existe o si weekIndex no es válido: nunca inventa texto
+ * ni cae en otra semana. No recorta ni reformatea: los saltos de línea y los espacios internos se conservan.
+ * @param {object} ex - ejercicio de la rutina
+ * @param {number} weekIndex - índice 0-based de la semana activa
+ * @returns {string}
+ */
+export function getExerciseWeekNote(ex, weekIndex) {
+  if (!ex || !Array.isArray(ex.weeks)) return "";
+  if (!Number.isInteger(weekIndex) || weekIndex < 0) return "";
+  const w = ex.weeks[weekIndex];
+  if (!w || typeof w !== "object") return "";
+  const raw = w.note;
+  if (typeof raw !== "string") return "";
+  return raw.trim() === "" ? "" : raw;
+}
+
+/**
  * Estimación heurística de minutos totales (entrada en calor + principal + descansos entre series).
  * @param {object} day - día de rutina con warmup / exercises
  * @param {number} currentWeek
