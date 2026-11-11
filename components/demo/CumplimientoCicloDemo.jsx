@@ -9,7 +9,7 @@ import { ALUMNOS_DEMO, RUTINAS_DEMO, SESIONES_ROSTER, CARGAS_DEMO } from './cump
 /**
  * Demostracion de la tarjeta «Cumplimiento del ciclo» (demo/ficha-alumno.html?vista=cumplimiento). Usa el mismo modelo y la misma
  * tarjeta que la ficha real (components/students/cumplimientoCiclo.js + CumplimientoCicloCard.jsx) con datos ficticios en memoria.
- * Sin login, sin Supabase, sin red y sin almacenamiento. Permite cambiar de alumno, de tema y el estado de la carga del historial.
+ * Sin login, sin base de datos, sin red y sin almacenamiento. Permite cambiar de alumno, de tema y el estado de la carga del historial.
  */
 export default function CumplimientoCicloDemo() {
   const [tema, setTema] = React.useState("oscuro");

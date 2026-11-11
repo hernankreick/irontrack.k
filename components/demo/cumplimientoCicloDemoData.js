@@ -1,5 +1,5 @@
 // Datos FICTICIOS de la demostracion «Cumplimiento del ciclo» (demo/ficha-alumno.html?vista=cumplimiento; solo builds de Preview).
-// Nada sale de la memoria del navegador: sin Supabase, sin red, sin localStorage. Todas las sesiones de todos los alumnos van en UNA
+// Nada sale de la memoria del navegador: sin base de datos, sin red y sin almacenamiento local. Todas las sesiones de todos los alumnos van en UNA
 // lista (como el historial del roster en la app) para comprobar que cada ficha solo usa las de su alumno.
 import { buildReinicioDatos } from "../../lib/rutinaCiclo.js";
 
