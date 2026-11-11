@@ -5,6 +5,7 @@ import { compararVolumen } from '../../lib/metricas/volumen.js'
 import { tipoDeCarga, TIPO_CARGA } from '../../lib/metricas/tipoCarga.js'
 import { lunesDe, diaLocal } from '../../lib/metricas/fechas.js'
 import { eventosPR, historialPorDia, recordDe, kgDeSerie } from '../../lib/metricas/pr.js'
+import { isCompletedSession } from '../../lib/studentWeeklyProgress.js'
 
 const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/
 
@@ -134,47 +135,61 @@ function sortDatesDesc(keys) {
   return [...keys].sort((a, b) => b.localeCompare(a))
 }
 
-/** Racha en días consecutivos con al menos un registro (hoy o ayer como ancla). */
-export function computeDayStreak(sesiones, progress) {
-  const keys = new Set()
+/** Número de día LOCAL de una fecha d/m/aaaa o ISO (created_at), o null. */
+function diaLocalDeValor(value) {
+  const d = parseProgressDate(value)
+  return d ? diaLocal(d) : null
+}
+
+function fechaDeDia(dia) {
+  const u = new Date(dia * 86400000)
+  return u.getUTCDate() + '/' + (u.getUTCMonth() + 1) + '/' + u.getUTCFullYear()
+}
+
+/**
+ * P0-5: racha de días seguidos del alumno, separando la VIGENTE de las históricas.
+ *  - día entrenado = sesión COMPLETADA (isCompletedSession; su `fecha` d/m/aaaa, o el día local de created_at si no la tiene) o al menos
+ *    una serie registrada ese día (progreso local). Fechas siempre como día de calendario local; los días futuros no cuentan.
+ *  - vigente: solo si el último día entrenado es HOY o AYER (la misma regla que la racha semanal del entrenador, lib/metricas/racha.js:
+ *    la unidad en curso todavía sin registro no corta la racha, la anterior sí). Antes se anclaba al último día con registro aunque fuera
+ *    de hace semanas y mostraba esa racha vieja como actual.
+ *  - ultima: la racha que termina en el último día entrenado { dias, hasta: "d/m/aaaa" } (histórica si vigente = 0); mejor: la más larga.
+ * No modifica sesiones ni series. opts.now (Date) solo para pruebas.
+ * @returns {{ vigente: number, ultima: ({ dias: number, hasta: string } | null), mejor: number }}
+ */
+export function computeDayStreakDetail(sesiones, progress, opts) {
+  const hoy = diaLocal(opts && opts.now ? opts.now : new Date())
+  const dias = new Set()
+  const add = (dia) => {
+    if (dia != null && dia <= hoy) dias.add(dia)
+  }
   ;(sesiones || []).forEach((s) => {
-    const k = dayKeyFromAny(s.fecha)
-    if (k) keys.add(k)
+    if (!s || !isCompletedSession(s)) return
+    const d = diaLocalDeValor(s.fecha)
+    add(d != null ? d : diaLocalDeValor(s.created_at))
   })
   Object.values(progress || {}).forEach((pg) => {
-    ;(pg.sets || []).forEach((st) => {
-      const k = dayKeyFromAny(st.date)
-      if (k) keys.add(k)
-    })
+    ;((pg && pg.sets) || []).forEach((st) => add(diaLocalDeValor(st && st.date)))
   })
-  if (keys.size === 0) return 0
-  const fmt = (d) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const y = new Date(today)
-  y.setDate(y.getDate() - 1)
-  const todayK = fmt(today)
-  const yesterdayK = fmt(y)
-  let anchor = keys.has(todayK) ? new Date(today) : null
-  if (!anchor && keys.has(yesterdayK)) {
-    anchor = new Date(y)
+  if (!dias.size) return { vigente: 0, ultima: null, mejor: 0 }
+  const largoHasta = (fin) => {
+    let n = 0
+    while (dias.has(fin - n)) n += 1
+    return n
   }
-  if (!anchor) {
-    const sorted = sortDatesDesc([...keys])
-    const first = sorted[0]
-    if (!first) return 0
-    const [yy, mm, dd] = first.split('-').map(Number)
-    anchor = new Date(yy, mm - 1, dd)
-  }
-  let streak = 0
-  let cursor = new Date(anchor)
-  cursor.setHours(0, 0, 0, 0)
-  while (keys.has(fmt(cursor))) {
-    streak += 1
-    cursor.setDate(cursor.getDate() - 1)
-  }
-  return streak
+  const ultimoDia = Math.max(...dias)
+  const ultima = { dias: largoHasta(ultimoDia), hasta: fechaDeDia(ultimoDia) }
+  const vigente = ultimoDia >= hoy - 1 ? ultima.dias : 0
+  let mejor = 0
+  dias.forEach((d) => {
+    if (!dias.has(d + 1)) mejor = Math.max(mejor, largoHasta(d))
+  })
+  return { vigente, ultima, mejor }
+}
+
+/** Racha VIGENTE en días seguidos (0 si el último día entrenado no es hoy ni ayer). Ver computeDayStreakDetail. */
+export function computeDayStreak(sesiones, progress, opts) {
+  return computeDayStreakDetail(sesiones, progress, opts).vigente
 }
 
 /**
@@ -197,20 +212,34 @@ export function countPRsThisMonth(allEx, EX, progress, sbData, opts) {
   return count
 }
 
-export function averageImprovementPercent(allEx, EX, progress, sbData) {
-  const exList = exercisesWithData(allEx, EX, progress, sbData)
+/**
+ * P0-4: variación de CARGA (no «mejora» global): por ejercicio, mejor serie válida de la PRIMERA sesión contra la mejor serie válida de
+ * la ÚLTIMA sesión, sobre todo su historial (local + Supabase). Sesión = día de calendario; la mejor serie del día y las series válidas
+ * son las de los PR (historialPorDia, lib/metricas/pr.js: kg > 0, reps > 0, fecha válida, sin ejercicios por tiempo), así que el
+ * calentamiento y las series de descarga no la distorsionan. Antes: primera vs última SERIE suelta de las últimas 20 (una descarga de
+ * 70 kg tras subir de 100 a 110 daba −30 %). Solo mira kg: no dice nada de repeticiones ni de otras condiciones.
+ * pct = promedio entre ejercicios con al menos dos sesiones (entero); null si ninguno las tiene (sin datos, no 0 %).
+ * @returns {{ pct: (number|null), ejercicios: number }}
+ */
+export function variacionDeCargaPromedio(allEx, EX, progress, sbData, opts) {
+  const indiceTiempo = opts && opts.indiceTiempo
   const pcts = []
-  exList.forEach((e) => {
-    const datos = mergeSetsForExercise(e.id, progress, sbData)
-    if (datos.length < 2) return
-    const ultimo = datos[datos.length - 1]
-    const primero = datos[0]
-    if (primero.kg > 0) {
-      pcts.push(Math.round(((ultimo.kg - primero.kg) / primero.kg) * 100))
-    }
+  exercisesWithData(allEx, EX, progress, sbData).forEach((e) => {
+    const dias = historialPorDia(filasPR(e.id, mergeAllSetsForExercise(e.id, progress, sbData)), e.id, { indiceTiempo })
+    if (dias.length < 2) return
+    const inicio = dias[0].kg
+    const fin = dias[dias.length - 1].kg
+    if (inicio > 0) pcts.push(((fin - inicio) / inicio) * 100)
   })
-  if (!pcts.length) return 0
-  return Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length)
+  if (!pcts.length) return { pct: null, ejercicios: 0 }
+  const pct = Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length)
+  return { pct: pct === 0 ? 0 : pct, ejercicios: pcts.length }
+}
+
+/** Contrato anterior del export: el porcentaje de variacionDeCargaPromedio, o 0 sin datos. */
+export function averageImprovementPercent(allEx, EX, progress, sbData, opts) {
+  const r = variacionDeCargaPromedio(allEx, EX, progress, sbData, opts)
+  return r.pct == null ? 0 : r.pct
 }
 
 export function mapMuscleLabel(ex) {
