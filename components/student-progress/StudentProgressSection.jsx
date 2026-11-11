@@ -8,8 +8,8 @@ import { StudentProgressKpiStrip } from './StudentProgressKpiStrip.jsx'
 import { StudentProgressWeeklyVolumeHero } from './StudentProgressWeeklyVolumeHero.jsx'
 import { indiceEjerciciosPorTiempo } from '../../lib/metricas/tipoCarga.js'
 import {
-  averageImprovementPercent,
-  computeDayStreak,
+  variacionDeCargaPromedio,
+  computeDayStreakDetail,
   countPRsThisMonth,
   buildWeeklyVolumeModel,
   hasAnyTrainingData,
@@ -156,8 +156,10 @@ export default function StudentProgressSection({
     return {
       totalSessions: sesiones?.length ?? 0,
       prsThisMonth: historialParcial ? null : countPRsThisMonth(allEx, EX, progress, sbData, { indiceTiempo }),
-      streak: computeDayStreak(sesiones, progress),
-      overall: averageImprovementPercent(allEx, EX, progress, sbData),
+      // P0-5: racha vigente (hoy o ayer) separada de la ultima y de la mejor racha historicas
+      streak: computeDayStreakDetail(sesiones, progress),
+      // P0-4: variacion de carga, mejor serie de la primera vs la ultima sesion; con historial parcial la primera sesion puede faltar
+      loadDelta: historialParcial ? null : variacionDeCargaPromedio(allEx, EX, progress, sbData, { indiceTiempo }).pct,
     }
   }, [sesiones, allEx, EX, progress, sbData, indiceTiempo, historialParcial])
 
@@ -217,8 +219,9 @@ export default function StudentProgressSection({
         id: 'streak7',
         title: es ? 'Racha sólida' : 'Solid streak',
         sub: es ? '7 días seguidos entrenando' : '7-day training streak',
-        unlocked: stats.streak >= 7,
-        progress: `${Math.min(stats.streak, 7)}/7`,
+        // logro conseguido = mejor racha historica (una racha ya terminada no lo quita)
+        unlocked: stats.streak.mejor >= 7,
+        progress: `${Math.min(stats.streak.mejor, 7)}/7`,
       },
       {
         id: 'sessions20',
@@ -248,17 +251,23 @@ export default function StudentProgressSection({
     {
       id: 'str',
       label: es ? 'Racha' : 'Streak',
-      val: !hasData ? null : stats.streak > 0 ? stats.streak : null,
-      sub: es ? 'Días seguidos' : 'Days',
+      val: !hasData ? null : stats.streak.vigente > 0 ? stats.streak.vigente : null,
+      // P0-5: sin racha vigente se informa la ultima como historica (nunca como actual)
+      sub:
+        hasData && stats.streak.vigente === 0 && stats.streak.ultima
+          ? es
+            ? `Última: ${stats.streak.ultima.dias} ${stats.streak.ultima.dias === 1 ? 'día' : 'días'}`
+            : `Last: ${stats.streak.ultima.dias} ${stats.streak.ultima.dias === 1 ? 'day' : 'days'}`
+          : es
+            ? 'Días seguidos'
+            : 'Days',
     },
     {
       id: 'avg',
-      label: es ? 'Mejora Δ' : 'Avg Δ',
-      val:
-        !hasData || stats.overall === 0
-          ? null
-          : `${stats.overall > 0 ? '+' : ''}${stats.overall}%`,
-      sub: es ? 'Promedio' : 'Avg',
+      // P0-4: variacion de la mejor carga (1.a vs ultima sesion), no una «mejora» global; 0 % = estable, «—» = sin datos
+      label: es ? 'Var. carga' : 'Load Δ',
+      val: !hasData || stats.loadDelta == null ? null : `${stats.loadDelta > 0 ? '+' : ''}${stats.loadDelta}%`,
+      sub: historialParcial ? (es ? 'Historial incompleto' : 'Incomplete history') : es ? '1.ª vs últ. sesión' : 'First vs last',
     },
   ]
 
