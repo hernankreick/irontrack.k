@@ -4,6 +4,7 @@ import CoachConfirmDialog from '../coach/CoachConfirmDialog.jsx';
 import EditExerciseModalHost from '../routines/EditExerciseModalHost.jsx';
 import AddExerciseModal from '../modals/AddExerciseModal.jsx';
 import AppGlobalStyles from '../layout/AppGlobalStyles.jsx';
+import VideoModal from '../ui/VideoModal.jsx';
 import ToastBanner from '../ui/ToastBanner.jsx';
 import { getCoachDialogModalConfig } from '../coach/coachDialogConfig.js';
 import { useCoachUIState } from '../../hooks/useCoachUIState.js';
@@ -34,6 +35,7 @@ export default function FichaAlumnoDemo() {
   const sb = React.useMemo(createDemoSb, []);
   const allEx = React.useMemo(function () { return EX.map(function (e) { return normalizeLibraryExercise(e, { catalog: true }); }); }, []);
 
+  const [videoModal, setVideoModal] = React.useState(null);
   const [toast, setToast] = React.useState(null);
   const toastTimer = React.useRef(null);
   const showToast = React.useCallback(function (text) {
@@ -200,11 +202,12 @@ export default function FichaAlumnoDemo() {
       <AddExerciseModal
         addExModal={addExModal} addExSearch={addExSearch} setAddExSearch={setAddExSearch} addExPat={addExPat} setAddExPat={setAddExPat}
         addExMuscle={addExMuscle} setAddExMuscle={setAddExMuscle} addExSelectedIds={addExSelectedIds} setAddExSelectedIds={setAddExSelectedIds}
-        allEx={allEx} coachDesktopNavHidden={true} darkMode={darkMode} es={es} lang={lang} msg={msg} btn={T.btn} inp={T.inp}
+        allEx={allEx} onPreviewVideo={setVideoModal} coachDesktopNavHidden={true} darkMode={darkMode} es={es} lang={lang} msg={msg} btn={T.btn} inp={T.inp}
         bgCard={T.bgCard} border={T.border} textMuted={T.textMuted}
         onClose={function () { setAddExModal(null); setAddExSelectedIds([]); }}
         onConfirm={function () { setAddExModal(null); setAddExSelectedIds([]); avisoDemo("Añadir ejercicio"); }}
       />
+      <VideoModal videoModal={videoModal} setVideoModal={setVideoModal} />
       <ToastBanner toast={toast} darkMode={darkMode} border={T.border} textMain={T.textMain} />
     </div>
   );

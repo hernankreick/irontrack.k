@@ -51,6 +51,7 @@ export default function AppGlobalStyles({ darkMode, bgSub, textMain, border }) {
       ".add-ex-list-scroll--desktop::-webkit-scrollbar{width:10px}" +
       ".add-ex-list-scroll--desktop::-webkit-scrollbar-track{background:transparent}" +
       ".add-ex-list-scroll--desktop::-webkit-scrollbar-thumb{background:"+(darkMode?"#475569":"#94a3b8")+";border-radius:99px;border:2px solid transparent;background-clip:padding-box}" +
+      "@media (max-width:767px){.add-ex-overlay{left:0!important}}" +
       ".add-ex-card{cursor:pointer;border-radius:12px;border:none;transition:background-color .15s ease;filter:none!important;outline:none;-webkit-focus-ring-color:transparent;-webkit-tap-highlight-color:transparent;position:relative}" +
       ".add-ex-card--light{background:#E2E8F0}.add-ex-card--light:hover{background:#d6dee9}" +
       ".add-ex-card--dark{background:#162234}.add-ex-card--dark:hover{background:#1c2d45}" +

@@ -2,6 +2,21 @@ import React, { useState } from 'react';
 import { Ic } from '../Ic.jsx';
 import { PATS } from '../../lib/exerciseStaticData.js';
 import { bibMuscleFilterHaystack, formatBibMuscleDisplay, BIB_MUSCLE_OPTIONS } from '../../lib/appHelpers.js';
+import { resolveVideoUrl } from '../../lib/exerciseResolve.js';
+import { getYTVideoId } from '../../lib/getYTVideoId.js';
+import { ExerciseVideoPlayButton } from '../ExerciseVideoPlayButton.jsx';
+
+/**
+ * Video reproducible en la vista previa: misma resolucion que el resto de la app (override del coach, luego video_url / youtube
+ * del catalogo o del ejercicio personalizado). Solo hay reproductor para YouTube; cualquier otra cosa devuelve null (sin boton).
+ */
+export function getAddExercisePreviewVideoId(ex, videoOverrides) {
+  const id = getYTVideoId(resolveVideoUrl(ex, null, videoOverrides));
+  return id && /^[A-Za-z0-9_-]{6,}$/.test(id) ? id : null;
+}
+
+// El boton de video vive dentro de la fila seleccionable: ningun evento suyo debe llegar a la fila (no cambia la seleccion).
+const stopRow = (e) => e.stopPropagation();
 
 export default function AddExerciseModal({
   addExModal,
@@ -24,6 +39,8 @@ export default function AddExerciseModal({
   bgCard,
   border,
   textMuted,
+  videoOverrides,
+  onPreviewVideo,
   onClose,
   onConfirm,
 }) {
@@ -43,6 +60,7 @@ export default function AddExerciseModal({
     <>
       <div
         role="presentation"
+        className="add-ex-overlay"
         style={{
           position:"fixed",top:0,right:0,bottom:0,left:260,zIndex:1200,
           display:"flex",flexDirection:"column",
@@ -158,6 +176,8 @@ export default function AddExerciseModal({
             }).map(ex=>{
               const pat=PATS[ex.pattern]||{icon:"E",color:textMuted,label:"Otro",labelEn:"Other"};
               const sel=addExSelectedIds.includes(ex.id);
+              const previewId=onPreviewVideo?getAddExercisePreviewVideoId(ex,videoOverrides):null;
+              const exName=es?ex.name:ex.nameEn;
               return(
                 <div
                   key={ex.id}
@@ -180,6 +200,22 @@ export default function AddExerciseModal({
                     <div style={{fontSize:11,fontWeight:700,color:pat.color,textTransform:"uppercase",letterSpacing:.3,lineHeight:1.2}}>{es?pat.label:pat.labelEn}</div>
                     {(formatBibMuscleDisplay(ex.muscle, lang)||ex.equip)&&<div style={{fontSize:11,color:textMuted,lineHeight:1.2,wordBreak:"break-word"}}>{[formatBibMuscleDisplay(ex.muscle, lang),ex.equip].filter(Boolean).join(" · ")}</div>}
                   </div>
+                  {previewId ? (
+                    <span
+                      data-add-ex-preview={ex.id}
+                      style={{display:"flex",flexShrink:0}}
+                      onClick={stopRow}
+                      onKeyDown={stopRow}
+                      onMouseDown={stopRow}
+                      onTouchStart={stopRow}
+                    >
+                      <ExerciseVideoPlayButton
+                        hasVideo
+                        ariaLabel={msg("Ver video de ", "Watch video: ")+exName}
+                        onClick={()=>onPreviewVideo({videoId:previewId,nombre:exName,wide:true})}
+                      />
+                    </span>
+                  ) : null}
                   <div style={{width:22,height:22,borderRadius:"50%",border:"none",boxShadow:sel?"inset 0 0 0 2px "+pat.color:"inset 0 0 0 2px "+border,background:sel?pat.color+"33":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
                     {sel ? <Ic name="check-sm" size={14} color={pat.color}/> : null}
                   </div>
