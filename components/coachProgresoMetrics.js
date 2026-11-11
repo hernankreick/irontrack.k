@@ -5,7 +5,7 @@
  */
 
 import { FALLBACK_EXERCISE_NAME } from "../lib/exerciseResolve.js";
-import { selectCurrentRoutine } from "../lib/routineStore.js";
+import { getRutinaAlumnoId, selectCurrentRoutine } from "../lib/routineStore.js";
 import { filaActivaEnBloque, readCicloActual, rowInCiclo } from "../lib/rutinaCiclo.js";
 import { irontrackMsg as M, pickExerciseName } from "../lib/irontrackMsg.js";
 import {
@@ -230,6 +230,10 @@ export function resolveProgressRowDay(row, sessions) {
  * ciclo vigente (así un reinicio de rutina no mezcla registros de ciclos anteriores); si trae rutina_id, la rutina vigente.
  * Si el mismo ejercicio está en varios días de la rutina, una fila solo se descarta cuando una sesión demuestra que es de OTRO día;
  * las filas cuyo día no se puede demostrar se incluyen y se marca `mixedDays` (el máximo puede incluir otro día).
+ * P0-1: `opts.asignadaDia` (número de día de la asignación de la rutina vigente) excluye las series sin rutina_id anteriores a la
+ * asignación, con el MISMO criterio que «Volumen por semana» (serieAnteriorAAsignacion, #151). `progreso` no trae rutina_id: sin este
+ * filtro las series de una rutina anterior con el mismo ejercicio y ciclo 1 aparecían en semanas que todavía no ocurrieron.
+ * Sin `asignadaDia` el comportamiento es el anterior.
  * @returns {{ series: Array<number|null>, mixedDays: boolean }}
  */
 export function buildLoadSeriesDetailed(rows, opts) {
@@ -242,6 +246,7 @@ export function buildLoadSeriesDetailed(rows, opts) {
     if (!rr || String(rr.ejercicio_id) !== String(opts.ejercicioId)) return;
     if (rr.rutina_id != null && rr.rutina_id !== "" && opts.routineId && String(rr.rutina_id) !== String(opts.routineId)) return;
     if (Object.prototype.hasOwnProperty.call(rr, "ciclo") && !(opts.routineDatos ? progressRowActivaEnBloque(rr, opts.routineDatos) : rowInCiclo(rr, opts.ciclo))) return;
+    if (serieAnteriorAAsignacion(rr, opts.asignadaDia)) return;
     var kgv = parseFloat(rr.kg) || 0;
     if (!(kgv > 0)) return;
     var rowUnknownDay = false;
@@ -272,6 +277,39 @@ export function buildLoadSeries(rows, opts) {
 
 export function getRoutineForAlumno(rutinasSBEntrenador, alumnoId) {
   return selectCurrentRoutine(rutinasSBEntrenador, alumnoId);
+}
+
+/**
+ * Rutinas asignadas a UN alumno (actual y anteriores), con la misma pertenencia que selectCurrentRoutine: nunca plantillas ni rutinas
+ * de otro alumno.
+ */
+export function rutinasDeAlumno(rutinasSBEntrenador, alumnoId) {
+  var aid = alumnoId != null && alumnoId !== "" ? String(alumnoId) : "";
+  if (!aid) return [];
+  return (rutinasSBEntrenador || []).filter(function (r) {
+    if (!r || r.es_plantilla === true) return false;
+    var rid = getRutinaAlumnoId(r);
+    return rid != null && String(rid) === aid;
+  });
+}
+
+/**
+ * P0-2: ejercicios por tiempo de UN alumno = catálogo (EX + custom) + SUS rutinas (lib/metricas/tipoCarga.js, detección de #151 sin
+ * cambios). Es la misma base que usa la app del alumno (StudentProgressSection). Antes el índice se armaba con las rutinas de TODO el
+ * roster: si otro alumno tenía el ejercicio por tiempo, este perdía sus PR y su volumen en el panel del entrenador.
+ */
+export function indiceTiempoDeAlumno(allEx, rutinasSBEntrenador, alumnoId) {
+  return indiceEjerciciosPorTiempo(allEx, rutinasDeAlumno(rutinasSBEntrenador, alumnoId));
+}
+
+/**
+ * ¿Serie de una rutina ANTERIOR? `progreso` no guarda rutina_id: una serie sin rutina_id con fecha anterior al día de asignación de la
+ * rutina vigente (asignadaDia, número de día local) no pertenece a su bloque (#151). Las del mismo día de la asignación sí.
+ */
+function serieAnteriorAAsignacion(row, asignadaDia) {
+  if (asignadaDia == null || !row || (row.rutina_id != null && row.rutina_id !== "")) return false;
+  var diaFila = parseFechaDMY(row.fecha);
+  return diaFila != null && diaFila < asignadaDia;
 }
 
 function routineExerciseIdSet(rut) {
@@ -464,13 +502,22 @@ export function buildCoachProgresoModel(params) {
   var hc = params.historiaCompleta || null;
   var sesionesIncompletas = !!(hc && hc.sesiones === false);
   var progresoIncompleto = !!(hc && hc.progreso === false);
-  /** Ejercicios por tiempo: catálogo (EX + custom) y snapshots de TODAS las rutinas del entrenador (lib/metricas/tipoCarga.js). */
-  var indiceTiempo = indiceEjerciciosPorTiempo(allEx, rutinasSBEntrenador);
+  /** P0-2: ejercicios por tiempo POR ALUMNO (catálogo + rutinas de ese alumno); nunca las rutinas de otro alumno. */
+  var indicesPorAlumno = {};
+  function indiceTiempoDe(aid) {
+    var k = aid == null ? "" : String(aid);
+    if (!Object.prototype.hasOwnProperty.call(indicesPorAlumno, k)) indicesPorAlumno[k] = indiceTiempoDeAlumno(allEx, rutinasSBEntrenador, aid);
+    return indicesPorAlumno[k];
+  }
+  /** Índice del alumno seleccionado: PR, volumen, patrón, ejercicios registrados e historial por ejercicio. */
+  var indiceTiempo = indiceTiempoDe(alumnoSel);
   var routineForSelected = getRoutineForAlumno(rutinasSBEntrenador, alumnoSel);
   var routineForSelectedId = routineForSelected && routineForSelected.id != null ? String(routineForSelected.id) : null;
   var routineExerciseIds = routineExerciseIdSet(routineForSelected);
   var routineCiclo = readCicloActual(routineForSelected && routineForSelected.datos);
   var routineDatos = routineForSelected && routineForSelected.datos;
+  /** Día local de asignación de la rutina vigente: borde del bloque para las series sin rutina_id (#151, P0-1). */
+  var asignadaDia = diaDeCreatedAtLocal(routineForSelected && routineForSelected.created_at);
   /** Historial completo del alumno seleccionado (todas las rutinas y ciclos): base de PR y volumen del período. */
   var alumnoAllRows = alumnoSel ? progresoGlobal[alumnoSel] || [] : [];
   /** Filas del bloque vigente de la rutina activa: solo para las tarjetas «de la rutina» (volumen por semana y patrón). */
@@ -607,8 +654,9 @@ export function buildCoachProgresoModel(params) {
     var previoAVentana = regs.filter(function (r) {
       return enRango(parseFechaDMY(r && r.fecha), null, stallDesde - 1);
     });
-    if (volumenEnRango(previoAVentana, { indiceTiempo: indiceTiempo }).series === 0) return;
-    if (contarPRs(eventosPR(regs, { indiceTiempo: indiceTiempo }), stallDesde, hoy) === 0) {
+    var indiceA = indiceTiempoDe(a.id);
+    if (volumenEnRango(previoAVentana, { indiceTiempo: indiceA }).series === 0) return;
+    if (contarPRs(eventosPR(regs, { indiceTiempo: indiceA }), stallDesde, hoy) === 0) {
       stalled++;
       stalledIds.push(a.id);
     }
@@ -627,6 +675,7 @@ export function buildCoachProgresoModel(params) {
           routineId: routineForSelectedId,
           ciclo: routineCiclo,
           routineDatos: routineDatos,
+          asignadaDia: asignadaDia,
           weekStarts: routineWeekContext.weekStarts.slice(0, LOAD_BLOCK_WEEKS),
           routineDays: routineForSelected && routineForSelected.datos ? routineForSelected.datos.days || [] : [],
           dayIdx: diaIdx,
@@ -695,15 +744,10 @@ export function buildCoachProgresoModel(params) {
    * calendario de respaldo. Tampoco se recorta por la duracion del periodo elegido (con 7 dias desaparecia la Semana 3).
    */
   // `progreso` no guarda rutina_id: una serie sin rutina_id anterior a la asignacion de la rutina vigente es de una rutina anterior
-  // (con los mismos ejercicios) y no entra en el bloque.
-  var asignadaDia = diaDeCreatedAtLocal(routineForSelected && routineForSelected.created_at);
+  // (con los mismos ejercicios) y no entra en el bloque (serieAnteriorAAsignacion; el mismo filtro usa «Evolución de carga», P0-1).
   var blockRows = alumnoAllRows.filter(function (row) {
     if (!progressRowMatchesRoutine(row, routineForSelectedId, routineExerciseIds, fallbackWeekStartMs, fallbackWeekEndMs, Infinity, routineDatos)) return false;
-    if (asignadaDia != null && (row.rutina_id == null || row.rutina_id === "")) {
-      var diaFila = parseFechaDMY(row.fecha);
-      if (diaFila != null && diaFila < asignadaDia) return false;
-    }
-    return true;
+    return !serieAnteriorAAsignacion(row, asignadaDia);
   });
   /**
    * D7.3: semana de la rutina (0..3) de una serie del bloque: progreso.semana; sin semana, la ventana de calendario de respaldo.
