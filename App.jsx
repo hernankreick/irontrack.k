@@ -4440,6 +4440,8 @@ function GymApp() {
         addExSelectedIds={addExSelectedIds}
         setAddExSelectedIds={setAddExSelectedIds}
         allEx={allEx}
+        videoOverrides={videoOverrides}
+        onPreviewVideo={setVideoModal}
         coachDesktopNavHidden={coachDesktopNavHidden}
         darkMode={darkMode}
         es={es}

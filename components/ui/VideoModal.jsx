@@ -48,7 +48,7 @@ function VideoModal({ videoModal, setVideoModal }) {
         }}
         onClick={() => setVideoModal(null)}
       >
-        <div style={{ width: "100%", maxWidth: 480, padding: "0 16px" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ width: "100%", maxWidth: "min(" + (videoModal.wide ? 720 : 480) + "px, calc((100dvh - 120px) * 1.7778 + 32px))", minWidth: 0, padding: "0 16px", boxSizing: "border-box" }} onClick={(e) => e.stopPropagation()}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{videoModal.nombre || ""}</div>
             <button
@@ -56,7 +56,7 @@ function VideoModal({ videoModal, setVideoModal }) {
               type="button"
               aria-label="Cerrar"
               onClick={() => setVideoModal(null)}
-              style={{ background: "none", border: "none", color: "#8B9AB2", fontSize: 24, cursor: "pointer" }}
+              style={{ background: "none", border: "none", color: "#8B9AB2", fontSize: 24, cursor: "pointer", width: 44, height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
             >
               ✕
             </button>
@@ -73,6 +73,16 @@ function VideoModal({ videoModal, setVideoModal }) {
               />
             ) : null}
           </div>
+          {videoModal.videoId ? (
+            <a
+              href={"https://www.youtube.com/watch?v=" + encodeURIComponent(videoModal.videoId)}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "inline-flex", alignItems: "center", minHeight: 44, marginTop: 4, color: "#8B9AB2", fontSize: 13, textDecoration: "underline" }}
+            >
+              Abrir en YouTube
+            </a>
+          ) : null}
         </div>
       </div>,
       document.body
