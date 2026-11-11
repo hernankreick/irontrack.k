@@ -1,6 +1,8 @@
 import React from 'react';
 import { Ic } from '../Ic.jsx';
 
+// P0-3: sugerencias de carga ORIENTATIVAS, solo en la interfaz del entrenador. «Revisar ejercicio» abre el editor con los valores
+// actuales: nada se cambia ni se guarda sin que el entrenador lo haga. Las de «datos insuficientes» se agrupan al final.
 export default function StudentSuggestionsPanel({
   alumno,
   rutinaAsignada,
@@ -16,12 +18,14 @@ export default function StudentSuggestionsPanel({
   onIgnoreSuggestion,
 }) {
   if(!rutinaAsignada || sugerencias.length === 0) return null;
+  const accionables = sugerencias.filter(function(s){ return s.tipo !== "insuficiente"; });
+  const insuficientes = sugerencias.filter(function(s){ return s.tipo === "insuficiente"; });
+  // sin ningún registro todavía (rutina recién asignada): como antes, no se muestra el panel
+  if(accionables.length === 0 && insuficientes.every(function(s){ return s.motivo === "sin_historial"; })) return null;
 
   const colores = {
     subir: {icon:(<Ic name="trending-up" size={16} color="#22C55E"/>),bg:"#22C55E12",border:"#22C55E33",color:"#22C55E",btnBg:"#22C55E"},
-    bajar: {icon:(<Ic name="trending-up" size={16} color="#EF4444" style={{transform:"rotate(180deg)"}}/>),bg:"#EF444412",border:"#EF444433",color:"#EF4444",btnBg:"#EF4444"},
-    ajustar: {icon:(<Ic name="zap" size={16} color="#F59E0B"/>),bg:"#F59E0B12",border:"#F59E0B33",color:"#F59E0B",btnBg:"#F59E0B"},
-    cambiar: {icon:(<Ic name="refresh-cw" size={16} color="#2563EB"/>),bg:"#2563EB12",border:"#2563EB33",color:"#2563EB",btnBg:"#2563EB"},
+    evaluar_reduccion: {icon:(<Ic name="trending-up" size={16} color="#F59E0B" style={{transform:"rotate(180deg)"}}/>),bg:"#F59E0B12",border:"#F59E0B33",color:"#F59E0B",btnBg:"#B45309"},
     mantener: {icon:(<Ic name="chevron-right" size={16} color={textMuted}/>),bg:bgSub,border:border,color:textMuted,btnBg:"#2563EB"}
   };
 
@@ -47,7 +51,7 @@ export default function StudentSuggestionsPanel({
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <Ic name="info" size={16} color="#F59E0B"/>
           <div style={{fontSize:11,fontWeight:800,color:"#F59E0B",letterSpacing:2,textTransform:"uppercase"}}>{msg("SUGERENCIAS", "SUGGESTIONS")}</div>
-          <span style={{fontSize:12,fontWeight:800,color:textMuted,background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:999,padding:"2px 8px"}}>{sugerencias.length}</span>
+          <span style={{fontSize:12,fontWeight:800,color:textMuted,background:"#F59E0B12",border:"1px solid #F59E0B33",borderRadius:999,padding:"2px 8px"}}>{accionables.length}</span>
         </div>
         <Ic
           name="chevron-right"
@@ -57,8 +61,9 @@ export default function StudentSuggestionsPanel({
         />
       </button>
       {isOpen && (
-        <div style={{marginTop:10,maxHeight:260,overflowY:"auto",paddingRight:4}}>
-          {sugerencias.map(function(sug,si){
+        <div style={{marginTop:10,maxHeight:320,overflowY:"auto",paddingRight:4}}>
+          <div style={{fontSize:12,color:textMuted,margin:"0 2px 8px",lineHeight:1.4}}>{msg("Orientativas, según las sesiones registradas. No cambian la rutina.", "For guidance, based on logged sessions. They don't change the routine.")}</div>
+          {accionables.map(function(sug,si){
             var c = colores[sug.tipo] || colores.mantener;
             var sugKey = alumno.id+"-sug-"+(sug.exId||"ex")+"-"+sug.dIdx+"-"+sug.eIdx+"-"+sug.tipo;
             return (
@@ -72,15 +77,26 @@ export default function StudentSuggestionsPanel({
                       <Ic name="chevron-right" size={12} color={textMuted}/>
                       {sug.ajuste}
                     </div>
-                    <div style={{display:"flex",gap:8,marginTop:8}}>
-                      <button className="hov" onClick={function(){onApplySuggestion(sug);}} style={{padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{msg("APLICAR", "APPLY")}</button>
-                      <button className="hov" onClick={function(){onIgnoreSuggestion(sugKey);}} style={{padding:"5px 14px",background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("IGNORAR", "IGNORE")}</button>
+                    {sug.evidencia ? <div style={{fontSize:11.5,color:textMuted,marginTop:4}}>{msg("Sesiones: ", "Sessions: ") + sug.evidencia}</div> : null}
+                    <div style={{display:"flex",gap:8,marginTop:8,flexWrap:"wrap"}}>
+                      <button className="hov" onClick={function(){onApplySuggestion(sug);}} style={{minHeight:44,padding:"5px 14px",background:c.btnBg,color:"#fff",border:"none",borderRadius:8,fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>{msg("REVISAR EJERCICIO", "REVIEW EXERCISE")}</button>
+                      <button className="hov" onClick={function(){onIgnoreSuggestion(sugKey);}} style={{minHeight:44,padding:"5px 14px",background:"transparent",color:textMuted,border:"1px solid "+border,borderRadius:8,fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{msg("IGNORAR", "IGNORE")}</button>
                     </div>
                   </div>
                 </div>
               </div>
             );
           })}
+          {insuficientes.length ? (
+            <details style={{margin:"4px 2px 0"}}>
+              <summary style={{cursor:"pointer",minHeight:44,display:"flex",alignItems:"center",fontSize:12,fontWeight:700,color:textMuted}}>{msg("Datos insuficientes", "Not enough data") + " (" + insuficientes.length + ")"}</summary>
+              <ul style={{margin:"4px 0 0",padding:"0 0 0 16px",fontSize:12,color:textMuted,lineHeight:1.5}}>
+                {insuficientes.map(function(sug){
+                  return <li key={alumno.id+"-insuf-"+(sug.exId||"ex")+"-"+sug.dIdx+"-"+sug.eIdx+"-"+sug.bloque}><b style={{color:textMain}}>{sug.nombre}</b>{": " + sug.ajuste}</li>;
+                })}
+              </ul>
+            </details>
+          ) : null}
         </div>
       )}
     </div>

@@ -443,7 +443,8 @@ export default function StudentsSection(props) {
               const regsAlu = rutSB && readCicloCargas(rutSB.datos) === CICLO_CARGAS.CERO && readCicloBase(rutSB.datos) > 1
                 ? progresoAlu.filter(function (reg) { return rowCiclo(reg) >= readCicloBase(rutSB.datos); })
                 : progresoAlu;
-              const sugs = rutSB && regsAlu.length >= 2 ? generarSugerenciasAlumno(regsAlu, rutSB.datos, EX) : [];
+              // P0-3: sugerencias orientativas solo para el entrenador; por sesion real, prescripcion de la semana activa y sin otro alumno
+              const sugs = rutSB ? generarSugerenciasAlumno(regsAlu, rutSB.datos, allEx && allEx.length ? allEx : EX, { rutina: rutSB, sesiones: isAlumnoActive ? filasDelAlumno(alumnoSesiones, a.id) : [], alumnoId: a.id }) : [];
               const suggestionsOpen = !!sugsOpen[a.id];
               return (
               <StudentCard
@@ -582,12 +583,9 @@ export default function StudentsSection(props) {
                     onAssignRoutine={function () { abrirAsignacionRutina(a); }}
                     onToggleSuggestions={function(){ setSugsOpen(function(prev){ return {...prev, [a.id]: !prev[a.id]}; }); }}
                     onApplySuggestion={function(sug){
-                      var exConSug = {...sug.exData};
-                      if(sug.sugKg) exConSug.kg = sug.sugKg;
-                      if(sug.sugReps) exConSug.reps = sug.sugReps;
-                      if(sug.sugSets) exConSug.sets = sug.sugSets;
-                      if(sug.sugPause) exConSug.pause = sug.sugPause;
-                      setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:exConSug});
+                      // P0-3: la sugerencia es orientativa: abre el ejercicio con sus valores ACTUALES (no precarga ni cambia nada);
+                      // cualquier cambio lo decide y guarda el entrenador en el editor.
+                      setEditEx({rId:rutSB.id,dIdx:sug.dIdx,eIdx:sug.eIdx,bloque:sug.bloque,ex:{...sug.exData}});
                     }}
                     onIgnoreSuggestion={function(sugKey){
                       var el=document.getElementById(sugKey);
