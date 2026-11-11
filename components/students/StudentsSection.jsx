@@ -7,6 +7,7 @@ import { CICLO_CARGAS, readCicloBase, readCicloCargas, rowCiclo } from '../../li
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
 import StudentOrphanSession from './StudentOrphanSession.jsx';
+import { modeloCumplimientoCiclo } from './cumplimientoCiclo.js';
 import { DeleteConfirmModal } from '../DeleteConfirmModal.jsx';
 import { registrarPagoAlumno, nombreAlumno } from './pagoAlumno.js';
 import ManualSessionValidationModal from './ManualSessionValidationModal.jsx';
@@ -24,7 +25,7 @@ export default function StudentsSection(props) {
     setAddExModal, setAddExMuscle, setAddExPat, setAddExSearch, setAddExSelectedIds, setAliasModal, setAlumnoActivo, setAlumnoProgreso, setAlumnoSesiones, setAlumnos, setAssignRoutineId,
     setCoachAlumnosFilter, setCoachAlumnosSearch, setCoachCardMenuId, setChatModal, setCoachDiaSecsOpen, setCoachDialog, setCoachRoutineDiaIdx, setCoachRutinaMenuOpen, setEditEx,
     setLoadingSB, setNewAlumnoData, setNewAlumnoErrors, setNewAlumnoForm, setNotaDiaInput, setRegistrosSubTab, setRutinasSB, setRutinasSBEntrenador,
-    sesionesGlobales = [], setSesionesGlobales, progresoGlobal = {}, showCoachDesktopShell, sugsOpen = {}, setSugsOpen, textMain, textMuted, toast2
+    sesionesGlobales = [], setSesionesGlobales, progresoGlobal = {}, historiaCompleta = null, showCoachDesktopShell, sugsOpen = {}, setSugsOpen, textMain, textMuted, toast2
   } = props;
   const t = typeof msg === "function" ? msg : function (esText, enText) { return es ? esText : enText; };
   const assignedRoutineFor = typeof getRutinaAsignadaAlumno === "function"
@@ -446,6 +447,8 @@ export default function StudentsSection(props) {
               // P0-3: sugerencias orientativas solo para el entrenador; por sesion real, prescripcion de la semana activa y sin otro alumno
               const sugs = rutSB ? generarSugerenciasAlumno(regsAlu, rutSB.datos, allEx && allEx.length ? allEx : EX, { rutina: rutSB, sesiones: isAlumnoActive ? filasDelAlumno(alumnoSesiones, a.id) : [], alumnoId: a.id }) : [];
               const suggestionsOpen = !!sugsOpen[a.id];
+              // Cumplimiento del ciclo (solo entrenador): historial confiable SOLO si la carga completa del roster incluye a ESTE alumno.
+              const cumplimientoCiclo = rutinaActiva ? modeloCumplimientoCiclo({ alumnoId: a.id, rutina: rutinaActiva, sesiones: sesionesForAlumno(a), historiaCompleta: historiaCompleta }) : null;
               return (
               <StudentCard
                 key={a.id}
@@ -544,6 +547,7 @@ export default function StudentsSection(props) {
                     warmupItems={warmupItems}
                     exerciseItems={exerciseItems}
                     sugs={sugs}
+                    cumplimientoCiclo={cumplimientoCiclo}
                     rutSB={rutSB}
                     suggestionsOpen={suggestionsOpen}
                     completedDays={completedDays}

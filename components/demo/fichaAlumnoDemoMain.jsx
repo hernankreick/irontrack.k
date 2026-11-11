@@ -9,5 +9,9 @@ import '@fontsource/geist-sans/latin-700.css'
 import '@fontsource/geist-sans/latin-800.css'
 import '../../index.css'
 import FichaAlumnoDemo from './FichaAlumnoDemo.jsx'
+import CumplimientoCicloDemo from './CumplimientoCicloDemo.jsx'
 
-ReactDOM.createRoot(document.getElementById('root')).render(<FichaAlumnoDemo />)
+// ?vista=cumplimiento: demo de la tarjeta «Cumplimiento del ciclo» con varios alumnos ficticios (misma pagina, sin otra entrada de build).
+const vista = new URLSearchParams(window.location.search).get('vista')
+
+ReactDOM.createRoot(document.getElementById('root')).render(vista === 'cumplimiento' ? <CumplimientoCicloDemo /> : <FichaAlumnoDemo />)

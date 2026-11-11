@@ -908,7 +908,8 @@ function GymApp() {
           setSesionesGlobales(sync.sesiones);
           setProgresoGlobal(groupByAlumno(sync.progreso));
         }
-        if(sync.state && sync.state.complete) setCoachHistoriaCompleta(Object.assign({}, sync.state.complete));
+        // rosterKey: alumnos de la carga completa a la que corresponde `complete` (la ficha solo confia en la bandera si el alumno esta en ella).
+        if(sync.state && sync.state.complete) setCoachHistoriaCompleta(Object.assign({}, sync.state.complete, { rosterKey: typeof sync.state.rosterKey === 'string' ? sync.state.rosterKey : null }));
       }
       if(results[1] && Array.isArray(results[1])) setMensajesEntrenadorPendientes(results[1]);
     } catch(e) { console.error('[cargarSesionesGlobales]', e); }
@@ -3449,6 +3450,7 @@ function GymApp() {
         setRutinasSBEntrenador: setRutinasSBEntrenador,
         sesionesGlobales: sesionesGlobalesLimpias,
         progresoGlobal: progresoGlobalLimpio,
+        historiaCompleta: coachHistoriaCompleta,
         showCoachDesktopShell: showCoachDesktopShell,
         sugsOpen: sugsOpen,
         setSugsOpen: setSugsOpen,

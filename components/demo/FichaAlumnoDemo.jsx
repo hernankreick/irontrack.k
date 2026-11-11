@@ -54,6 +54,9 @@ export default function FichaAlumnoDemo() {
   const [rutinasSB, setRutinasSB] = React.useState([]);
   const [rutinasSBEntrenador, setRutinasSBEntrenador] = React.useState([]);
   const [sesionesGlobales, setSesionesGlobales] = React.useState([]);
+  // Bandera de historial completo del roster (como coachHistoriaCompleta en la app): solo despues de la carga simulada, con el rosterKey
+  // de los alumnos cargados. Mientras tanto es null y la tarjeta «Cumplimiento del ciclo» muestra «Sin datos suficientes».
+  const [historiaCompleta, setHistoriaCompleta] = React.useState(null);
   const [loadingSB, setLoadingSB] = React.useState(false);
   const [coachDialog, setCoachDialog] = React.useState({ t: 'none' });
   const [notaDiaInput, setNotaDiaInput] = React.useState("");
@@ -70,7 +73,10 @@ export default function FichaAlumnoDemo() {
   // Carga inicial como la de la app (rutinas del entrenador y ultimas sesiones), desde la capa simulada.
   React.useEffect(function () {
     sb.getRutinas(DEMO_ALUMNO.id).then(setRutinasSBEntrenador);
-    sb.getSesiones(DEMO_ALUMNO.id).then(setSesionesGlobales);
+    sb.getSesiones(DEMO_ALUMNO.id).then(function (rows) {
+      setSesionesGlobales(rows);
+      setHistoriaCompleta({ sesiones: true, progreso: true, rosterKey: DEMO_ALUMNO.id });
+    });
   }, [sb]);
 
   const rutinasUnificadas = React.useMemo(function () {
@@ -173,6 +179,7 @@ export default function FichaAlumnoDemo() {
           setRutinasSBEntrenador={setRutinasSBEntrenador}
           sesionesGlobales={sesionesGlobales}
           progresoGlobal={{}}
+          historiaCompleta={historiaCompleta}
           showCoachDesktopShell={false}
           sugsOpen={ui.sugsOpen}
           setSugsOpen={ui.setSugsOpen}
