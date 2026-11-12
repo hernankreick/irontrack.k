@@ -3,6 +3,7 @@ import StudentRoutinePreview from './StudentRoutinePreview.jsx';
 import StudentSuggestionsPanel from './StudentSuggestionsPanel.jsx';
 import StudentNotesPanel from './StudentNotesPanel.jsx';
 import StudentRoutineActions from './StudentRoutineActions.jsx';
+import CumplimientoCicloCard from './CumplimientoCicloCard.jsx';
 
 export default function StudentDetailPanel({
   alumno,
@@ -64,6 +65,7 @@ export default function StudentDetailPanel({
   onEnviarNota,
   notaEnviando = false,
   notaError = null,
+  cumplimientoCiclo = null,
 }) {
   if(!rutinaActiva) {
     return (
@@ -143,6 +145,16 @@ export default function StudentDetailPanel({
         onAddMainExercise={onAddMainExercise}
         onEditRoutine={onEditRoutine}
         onRemoveRoutine={onRemoveRoutine}
+      />
+      <CumplimientoCicloCard
+        modelo={cumplimientoCiclo}
+        darkMode={darkMode}
+        msg={msg}
+        textMain={textMain}
+        textMuted={textMuted}
+        coachAluSurface={coachAluSurface}
+        coachAluBorderSoft={coachAluBorderSoft}
+        coachAluSubtle={coachAluSubtle}
       />
       <StudentRoutineActions
         variant="assign"

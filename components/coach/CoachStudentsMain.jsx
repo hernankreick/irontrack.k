@@ -76,6 +76,7 @@ export default function CoachStudentsMain({
   setRutinasSBEntrenador,
   sesionesGlobales,
   progresoGlobal,
+  historiaCompleta = null,
   showCoachDesktopShell,
   sugsOpen,
   setSugsOpen,
@@ -168,6 +169,7 @@ export default function CoachStudentsMain({
       setRutinasSBEntrenador={setRutinasSBEntrenador}
       sesionesGlobales={sesionesGlobales}
       progresoGlobal={progresoGlobal}
+      historiaCompleta={historiaCompleta}
       showCoachDesktopShell={showCoachDesktopShell}
       sugsOpen={sugsOpen}
       setSugsOpen={setSugsOpen}
