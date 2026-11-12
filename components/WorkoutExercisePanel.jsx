@@ -10,6 +10,7 @@ import { setsForLoadPrefill } from '../lib/rutinaCiclo.js';
 import { createRepsSwipeHandlers } from '../lib/repsSwipe.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
 import { generateOpId } from '../lib/pendingSyncQueue.js';
+import { resolveRestSeconds } from '../lib/restPause.js';
 import { createSetLogGuard } from '../lib/setLogGuard.js';
 import { validarKgEntrada } from '../lib/cargaSerie.js';
 import {
@@ -143,7 +144,7 @@ export function WorkoutExercisePanel(props) {
       const lastKg = setsHoy[0]?.kg || setsForLoadPrefill(progress[ex.id]?.sets, rutinaDatos)[0]?.kg || ex.kg || "";
       setKg(lastKg ? String(lastKg) : "");
       setReps(ex.reps ? String(ex.reps) : "");
-      setPause(ex.pause||90);
+      setPause(resolveRestSeconds(ex.pause));
       setNote("");
       setRpe(null);
     }
@@ -231,7 +232,8 @@ export function WorkoutExercisePanel(props) {
       setPrCelebration(function(prev){ return prev && prev.exId === ex.id && prev.kg === newPR.kg ? prev : {ejercicio: displayName, kg: newPR.kg}; });
       setTimeout(()=>setPrCelebration(null), 2500);
     }
-    if(pause>0) startTimer(pause, pat.color);
+    const restSecs = resolveRestSeconds(pause);
+    if(restSecs>0) startTimer(restSecs, pat.color);
     setNote("");
     setRpe(null);
     // Si completó todos los sets, avanzar al siguiente ejercicio
@@ -258,7 +260,7 @@ export function WorkoutExercisePanel(props) {
             <div style={{fontSize:12,color:"#64748B",fontWeight:600,marginTop:4,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
               <span style={{background:"#2563EB22",borderRadius:4,padding:"1px 6px",color:"#60A5FA",fontWeight:700}}>{ex.sets}×{ex.reps}</span>
               {ex.kg&&<span>{ex.kg}kg</span>}
-              {ex.pause&&<span>⏱ {fmtTime(ex.pause)}</span>}
+              {resolveRestSeconds(ex.pause)>0&&<span>⏱ {fmtTime(resolveRestSeconds(ex.pause))}</span>}
             </div>
           </div>
           <ExerciseVideoPlayButton

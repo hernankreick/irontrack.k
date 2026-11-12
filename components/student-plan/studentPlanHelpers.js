@@ -1,6 +1,7 @@
 import { normalizeFecha } from '../../lib/normalizeFecha.js';
 import { rowInCiclo } from '../../lib/rutinaCiclo.js';
 import { esPRNuevo } from '../../lib/metricas/pr.js';
+import { resolveRestSeconds } from '../../lib/restPause.js';
 import { firstNonEmptyString } from '../../lib/appPureHelpers.js';
 
 /**
@@ -10,8 +11,7 @@ import { firstNonEmptyString } from '../../lib/appPureHelpers.js';
 
 /** @param {string|number|undefined} pause */
 export function parsePauseSeconds(pause) {
-  const n = parseInt(String(pause), 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  return resolveRestSeconds(pause);
 }
 
 /**
