@@ -247,7 +247,8 @@ await test("render: titulo, ciclo, S1..S4, conteos, estados con texto e icono y 
     const txt = sinTags(html(modelo(A, RA, ROSTER), dark));
     assert.match(txt, /Cumplimiento del ciclo/);
     assert.match(txt, /Ciclo 1/);
-    assert.match(txt, /Acumulado: 5 de 6 sesiones · 83 %/);
+    assert.match(txt, /Cumplimiento de semanas evaluadas 5 de 6 sesiones · 83 %/);
+    assert.doesNotMatch(txt, /Acumulado/);
     assert.match(txt, /2 semanas evaluadas/);
     ["S1", "S2", "S3", "S4"].forEach((s) => assert.match(txt, new RegExp(s)));
     assert.match(txt, /3\/3/);
@@ -256,14 +257,15 @@ await test("render: titulo, ciclo, S1..S4, conteos, estados con texto e icono y 
     assert.match(txt, / Parcial/);
     assert.match(txt, / Pendiente · próxima/);
     assert.match(txt, /1 validada/);
-    assert.match(txt, /planificación actual de la rutina \(3 días por semana\)/);
+    assert.match(txt, /Se utiliza la planificación actual\. Los cambios de rutina pueden afectar la comparación con semanas anteriores\./);
+    assert.doesNotMatch(txt, /Calculado con|Si la rutina se modificó/);
   });
 });
 
 await test("render: no verificable => «Sin datos suficientes», sin conteo ni porcentaje inventado", () => {
   const h = html(modelo(A, RA, ROSTER, null), true);
   const txt = sinTags(h);
-  assert.match(txt, /Acumulado: Sin datos suficientes/);
+  assert.match(txt, /Cumplimiento de semanas evaluadas Sin datos suficientes/);
   assert.match(txt, /Sin datos suficientes/);
   assert.match(h, /data-estado="sin_datos"[\s\S]*?<svg[^>]*aria-hidden="true"/, "icono SVG decorativo junto al texto");
   assert.doesNotMatch(txt, /%/, "sin historial confiable no se muestra ningun porcentaje");
@@ -295,6 +297,45 @@ await test("demo sin login: varios alumnos, cargas y temas; sin Supabase ni alma
     .map(read).join("\n").replace(/\/\/.*$/gm, "");
   ["supabase", "fetch(", "localStorage", "sessionStorage", "App.jsx"].forEach((t) => assert.equal(src.includes(t), false, t));
   assert.match(read("components/demo/fichaAlumnoDemoMain.jsx"), /vista === 'cumplimiento' \? <CumplimientoCicloDemo \/> : <FichaAlumnoDemo \/>/);
+});
+
+// ---------------------------------------------------------------- PR #177: claridad (los valores no cambian)
+const acumTxt = (m) => sinTags(html(m, true)).match(/Cumplimiento de semanas evaluadas (.*?) (\d+ semanas? evaluadas?|El historial|Todavía)/);
+await test("PR #177: 5/8 = 63 % y 1/3 = 33 % (mismos valores, nuevo encabezado), en claro y oscuro", () => {
+  const r4 = rutina("rut-a", A, { semana_activa: 2, days: [{}, {}, {}, {}] });
+  const filas8 = [ses(A, "rut-a", 1, 0), ses(A, "rut-a", 1, 1), ses(A, "rut-a", 1, 2), ses(A, "rut-a", 1, 3), ses(A, "rut-a", 2, 1)];
+  const m8 = modelo(A, r4, filas8);
+  assert.deepEqual(m8.acumulado, { completados: 5, programados: 8, pct: 63, semanas: 2 });
+  const r3 = rutina("rut-b", B, { semana_activa: 1 });
+  const m3 = modelo(B, r3, [ses(B, "rut-b", 1, 0)]);
+  assert.deepEqual(m3.acumulado, { completados: 1, programados: 3, pct: 33, semanas: 1 });
+  [true, false].forEach((dark) => {
+    const t8 = sinTags(html(m8, dark)), t3 = sinTags(html(m3, dark));
+    assert.match(t8, /Cumplimiento de semanas evaluadas 5 de 8 sesiones · 63 % 2 semanas evaluadas/);
+    assert.match(t3, /Cumplimiento de semanas evaluadas 1 de 3 sesiones · 33 % 1 semana evaluada/);
+  });
+});
+
+await test("PR #177: una semana futura no cambia el porcentaje (ni aunque se le agreguen semanas futuras pendientes)", () => {
+  const base = modelo(B, rutina("rut-b", B, { semana_activa: 1 }), [ses(B, "rut-b", 1, 0)]);
+  assert.equal(base.semanas.filter((s) => s.futura).length, 3);
+  assert.ok(base.semanas.filter((s) => s.futura).every((s) => s.pctBarra === null));
+  assert.equal(acumTxt(base)[1], "1 de 3 sesiones · 33 %");
+});
+
+await test("PR #177: no verificables sin porcentajes inventados (ni en semanas ni en el encabezado)", () => {
+  const r3 = rutina("rut-a", A, { semana_activa: 3 });
+  const m = modelo(A, r3, ROSTER.concat([ses(A, "rut-a", 3, null)]));
+  const h = html(m, false);
+  [2, 3].forEach((w) => {
+    const ini = h.indexOf('data-qa="cumplimiento-semana-' + w + '"');
+    const fila = sinTags(h.slice(ini, h.indexOf("</li>", ini)));
+    assert.match(fila, /Sin datos suficientes/);
+    assert.doesNotMatch(fila, /%|\d\/3/);
+  });
+  assert.equal(acumTxt(m)[1], "3 de 3 sesiones · 100 %", "el encabezado solo suma la semana demostrada");
+  const sinHist = sinTags(html(modelo(A, RA, ROSTER, null), false));
+  assert.doesNotMatch(sinHist, /%/);
 });
 
 await test("cableado: App -> CoachStudentsMain -> StudentsSection -> StudentDetailPanel (solo entrenador)", () => {

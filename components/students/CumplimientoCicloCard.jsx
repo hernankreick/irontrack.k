@@ -56,8 +56,9 @@ export default function CumplimientoCicloCard({ modelo, darkMode, msg, textMain,
         <span data-qa-text style={{ fontSize: 12.5, fontWeight: 700, color: P.blueText, background: P.blueSoft, border: "1px solid " + P.blueBorder, borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" }}>{t("Ciclo", "Cycle")} {modelo.ciclo}</span>
       </div>
       <div style={{ background: P.inner, border: "1px solid " + P.border, borderRadius: 10, padding: "7px 10px", marginBottom: 8 }}>
-        <div data-qa-text data-qa="cumplimiento-acumulado" style={{ fontSize: 13.5, fontWeight: 700, color: acum ? textMain : C.sin_datos, lineHeight: 1.3 }}>
-          {acum ? null : <IconoEstado estado="sin_datos" color={C.sin_datos} />}{t("Acumulado: ", "Total: ")}{textoAcumulado}
+        <div data-qa-text data-qa="cumplimiento-acumulado-titulo" style={{ fontSize: 12, fontWeight: 600, color: textMuted, lineHeight: 1.3 }}>{t("Cumplimiento de semanas evaluadas", "Compliance of assessed weeks")}</div>
+        <div data-qa-text data-qa="cumplimiento-acumulado" style={{ fontSize: 13.5, fontWeight: 700, color: acum ? textMain : C.sin_datos, lineHeight: 1.3, marginTop: 1 }}>
+          {acum ? null : <IconoEstado estado="sin_datos" color={C.sin_datos} />}{textoAcumulado}
         </div>
         <div data-qa-text style={{ fontSize: 12, color: textMuted, lineHeight: 1.3, marginTop: 1 }}>{detalleAcumulado}</div>
       </div>
@@ -87,8 +88,7 @@ export default function CumplimientoCicloCard({ modelo, darkMode, msg, textMain,
         })}
       </ol>
       <p data-qa-text style={{ margin: "8px 0 0", fontSize: 12, color: textMuted, lineHeight: 1.35 }}>
-        {t("Calculado con la planificación actual de la rutina", "Based on the routine's current plan")} ({modelo.diasPorSemana} {modelo.diasPorSemana === 1 ? t("día por semana", "day per week") : t("días por semana", "days per week")}).
-        {" "}{t("Si la rutina se modificó, las semanas anteriores pueden no reflejar lo planificado entonces.", "If the routine was changed, past weeks may not reflect what was planned then.")}
+        {t("Se utiliza la planificación actual. Los cambios de rutina pueden afectar la comparación con semanas anteriores.", "The current plan is used. Routine changes may affect the comparison with earlier weeks.")}
         {modelo.huboReinicioDeSemana ? " " + t("Hubo un reinicio de semana: el intento anterior no cuenta.", "A week was restarted: the previous attempt does not count.") : ""}
       </p>
     </section>
