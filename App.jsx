@@ -150,6 +150,7 @@ import { reiniciarRutinaCiclo as reiniciarRutinaCicloLib } from './lib/reiniciar
 import { readCicloActual, tipoReinicioVigente, TIPO_REINICIO } from './lib/rutinaCiclo.js';
 // D76-05: fecha estable del entrenamiento activo (medianoche / recarga de Safari).
 import { fechaDeSesion, prepararInicioEntrenamiento } from './lib/workoutSessionDate.js';
+import { resolverSemanaEntrenamiento, cicloVivoDeSesion, textoConflictoSemana } from './lib/semanaEntrenamiento.js';
 import { resumirSeriesSinFinalizar } from './lib/orphanSessions.js';
 import { textoErrorReinicio, textoPlanReiniciado, textoSeriesSinFinalizar } from './lib/reinicioMensajes.js';
 import RoutineRestartModal from './components/routines/RoutineRestartModal.jsx';
@@ -2106,8 +2107,25 @@ function GymApp() {
     const effectiveCurrentWeek = (Number.isFinite(persistedWeekNumForSet) && persistedWeekNumForSet >= 1 && persistedWeekNumForSet <= 4)
       ? (persistedWeekNumForSet - 1)
       : currentWeek;
-    const weekForSet = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : effectiveCurrentWeek;
-    const cicloForSet = readCicloActual(routines[0] && routines[0].datos);
+    const semanaLegadaIdx = Number.isFinite(Number(weekOverride)) ? Number(weekOverride) : effectiveCurrentWeek;
+    const cicloLegado = readCicloActual(routines[0] && routines[0].datos);
+    // P0-1: en el flujo del alumno la serie usa la MISMA semana y ciclo que la sesion que se va a finalizar (congelados al iniciar, la semana que
+    // el alumno ve; lib/semanaEntrenamiento.js). Si la semana visible o el ciclo de la rutina del entrenamiento cambiaron, no se guarda la serie.
+    const semRes = (sessionData?.role === "alumno" && !readOnly)
+      ? resolverSemanaEntrenamiento({
+          session: session,
+          semanaVisibleIdx: typeof weekOverride === "number" ? weekOverride : null,
+          cicloVivo: cicloVivoDeSesion(routines, session),
+          semanaLegadaIdx: semanaLegadaIdx,
+          cicloLegado: cicloLegado,
+        })
+      : { ok: true, semanaProgreso: semanaLegadaIdx, ciclo: cicloLegado };
+    if (!semRes.ok) {
+      toast2(textoConflictoSemana(semRes.motivo, es));
+      return false;
+    }
+    const weekForSet = semRes.semanaProgreso;
+    const cicloForSet = semRes.ciclo;
     // D76-03: el panel pasa el opId del intento (lib/setLogGuard.js): el reintento del MISMO registro tras un error reutiliza el mismo id.
     const opId = isUuid(opIdIntento) ? opIdIntento : generateOpId();   // identidad estable de esta serie: progreso.id en el POST y en todos los reintentos
     // D7.1: la serie local guarda su ciclo (el mismo que va a Supabase) para no mezclarla con el ciclo nuevo tras un reinicio.
