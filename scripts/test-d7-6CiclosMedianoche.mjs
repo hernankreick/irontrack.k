@@ -378,9 +378,10 @@ await t("cambio de alumno: B no ve ni envia los pendientes de A y no recupera su
   assert.equal((await w.flush(B)).sent, 0);
   assert.equal(w.srv.posts.length, 0);
   assert.equal(visiblePendingItems(w.storage, A).length, 1, "los pendientes de A quedan en el dispositivo");
-  // B escribio su propia ancla; un cierre de B nunca borra la de A (y viceversa).
-  assert.equal(leerSesionActiva(w.storage).alumnoId, B);
-  assert.equal(cerrarSesionActiva(w.storage, { alumnoId: A, session: { rId: w.rutina.id, dIdx: 0, startTime: T_2355 } }), false);
+  // PR-2 (transitorio): B NO sobrescribe el ancla vigente de A; un cierre de B nunca borra la de A (y viceversa).
+  assert.equal(leerSesionActiva(w.storage).alumnoId, A);
+  assert.equal(cerrarSesionActiva(w.storage, { alumnoId: B, session: { rId: w.rutina.id, dIdx: 0, startTime: T_2355 } }), false);
+  assert.equal(leerSesionActiva(w.storage).alumnoId, A, "el cierre de B no borro el ancla de A");
 });
 
 await t("series con y sin ciclo explicito: payload, hidratacion, filtro del dia y precarga", () => {
@@ -529,7 +530,7 @@ await t("el ancla solo guarda ids, numeros y la fecha (sin datos personales)", (
   const w = mundo(T_2355);
   w.iniciar();
   const raw = JSON.parse(w.storage.getItem(ACTIVE_WORKOUT_KEY));
-  assert.deepEqual(Object.keys(raw).sort(), ["alumnoId", "ciclo", "dIdx", "fecha", "rId", "semana", "startTime", "v"]);
+  assert.deepEqual(Object.keys(raw).sort(), ["alumnoId", "ciclo", "dIdx", "fecha", "rId", "semana", "sessionId", "startTime", "v"]);
 });
 
 console.log("\n" + n + " pruebas OK" + (failed ? ", " + failed + " FALLIDAS" : ""));
