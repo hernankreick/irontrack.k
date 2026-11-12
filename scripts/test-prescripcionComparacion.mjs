@@ -308,8 +308,8 @@ test("planificacion del servidor diferente de la mostrada => ambigua; sin huella
 });
 
 // ---------------------------------------------------------------- finalizacion
-test("sesion sin finalizar (pendiente, completada=false, sin marca o validada por el coach) => sin_finalizar", () => {
-  [{ estado: "pendiente", completada: undefined }, { completada: false }, { completada: undefined }, { origen: "validada_coach" }].forEach((over) => {
+test("sesion sin finalizar (pendiente, completada=false, sin marca) => sin_finalizar; la ausencia de marca NO se acepta como completa", () => {
+  [{ estado: "pendiente", completada: undefined }, { completada: false }, { completada: undefined }, { completada: null }, { completada: "true" }, { estado: "" , completada: undefined }].forEach((over) => {
     const r = comparar({ sesion: sesion(over) });
     assert.equal(r.estado, E.SIN_FINALIZAR, JSON.stringify(over));
     assert.equal(r.ejercicios, null);
@@ -386,13 +386,12 @@ test("cargas: numerica y rango; vacio, texto/% y valor ejecutado cero o invalido
   assert.equal(ej(nulo, "main", 0).variables.reps.estado, "comparable");
 });
 
-test("peso corporal: kg 0 cumple; con carga ejecutada no es comparable; tiempo se compara en segundos", () => {
+test("peso corporal: kg 0 cumple; con carga ejecutada no es comparable", () => {
   const r = comparar();
   const plancha = ej(r, "main", 3);
   assert.equal(plancha.variables.kg.resultado, R.CUMPLE);
   assert.equal(plancha.variables.reps.prescrito.tipo, "tiempo");
-  assert.equal(plancha.variables.reps.ejecutado.unidad, "s");
-  assert.equal(plancha.variables.reps.resultado, R.MIXTO); // 40 s por debajo, 50 s por encima de 45 s
+  assert.equal(plancha.variables.reps.estado, "no_comparable"); // ver prueba "tiempo: unidad no garantizada"
   const lastre = comparar({ series: [serie("main", 3, "ex-plancha", 10, 45)] });
   assert.equal(ej(lastre, "main", 3).variables.kg.motivo, "peso_corporal_con_carga_ejecutada");
 });
@@ -430,6 +429,89 @@ test("ejercicio prescrito sin ninguna serie y registro completo => series por_de
   assert.equal(sq.variables.series.omitidas, 3);
   assert.equal(sq.variables.reps.motivo, "sin_series_ejecutadas");
   assert.equal(sq.estado, E.VERIFICABLE);
+});
+
+// ---------------------------------------------------------------- revision final (PR #178)
+test("tiempo: unidad no garantizada => reps no_comparable para cualquier prescripcion por tiempo y cualquier valor ejecutado", () => {
+  ["45s", "30-45 s", "2 min", "1:30", '60"'].forEach((t) => {
+    const rt = rutina(); rt.datos.days[0].exercises[3].reps = t;
+    const c = copiaRow({}, {}, rt);
+    [45, 2, 120, 1].forEach((valor) => {
+      const r = compararPrescripcionEjecucion({
+        sesion: sesion(), copias: [c], series: [serie("main", 3, "ex-plancha", 0, valor)],
+        contexto: { registroSeriesCompleto: true, planificacionMostradaHash: c.prescripcion_hash },
+      });
+      assert.equal(r.estado, E.VERIFICABLE, t);
+      const v = ej(r, "main", 3).variables.reps;
+      assert.deepEqual([v.estado, v.motivo, v.resultado], ["no_comparable", "unidad_de_series_no_garantizada", "no_comparable"], t + "/" + valor);
+      assert.equal(v.ejecutado, null);
+    });
+  });
+  // las series (cantidad) y el kg de ese mismo ejercicio siguen siendo comparables
+  const r = comparar();
+  assert.equal(ej(r, "main", 3).variables.series.estado, "comparable");
+  assert.equal(ej(r, "main", 3).variables.kg.estado, "comparable");
+  // la prescripcion por tiempo sigue interpretandose (para la UI), solo que no se compara
+  assert.equal(interpretarPrescripcion("45s").tipo, "tiempo");
+});
+
+test("validacion manual del entrenador => validacion_manual_sin_series (no sin_finalizar, ni sin_copia aunque no haya copia)", () => {
+  [{ origen: "validada_coach" }, { origen: "validada_coach", completada: false }, { origen: "validada_coach", completada: undefined }].forEach((over) => {
+    [[], [copiaRow()]].forEach((copias) => {
+      const r = comparar({ sesion: sesion(over), copias });
+      assert.equal(r.estado, E.VALIDACION_MANUAL_SIN_SERIES, JSON.stringify(over));
+      assert.equal(r.verificable, false);
+      assert.equal(r.ejercicios, null);
+      assert.equal(r.resumen, null);
+      assert.ok(motivos(r).includes("validacion_manual_sin_series:validada_por_el_entrenador"));
+      assert.equal(motivos(r).some((m) => m.startsWith("sin_finalizar:")), false);
+    });
+  });
+  // una sesion NO validada manualmente sigue siendo sin_finalizar
+  assert.equal(comparar({ sesion: sesion({ completada: false }) }).estado, E.SIN_FINALIZAR);
+});
+
+test("lista de series vacia NO implica ejercicios omitidos sin evidencia explicita de registro completo", () => {
+  const h = copiaRow().prescripcion_hash;
+  const sin = (registroSeriesCompleto, series) => compararPrescripcionEjecucion({
+    sesion: sesion(), copias: [copiaRow()], series, contexto: { registroSeriesCompleto, planificacionMostradaHash: h },
+  });
+  [[false, []], [undefined, []], ["true", []], [1, []], [true, undefined], [true, null]].forEach(([flag, series]) => {
+    const r = sin(flag, series);
+    assert.equal(r.estado, E.VERIFICABLE);
+    r.ejercicios.forEach((e) => {
+      const v = e.variables.series;
+      assert.equal(v.estado, "no_comparable", JSON.stringify([flag, series]));
+      assert.notEqual(v.resultado, R.POR_DEBAJO);
+      assert.equal(v.omitidas, undefined);
+    });
+    assert.equal(JSON.stringify(r).includes('"omitidas"'), false);
+  });
+  // con evidencia explicita (true + lista provista) si se informa como omitida
+  const ok = sin(true, []);
+  assert.equal(ej(ok, "main", 0).variables.series.omitidas, 3);
+  // aun con la marca explicita, las omitidas nunca cuentan como cumplidas
+  assert.equal(ok.resumen.variables.series.cumplen, 0);
+});
+
+test("copia corrupta, planificacion distinta y series sin vinculo: sin comparacion, sin ejercicios, sin porcentajes", () => {
+  const corrupta = copiaRow(); corrupta.snapshot.ejercicios[1].kg = "999";
+  const mostradaOtra = rutina(); mostradaOtra.datos.days[0].exercises[0].reps = "5";
+  const hOtra = buildPrescripcionSnapshot({ rutina: mostradaOtra, alumnoId: ALU, diaIdx: 0, semana: 1, fecha: FECHA }).hash;
+  const casos = [
+    [comparar({ copias: [corrupta] }), E.SIN_COPIA],
+    [comparar({ contexto: { registroSeriesCompleto: true, planificacionMostradaHash: hOtra } }), E.AMBIGUA],
+    [comparar({ series: seriesCompletas().map((s) => { const c = clone(s); delete c.bloque; delete c.pos; return c; }).map((s) => { delete s.sesion_id; return s; }) }), E.SERIES_SIN_VINCULO],
+    [comparar({ series: seriesCompletas().concat([serie("main", 1, "ex-sq", 50, 8)]) }), E.SERIES_SIN_VINCULO], // vinculo incoherente
+  ];
+  casos.forEach(([r, esperado]) => {
+    assert.equal(r.estado, esperado);
+    assert.equal(r.verificable, false);
+    assert.equal(r.ejercicios, null);
+    assert.equal(r.resumen, null);
+    const json = JSON.stringify(r);
+    ["porcentajes", "variables", "resultado", "por_debajo", "cumple"].forEach((t) => assert.equal(json.includes(t), false, esperado + " no debe contener " + t));
+  });
 });
 
 // ---------------------------------------------------------------- porcentajes
