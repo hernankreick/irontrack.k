@@ -166,7 +166,7 @@ await t("4. recarga a las 00:05: se recupera el mismo entrenamiento con fecha 5/
   assert.equal(r1.motivo, "sin_ancla");
   assert.ok(storage.getItem(ACTIVE_WORKOUT_KEY), "ancla escrita");
   const ancla = leerSesionActiva(storage);
-  assert.deepEqual(Object.keys(ancla).sort(), ["alumnoId", "ciclo", "dIdx", "fecha", "rId", "semana", "startTime", "v"]);
+  assert.deepEqual(Object.keys(ancla).sort(), ["alumnoId", "ciclo", "dIdx", "fecha", "rId", "semana", "sessionId", "startTime", "v"]);
   // "Recarga": la session en memoria se perdio; el alumno toca Iniciar de nuevo (startTime nuevo).
   const r2 = iniciar(storage, { now: T_0005 });
   assert.equal(r2.recuperada, true);
@@ -248,7 +248,8 @@ await t("7. ancla del alumno A no se usa para el alumno B", () => {
   assert.equal(rB.motivo, "otro_alumno");
   assert.equal(rB.session.fecha, F6);
   assert.equal(rB.session.startTime, T_0010);
-  assert.equal(String(leerSesionActiva(storage).alumnoId), ALUMNO_B, "el ancla pasa a ser de B");
+  // PR-2 (decision transitoria): el ancla vigente de A NO se sobrescribe; B sigue solo en memoria (su recuperacion tras recarga no esta garantizada).
+  assert.equal(String(leerSesionActiva(storage).alumnoId), ALUMNO_A, "el ancla vigente de A se conserva");
 });
 
 // ───────── 8. ciclo nuevo + medianoche ─────────
