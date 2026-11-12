@@ -20,6 +20,7 @@ import {
   sessionAlreadyExists,
 } from '../lib/workoutSession.js';
 import { readCicloActual, tipoReinicioVigente } from '../lib/rutinaCiclo.js';
+import { resolverSemanaEntrenamiento, cicloVivoDeSesion, textoConflictoSemana } from '../lib/semanaEntrenamiento.js';
 import { textoSesionTrasReinicio } from '../lib/reinicioMensajes.js';
 import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
 // D76-05: fecha estable del entrenamiento activo (medianoche / recarga de Safari).
@@ -151,12 +152,31 @@ export function WorkoutScreen(props) {
     // estado local, para no marcar el día completado bajo la semana equivocada.
     const persistedWeekNum = Number(r && r.datos && r.datos.semana_activa);
     const hasPersistedWeek = Number.isFinite(persistedWeekNum) && persistedWeekNum >= 1 && persistedWeekNum <= 4;
-    const effectiveWeek = hasPersistedWeek ? (persistedWeekNum - 1) : currentWeek;
+    const semanaLegadaIdx = hasPersistedWeek ? (persistedWeekNum - 1) : currentWeek;
+    // P0-1: el alumno finaliza con la MISMA semana y ciclo con que se guardaron sus series (congelados al iniciar: la semana que ve, la de la
+    // prescripcion). Si la semana visible o el ciclo cambiaron durante el entrenamiento, no se guarda una sesion contradictoria.
+    // Entrenador y enlace compartido, y sesiones sin semana congelada: calculo anterior (semana_activa persistida o currentWeek).
+    const esFlujoAlumno = !readOnly && sessionData?.role === "alumno" && !!sessionData?.alumnoId;
+    const semanaRes = esFlujoAlumno
+      ? resolverSemanaEntrenamiento({
+          session: session,
+          semanaVisibleIdx: typeof currentWeek === "number" ? currentWeek : null,
+          cicloVivo: cicloVivoDeSesion([r], session),
+          semanaLegadaIdx: semanaLegadaIdx,
+          cicloLegado: readCicloActual(r && r.datos),
+        })
+      : null;
+    if (semanaRes && !semanaRes.ok) {
+      setFinalizeError(textoConflictoSemana(semanaRes.motivo, es));
+      if (typeof toast2 === "function") toast2(es ? "No se guardó: la semana del plan cambió" : "Not saved: the plan week changed");
+      return;
+    }
+    const effectiveWeek = semanaRes && semanaRes.semanaIdx != null ? semanaRes.semanaIdx : semanaLegadaIdx;
     const dayKey = buildCompletedDayKey(session, effectiveWeek);
     const newCompleted = mergeCompletedDay(completedDays, dayKey);
     const totalDays = r ? r.days.length : 1;
-    const semanaParaGuardar = effectiveWeek + 1;
-    const cicloActual = readCicloActual(r && r.datos);
+    const semanaParaGuardar = semanaRes && semanaRes.semanaSesion != null ? semanaRes.semanaSesion : effectiveWeek + 1;
+    const cicloActual = semanaRes && semanaRes.ciclo != null ? semanaRes.ciclo : readCicloActual(r && r.datos);
     // D76-05: la sesion se guarda (y se busca para no duplicarla) con la fecha del entrenamiento; horaFin sigue siendo la hora real.
     const hoyFin = fechaDeSesion(session, Date.now());
     const horaFin = new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
