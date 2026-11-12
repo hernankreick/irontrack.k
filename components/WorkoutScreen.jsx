@@ -20,7 +20,7 @@ import {
   sessionAlreadyExists,
 } from '../lib/workoutSession.js';
 import { readCicloActual, tipoReinicioVigente } from '../lib/rutinaCiclo.js';
-import { resolverSemanaEntrenamiento, cicloVivoDeSesion, textoConflictoSemana } from '../lib/semanaEntrenamiento.js';
+import { resolverSemanaEntrenamiento, cicloVivoDeSesion, textoConflictoSemana, semanaIdxValida } from '../lib/semanaEntrenamiento.js';
 import { textoSesionTrasReinicio } from '../lib/reinicioMensajes.js';
 import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
 // D76-05: fecha estable del entrenamiento activo (medianoche / recarga de Safari).
@@ -66,7 +66,13 @@ export function WorkoutScreen(props) {
   const exercises = [...(activeDay?.warmup || []), ...(activeDay?.exercises || [])];
   // Prescripción de la SEMANA ACTIVA (series/reps/kg/pausa de ex.weeks[currentWeek], base solo si la semana no define el dato): la misma
   // que muestra Inicio. Alimenta lo que se ve, el total de series, la precarga y la validación del panel. No toca la rutina ni lo registrado.
-  const ex        = resolveExerciseForWeek(exercises[activeExIdx], currentWeek);
+  // P0-1: con el entrenamiento del alumno abierto, la prescripcion, el progreso y el registro de series usan SIEMPRE la semana congelada al iniciar
+  // (session.semanaIdx), aunque una reconciliacion automatica cambie la semana del plan a mitad de sesion. Sin semana congelada (entrenador,
+  // enlace compartido, sesiones anteriores): la semana vigente, como antes.
+  const semanaMostrada = (!readOnly && sessionData?.role === "alumno" && semanaIdxValida(session && session.semanaIdx) != null)
+    ? session.semanaIdx
+    : currentWeek;
+  const ex        = resolveExerciseForWeek(exercises[activeExIdx], semanaMostrada);
   const info      = ex ? allEx.find(e => e.id === ex.id) : null;
   const pat       = info
     ? ({ empuje:{icon:"E",color:blue}, traccion:{icon:"T",color:blue},
@@ -82,7 +88,7 @@ export function WorkoutScreen(props) {
     exercise: ex,
     progress: progress,
     date: hoy,
-    currentWeek: currentWeek,
+    currentWeek: semanaMostrada,
     ciclo: cicloVigente,
   });
   const setsHoy = exerciseStatus.setsToday;
@@ -92,7 +98,7 @@ export function WorkoutScreen(props) {
   const ultimoSet = exerciseStatus.lastSet;
   const pr = exerciseStatus.pr;
 
-  const dayProgress = calculateDayProgress(exercises, progress, hoy, currentWeek, { checkWeek: false, ciclo: cicloVigente });
+  const dayProgress = calculateDayProgress(exercises, progress, hoy, semanaMostrada, { checkWeek: false, ciclo: cicloVigente });
   const totalExDone = dayProgress.done;
   const pct = dayProgress.pct;
   const workoutReadyToFinish = exercises.length > 0 && totalExDone >= exercises.length;
@@ -154,7 +160,8 @@ export function WorkoutScreen(props) {
     const hasPersistedWeek = Number.isFinite(persistedWeekNum) && persistedWeekNum >= 1 && persistedWeekNum <= 4;
     const semanaLegadaIdx = hasPersistedWeek ? (persistedWeekNum - 1) : currentWeek;
     // P0-1: el alumno finaliza con la MISMA semana y ciclo con que se guardaron sus series (congelados al iniciar: la semana que ve, la de la
-    // prescripcion). Si la semana visible o el ciclo cambiaron durante el entrenamiento, no se guarda una sesion contradictoria.
+    // prescripcion). Un avance de la semana del plan durante el entrenamiento NO bloquea (la semana de series y sesion es la congelada);
+    // un cambio local de ciclo si: no se guarda una sesion contradictoria.
     // Entrenador y enlace compartido, y sesiones sin semana congelada: calculo anterior (semana_activa persistida o currentWeek).
     const esFlujoAlumno = !readOnly && sessionData?.role === "alumno" && !!sessionData?.alumnoId;
     const semanaRes = esFlujoAlumno
@@ -168,7 +175,7 @@ export function WorkoutScreen(props) {
       : null;
     if (semanaRes && !semanaRes.ok) {
       setFinalizeError(textoConflictoSemana(semanaRes.motivo, es));
-      if (typeof toast2 === "function") toast2(es ? "No se guardó: la semana del plan cambió" : "Not saved: the plan week changed");
+      if (typeof toast2 === "function") toast2(es ? "No se guardó: el plan fue reiniciado" : "Not saved: the plan was restarted");
       return;
     }
     const effectiveWeek = semanaRes && semanaRes.semanaIdx != null ? semanaRes.semanaIdx : semanaLegadaIdx;
@@ -248,7 +255,8 @@ export function WorkoutScreen(props) {
         // Persistencia confirmada: recién ahora se aplican los efectos de "terminado".
         // D76-05: entrenamiento cerrado; se borra su ancla (solo si es de esta sesion) para que un nuevo inicio no lo continue.
         try { cerrarSesionActiva(localStorage, { alumnoId: sessionData.alumnoId, session: session }); } catch (e) {}
-        if (hasPersistedWeek && effectiveWeek !== currentWeek) {
+        // Con semana congelada (P0-1) la semana local NO se re-sincroniza hacia atras: la semana vigente puede haber avanzado durante el entrenamiento.
+        if (hasPersistedWeek && effectiveWeek !== currentWeek && !(semanaRes && semanaRes.fuente === "sesion")) {
           setCurrentWeek(effectiveWeek);
         }
         const weekAdvanceFailed = outcome.week.advance === "failed" || outcome.week.advance === "unverified";
@@ -278,7 +286,7 @@ export function WorkoutScreen(props) {
           }
         } else if (outcome.week.advance === "ok") {
           setCompletedDays(prev => prev.filter(k => !k.endsWith("-w"+effectiveWeek)));
-          setCurrentWeek(effectiveWeek + 1);
+          setCurrentWeek(function (prev) { return Math.max(Number(prev) || 0, effectiveWeek + 1); });   // nunca retrocede la semana local
           if (r && r.id && typeof onWeekAdvanced === "function") onWeekAdvanced(r.id, effectiveWeek + 2);
           try { localStorage.setItem("it_last_week_advance_date", todayStr); } catch (e) {}
         } else if (weekAdvanceFailed) {
@@ -382,7 +390,7 @@ export function WorkoutScreen(props) {
           exercise: e,
           progress: progress,
           date: hoy,
-          currentWeek: currentWeek,
+          currentWeek: semanaMostrada,
           checkWeek: false,
           ciclo: cicloVigente,
         })}
@@ -412,7 +420,7 @@ export function WorkoutScreen(props) {
             textMain={textMain} textMuted={textMuted}
             sessionPRList={sessionPRList}
             videoOverrides={videoOverrides} setVideoModal={setVideoModal}
-            currentWeek={currentWeek}
+            currentWeek={semanaMostrada}
             logSet={logSet} startTimer={startTimer}
             setPrCelebration={setPrCelebration} progress={progress}
             rutinaDatos={activeR && activeR.datos}

@@ -204,7 +204,9 @@ await test("duracion estimada del dia (Inicio): usa la pausa de la semana", () =
 
 await test("alcance: WorkoutScreen alimenta estado y panel con la prescripcion de la semana; el efecto de precarga no depende de la semana (no pisa cambios del alumno)", () => {
   const ws = read("components/WorkoutScreen.jsx");
-  assert.match(ws, /const ex\s+= resolveExerciseForWeek\(exercises\[activeExIdx\], currentWeek\);/);
+  // P0-1: la semana mostrada es la congelada al iniciar (session.semanaIdx) en el flujo del alumno; sin ella, currentWeek como antes.
+  assert.match(ws, /const ex\s+= resolveExerciseForWeek\(exercises\[activeExIdx\], semanaMostrada\);/);
+  assert.match(ws, /: currentWeek;\s*\n\s*const ex\s+=/, "sin semana congelada se usa la semana vigente (comportamiento anterior)");
   assert.match(ws, /getWorkoutExerciseStatus\(\{\s*exercise: ex,/);
   const panelSrc = read("components/WorkoutExercisePanel.jsx");
   assert.match(panelSrc, /\}, \[activeExIdx\]\);/, "la precarga sigue ligada solo al cambio de ejercicio");
