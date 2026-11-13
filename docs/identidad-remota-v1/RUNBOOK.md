@@ -56,3 +56,20 @@ NO-GO ante cualquier desvío no explicado. Post-migración GO a activar solo si 
 2. **Grants solo por columna (P8 > 0) rompen también los inserts ANTIGUOS tras migrar**, no solo la bandera: con `Prefer: return=representation` PostgREST hace `RETURNING *` e incluye las columnas nuevas, y sin `SELECT` sobre ellas el insert falla con `42501`. Si P8 da más de 0: agregar `SELECT` (e `INSERT`) de las 5 columnas nuevas **antes** de correr `1_migracion.sql`, no solo antes de activar la bandera.
 3. Un `CREATE INDEX CONCURRENTLY` que falla por duplicados deja un índice inválido y `IF NOT EXISTS` lo saltea al reintentar: hay que borrarlo con `DROP INDEX CONCURRENTLY` (V6 lo detecta). Cubierto por prueba.
 4. `CREATE INDEX CONCURRENTLY` espera a las transacciones previas: con una sesión larga abierta el paso B queda esperando (no falla). Revisar P12 antes de correrlo.
+
+## Estado del preflight REAL (Supabase de producción) — actualizado tras el PR #191
+| Control | Estado |
+|---|---|
+| P1–P12 contra Supabase | **No ejecutado por el agente**: la sesión no tiene credenciales ni herramienta de solo lectura hacia Supabase (el hook y `settings.json` bloquean `psql`/`supabase`/`curl` a `supabase.co` y los `.env`). Lo único comprobado fuera de este repo es lo que informó el dueño (tablas normales, PK uuid, sin triggers ni publicaciones Realtime, sin conflictos de nombres, RLS habilitada con `acceso_total`, columnas nuevas ausentes). |
+| P8 (grants por columna), P9 (RPC), P6 (vistas), P12 (transacciones largas) | **Sin resultado real todavía.** El dueño debe correr `0_preflight.sql` (solo lectura, rol de lectura) y guardar la salida; P9 ya no aborta. |
+
+### GO / NO-GO actual
+**NO-GO para migrar y para activar la bandera en producción**, por incumplimientos del runbook que no se resuelven en código:
+1. Preflight real incompleto (P6, P8, P9, P12 sin salida comprobada).
+2. RLS permisiva `acceso_total` sin corregir (otro carril): la migración no la cambia ni la agrava, pero V8(b) («escribir con otro `alumno_id` es rechazado») **no puede pasar** mientras exista; no se declara GO con ese punto abierto.
+3. Falta la prueba en un branch de Supabase de prueba (PostgREST real, JWT, V8 a–f).
+
+Cuando 1–3 estén cumplidos: migración (A, B, C) → V1–V8 → recién entonces la bandera solo en Preview.
+
+## Dependencia de «Prescrito vs. ejecutado»
+La comparación necesita (a) la identidad de esta migración y (b) la tabla de copias de `docs/prescripcion-copias-v1/` (propuesta, no aplicada, sin escritura desde la app). Hasta entonces cada sesión devuelve un estado explícito (`sin_copia`, `sin_finalizar`, `series_sin_vinculo`); ver `lib/prescritoEjecutadoResumen.js`. No hay copias retroactivas: las sesiones anteriores quedan sin comparar.
