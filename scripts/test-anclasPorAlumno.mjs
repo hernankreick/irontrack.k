@@ -141,6 +141,48 @@ test("localStorage inaccesible o ausente: no lanza y no hay perdida", () => {
   }
 });
 
+// ───────────── error de lectura distinto de clave ausente
+const memLecturaFalla = (init, clavesQueFallan) => {
+  const base = mem(init);
+  return Object.assign(base, { getItem: (k) => { if (clavesQueFallan.includes(k)) throw new Error("lectura"); return base.m.has(k) ? base.m.get(k) : null; } });
+};
+test("getItem falla SOLO para la clave individual: la migracion aborta sin escribir, sobrescribir ni borrar", () => {
+  const ind = J(v2()); const glob = J(v2({ sessionId: "9b2e6a40-1c3d-4e5f-8a7b-0c1d2e3f4a5b", startTime: T2355 + 600000 }));
+  const st = memLecturaFalla([[KA, ind], [ACTIVE_WORKOUT_KEY, glob]], [KA]);
+  const antes = [...st.m.entries()];
+  assert.equal(migrarAnclaGlobal(st, T2355 + 700000).estado, "error_almacenamiento");
+  assert.deepEqual([...st.m.entries()], antes, "ninguna clave cambio");
+  assert.equal(st.m.get(KA), ind, "la individual valida sigue intacta");
+});
+test("getItem falla para la clave individual sin individual previa: tampoco se escribe (puede existir una que no se ve)", () => {
+  const glob = J(v2()); const st = memLecturaFalla([[ACTIVE_WORKOUT_KEY, glob]], [KA]);
+  assert.equal(migrarAnclaGlobal(st, T2355 + 1).estado, "error_almacenamiento");
+  assert.deepEqual([...st.m.entries()], [[ACTIVE_WORKOUT_KEY, glob]]);
+});
+test("getItem falla para la global: error_almacenamiento, nada cambia; recuperada tras volver el acceso", () => {
+  const glob = J(v2()); const st = memLecturaFalla([[ACTIVE_WORKOUT_KEY, glob]], [ACTIVE_WORKOUT_KEY]);
+  assert.equal(migrarAnclaGlobal(st, T2355 + 1).estado, "error_almacenamiento");
+  assert.deepEqual([...st.m.entries()], [[ACTIVE_WORKOUT_KEY, glob]]);
+  const ok = mem([[ACTIVE_WORKOUT_KEY, glob]]); assert.equal(migrarAnclaGlobal(ok, T2355 + 1).estado, "migrada");
+});
+test("inicio con lectura individual fallida: no recupera a ciegas ni sobrescribe la individual; sesion en memoria con identidad", () => {
+  const ind = J(v2()); const st = memLecturaFalla([[KA, ind]], [KA]);
+  const r = iniEn(st, A, T2355 + 1000);
+  assert.equal(r.recuperada, false); assert.ok(r.session.identity); assert.equal(st.m.get(KA), ind, "no se sobrescribio");
+  assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: { rId: R, dIdx: 0, startTime: T2355, identity: { sessionId: UUID_A } } }), false);
+  assert.equal(st.m.get(KA), ind);
+});
+test("lectura individual fallida con global valida del mismo alumno: no se usa ni se borra la global", () => {
+  const glob = J(v2()); const st = memLecturaFalla([[ACTIVE_WORKOUT_KEY, glob]], [KA]);
+  assert.equal(leerSesionActiva(st, A), null);
+  const r = iniEn(st, A, T2355 + 1000); assert.equal(st.m.get(ACTIVE_WORKOUT_KEY), glob); assert.equal(st.m.has(KA), false);
+  assert.ok(r.session.identity);
+});
+test("lectura que vuelve a funcionar: la migracion y la recuperacion siguen intactas", () => {
+  const ind = J(v2()); const st = mem([[KA, ind], [ACTIVE_WORKOUT_KEY, ind]]);
+  assert.equal(migrarAnclaGlobal(st, T2355 + 1).estado, "ya_migrada"); assert.equal(leerSesionActiva(st, A).sessionId, UUID_A);
+});
+
 // ───────────── global vencida / corrupta
 test("global vencida, futura o corrupta: no se migra, no se reutiliza y no se borra", () => {
   const casos = [["vencida", J(v2()), T2355 + ACTIVE_WORKOUT_MAX_MS + 1], ["invalida", J(v2()), T2355 - 1000], ["invalida", "{roto", T2355],
