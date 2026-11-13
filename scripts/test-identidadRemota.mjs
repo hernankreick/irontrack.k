@@ -220,6 +220,18 @@ await test("13 duplicados de sesion: sesion_uid repetido (23505) no crea otra fi
   const b2 = await persistSessionConfirmed(Object.assign({}, base, { sb: s2.sb, payload: payloadSesion(v1, true) }));
   assert.equal(b1.confirmed && b2.confirmed, true); assert.equal(s2.ses.length, 1); assert.equal(b2.source, "existing");
 });
+await test("13b reintento con clave fecha/semana distinta pero mismo sesion_uid (23505): se confirma por el uid, sin segunda fila", async () => {
+  reset(); const st = memStorage(); const a = ini(st); const srv = servidor("migrado", { lecturaVieja: true });
+  const payload = payloadSesion(a.session, true);
+  const base = { sb: srv.sb, alumnoId: A, payload, date: a.session.fecha, dayIndex: 0, weekToSave: 1, ciclo: 1, rutinaId: R, isOnline: true };
+  assert.equal((await persistSessionConfirmed(base)).confirmed, true);
+  const lee = Object.assign({}, srv.sb, { getSesiones: (() => { let n = 0; return async () => (n++ === 0 ? [] : srv.ses.slice()); })() });
+  const o = await persistSessionConfirmed(Object.assign({}, base, { sb: lee, weekToSave: 2, date: "6/11/2026" }));
+  assert.equal(o.confirmed, true); assert.equal(srv.ses.length, 1);
+  // otro uid con clave distinta NO se confunde
+  const otro = await persistSessionConfirmed(Object.assign({}, base, { payload: Object.assign({}, payload, { sesion_uid: "55555555-5555-4555-8555-555555555555" }), weekToSave: 2, date: "6/11/2026" }));
+  assert.equal(otro.confirmed, true); assert.equal(srv.ses.length, 2); reset();
+});
 await test("14-20 ejercicio repetido, dos sesiones del dia, dos alumnos, cambio de rutina/ciclo, semana congelada y medianoche: el servidor migrado conserva cada identidad", async () => {
   reset(); const st = memStorage(); const srv = servidor("migrado");
   const t1 = new Date(2026, 10, 5, 23, 55).getTime(), t2 = new Date(2026, 10, 6, 0, 15).getTime();
