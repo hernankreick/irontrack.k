@@ -4,7 +4,7 @@ Estado: **preparada y DESACTIVADA**. Sin la variable de activación, el frontend
 
 ## Contrato
 `progreso`: `sesion_uid uuid`, `bloque text ('warmup'|'main')`, `pos smallint` (todos nullable).
-`sesiones`: `sesion_uid uuid` (índice único parcial), `identidad_v smallint` (=1). Migración propuesta: `docs/identidad-remota-migracion-propuesta.md` (no ejecutada, vive en docs/ porque `sql/` está bloqueado para agentes, sin backfill, sin FK, sin cambios de RLS).
+`sesiones`: `sesion_uid uuid` (índice único parcial), `identidad_v smallint` (=1). Migración definitiva (preparada, no ejecutada) y runbook: `docs/identidad-remota-v1/` (la propuesta inicial queda superada) (no ejecutada, vive en docs/ porque `sql/` está bloqueado para agentes, sin backfill, sin FK, sin cambios de RLS).
 
 ## Activación (humana, en este orden)
 1. Revisar y copiar la migración propuesta a `sql/` y correrla en un entorno de prueba; ejecutar los bloques de VERIFICACIÓN (RLS, grants, triggers, RPC).

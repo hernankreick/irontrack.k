@@ -1,5 +1,7 @@
 # Migración propuesta: identidad remota v1 (NO EJECUTADA)
 
+> **SUPERADA por `docs/identidad-remota-v1/`** (auditoría estática): scripts definitivos `0_preflight.sql`, `1_migracion.sql`, `2_verificacion.sql`, `3_rollback.sql` y `RUNBOOK.md` (activación, desactivación rápida, GO/NO-GO). Cambios clave: CHECK `NOT VALID` + `VALIDATE`, índices `CONCURRENTLY` fuera de transacción, `lock_timeout`, recarga de PostgREST. El SQL de abajo se conserva solo como referencia histórica: **no usarlo**.
+
 > Propuesta para revisión. Está en `docs/` (y no en `sql/`) porque los permisos del proyecto no permiten que los agentes editen `sql/`. Si se aprueba, el dueño la copia a `sql/identidad_remota_v1.sql` y la corre a mano, primero en un entorno de prueba. El frontend NO envía los campos nuevos hasta definir `VITE_IRONTRACK_IDENTIDAD_REMOTA` (ver `docs/identidad-remota.md`).
 
 ## Diseño seguro
