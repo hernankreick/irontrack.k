@@ -23,7 +23,7 @@ export function makeRest(pg, db, ctx) {
   const filtros = (qs) => {
     const where = [];
     for (const [k, v] of new URLSearchParams(qs)) {
-      if (["select", "order", "limit"].includes(k)) continue;
+      if (["select", "order", "limit", "offset"].includes(k)) continue;
       if (v.startsWith("eq.")) where.push(ident(k) + "::text = $v$" + v.slice(3).replace(/\$v\$/g, "") + "$v$");
       else if (v === "is.null") where.push(ident(k) + " is null");
       else throw new Error("filtro no soportado: " + k + "=" + v);
@@ -61,16 +61,17 @@ export function makeRest(pg, db, ctx) {
     /** path estilo PostgREST: "progreso?id=eq.X&alumno_id=eq.Y&select=a,b&order=created_at.asc&limit=5" */
     async get(pathQs) {
       const [table, qs = ""] = pathQs.split("?"); const t = ident(table);
-      const p = new URLSearchParams(qs); let select = "*"; const where = []; let order = ""; let limit = "";
+      const p = new URLSearchParams(qs); let select = "*"; const where = []; let order = ""; let limit = ""; let offset = "";
       for (const [k, v] of p) {
         if (k === "select") select = v.split(",").map((c) => (c === "*" ? "*" : ident(c))).join(", ");
         else if (k === "order") order = " order by " + v.split(",").map((x) => { const [c, d] = x.split("."); return ident(c) + (d === "desc" ? " desc" : " asc"); }).join(", ");
         else if (k === "limit") limit = " limit " + Number(v);
+        else if (k === "offset") offset = " offset " + Number(v);
         else if (v.startsWith("eq.")) where.push(ident(k) + " = $v$" + v.slice(3).replace(/\$v\$/g, "") + "$v$");
         else if (v === "is.null") where.push(ident(k) + " is null");
         else throw new Error("filtro no soportado: " + k + "=" + v);
       }
-      const q = "select " + select + " from public." + t + (where.length ? " where " + where.join(" and ") : "") + order + limit;
+      const q = "select " + select + " from public." + t + (where.length ? " where " + where.join(" and ") : "") + order + limit + offset;
       const r = pg.tryRows(q, db, opts);
       return r.ok ? { ok: true, status: 200, data: r.rows } : fail(r.error);
     },
