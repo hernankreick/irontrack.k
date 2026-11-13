@@ -37,7 +37,7 @@ let seq = 0; const opId = () => "00000000-0000-4000-8000-" + String(++seq).padSt
 const pg = new LocalPg().start();
 const ROLES = ESQUEMA_BASE.split("\n").find((l) => l.startsWith("create role"));
 let dbN = 0;
-const TEST_POLICY = "grant select, insert on public.prescripcion_copias to authenticated; create policy solo_prueba on public.prescripcion_copias for all to authenticated using (alumno_id = auth.uid()) with check (alumno_id = auth.uid());";
+const TEST_POLICY = "grant select, insert on public.prescripcion_copias to authenticated; create policy solo_prueba on public.prescripcion_copias for all to authenticated using (alumno_id = (auth.jwt() ->> 'sub')) with check (alumno_id = (auth.jwt() ->> 'sub'));";
 function nuevaBase(conTabla) { const db = "p" + (++dbN); pg.createDb(db, "tpl"); if (conTabla) assert.ok(pg.sql(TABLA + (conTabla === "politica" ? TEST_POLICY : ""), db).ok); return db; }
 
 // Entrena (cliente real) y escribe en PostgreSQL: copia al iniciar, series con identidad, sesion al finalizar.
