@@ -11,7 +11,7 @@ import { buildSessionPayload, buildWorkoutSummary, buildExerciseSetRecord, remov
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let n = 0;
 const test = (name, fn) => { fn(); n++; console.log("ok -", name); };
-const memStorage = (init) => { const m = new Map(init || []); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), raw: () => m.get(ACTIVE_WORKOUT_KEY) }; };
+const memStorage = (init) => { const m = new Map(init || []); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), raw: (al) => m.get(ACTIVE_WORKOUT_KEY + ":" + (al || "alumno-demo-a")), rawG: () => m.get(ACTIVE_WORKOUT_KEY) }; };
 
 const T0 = new Date(2026, 10, 5, 23, 55).getTime();
 const HORA = 3600 * 1000;
@@ -31,7 +31,7 @@ test("sesion nueva: identity con UUID v4 valido, campos congelados del entrenami
 test("ancla nueva es v2: campos existentes + sessionId igual a la identidad", () => {
   const st = memStorage(); const r = ini(st);
   assert.deepEqual(JSON.parse(st.raw()), { v: 2, sessionId: r.session.identity.sessionId, alumnoId: A, rId: R, dIdx: 0, ciclo: 1, semana: 2, startTime: T0, fecha: "5/11/2026" });
-  assert.equal(leerSesionActiva(st).v, 2);
+  assert.equal(leerSesionActiva(st, A).v, 2);
 });
 test("reanudacion dentro de 6 h: mismo sessionId; recarga: mismo sessionId; fecha original en medianoche", () => {
   const st = memStorage(); const a = ini(st);
@@ -48,20 +48,21 @@ test("no genera ID nuevo en renders: la identidad es la misma referencia congela
   ini(st, { now: T0 + 1000 });
   assert.equal(st.raw(), antes); assert.ok(Object.isFrozen(a.session.identity));
 });
-test("alumno distinto: no reutiliza identidad ni sobrescribe el ancla vigente del otro", () => {
-  const st = memStorage(); const a = ini(st); const antes = st.raw();
+test("alumno distinto: no reutiliza identidad y NO toca el ancla del otro (cada uno tiene la suya)", () => {
+  const st = memStorage(); const a = ini(st); const antes = st.raw(A);
   const b = ini(st, { alumnoId: B, now: T0 + 1000, session: { rId: R, dIdx: 0, exIdx: 0, startTime: T0 + 1000 } });
-  assert.equal(b.recuperada, false); assert.equal(b.motivo, "otro_alumno");
+  assert.equal(b.recuperada, false); assert.equal(b.motivo, "sin_ancla");
   assert.notEqual(b.session.identity.sessionId, a.session.identity.sessionId);
   assert.equal(b.session.identity.alumnoId, B);
-  assert.equal(st.raw(), antes, "ancla de A intacta");
-  assert.equal(leerSesionActiva(st).alumnoId, A);
+  assert.equal(st.raw(A), antes, "ancla de A intacta");
+  assert.equal(leerSesionActiva(st, A).sessionId, a.session.identity.sessionId);
+  assert.equal(leerSesionActiva(st, B).sessionId, b.session.identity.sessionId);
 });
-test("ancla vencida de otro alumno si se reemplaza", () => {
-  const st = memStorage(); ini(st);
+test("el ancla vencida de A no afecta a B ni se borra", () => {
+  const st = memStorage(); ini(st); const antes = st.raw(A);
   const t = T0 + ACTIVE_WORKOUT_MAX_MS + 1000;
   const b = ini(st, { alumnoId: B, now: t, session: { rId: R, dIdx: 0, exIdx: 0, startTime: t } });
-  assert.equal(leerSesionActiva(st).alumnoId, B); assert.equal(leerSesionActiva(st).sessionId, b.session.identity.sessionId);
+  assert.equal(leerSesionActiva(st, B).sessionId, b.session.identity.sessionId); assert.equal(st.raw(A), antes);
 });
 test("rutina, dia o ciclo distintos: identidad nueva", () => {
   const casos = [{ session: { rId: "rutina-2", dIdx: 0, exIdx: 0, startTime: T0 + 5 } }, { session: { rId: R, dIdx: 1, exIdx: 0, startTime: T0 + 5 } }, { ciclo: 2 }];
@@ -96,13 +97,13 @@ test("ancla corrupta o incompatible: no se reutiliza (v2 con UUID malo, version 
     assert.ok(esUuidV4(r.session.identity.sessionId)); assert.notEqual(r.session.identity.sessionId, UUID);
   }
 });
-test("ancla v1 valida: se lee sin sessionId; recuperacion legada sin identity inventada y sin reescribir a v2", () => {
+test("ancla v1 global valida: se migra a la clave del alumno, recuperacion legada sin identity inventada", () => {
   const raw = JSON.stringify(anclaV1()); const st = memStorage([[ACTIVE_WORKOUT_KEY, raw]]);
   const l = leerSesionActiva(st); assert.equal(l.v, 1); assert.equal("sessionId" in l, false);
   const r = ini(st, { now: T0 + 60000 });
   assert.equal(r.recuperada, true); assert.equal(r.legado, true);
   assert.equal("identity" in r.session, false); assert.equal(r.session.startTime, T0); assert.equal(r.session.fecha, "5/11/2026");
-  assert.equal(st.raw(), raw, "el ancla v1 se conserva tal cual");
+  assert.equal(st.raw(A), raw, "copia exacta v1 en la clave individual, sin sessionId"); assert.equal(st.rawG(), undefined);
 });
 test("ancla v2 valida: recuperacion exacta de la identidad original", () => {
   const ancla = { v: 2, sessionId: UUID, alumnoId: A, rId: R, dIdx: 0, ciclo: 1, semana: 2, startTime: T0, fecha: "5/11/2026" };
@@ -132,49 +133,52 @@ test("no muta la sesion de entrada", () => {
 });
 test("cierre: borra solo el ancla de su propia sesion (v2), no la ajena", () => {
   const st = memStorage(); const a = ini(st);
-  assert.equal(cerrarSesionActiva(st, { alumnoId: B, session: a.session }), false); assert.ok(st.raw());
-  assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: Object.assign({}, a.session, { dIdx: 3 }) }), false); assert.ok(st.raw());
+  assert.equal(cerrarSesionActiva(st, { alumnoId: B, session: a.session }), false); assert.ok(st.raw(A));
+  assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: Object.assign({}, a.session, { dIdx: 3 }) }), false); assert.ok(st.raw(A));
   const otraId = Object.assign({}, a.session, { identity: Object.assign({}, a.session.identity, { sessionId: UUID }) });
-  assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: otraId }), false); assert.ok(st.raw());
-  assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: a.session }), true); assert.equal(st.raw(), undefined);
+  assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: otraId }), false); assert.ok(st.raw(A));
+  assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: a.session }), true); assert.equal(st.raw(A), undefined);
 });
 test("cierre de ancla v1 legada sigue funcionando", () => {
   const st = memStorage([[ACTIVE_WORKOUT_KEY, JSON.stringify(anclaV1())]]);
   const r = ini(st, { now: T0 + 1 });
   assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: r.session }), true);
 });
-test("A -> B -> A: A recupera su identidad y fecha originales; el ancla de A nunca fue tocada por B", () => {
-  const st = memStorage(); const a1 = ini(st); const raw = st.raw();
+test("A -> B -> A: cada uno recupera su identidad y fecha originales; B no toco el ancla de A", () => {
+  const st = memStorage(); const a1 = ini(st); const raw = st.raw(A);
   const tb = T0 + 5 * 60 * 1000;
   const b = ini(st, { alumnoId: B, now: tb, session: { rId: R, dIdx: 0, exIdx: 0, startTime: tb } });
-  assert.equal(b.motivo, "otro_alumno"); assert.equal(b.anclaConservada, true); assert.equal(st.raw(), raw);
+  assert.equal(b.motivo, "sin_ancla"); assert.equal(st.raw(A), raw);
   const ta = T0 + 15 * 60 * 1000;
   const a2 = ini(st, { now: ta, session: { rId: R, dIdx: 0, exIdx: 0, startTime: ta } });
   assert.equal(a2.recuperada, true); assert.deepEqual(a2.session.identity, a1.session.identity);
   assert.equal(a2.session.startTime, T0); assert.equal(a2.session.fecha, "5/11/2026");
   assert.notEqual(b.session.identity.sessionId, a1.session.identity.sessionId);
 });
-test("A -> B -> recarga de B (limitacion transitoria): B no recupera; nueva identidad y nueva fecha/inicio; el ancla de A sigue intacta", () => {
-  const st = memStorage(); ini(st); const raw = st.raw();
+test("A -> B -> recarga de B (tras medianoche): B recupera su identidad y su fecha original; el ancla de A sigue intacta", () => {
+  const st = memStorage(); ini(st); const raw = st.raw(A);
   const tb = new Date(2026, 10, 5, 23, 58).getTime();
   const b1 = ini(st, { alumnoId: B, now: tb, session: { rId: R, dIdx: 0, exIdx: 0, startTime: tb } });
-  const tr = new Date(2026, 10, 6, 0, 5).getTime(); // B recarga despues de medianoche
+  const tr = new Date(2026, 10, 6, 0, 5).getTime();
   const b2 = ini(st, { alumnoId: B, now: tr, session: { rId: R, dIdx: 0, exIdx: 0, startTime: tr } });
-  assert.equal(b2.recuperada, false); assert.equal(b2.motivo, "otro_alumno");
-  assert.notEqual(b2.session.identity.sessionId, b1.session.identity.sessionId, "sin ancla propia, B no conserva su identidad");
-  assert.equal(b1.session.fecha, "5/11/2026"); assert.equal(b2.session.fecha, "6/11/2026");
-  assert.equal(st.raw(), raw);
+  assert.equal(b2.recuperada, true); assert.deepEqual(b2.session.identity, b1.session.identity);
+  assert.equal(b2.session.fecha, "5/11/2026"); assert.equal(b2.session.startTime, tb);
+  assert.equal(st.raw(A), raw);
 });
-test("B puede persistir ancla propia cuando el ancla de A venció o se cerro", () => {
+test("cerrar A no elimina el ancla de B, y cerrar B no elimina la de A", () => {
   const st = memStorage(); const a = ini(st);
-  assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: a.session }), true);
   const b = ini(st, { alumnoId: B, now: T0 + 1000, session: { rId: R, dIdx: 0, exIdx: 0, startTime: T0 + 1000 } });
-  assert.equal(leerSesionActiva(st).sessionId, b.session.identity.sessionId);
+  assert.equal(cerrarSesionActiva(st, { alumnoId: A, session: a.session }), true);
+  assert.ok(st.raw(B)); assert.equal(st.raw(A), undefined);
+  const a2 = ini(st, { now: T0 + 2000, session: { rId: R, dIdx: 0, exIdx: 0, startTime: T0 + 2000 } });
+  assert.equal(cerrarSesionActiva(st, { alumnoId: B, session: b.session }), true);
+  assert.ok(st.raw(A)); assert.equal(st.raw(B), undefined); assert.equal(leerSesionActiva(st, A).sessionId, a2.session.identity.sessionId);
 });
-test("ancla v1 vigente de A tampoco se sobrescribe y no se le inventa identidad", () => {
+test("ancla v1 global de A no se pierde cuando B inicia: se migra intacta a la clave de A", () => {
   const raw = JSON.stringify(anclaV1()); const st = memStorage([[ACTIVE_WORKOUT_KEY, raw]]);
   const b = ini(st, { alumnoId: B, now: T0 + 1000, session: { rId: R, dIdx: 0, exIdx: 0, startTime: T0 + 1000 } });
-  assert.equal(b.anclaConservada, true); assert.equal(st.raw(), raw);
+  assert.equal(st.raw(A), raw); assert.equal(st.rawG(), undefined); assert.ok(b.session.identity);
+  assert.equal(leerSesionActiva(st, A).v, 1);
 });
 test("payloads remotos identicos con y sin identity (sesion, resumen, serie)", () => {
   const con = ini(memStorage()).session; const sin = Object.assign({}, con); delete sin.identity;
