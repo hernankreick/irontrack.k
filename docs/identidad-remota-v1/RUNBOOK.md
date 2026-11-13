@@ -1,6 +1,6 @@
 # Identidad remota v1 — runbook de migración y activación
 
-Estado: **preparado, NO ejecutado**. Nada de esto se corre sin autorización del dueño. El esquema real de Supabase **no pudo inspeccionarse** (sin acceso de solo lectura en la sesión de auditoría): todo lo marcado «ESPERADO» en `0_preflight.sql` es una hipótesis a confirmar, no un hecho.
+Estado: **preparado, NO ejecutado en Supabase**. Nada de esto se corre sin autorización del dueño. Los archivos SQL se ejecutaron completos contra un **PostgreSQL local descartable** (ver «Validación en PostgreSQL local» al final); eso NO equivale a Supabase. El esquema real ya fue inspeccionado en solo lectura por el dueño (tablas normales, PK uuid, sin triggers ni publicaciones, RLS con la política permisiva `acceso_total`, cuya corrección es de otro carril).
 
 Archivos (en `docs/` porque `sql/` está bloqueado para agentes; el dueño los copia a `sql/` si decide aplicarlos):
 `0_preflight.sql` (lectura) · `1_migracion.sql` (escritura) · `2_verificacion.sql` (lectura + guía de prueba RLS) · `3_rollback.sql` (escritura).
@@ -41,3 +41,18 @@ GO solo si **todas** se cumplen en preflight:
 - P9 ningún RPC que inserte en `progreso`/`sesiones` con lista fija usado por IronTrack (o confirmado que no afecta); P10 Realtime sin lista de columnas (o ajustada).
 - P12 sin transacciones largas.
 NO-GO ante cualquier desvío no explicado. Post-migración GO a activar solo si V1–V7 dan lo ESPERADO y V8 (a–f) pasa con un alumno real de prueba.
+
+## Validación en PostgreSQL local (no es Supabase)
+`npm run test:all` ejecuta, si hay binarios de PostgreSQL (`initdb`, `postgres` y el cliente de línea de comandos; en Debian/Ubuntu `/usr/lib/postgresql/*/bin`, o la variable `IRONTRACK_PG_BIN`), un clúster **descartable**: socket Unix en un directorio temporal, sin TCP, entorno limpio de variables `PG*`/`SUPABASE_*` (ver `scripts/lib/pgLocal.mjs`). Sin binarios, las suites se **omiten** y lo dicen: no cuentan como ejecutadas.
+- `scripts/test-pgIdentidadRemotaMigracion.mjs`: preflight, migración (A/B/C), verificación V1-V7, CHECK, índices parciales, 23505, históricos sin backfill, reejecución, rollback, segunda migración, rollback parcial, índice inválido tras un `CONCURRENTLY` fallido, `lock_timeout` con una transacción larga y emisión de `NOTIFY pgrst`.
+- `scripts/test-pgIdentidadRemotaRls.mjs`: roles ficticios con la política permisiva actual, con una política por fila **solo de prueba** (no es la corrección de RLS), con grants solo por columna, y esquema antiguo / caché de esquema vieja.
+- `scripts/test-pgIdentidadRemotaFlujo.mjs`: flujo completo del cliente real (offline, recarga, reintentos, finalización, hidratación, vínculo serie-sesión, estadísticas, dos alumnos, dos sesiones el mismo día, semana congelada, ciclo, históricos, bandera, esquema antiguo) contra esa base.
+- `scripts/test-pgLocalAislamiento.mjs`: demuestra que el arnés no abre TCP, no se puede redirigir por variables de entorno y que el hook y `settings.json` siguen bloqueando el cliente SQL y la CLI de Supabase directos.
+
+**Sigue sin probarse (requiere un branch/proyecto de Supabase de prueba):** PostgREST real (recarga del esquema, `PGRST204`, `return=representation`), JWT/`auth.uid()` reales, la política RLS real y los grants reales de producción. Se cubren con `0_preflight.sql`, `2_verificacion.sql` y el paso V8.
+
+### Hallazgos de la validación local
+1. **`0_preflight.sql` P9 abortaba** con `"array_agg" is an aggregate function` (PostgreSQL evaluaba `pg_get_functiondef` sobre agregados de `pg_catalog` antes de filtrar el esquema). Corregido con un CTE `MATERIALIZED` y `prokind in ('f','p')`.
+2. **Grants solo por columna (P8 > 0) rompen también los inserts ANTIGUOS tras migrar**, no solo la bandera: con `Prefer: return=representation` PostgREST hace `RETURNING *` e incluye las columnas nuevas, y sin `SELECT` sobre ellas el insert falla con `42501`. Si P8 da más de 0: agregar `SELECT` (e `INSERT`) de las 5 columnas nuevas **antes** de correr `1_migracion.sql`, no solo antes de activar la bandera.
+3. Un `CREATE INDEX CONCURRENTLY` que falla por duplicados deja un índice inválido y `IF NOT EXISTS` lo saltea al reintentar: hay que borrarlo con `DROP INDEX CONCURRENTLY` (V6 lo detecta). Cubierto por prueba.
+4. `CREATE INDEX CONCURRENTLY` espera a las transacciones previas: con una sesión larga abierta el paso B queda esperando (no falla). Revisar P12 antes de correrlo.
