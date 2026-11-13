@@ -180,6 +180,7 @@ import {
   removeAllPendingForAlumno,
 } from './lib/pendingSyncQueue.js';
 import { construirIdentidadSerie, adjuntarIdentidadPendientes } from './lib/serieIdentidad.js';
+import { identidadRemotaDesdeEntorno, proyectarPayloadSerie, enviarConFallbackIdentidad, tieneCampos, CAMPOS_REMOTOS_SERIE, CAMPOS_REMOTOS_SESION } from './lib/identidadRemota.js';
 import { writeAheadPendingSet, sendWriteAheadSet, isSetSendInFlight } from './lib/setWriteAhead.js';
 import { createPendingSyncController, attachSyncTriggers } from './lib/pendingSyncController.js';
 import PendingSyncIndicator from './components/workout/PendingSyncIndicator.jsx';
@@ -429,7 +430,8 @@ const sb = {
   addProgreso: (data) => sbFetch("progreso", "POST", data),
   // Insercion idempotente: data.id (UUID de la operacion) se reutiliza en los reintentos; 23505 sobre ese id se verifica leyendo la fila.
   addProgresoIdempotente: (data) => postProgressIdempotent({
-    post: (p) => sbRequestStatus("progreso", "POST", p),
+    // PR-6: con la persistencia remota de identidad activada y el servidor sin las columnas, el envio se repite sin ellas (no bloquea la serie).
+    post: (p) => enviarConFallbackIdentidad((x) => sbRequestStatus("progreso", "POST", x), p, CAMPOS_REMOTOS_SERIE),
     getById: (id) => sbRequestStatus("progreso?id=eq." + encodeURIComponent(id) + "&select=id,alumno_id,ejercicio_id,kg,reps,semana,nota", "GET", null),
   }, data),
   deleteProgresoByAlumno: async (alumnoId) => {
@@ -443,7 +445,12 @@ const sb = {
   getSesiones: (alumnoId) => getSesionesCompletas(sbRequestStatus, alumnoId),
   // D76-02: misma lectura que getSesiones, pero devuelve { ok, status, data } para no confundir una lectura fallida con "cero sesiones".
   getSesionesDetallado: (alumnoId) => leerSesionesAlumnoCompletas(sbRequestStatus, alumnoId),
-  addSesion: (data) => sbFetch("sesiones", "POST", data),
+  // PR-6: sin campos de identidad (valor por defecto) es exactamente el POST de siempre.
+  addSesion: async (data) => {
+    if (!tieneCampos(data, CAMPOS_REMOTOS_SESION)) return sbFetch("sesiones", "POST", data);
+    const res = await enviarConFallbackIdentidad((x) => sbRequestStatus("sesiones", "POST", x), data, CAMPOS_REMOTOS_SESION);
+    return res && res.ok ? res.data : null;
+  },
   deleteSesionesByAlumno: async (alumnoId) => {
     const { error } = await supabase.from("sesiones").delete().eq("alumno_id", String(alumnoId));
     if (error) throw error;
@@ -2069,7 +2076,7 @@ function GymApp() {
       isOnline: function () { return typeof navigator === "undefined" || navigator.onLine !== false; },
       isInFlight: isSetSendInFlight,
       // Mismo payload que antes; el opId viaja como progreso.id en todos los reintentos.
-      sendItem: function (item, alumnoIdSync) { return sb.addProgresoIdempotente(buildProgressPayloadFromPending(item, alumnoIdSync)); },
+      sendItem: function (item, alumnoIdSync) { return sb.addProgresoIdempotente(buildProgressPayloadFromPending(item, alumnoIdSync, identidadRemotaDesdeEntorno())); },
       onChange: function (st) { setPendingSyncState(st); },
       onResult: function (r) {
         setPendingSync(readVisiblePending());
@@ -2167,7 +2174,7 @@ function GymApp() {
       sendWriteAheadSet({
         storage: localStorage,
         opId: opId,
-        send: function () { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId)); },
+        send: function () { return sb.addProgresoIdempotente(proyectarPayloadSerie(buildProgressPayload(alumnoIdSync, exId, kg, reps, note, d, weekForSet, cicloForSet, opId), identidadSerie, identidadRemotaDesdeEntorno())); },
       }).then(function (res) {
         setPendingSync(readVisiblePending());
         if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.refresh();

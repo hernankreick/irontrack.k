@@ -25,6 +25,7 @@ import { textoSesionTrasReinicio } from '../lib/reinicioMensajes.js';
 import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
 // D76-05: fecha estable del entrenamiento activo (medianoche / recarga de Safari).
 import { ubicarEjercicioEnDia } from '../lib/serieIdentidad.js';
+import { proyectarPayloadSesion, identidadRemotaDesdeEntorno } from '../lib/identidadRemota.js';
 import { cerrarSesionActiva, claveDiaDeSesion, fechaDeSesion } from '../lib/workoutSessionDate.js';
 
 export function WorkoutScreen(props) {
@@ -208,7 +209,8 @@ export function WorkoutScreen(props) {
         let lastAdvanceDate = null;
         try { lastAdvanceDate = localStorage.getItem("it_last_week_advance_date"); } catch (e) {}
         // D76-02: se guarda el payload para pasarle a onSesionGuardada la fila confirmada por el servidor
-        const sesionPayload = removeUndefinedPayloadFields(buildSessionPayload({
+        // PR-6: identidad remota de la sesion solo con la persistencia remota activada (desactivada por defecto) y sesion v2 coherente (lib/identidadRemota.js).
+        const sesionPayload = removeUndefinedPayloadFields(proyectarPayloadSesion(buildSessionPayload({
           alumnoId: sessionData.alumnoId,
           session: session,
           activeDay: activeDay,
@@ -219,7 +221,7 @@ export function WorkoutScreen(props) {
           time: horaFin,
           includeRoutineId: true,
           ciclo: cicloActual,
-        }));
+        }), session, sessionData.alumnoId, identidadRemotaDesdeEntorno()));
         const outcome = await finalizeStudentSession({
           sb: sb,
           alumnoId: sessionData.alumnoId,
