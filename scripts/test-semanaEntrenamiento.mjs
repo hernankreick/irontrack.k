@@ -130,9 +130,10 @@ await test("8 entrenamiento nocturno: la semana congelada sobrevive a la mediano
   assert.equal(b.recuperada, true);
   assert.equal(a.session.semanaIdx, 2); assert.equal(b.session.semanaIdx, 2);
   assert.equal(b.session.fecha, a.session.fecha);
-  // si la semana cambio entre medio: sesion NUEVA (otra fecha y otra semana), nunca mezcla semanas en una sola sesion
+  // PR-3: si la semana visible cambio entre medio, la ancla v2 se recupera con la semana CONGELADA (2), nunca mezcla semanas en una sola sesion
   const c = prepararInicioEntrenamiento({ storage: st, session: { rId: "R1", dIdx: 0 }, alumnoId: ALU, ciclo: 1, semana: 3, now: t2 + 1000 });
-  assert.equal(c.recuperada, false); assert.equal(c.motivo, "otra_semana"); assert.equal(c.session.semanaIdx, 3);
+  assert.equal(c.recuperada, true); assert.equal(c.motivo, "ancla"); assert.equal(c.session.semanaIdx, 2);
+  assert.equal(c.session.identity.sessionId, a.session.identity.sessionId); assert.equal(c.session.fecha, a.session.fecha);
 });
 await test("9 compatibilidad: sesion sin semana congelada (o semana invalida) => comportamiento anterior", () => {
   for (const sem of [undefined, null, 4, -1, "1", NaN]) {
