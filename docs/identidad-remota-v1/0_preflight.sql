@@ -43,8 +43,12 @@ select count(*) as grants_por_columna from information_schema.column_privileges 
 -- ESPERADO (grants_por_columna): 0 (si > 0 hay grants solo por columna: agregar las nuevas columnas antes de activar la bandera).
 
 -- P9. Funciones/RPC que escriben en progreso o sesiones (revisar si usan lista fija de columnas o SELECT *).
-select p.proname, p.prosecdef as security_definer from pg_proc p join pg_namespace n on n.oid = p.pronamespace
- where n.nspname = 'public' and pg_get_functiondef(p.oid) ~* '(insert\s+into|update|delete\s+from)\s+(public\.)?(progreso|sesiones)\y';
+-- (CTE MATERIALIZED + prokind: sin esto PostgreSQL puede evaluar pg_get_functiondef sobre un agregado de otro esquema y abortar con '"x" is an aggregate function'.)
+with f as materialized (
+  select p.oid, p.proname, p.prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.prokind in ('f', 'p'))
+select proname, prosecdef as security_definer from f
+ where pg_get_functiondef(oid) ~* '(insert\s+into|update|delete\s+from)\s+(public\.)?(progreso|sesiones)\y';
 
 -- P10. Publicaciones (Realtime) que incluyen las tablas (si se usan listas de columnas, agregar las nuevas).
 select pubname, schemaname, tablename, attnames from pg_publication_tables where schemaname = 'public' and tablename in ('progreso','sesiones');
