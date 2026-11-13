@@ -1,6 +1,7 @@
 import { normalizeFecha } from '../../lib/normalizeFecha.js';
 import { isCompletedSession, sessionMatchesRoutine, mondayStartMs, parseLocalDateMs } from '../../lib/studentWeeklyProgress.js';
 import { updateExerciseProgressRecord } from '../../lib/workoutSession.js';
+import { extraerIdentidadSerie } from '../../lib/serieIdentidad.js';
 import { countExercisesWithLogToday } from './studentPlanHelpers.js';
 import { readCicloActual, rowInCiclo } from '../../lib/rutinaCiclo.js';
 
@@ -167,12 +168,14 @@ export function buildSessionContext(session) {
  * nuevo) y no se modifica normalizeWorkoutSet ni updateExerciseProgressRecord.
  * Sin `session` valido el resultado es identico a updateExerciseProgressRecord.
  */
-export function updateProgressEntryWithSessionContext(currentEntry, newSet, session) {
+export function updateProgressEntryWithSessionContext(currentEntry, newSet, session, identidad) {
   const entry = updateExerciseProgressRecord(currentEntry, newSet);
   const ctx = buildSessionContext(session);
-  if (!ctx) return entry;
+  // PR-4: identidad local opcional de la serie (sesion_uid, bloque, pos); solo los campos validos, nunca se inventan.
+  const idSerie = extraerIdentidadSerie(identidad);
+  if (!ctx && !Object.keys(idSerie).length) return entry;
   const sets = entry.sets.slice();
-  sets[0] = Object.assign({}, sets[0], ctx);
+  sets[0] = Object.assign({}, sets[0], ctx || {}, idSerie);
   return Object.assign({}, entry, { sets: sets });
 }
 

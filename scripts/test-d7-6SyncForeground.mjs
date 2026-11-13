@@ -599,7 +599,7 @@ await t("cableado: App.jsx usa el controlador con identidad validada y los dispa
   assert.match(ident, /ls\.role !== "alumno"/);
   assert.match(ident, /String\(ls\.alumnoId\) !== String\(sd\.alumnoId\)/);
   assert.ok(app.includes("isInFlight: isSetSendInFlight"));
-  assert.ok(app.includes("sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo, item.opId))"));
+  assert.ok(app.includes("sb.addProgresoIdempotente(buildProgressPayloadFromPending(item, alumnoIdSync))"));
   assert.match(app, /flushPendingRef\.current = function \(\) \{ return pendingSyncCtlRef\.current \? pendingSyncCtlRef\.current\.trigger\('retry'\) : null; \};/);
   assert.ok(!/setInterval\(/.test(app.slice(app.indexOf("const readSyncAlumnoId"), app.indexOf("const logSet = ("))), "sin sondeo");
   assert.match(app, /<PendingSyncIndicator variant="banner"/);
