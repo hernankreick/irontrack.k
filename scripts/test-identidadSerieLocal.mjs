@@ -220,7 +220,7 @@ await test("17 ausencia absoluta de los tres campos en payloads remotos (envio i
   assert.deepEqual(buildProgressPayloadFromPending(sinId, A), remotos[0]);
   // codigo: App.jsx no pasa la identidad a ninguna escritura remota ni a sb.*
   const app = readFileSync(path.join(ROOT, "App.jsx"), "utf8");
-  assert.ok(app.includes("buildProgressPayloadFromPending(item, alumnoIdSync)"));
+  assert.ok(app.includes("buildProgressPayloadFromPending(item, alumnoIdSync, identidadRemotaDesdeEntorno())"), "PR-6: la bandera remota se evalua al enviar; por defecto desactivada");
   assert.equal(/addProgresoIdempotente\([^)]*identidadSerie/.test(app), false);
   assert.equal(/sbFetch\([^)]*(sesion_uid|identidadSerie)/.test(app), false);
   for (const f of ["lib/supabase.js", "lib/progressPersist.js"]) { try { assert.equal(/sesion_uid/.test(readFileSync(path.join(ROOT, f), "utf8")), false); } catch (e) { if (e.code !== "ENOENT") throw e; } }

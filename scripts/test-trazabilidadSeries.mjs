@@ -181,7 +181,10 @@ await test("15 coincidencias ambiguas: sin id coincidente, con valores distintos
   for (const cambio of [{ kg: 55 }, { reps: 9 }, { week: 1 }, { note: "x" }, { date: "6/11/2026" }, { ciclo: 2 }]) {
     assert.equal(conservarIdentidadHidratada(Object.assign({}, loc, { ciclo: 1 }), Object.assign({}, hidBase, { ciclo: 1 }, cambio)).sesion_uid, undefined, JSON.stringify(cambio));
   }
-  assert.equal(conservarIdentidadHidratada(loc, Object.assign({}, hidBase, { sesion_uid: "99999999-9999-4999-8999-999999999999", bloque: "warmup", pos: 1 })).sesion_uid, "99999999-9999-4999-8999-999999999999", "la del servidor no se pisa");
+  const conf = conservarIdentidadHidratada(loc, Object.assign({}, hidBase, { sesion_uid: "99999999-9999-4999-8999-999999999999", bloque: "warmup", pos: 1 }));
+  assert.deepEqual(idDe(conf), {}, "PR-6: identidades contradictorias => ninguna es confiable"); assert.equal(conf.identidad_no_verificable, true);
+  const iguales = conservarIdentidadHidratada(loc, Object.assign({}, hidBase, { sesion_uid: loc.sesion_uid }));
+  assert.equal(iguales.sesion_uid, loc.sesion_uid, "la del servidor consistente se conserva");
   // mismas firmas sin id: dos locales identicos con identidad distinta y UN solo hidratado => no se atribuye a ninguno
   const l1 = { kg: 50, reps: 8, date: "5/11/2026", week: 0, note: "", sesion_uid: "a", bloque: "main", pos: 0 };
   const l2 = Object.assign({}, l1, { pos: 2 });
