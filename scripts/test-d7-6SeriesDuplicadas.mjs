@@ -306,7 +306,7 @@ await t("compatibilidad #154: el pendiente it_pq:<opId> existe antes del POST, e
 // ───────── Cableado (por texto, complemento de las pruebas de lógica) ─────────
 await t("App.jsx: logSet acepta opIdIntento y usa isUuid(opIdIntento) ? opIdIntento : generateOpId()", () => {
   const app = read("App.jsx");
-  assert.match(app, /const logSet = \(exId, kg, reps, note, rpe, weekOverride, opIdIntento\) => \{/);
+  assert.match(app, /const logSet = \(exId, kg, reps, note, rpe, weekOverride, opIdIntento(?:, ubicacionEj)?\) => \{/);
   assert.match(app, /const opId = isUuid\(opIdIntento\) \? opIdIntento : generateOpId\(\);/);
   assert.match(app, /\n  isUuid,\n[\s\S]*?\} from '\.\/lib\/workoutSession\.js';/);
   assert.equal((app.match(/generateOpId\(\)/g) || []).length >= 1, true);
@@ -315,7 +315,7 @@ await t("App.jsx: logSet acepta opIdIntento y usa isUuid(opIdIntento) ? opIdInte
 await t("WorkoutExercisePanel: registra via attempt( y libera con finishConfirmation( al terminar la confirmacion visual", () => {
   const p = read("components/WorkoutExercisePanel.jsx");
   assert.match(p, /import \{ createSetLogGuard \} from '\.\.\/lib\/setLogGuard\.js';/);
-  assert.match(p, /logGuardRef\.current\.attempt\(attemptScope, \(opId\) => logSet\(ex\.id, [^\n]*?, currentWeek, opId\)\);/);
+  assert.match(p, /logGuardRef\.current\.attempt\(attemptScope, \(opId\) => logSet\(ex\.id, [^\n]*?, currentWeek, opId(?:, ubicacionEjercicio)?\)\);/);
   assert.match(p, /if\(res\.status !== "logged"\) return;/);
   assert.match(p, /if\(res\.status === "failed" && res\.error\) console\.error\("\[PROGRESO\] error al registrar la serie", res\.error\);/);
   assert.match(p, /if \(logGuardRef\.current\.snapshot\(\)\.phase !== "confirming"\) \{\s*setShowCheckAnim\(false\);/);

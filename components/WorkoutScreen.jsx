@@ -24,6 +24,7 @@ import { resolverSemanaEntrenamiento, cicloVivoDeSesion, textoConflictoSemana, s
 import { textoSesionTrasReinicio } from '../lib/reinicioMensajes.js';
 import { FINALIZE_FAILURE, createFinalizeGuard, finalizeStudentSession } from '../lib/finalizeWorkoutSession.js';
 // D76-05: fecha estable del entrenamiento activo (medianoche / recarga de Safari).
+import { ubicarEjercicioEnDia } from '../lib/serieIdentidad.js';
 import { cerrarSesionActiva, claveDiaDeSesion, fechaDeSesion } from '../lib/workoutSessionDate.js';
 
 export function WorkoutScreen(props) {
@@ -425,6 +426,7 @@ export function WorkoutScreen(props) {
             setPrCelebration={setPrCelebration} progress={progress}
             rutinaDatos={activeR && activeR.datos}
             // D76-03: identidad de alumno + sesion para la guarda de registro (un cambio de contexto libera y descarta el opId de reintento).
+            ubicacionEjercicio={ubicarEjercicioEnDia(activeDay, activeExIdx)}
             logScope={[sessionData && sessionData.alumnoId, session && session.rId, session && session.dIdx, session && session.startTime].join("|")}
           />
         )}

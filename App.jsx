@@ -162,6 +162,7 @@ import {
 import {
   buildExerciseSetRecord,
   buildPendingProgressItem,
+  buildProgressPayloadFromPending,
   buildProgressPayload,
   calculateNewWeightPR,
   formatWorkoutSetLabel,
@@ -178,6 +179,7 @@ import {
   visiblePendingItems,
   removeAllPendingForAlumno,
 } from './lib/pendingSyncQueue.js';
+import { construirIdentidadSerie } from './lib/serieIdentidad.js';
 import { writeAheadPendingSet, sendWriteAheadSet, isSetSendInFlight } from './lib/setWriteAhead.js';
 import { createPendingSyncController, attachSyncTriggers } from './lib/pendingSyncController.js';
 import PendingSyncIndicator from './components/workout/PendingSyncIndicator.jsx';
@@ -2065,7 +2067,7 @@ function GymApp() {
       isOnline: function () { return typeof navigator === "undefined" || navigator.onLine !== false; },
       isInFlight: isSetSendInFlight,
       // Mismo payload que antes; el opId viaja como progreso.id en todos los reintentos.
-      sendItem: function (item, alumnoIdSync) { return sb.addProgresoIdempotente(buildProgressPayload(alumnoIdSync, item.exId, item.kg, item.reps, item.note, item.date, item.semana, item.ciclo, item.opId)); },
+      sendItem: function (item, alumnoIdSync) { return sb.addProgresoIdempotente(buildProgressPayloadFromPending(item, alumnoIdSync)); },
       onChange: function (st) { setPendingSyncState(st); },
       onResult: function (r) {
         setPendingSync(readVisiblePending());
@@ -2092,7 +2094,7 @@ function GymApp() {
   React.useEffect(() => {
     if (pendingSyncCtlRef.current) pendingSyncCtlRef.current.trigger('session');
   }, [readOnly, sessionData?.role, sessionData?.alumnoId]);
-  const logSet = (exId, kg, reps, note, rpe, weekOverride, opIdIntento) => {
+  const logSet = (exId, kg, reps, note, rpe, weekOverride, opIdIntento, ubicacionEj) => {
     // D76-05: fecha del entrenamiento (fijada al iniciar), no la del reloj: tras medianoche las series siguen en el mismo dia.
     const d = fechaDeSesion(session, Date.now());
     // D7.6: serie invalida (kg negativo/NaN/infinito/fuera de techo, reps fuera de rango): no se registra ni envia (lib/cargaSerie.js).
@@ -2132,10 +2134,13 @@ function GymApp() {
     // D76-04: y su opId (= progreso.id), para reconciliarla con la fila hidratada por identidad y no solo por valores.
     const newSet = Object.assign(buildExerciseSetRecord(kg, reps, d, weekForSet, note, rpe, cicloForSet), { id: opId });
     const alumnoIdSync = (()=>{try{return JSON.parse(localStorage.getItem("it_session")||"null")?.alumnoId}catch(e){return null}})() || (readOnly&&sharedParam?(()=>{try{return JSON.parse(atob(sharedParam)).alumnoId}catch(e){return null}})():null);
+    // PR-4: identidad LOCAL de la serie (id de la sesion v2 + bloque/pos del ejercicio). Se congela aqui; solo se guarda en it_pq/it_pg,
+    // nunca viaja a Supabase (buildProgressPayload no la recibe). Sesion v1/legada o sin ubicacion confiable: campos ausentes.
+    const identidadSerie = (sessionData?.role === "alumno" && !readOnly) ? construirIdentidadSerie({ session: session, alumnoId: alumnoIdSync, ubicacion: ubicacionEj }) : {};
     // D76-01 (write-ahead): la serie se persiste como pendiente ANTES de mostrarla y de enviarla. Si Safari descarta la pestaña durante el
     // envio, el pendiente sigue en el dispositivo y el proximo flush lo reenvia con el mismo id. Si no se puede persistir, no se registra.
     if(alumnoIdSync) {
-      const pendingItem = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, cicloForSet, alumnoIdSync, opId);
+      const pendingItem = buildPendingProgressItem(exId, kg, reps, note, d, weekForSet, cicloForSet, alumnoIdSync, opId, identidadSerie);
       const wa = writeAheadPendingSet(localStorage, pendingItem, Date.now());
       if(!wa.ok) {
         console.error("[PROGRESO] no se pudo persistir la serie en el dispositivo (" + wa.reason + "); no se registra");
@@ -2149,7 +2154,7 @@ function GymApp() {
       // Igual que updateExerciseProgressRecord, marcando el set con el contexto LOCAL del entrenamiento
       // abierto (session_rutina_id / session_dia_idx). No se envia a Supabase: el payload remoto se arma
       // aparte con buildProgressPayload.
-      const ex = updateProgressEntryWithSessionContext(prev[exId], newSet, session);
+      const ex = updateProgressEntryWithSessionContext(prev[exId], newSet, session, identidadSerie);
       return {...prev,[exId]:ex};
     });
     // Enviar a Supabase (la serie ya esta en cola). Online: se retira de la cola SOLO si Supabase devuelve la fila insertada; si no, queda

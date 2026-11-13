@@ -104,6 +104,7 @@ export function WorkoutExercisePanel(props) {
     rutinaDatos,
     progress,
     logScope,
+    ubicacionEjercicio,
   } = props;
 
   const [kg, setKg] = React.useState("");
@@ -210,7 +211,7 @@ export function WorkoutExercisePanel(props) {
     if(!canLogWorkoutSet(validationExercise, kg, reps)) return;
     // D76-01: primero se registra (persistencia local antes que todo); si no se pudo guardar en el dispositivo, los datos quedan en pantalla.
     // D76-03: el registro pasa por la guarda con el opId del intento.
-    const res = logGuardRef.current.attempt(attemptScope, (opId) => logSet(ex.id, normalizeWorkoutKg(kg), resolveWorkoutRepsInput(reps, validationExercise), note, rpe, currentWeek, opId));
+    const res = logGuardRef.current.attempt(attemptScope, (opId) => logSet(ex.id, normalizeWorkoutKg(kg), resolveWorkoutRepsInput(reps, validationExercise), note, rpe, currentWeek, opId, ubicacionEjercicio));
     // busy/disposed: el toque extra se ignora; failed: los datos quedan en pantalla y el proximo toque reintenta con el mismo opId.
     if(res.status === "failed" && res.error) console.error("[PROGRESO] error al registrar la serie", res.error);
     if(res.status !== "logged") return;
