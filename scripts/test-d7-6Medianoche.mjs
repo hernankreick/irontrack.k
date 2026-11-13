@@ -295,7 +295,8 @@ await t("9. politica conservadora: vencida, corrupta, futura, otra semana, otro 
   const semana = memStorage();
   iniciar(semana, { now: T_2355, semana: 0 });
   const rs = iniciar(semana, { now: T_0005, semana: 1 });
-  assert.equal(rs.recuperada, false); assert.equal(rs.motivo, "otra_semana"); assert.equal(rs.session.fecha, F6);
+  // PR-3: ancla v2 -> se recupera con la fecha y la semana originales aunque la semana visible haya avanzado.
+  assert.equal(rs.recuperada, true); assert.equal(rs.motivo, "ancla"); assert.equal(rs.session.fecha, F5); assert.equal(rs.session.semanaIdx, 0);
 
   const dia = memStorage();
   iniciar(dia, { now: T_2355 });

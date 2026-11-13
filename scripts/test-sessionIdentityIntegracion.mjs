@@ -71,9 +71,12 @@ test("rutina, dia o ciclo distintos: identidad nueva", () => {
     assert.equal(b.recuperada, false); assert.notEqual(b.session.identity.sessionId, a.session.identity.sessionId);
   }
 });
-test("semana distinta (regla actual, PR-3 la cambia): identidad nueva", () => {
+test("semana visible distinta (PR-3): ancla v2 se recupera con la semana congelada; v1 sigue creando sesion nueva", () => {
   const st = memStorage(); const a = ini(st); const b = ini(st, { semana: 3, now: T0 + 5 });
-  assert.equal(b.motivo, "otra_semana"); assert.notEqual(b.session.identity.sessionId, a.session.identity.sessionId);
+  assert.equal(b.recuperada, true); assert.equal(b.motivo, "ancla");
+  assert.equal(b.session.identity.sessionId, a.session.identity.sessionId); assert.equal(b.session.semanaIdx, 2);
+  const st1 = memStorage([[ACTIVE_WORKOUT_KEY, JSON.stringify(anclaV1())]]); const c = ini(st1, { semana: 3, now: T0 + 5 });
+  assert.equal(c.motivo, "otra_semana"); assert.equal(c.recuperada, false);
 });
 test("ancla vencida o con inicio futuro: no reutiliza identidad", () => {
   const st = memStorage(); const a = ini(st);
