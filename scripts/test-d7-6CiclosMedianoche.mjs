@@ -277,7 +277,7 @@ await t("inicio 23:55, fin 00:10: series, progreso del dia, sesion y clave de av
   assert.equal(out.todayStr, new Date(2026, 10, 5).toDateString());
   assert.equal(out.week.advance, "ok");
   assert.equal(w.srv.sesiones.length, 1);
-  assert.equal(leerSesionActiva(w.storage), null, "ancla cerrada al confirmar");
+  assert.equal(leerSesionActiva(w.storage, A), null, "ancla cerrada al confirmar");
 });
 
 await t("cruce de medianoche sin conexion: 23:58 y 00:03 -> misma fecha, pendientes; al reconectar 1 fila por serie (5/11, ciclo 1); luego finaliza", async () => {
@@ -341,7 +341,7 @@ await t("reanudacion con sincronizacion pendiente: pendientes c1 + reinicio + me
   const c1 = w.logSet(EX0);
   w.reloj.set(T_2358);
   w.reiniciar();   // el entrenador reinicia desde su dispositivo: el ancla del alumno queda
-  assert.ok(leerSesionActiva(w.storage));
+  assert.ok(leerSesionActiva(w.storage, A));
   w.reloj.set(T_0005);
   const r = w.iniciar();
   assert.equal(r.recuperada, false);
@@ -371,17 +371,18 @@ await t("cambio de alumno: B no ve ni envia los pendientes de A y no recupera su
   w.reloj.set(T_0005);
   const r = w.iniciar(B);
   assert.equal(r.recuperada, false);
-  assert.equal(r.motivo, "otro_alumno");
+  assert.equal(r.motivo, "sin_ancla", "PR anclas por alumno: B no tiene ancla propia (la de A es independiente)");
   assert.equal(r.session.fecha, F6);
   assert.deepEqual(visiblePendingItems(w.storage, B), []);
   w.online = true;
   assert.equal((await w.flush(B)).sent, 0);
   assert.equal(w.srv.posts.length, 0);
   assert.equal(visiblePendingItems(w.storage, A).length, 1, "los pendientes de A quedan en el dispositivo");
-  // PR-2 (transitorio): B NO sobrescribe el ancla vigente de A; un cierre de B nunca borra la de A (y viceversa).
-  assert.equal(leerSesionActiva(w.storage).alumnoId, A);
+  // Anclas por alumno: B tiene su propia ancla y NO toca la de A; un cierre de B nunca borra la de A (y viceversa).
+  assert.equal(leerSesionActiva(w.storage, B).alumnoId, B);
+  assert.equal(leerSesionActiva(w.storage, A).alumnoId, A);
   assert.equal(cerrarSesionActiva(w.storage, { alumnoId: B, session: { rId: w.rutina.id, dIdx: 0, startTime: T_2355 } }), false);
-  assert.equal(leerSesionActiva(w.storage).alumnoId, A, "el cierre de B no borro el ancla de A");
+  assert.equal(leerSesionActiva(w.storage, A).alumnoId, A, "el cierre de B no borro el ancla de A");
 });
 
 await t("series con y sin ciclo explicito: payload, hidratacion, filtro del dia y precarga", () => {
@@ -471,7 +472,7 @@ await t("#155 una lectura fallida de sesiones no se toma como 'cero sesiones': f
   assert.equal(out.reason, FINALIZE_FAILURE.LOOKUP_FAILED);
   assert.equal(w.srv.sesionPosts.length, 0);
   assert.ok(w.session, "el entrenamiento sigue abierto");
-  assert.ok(leerSesionActiva(w.storage), "y su ancla tambien");
+  assert.ok(leerSesionActiva(w.storage, A), "y su ancla tambien");
 });
 
 await t("#156 un toque = una serie (createSetLogGuard): el doble toque no registra; el reintento tras un fallo reutiliza el opId", async () => {
@@ -529,7 +530,7 @@ await t("#157 el controlador real envia los pendientes al volver online (evento 
 await t("el ancla solo guarda ids, numeros y la fecha (sin datos personales)", () => {
   const w = mundo(T_2355);
   w.iniciar();
-  const raw = JSON.parse(w.storage.getItem(ACTIVE_WORKOUT_KEY));
+  const raw = JSON.parse(w.storage.getItem(ACTIVE_WORKOUT_KEY + ":" + A));
   assert.deepEqual(Object.keys(raw).sort(), ["alumnoId", "ciclo", "dIdx", "fecha", "rId", "semana", "sessionId", "startTime", "v"]);
 });
 

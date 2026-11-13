@@ -340,7 +340,7 @@ export function crearMundoCiclos(opts) {
     });
     const fecha = st.sesion ? fechaSesion() : null;
     const dia = st.sesion ? calculateDayProgress(ejercicios(), prog, fecha, semanaBase0(), { checkWeek: false, ciclo: c }) : { done: 0, total: ejercicios().length, pct: 0 };
-    const ancla = leerSesionActiva(storage);
+    const ancla = leerSesionActiva(storage, alumnoId);
     return {
       alumnoId, alumno: nombreAlumno(alumnoId), ciclo: c, semana: Number(r.datos.semana_activa) || 1,
       sesionAbierta: !!st.sesion, fechaInicio: st.sesion ? st.sesion.fecha : null, horaInicio: st.sesion ? formatoHora(st.sesion.startTime) : null,
@@ -445,7 +445,7 @@ export async function ejecutarEscenarios(opts) {
     ['Iniciar a las 23:55 → fecha 5/11 y ancla', async (m) => {
       m.reloj.fijar(23, 55);
       await m.iniciarEntrenamiento();
-      const a = leerSesionActiva(m.storage);
+      const a = leerSesionActiva(m.storage, m.alumnoId);
       const ok = m.sesion.fecha === F5 && !m.st.ultimoInicio.recuperada && !!a && a.fecha === F5 && a.ciclo === 1 && a.startTime === m.reloj.now();
       return [ok, 'fecha de la sesión ' + m.sesion.fecha + ', ancla ' + (a ? a.fecha + ' ciclo ' + a.ciclo : 'ausente')];
     }],
@@ -474,7 +474,7 @@ export async function ejecutarEscenarios(opts) {
       const ses = m.servidor.sesionesDe(DEMO_ALUMNO_A);
       const filas = m.servidor.filasDe(DEMO_ALUMNO_A);
       const ok = fallo1 && m.st.ultimoFinal.status === 'saved' && m.st.ultimoFinal.source === 'existing' && ses.length === 1 && ses[0].fecha === F5 &&
-        m.servidor.sesionPosts.length === 1 && filas.length === 2 && filas.every((f) => f.fecha === F5) && m.sesion === null && leerSesionActiva(m.storage) === null &&
+        m.servidor.sesionPosts.length === 1 && filas.length === 2 && filas.every((f) => f.fecha === F5) && m.sesion === null && leerSesionActiva(m.storage, m.alumnoId) === null &&
         m.st.ultimoFinal.week.advance === 'ok' && m.servidor.avances.length === 1;
       return [ok, '1.º intento: ' + (fallo1 ? 'sin confirmar' : t1) + ' · reintento 00:12: ' + m.st.ultimoFinal.source + ' · ' + ses.length + ' sesión con fecha ' + (ses[0] && ses[0].fecha) + ', ' + filas.length + ' series del ' + F5 + ', semana avanzada ' + m.servidor.avances.length + ' vez'];
     }],
@@ -502,7 +502,7 @@ export async function ejecutarEscenarios(opts) {
       const rec = m.st.ultimoInicio;
       await m.conectar();
       await m.sincronizarPendientes();
-      const ok = m.alumnoId === DEMO_ALUMNO_B && !rec.recuperada && rec.motivo === 'otro_alumno' && m.sesion.fecha === F6 && m.pendientes(DEMO_ALUMNO_B).length === 0 &&
+      const ok = m.alumnoId === DEMO_ALUMNO_B && !rec.recuperada && rec.motivo === 'sin_ancla' && m.sesion.fecha === F6 && m.pendientes(DEMO_ALUMNO_B).length === 0 &&
         m.pendientes(DEMO_ALUMNO_A).length === 1 && m.servidor.posts.length === 0;
       return [ok, 'inicio de B: ' + rec.motivo + ', fecha ' + m.sesion.fecha + ' · pendientes A ' + m.pendientes(DEMO_ALUMNO_A).length + ', B ' + m.pendientes(DEMO_ALUMNO_B).length + ', POST ' + m.servidor.posts.length];
     }],

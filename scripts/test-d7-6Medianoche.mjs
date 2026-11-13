@@ -164,8 +164,8 @@ await t("4. recarga a las 00:05: se recupera el mismo entrenamiento con fecha 5/
   const r1 = iniciar(storage, { now: T_2355 });
   assert.equal(r1.recuperada, false);
   assert.equal(r1.motivo, "sin_ancla");
-  assert.ok(storage.getItem(ACTIVE_WORKOUT_KEY), "ancla escrita");
-  const ancla = leerSesionActiva(storage);
+  assert.ok(storage.getItem(ACTIVE_WORKOUT_KEY + ":" + ALUMNO_A), "ancla escrita (clave del alumno)");
+  const ancla = leerSesionActiva(storage, ALUMNO_A);
   assert.deepEqual(Object.keys(ancla).sort(), ["alumnoId", "ciclo", "dIdx", "fecha", "rId", "semana", "sessionId", "startTime", "v"]);
   // "Recarga": la session en memoria se perdio; el alumno toca Iniciar de nuevo (startTime nuevo).
   const r2 = iniciar(storage, { now: T_0005 });
@@ -245,11 +245,12 @@ await t("7. ancla del alumno A no se usa para el alumno B", () => {
   iniciar(storage, { now: T_2355, alumnoId: ALUMNO_A });
   const rB = iniciar(storage, { now: T_0010, alumnoId: ALUMNO_B });
   assert.equal(rB.recuperada, false);
-  assert.equal(rB.motivo, "otro_alumno");
+  assert.equal(rB.motivo, "sin_ancla", "anclas por alumno: B no tiene ancla propia");
   assert.equal(rB.session.fecha, F6);
   assert.equal(rB.session.startTime, T_0010);
-  // PR-2 (decision transitoria): el ancla vigente de A NO se sobrescribe; B sigue solo en memoria (su recuperacion tras recarga no esta garantizada).
-  assert.equal(String(leerSesionActiva(storage).alumnoId), ALUMNO_A, "el ancla vigente de A se conserva");
+  // Anclas por alumno: el ancla vigente de A se conserva y B escribe la suya, independiente.
+  assert.equal(String(leerSesionActiva(storage, ALUMNO_A).alumnoId), ALUMNO_A, "el ancla vigente de A se conserva");
+  assert.equal(String(leerSesionActiva(storage, ALUMNO_B).alumnoId), ALUMNO_B, "B tiene su propia ancla");
 });
 
 // ───────── 8. ciclo nuevo + medianoche ─────────
@@ -326,9 +327,9 @@ await t("10. cerrarSesionActiva solo borra el ancla propia; tras finalizar un nu
   assert.equal(cerrarSesionActiva(storage, { alumnoId: ALUMNO_B, session }), false);
   assert.equal(cerrarSesionActiva(storage, { alumnoId: ALUMNO_A, session: Object.assign({}, session, { startTime: T_0005 }) }), false);
   assert.equal(cerrarSesionActiva(storage, { alumnoId: ALUMNO_A, session: Object.assign({}, session, { dIdx: 2 }) }), false);
-  assert.ok(storage.getItem(ACTIVE_WORKOUT_KEY));
+  assert.ok(storage.getItem(ACTIVE_WORKOUT_KEY + ":" + ALUMNO_A));
   assert.equal(cerrarSesionActiva(storage, { alumnoId: ALUMNO_A, session }), true);
-  assert.equal(storage.getItem(ACTIVE_WORKOUT_KEY), null);
+  assert.equal(storage.getItem(ACTIVE_WORKOUT_KEY + ":" + ALUMNO_A), null);
   const r = iniciar(storage, { now: T_0010 });
   assert.equal(r.recuperada, false);
   assert.equal(r.session.fecha, F6);
