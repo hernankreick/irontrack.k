@@ -179,7 +179,7 @@ import {
   visiblePendingItems,
   removeAllPendingForAlumno,
 } from './lib/pendingSyncQueue.js';
-import { construirIdentidadSerie } from './lib/serieIdentidad.js';
+import { construirIdentidadSerie, adjuntarIdentidadPendientes } from './lib/serieIdentidad.js';
 import { writeAheadPendingSet, sendWriteAheadSet, isSetSendInFlight } from './lib/setWriteAhead.js';
 import { createPendingSyncController, attachSyncTriggers } from './lib/pendingSyncController.js';
 import PendingSyncIndicator from './components/workout/PendingSyncIndicator.jsx';
@@ -1727,7 +1727,9 @@ function GymApp() {
           // (localStorage "it_pg") se borra en cada login nuevo y, sin esto,
           // quedaba en {} hasta el primer set logueado en este dispositivo,
           // haciendo que todo se marque como "PR nuevo" con "Anterior 0 kg".
-          const hydratedProgress = hydrateProgressFromRows(progresoRows || []);
+          // PR-5: it_pg se borra en cada login; si un pendiente (it_pq) aun lleva la identidad local de una fila que ya esta en el servidor, se conserva (por opId verificado).
+          let pendIdent = []; try { pendIdent = visiblePendingItems(localStorage, sessionData.alumnoId); } catch (e) {}
+          const hydratedProgress = adjuntarIdentidadPendientes(hydrateProgressFromRows(progresoRows || []), pendIdent, sessionData.alumnoId);
           setProgress(function (prev) {
             var isLocalEmpty = !prev || Object.keys(prev).length === 0;
             if (isLocalEmpty) return hydratedProgress;
