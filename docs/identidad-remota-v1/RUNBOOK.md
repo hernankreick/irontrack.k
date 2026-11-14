@@ -64,12 +64,14 @@ NO-GO ante cualquier desvío no explicado. Post-migración GO a activar solo si 
 | P8 (grants por columna), P9 (RPC), P6 (vistas), P12 (transacciones largas) | **Sin resultado real todavía.** El dueño debe correr `0_preflight.sql` (solo lectura, rol de lectura) y guardar la salida; P9 ya no aborta. |
 
 ### GO / NO-GO actual
-**NO-GO para migrar y para activar la bandera en producción**, por incumplimientos del runbook que no se resuelven en código:
-1. Preflight real incompleto (P6, P8, P9, P12 sin salida comprobada).
-2. RLS permisiva `acceso_total` sin corregir (otro carril): la migración no la cambia ni la agrava, pero V8(b) («escribir con otro `alumno_id` es rechazado») **no puede pasar** mientras exista; no se declara GO con ese punto abierto.
-3. Falta la prueba en un branch de Supabase de prueba (PostgREST real, JWT, V8 a–f).
+Resultados reales de solo lectura informados por el dueño: **P6** sin vistas dependientes, **P8** 0 permisos solo por columna, **P9** sin funciones públicas que escriban en `progreso`/`sesiones`, **P12** 0 transacciones largas en ese instante. No sustituyen el preflight completo (P1–P5, P7, P10, P11 y el preflight de seguridad `docs/rls-v1/0_preflight.sql`).
 
-Cuando 1–3 estén cumplidos: migración (A, B, C) → V1–V8 → recién entonces la bandera solo en Preview.
+**NO-GO para migrar y para activar las banderas en producción** mientras no se cumpla TODO esto (ninguna migración ni variable se tocó):
+1. Preflight completo, incluido `docs/rls-v1/0_preflight.sql` (R5 RPC, R7 cuentas vinculadas, R9 gestores).
+2. **RLS v1 aplicada y verificada** (`docs/rls-v1`, ahora preparada y probada en local): hasta entonces V8(b) («escribir con otro `alumno_id` es rechazado») no puede pasar.
+3. Prueba en un branch de Supabase de prueba con Supabase Auth real (PostgREST, JWT, V8 y V9).
+
+Orden de despliegue y rollback de cada etapa: `docs/rls-v1/README.md` §4.
 
 ## Dependencia de «Prescrito vs. ejecutado»
-La comparación necesita (a) la identidad de esta migración y (b) la tabla de copias de `docs/prescripcion-copias-v1/` (propuesta, no aplicada, sin escritura desde la app). Hasta entonces cada sesión devuelve un estado explícito (`sin_copia`, `sin_finalizar`, `series_sin_vinculo`); ver `lib/prescritoEjecutadoResumen.js`. No hay copias retroactivas: las sesiones anteriores quedan sin comparar.
+La comparación necesita (a) la identidad de esta migración y (b) la tabla de copias de `docs/prescripcion-copias-v1/` (no aplicada; la app ya la escribe y la lee, pero solo con `VITE_IRONTRACK_COPIAS_PRESCRIPCION`). Hasta entonces cada sesión devuelve un estado explícito (`sin_copia`, `sin_finalizar`, `series_sin_vinculo`); ver `lib/prescritoEjecutadoResumen.js`. No hay copias retroactivas: las sesiones anteriores quedan sin comparar.

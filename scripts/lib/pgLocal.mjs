@@ -126,7 +126,7 @@ create role anon nologin; create role authenticated nologin; create role service
 create schema if not exists auth;
 -- Equivalentes minimos de los helpers de Supabase (sub del JWT en request.jwt.claims).
 create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
-create function auth.uid() returns text language sql stable as $$ select auth.jwt() ->> 'sub' $$;
+create function auth.uid() returns uuid language sql stable as $$ select nullif(auth.jwt() ->> 'sub', '')::uuid $$;  -- como Supabase: uuid
 grant usage on schema public, auth to anon, authenticated, service_role;
 grant execute on all functions in schema auth to anon, authenticated, service_role;
 

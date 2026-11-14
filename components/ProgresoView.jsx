@@ -20,6 +20,7 @@ import { useIronTrackI18n } from "../contexts/IronTrackI18nContext.jsx";
 import { irontrackMsg as M, localeForSort } from "../lib/irontrackMsg.js";
 import { coachThemePalette } from "./coachThemePalette.js";
 import { alumnosPaleta } from "./students/alumnosPaleta.js";
+import PrescritoEjecutadoPanel from "./prescrito/PrescritoEjecutadoPanel.jsx";
 
 /** Volumen en kg abreviado tipo SaaS: 12400 → "12.4k kg", 850 → "850 kg" */
 function formatWeeklyVolKgAbbrev(v) {
@@ -671,6 +672,9 @@ export default function ProgresoView({
               P={P}
             />
           </div>
+
+          {/* Prescrito vs. ejecutado: solo con un alumno elegido y con la bandera de build (sin ella el panel no renderiza ni lee nada). */}
+          {alumnoSel != null ? <PrescritoEjecutadoPanel key={"pe-" + String(alumnoSel)} alumnoId={alumnoSel} propio={false} darkMode={darkMode} /> : null}
         </section>
 
         {/* ===== EQUIPO: global, no depende de alumnoSel; colapsado por defecto ===== */}

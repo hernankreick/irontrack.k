@@ -397,7 +397,9 @@ await t("13. WorkoutScreen y logSet ya no usan la fecha del reloj para hoy/hoyFi
   const start = app.slice(app.indexOf("const startStudentWorkout = function"), app.indexOf("const alumnoPlanHeaderDayNum"));
   assert.match(start, /prepararInicioEntrenamiento\(/);
   assert.equal((start.match(/setSession\(/g) || []).length, 1, "un solo setSession, dentro de iniciar()");
-  assert.match(start, /nextSession = prepararInicioEntrenamiento\(\{[\s\S]*?\}\)\.session;\s*setSession\(nextSession\);/);
+  // Prescrito vs. ejecutado: se conserva `recuperada` para capturar la copia SOLO en un inicio real; la sesion sigue saliendo de prepararInicioEntrenamiento().session.
+  assert.match(start, /var inicioPrep = prepararInicioEntrenamiento\(\{[\s\S]*?\}\);\s*nextSession = inicioPrep\.session;/);
+  assert.match(start, /capturarCopiaAlIniciar\(\{[\s\S]*?recuperada: inicioPrep\.recuperada[\s\S]*?\}\);[\s\S]*?setSession\(nextSession\);/);
   assert.equal((start.match(/iniciar\(\);/g) || []).length, 3);
 });
 

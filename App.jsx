@@ -180,6 +180,10 @@ import {
   removeAllPendingForAlumno,
 } from './lib/pendingSyncQueue.js';
 import { construirIdentidadSerie, adjuntarIdentidadPendientes } from './lib/serieIdentidad.js';
+import { debeRegistrarEntrenador } from './lib/entrenadorUpsertGate.js';
+import { capturarCopiaAlIniciar, enviarCopiasPendientes, copiasPrescripcionDesdeEntorno, copiasBanderaDeBuild } from './lib/prescripcionCopiaSync.js';
+import { cargarPrescritoEjecutado } from './lib/prescritoEjecutadoCarga.js';
+import { registrarHostPrescritoEjecutado } from './lib/prescritoEjecutadoHost.js';
 import { identidadRemotaDesdeEntorno, proyectarPayloadSerie, enviarConFallbackIdentidad, tieneCampos, CAMPOS_REMOTOS_SERIE, CAMPOS_REMOTOS_SESION } from './lib/identidadRemota.js';
 import { writeAheadPendingSet, sendWriteAheadSet, isSetSendInFlight } from './lib/setWriteAhead.js';
 import { createPendingSyncController, attachSyncTriggers } from './lib/pendingSyncController.js';
@@ -1453,6 +1457,9 @@ function GymApp() {
 
     function upsertEntrenador(user) {
       if (cancelled || !user || !user.id) return;
+      var sesionLocalUp = null;
+      try { sesionLocalUp = JSON.parse(localStorage.getItem("it_session") || "null"); } catch (eSl) {}
+      if (!debeRegistrarEntrenador(user, sesionLocalUp)) return; // RLS v1: una cuenta de alumno no escribe en `entrenadores`
       supabase
         .from('entrenadores')
         .upsert({ id: user.id, email: user.email ?? null }, { onConflict: 'id' })
@@ -2394,6 +2401,27 @@ function GymApp() {
   // Con conexion, antes de iniciar se lee la rutina FRESCA: si el entrenador la reinicio (ciclo nuevo) se actualiza el plan y NO se inicia
   // el dia viejo (el alumno ve el aviso y vuelve a tocar Iniciar sobre el plan nuevo). Sin conexion o si la lectura falla, inicia igual.
   const startingWorkoutRef = React.useRef(false);
+  // Prescrito vs. ejecutado: envio idempotente de las copias en cola (solo con la bandera; ver lib/prescripcionCopiaSync.js).
+  const sincronizarCopiasRef = React.useRef(null);
+  sincronizarCopiasRef.current = function () {
+    if (!copiasPrescripcionDesdeEntorno()) return;
+    var alumnoSync = sessionData?.alumnoId;
+    if (!alumnoSync || sessionData?.role !== "alumno" || readOnly || sharedParam) return;
+    enviarCopiasPendientes({ storage: localStorage, alumnoId: alumnoSync, post: function (row) { return sbRequestStatus("prescripcion_copias", "POST", row); } }).catch(function () {});
+  };
+  useEffect(function () { if (isOnline && sincronizarCopiasRef.current) sincronizarCopiasRef.current(); }, [isOnline, sessionData?.alumnoId]);
+  useEffect(function () {
+    registrarHostPrescritoEjecutado({
+      activo: copiasBanderaDeBuild(),
+      cargar: function (alumnoId, o) {
+        var propio = !!(o && o.propio);
+        return cargarPrescritoEjecutado({
+          alumnoId: alumnoId, requestStatus: sbRequestStatus, fetchPath: sbFetch,
+          registroCompletoPosible: propio, pendientesLocales: propio ? function () { return visiblePendingItems(localStorage, alumnoId).length; } : null,
+        });
+      },
+    });
+  }, []);
   // D76-02: alumno (no solo lectura) cuyas sesiones no se pudieron leer: no se calcula ni se inicia ningun dia (no se asume "Dia 1").
   const planAlumno = estadoPlanAlumno({ esAlumno: esAlumno, readOnly: readOnly, lectura: sesionesLectura });
   const startStudentWorkout = function (nextSession) {
@@ -2402,14 +2430,32 @@ function GymApp() {
     // D76-05: la sesion se inicia con su fecha fija (session.fecha) y, para el alumno, con un ancla local que permite continuar el mismo
     // entrenamiento (misma fecha) tras una recarga de Safari. Sin informacion confiable se inicia una sesion nueva (no se re-fecha nada).
     var iniciar = function () {
-      nextSession = prepararInicioEntrenamiento({
+      var inicioPrep = prepararInicioEntrenamiento({
         storage: localStorage,
         session: nextSession,
         alumnoId: (esAlumno && !readOnly && !sharedParam) ? sessionData?.alumnoId : null,
         ciclo: readCicloActual((routines.find(function (r) { return String(r.id) === String(nextSession.rId); }) || {}).datos),
         semana: studentCurrentWeek,
         now: Date.now(),
-      }).session;
+      });
+      nextSession = inicioPrep.session;
+      // Prescrito vs. ejecutado: copia inmutable de lo prescrito al INICIO real (no al reanudar). Solo con la bandera de build; nunca bloquea el entrenamiento.
+      try {
+        var alumnoCopia = (esAlumno && !readOnly && !sharedParam) ? sessionData?.alumnoId : null;
+        if (alumnoCopia) {
+          var capCopia = capturarCopiaAlIniciar({
+            activa: copiasPrescripcionDesdeEntorno(),
+            recuperada: inicioPrep.recuperada,
+            storage: localStorage,
+            rutina: routines.find(function (r) { return String(r.id) === String(nextSession.rId); }),
+            alumnoId: alumnoCopia,
+            session: nextSession,
+            capturadaEn: new Date().toISOString(),
+            ahora: Date.now(),
+          });
+          if (capCopia && capCopia.ok && isOnline && sincronizarCopiasRef.current) sincronizarCopiasRef.current();
+        }
+      } catch (eCopia) {}
       setSession(nextSession);
     };
     var check = checkCicloAlumnoRef.current;

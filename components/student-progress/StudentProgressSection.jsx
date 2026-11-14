@@ -1,6 +1,7 @@
 import React from 'react'
 import { Medal } from 'lucide-react'
 import { ProgressChartsPanel } from './ProgressChartsPanel.jsx'
+import PrescritoEjecutadoPanel from '../prescrito/PrescritoEjecutadoPanel.jsx'
 import { ProgressSessionsPanel } from './ProgressSessionsPanel.jsx'
 import { ProgressPhotosPanel } from './ProgressPhotosPanel.jsx'
 import { StudentProgressEmptyState } from './StudentProgressEmptyState.jsx'
@@ -458,6 +459,13 @@ export default function StudentProgressSection({
                 })}
               </div>
             </div>
+
+            {/* Prescrito vs. ejecutado (solo con la bandera de build; el propio alumno, en su dispositivo) */}
+            {sessionData?.alumnoId != null && !esEntrenador ? (
+              <div style={{ padding: '0 var(--page-gutter)' }}>
+                <PrescritoEjecutadoPanel alumnoId={sessionData.alumnoId} propio darkMode />
+              </div>
+            ) : null}
 
             {/* Links sesiones / fotos */}
             <div className="mt-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 border-t pt-6 text-[13px] font-semibold" style={{ borderColor: 'rgba(90,121,160,0.42)' }}>
