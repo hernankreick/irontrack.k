@@ -57,3 +57,24 @@ El orden se verificó con pruebas: **RLS e identidad remota conmutan** (mismo es
 - `config` (datos de pago) la lee cualquier alumno vinculado; las fotos son URLs (el bucket no está cubierto).
 - El contenido de `prescripcion_copias.snapshot` lo calcula el cliente: un alumno podría falsear la copia de **su propia** sesión (no la de otros). Cerrarlo exige capturar la copia del lado del servidor (RPC), fuera de esta etapa.
 - Un `SECURITY DEFINER` público sin validar al llamador elude estas políticas (V8 lo señala).
+- Una serie puede declarar el `sesion_uid` de otra sesión: la base no tiene FK (decisión del diseño) y el uid es un UUID v4 que RLS impide conocer a otro alumno. Si ocurriera, la comparación de esa sesión queda en `series_sin_vinculo` (nunca se le atribuyen series ajenas).
+
+## 6. Entorno de validación gratuito: qué se probó y qué no
+Entorno: PostgreSQL 16 local descartable (socket Unix, sin red; `scripts/lib/pgLocal.mjs`) + un emulador mínimo de PostgREST (`scripts/lib/pgRest.mjs`) + el cliente real de la app. **Costo: 0.**
+
+| Se probó (automatizado, `npm run test:all`) | Suite |
+|---|---|
+| Políticas, triggers, privilegios y funciones de RLS v1 con SELECT/INSERT/UPDATE/DELETE y upsert, para entrenador, alumnos A y B, usuario sin vínculo, cuenta sin `app_metadata`, otro entrenador y anon; ids `text` y `uuid` | `test-pgRlsV1` (30) |
+| Que esas pruebas **detectan** una política débil (4 mutaciones de la migración) | `test-pgRlsV1` |
+| Que toda tabla y operación que la app usa tiene política versionada (si aparece una nueva sin política, falla) | `test-rlsInventarioApp` |
+| Migración de identidad (CHECK, índices, 23505, rollback, reejecución, lock_timeout, NOTIFY) y flujo completo del cliente (offline, recarga, reintentos, historial, datos antiguos) | `test-pgIdentidadRemota*` |
+| Copias de prescripción, flujo bajo RLS real, edición posterior de la rutina, comparación y resúmenes (con prueba de rendimiento) | `test-pgPrescritoEjecutado`, `test-prescrito*` |
+| Interfaz: estados, accesibilidad, contraste, 375/390/430/768 px, claro y oscuro (Chromium) | `test-prescritoEjecutadoVista`, `scripts/qa/prescrito-ejecutado-visual.mjs` |
+
+| NO se pudo probar gratis en este entorno | Por qué / cómo hacerlo gratis |
+|---|---|
+| **PostgREST real** (recarga de esquema, `PGRST204`, `return=representation`, validación del JWT) | Sin Docker en ejecución ni paquete firmado; el binario oficial es una descarga de terceros sin verificar y su descarga fue denegada. Se emula el contrato HTTP. En la máquina del dueño es gratis: contenedor oficial de PostgREST sobre un PostgreSQL local, o el stack local de la CLI de Supabase (Docker Desktop y CLI son gratuitos), siguiendo V9. |
+| **Supabase Auth (GoTrue)**: emisión real de `app_metadata`, vencimiento y refresco de tokens | Ídem. El JWT se simula con las mismas *claims*. |
+| Safari/WebKit real, VoiceOver, safe area, teclado | No hay WebKit en el entorno. Se probó Chromium y se evitó CSS no soportado (`word-break` de respaldo). |
+| Storage (políticas del bucket de fotos) | No está versionado en el repositorio. |
+| Datos reales (preflight R5/R7/R9, cuentas vinculadas) | Requiere acceso de solo lectura a Supabase de producción. |

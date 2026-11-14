@@ -50,9 +50,9 @@ pg.sql(ROLES, "postgres");
 for (const idType of ["text", "uuid"]) {
   const tpl = "tpl_" + idType;
   pg.createDb(tpl); assert.ok(pg.sql(ESQUEMA_BASE.replace(ROLES, "") + esquemaApp(idType), tpl).ok, "esquema " + idType);
-  let k = 0; const nueva = (migrar, padron = [C1, C2]) => {
+  let k = 0; const nueva = (migrar, padron = [C1, C2], migSql = MIG) => {
     const db = idType + "_" + (++k); pg.createDb(db, tpl); const r0 = pg.sql(SEED, db); assert.ok(r0.ok, r0.stderr);
-    if (migrar) { pg.sql("create schema if not exists it_authz; create table if not exists it_authz.entrenadores_autorizados (uid uuid primary key, nota text, created_at timestamptz not null default now());" + padron.map((u) => "insert into it_authz.entrenadores_autorizados (uid) values ('" + u + "');").join(""), db); const m = pg.sql(MIG, db); assert.ok(m.ok, m.error && m.error.message + m.stderr); }
+    if (migrar) { pg.sql("create schema if not exists it_authz; create table if not exists it_authz.entrenadores_autorizados (uid uuid primary key, nota text, created_at timestamptz not null default now());" + padron.map((u) => "insert into it_authz.entrenadores_autorizados (uid) values ('" + u + "');").join(""), db); const m = pg.sql(migSql, db); assert.ok(m.ok, m.error && m.error.message + m.stderr); }
     return db;
   };
   const como = (db, who) => makeRest(pg, db, who === "anon" ? { role: "anon" } : { claims: who });
@@ -212,6 +212,39 @@ for (const idType of ["text", "uuid"]) {
     const v8 = pg.rows("with f as materialized (select p.oid, p.proname, p.prosecdef from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prokind in ('f','p')) select proname from f where prosecdef and (has_function_privilege('anon', oid, 'execute') or has_function_privilege('authenticated', oid, 'execute'))", db);
     assert.deepEqual(v8.map((x) => x.proname), ["it_mala_rpc"], "la verificacion V8 la senala para revision");
     assert.ok(pg.tryRows("select public.it_mala_rpc('" + IB + "')", db, { role: "authenticated", claims: claims.alumno(UA, IA) }).ok, "(demuestra por que V8 es obligatoria: una RPC DEFINER sin validacion SI elude RLS)");
+  });
+
+  await test("[" + idType + "] upsert como lo hace PostgREST (INSERT ... ON CONFLICT DO UPDATE): el entrenador actualiza lo suyo; un alumno u otro entrenador no pisan filas ajenas ni se registran", async () => {
+    const db = nueva(true); const coach = { role: "authenticated", claims: claims.coach(C1) }, alumno = { role: "authenticated", claims: claims.alumno(UA, IA) }, otro = { role: "authenticated", claims: claims.coach(C2) };
+    const upsertOv = (nombre, o, ent) => pg.tryRows("insert into public.ejercicio_overrides (entrenador_id, ejercicio_id, name) values ('" + ent + "','sq','" + nombre + "') on conflict (entrenador_id, ejercicio_id) do update set name = excluded.name returning name", db, o);
+    assert.equal(upsertOv("Nuevo", coach, C1).rows[0].name, "Nuevo", "el entrenador actualiza su override");
+    assert.equal(upsertOv("Pisado", alumno, C1).error.code, "42501", "un alumno no pisa el override del entrenador"); assert.equal(upsertOv("Pisado", otro, C1).error.code, "42501", "otro entrenador tampoco");
+    assert.equal(pg.scalar("(select name from public.ejercicio_overrides where entrenador_id = '" + C1 + "' and ejercicio_id = 'sq')", db), "Nuevo");
+    const upsertEnt = (id, o, nombre) => pg.tryRows("insert into public.entrenadores (id, email) values ('" + id + "','x@t.test') on conflict (id) do update set email = excluded.email returning id", db, o);
+    assert.ok(upsertEnt(C1, coach).ok, "el entrenador registra/actualiza su fila"); assert.equal(upsertEnt(UA, alumno).error.code, "42501", "un alumno no se registra como entrenador"); assert.equal(upsertEnt(C1, alumno).error.code, "42501", "ni pisa la fila del entrenador");
+    assert.equal(upsertEnt(C1, otro).error.code, "42501", "otro entrenador no pisa la fila ajena");
+  });
+
+  await test("[" + idType + "] las pruebas DETECTAN una politica debil: 4 mutaciones de la migracion (select abierto, mensaje como entrenador, trigger ausente, es_dueno sin padron) son senaladas y la migracion real no", async () => {
+    const mut = (de, a) => { assert.ok(MIG.includes(de), "la mutacion no aplica: " + de.slice(0, 50)); return MIG.replace(de, () => a); };
+    const fugas = {
+      progreso_abierto: async (db) => (await como(db, claims.alumno(UA, IA)).get("progreso?select=id")).data.length > 1,
+      mensaje_como_entrenador: async (db) => (await como(db, claims.alumno(UA, IA)).post("mensajes", { alumno_id: IA, de_entrenador: true, texto: "x" })).status === 201,
+      alumno_cambia_entrenador: async (db) => { const r = await como(db, claims.alumno(UA, IA)).patch("alumnos?id=eq." + IA, { entrenador_id: UA }); return r.ok && r.data.length === 1; },
+      cualquiera_ve_legados: async (db) => (await como(db, claims.plano(UZ)).get("alumnos?select=id")).data.length > 0,
+    };
+    const mutadas = {
+      progreso_abierto: mut("CREATE POLICY it_rls_progreso_select ON public.progreso FOR SELECT TO authenticated USING (it_authz.es_alumno(alumno_id::text) OR it_authz.gestiona_alumno(alumno_id::text));", "CREATE POLICY it_rls_progreso_select ON public.progreso FOR SELECT TO authenticated USING (true);"),
+      mensaje_como_entrenador: mut("(it_authz.es_alumno(alumno_id::text) AND de_entrenador IS NOT TRUE) OR (it_authz.gestiona_alumno(alumno_id::text) AND de_entrenador IS TRUE));", "it_authz.es_alumno(alumno_id::text) OR (it_authz.gestiona_alumno(alumno_id::text) AND de_entrenador IS TRUE));"),
+      alumno_cambia_entrenador: mut("CREATE TRIGGER it_guard_alumnos BEFORE UPDATE ON public.alumnos FOR EACH ROW EXECUTE FUNCTION it_authz.guard_columnas_alumno('onesignal_id', 'updated_at');", "-- trigger removido"),
+      cualquiera_ve_legados: mut("AS $$ SELECT it_authz.es_entrenador() AND p_entrenador_id IS NOT NULL AND p_entrenador_id IN (auth.uid()::text, 'entrenador_principal') $$;", "AS $$ SELECT p_entrenador_id IS NOT NULL AND p_entrenador_id IN (auth.uid()::text, 'entrenador_principal') $$;"),
+    };
+    const real = nueva(true);
+    for (const [nombre, sqlMut] of Object.entries(mutadas)) {
+      const dbMut = nueva(true, [C1, C2], sqlMut);
+      assert.equal(await fugas[nombre](dbMut), true, "la prueba NO detecta la mutacion " + nombre);
+      assert.equal(await fugas[nombre](real), false, "falso positivo en la migracion real: " + nombre);
+    }
   });
 
   await test("[" + idType + "] identidad remota + RLS: el alumno guarda series/sesion con identidad bajo las politicas nuevas; B no las ve; la migracion de identidad es compatible en ambos ordenes", async () => {

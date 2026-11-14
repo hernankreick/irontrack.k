@@ -14,7 +14,7 @@ import { ubicarEjercicioEnDia, construirIdentidadSerie } from "../lib/serieIdent
 import { buildSessionPayload, removeUndefinedPayloadFields, buildPendingProgressItem, buildProgressPayloadFromPending } from "../lib/workoutSession.js";
 import { proyectarPayloadSesion } from "../lib/identidadRemota.js";
 import { buildPrescripcionSnapshot } from "../lib/prescripcionSnapshot.js";
-import { capturarCopiaAlIniciar, enviarCopiasPendientes, __resetCopiasParaPruebas } from "../lib/prescripcionCopiaSync.js";
+import { capturarCopiaAlIniciar, construirFilaCopia, enviarCopiasPendientes, __resetCopiasParaPruebas } from "../lib/prescripcionCopiaSync.js";
 import { cargarPrescritoEjecutado } from "../lib/prescritoEjecutadoCarga.js";
 import { ESTADO_COMPARACION as E } from "../lib/prescripcionComparacion.js";
 
@@ -154,6 +154,21 @@ try {
     assert.deepEqual(r.semanas.map((w) => [w.semana, w.sesiones_total, w.sesiones_verificables]), [[1, 2, 2], [2, 1, 0]]);
     assert.equal(r.sesiones.find((x) => x.semana === 2).comparacion.estado, E.SIN_COPIA); assert.equal(r.global.estado, "parcial");
     const rb = (await cargar(db, claims.alumno(UB, B), B, {})).resultado; assert.equal(rb.sesiones[0].comparacion.estado, E.VERIFICABLE); assert.equal(rb.global.series.ejecutadas, 3);
+  });
+
+  await test("el entrenador edita la rutina DESPUES: la copia guardada y la comparacion de la sesion pasada no cambian; una sesion posterior captura la prescripcion nueva con otra huella", async () => {
+    const db = nuevaBase(); await entrenar(db, A, { idxs: [0, 0, 1, 1, 1, 2, 2, 2], repsPor: { sq: 9, mov: 12 } });
+    const antes = await cargar(db, claims.alumno(UA, A), A, {}); const hash0 = pg.scalar("(select prescripcion_hash from public.prescripcion_copias)", db); const snap0 = pg.scalar("(select snapshot::text from public.prescripcion_copias)", db);
+    assert.equal(antes.resultado.sesiones[0].comparacion.estado, E.VERIFICABLE);
+    const nuevaRutina = rutina(A); nuevaRutina.datos.days[0].exercises[0].kg = "120"; nuevaRutina.datos.days[0].exercises[0].sets = "5"; nuevaRutina.datos.days[0].exercises[0].reps = "3";
+    const ed = await como(db, claims.coach(UC)).patch("rutinas?id=eq." + RA, { datos: nuevaRutina.datos }); assert.equal(ed.data.length, 1, "el entrenador edita la rutina");
+    const despues = await cargar(db, claims.alumno(UA, A), A, {}); const coachVe = await cargar(db, claims.coach(UC), A, {});
+    assert.deepEqual(despues.resultado, antes.resultado, "la comparacion de la sesion pasada no cambia con la edicion");
+    assert.equal(pg.scalar("(select prescripcion_hash from public.prescripcion_copias)", db), hash0); assert.equal(pg.scalar("(select snapshot::text from public.prescripcion_copias)", db), snap0, "la copia es byte a byte la original");
+    assert.equal(coachVe.resultado.sesiones[0].comparacion.ejercicios.find((e) => e.ejercicio_id === "sq").variables.kg.prescrito.texto, "50", "el entrenador ve lo que se prescribio ese dia (50), no la rutina nueva (120)");
+    const nueva = construirFilaCopia({ rutina: Object.assign({}, nuevaRutina, { id: RA }), alumnoId: A, session: prepararInicioEntrenamiento({ storage: memStorage(), alumnoId: A, session: { rId: RA, dIdx: 0, exIdx: 0, startTime: T0 + 24 * 60 * MIN }, ciclo: 1, semana: 0, now: T0 + 24 * 60 * MIN }).session });
+    assert.equal(nueva.ok, true); assert.notEqual(nueva.row.prescripcion_hash, hash0); assert.equal(nueva.row.snapshot.ejercicios.find((e) => e.id === "sq").kg, "120", "una sesion posterior captura lo nuevo");
+    assert.equal(como(db, claims.alumno(UA, A)) && (await como(db, claims.alumno(UA, A)).patch("prescripcion_copias?alumno_id=eq." + A, { prescripcion_hash: "sha256:" + "e".repeat(64) })).ok, false, "y la copia vieja no se puede reescribir");
   });
 
   await test("copia ambigua (dos huellas): ninguna se elige; la edicion posterior de la rutina no reescribe el pasado; sesiones historicas sin identidad: estados explicitos sin porcentajes", async () => {

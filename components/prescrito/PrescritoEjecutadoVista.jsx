@@ -11,7 +11,7 @@ function paleta(dark) {
     ? { card: P.card, sub: P.cardDark, brd: P.brd, t: P.t, m: "#a1a1aa", ok: "#4ade80", warn: "#facc15", bad: "#f87171", acc: "#60a5fa", okBg: "#052e16", warnBg: "#422006", badBg: "#450a0a" }
     : { card: P.card, sub: P.cardDark, brd: P.brd, t: P.t, m: "#475569", ok: "#15803d", warn: "#854d0e", bad: "#b91c1c", acc: "#1d4ed8", okBg: "#dcfce7", warnBg: "#fef9c3", badBg: "#fee2e2" };
 }
-var base = { margin: 0, minWidth: 0, overflowWrap: "anywhere" };
+var base = { margin: 0, minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }; // respaldo para Safari anterior a 15.4
 function colorDe(res, C) { return res === "cumple" || res === "por_encima" ? [C.ok, C.okBg] : res === "por_debajo" ? [C.bad, C.badBg] : res === "mixto" ? [C.warn, C.warnBg] : [C.m, C.sub]; }
 
 function Chip({ children, fg, bg, C }) {
