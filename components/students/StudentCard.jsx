@@ -1,4 +1,5 @@
 import React from 'react';
+import { estadoPagoAlumno } from "./pagoAlumno.js";
 import { Ic } from '../Ic.jsx';
 import { getRutinaBadgeConfig } from '../../lib/routineStore.js';
 import StudentActionsMenu from './StudentActionsMenu.jsx';
@@ -35,7 +36,6 @@ export default function StudentCard({
   onMarkPaid,
   onClearProgress,
   onDelete,
-  onAsignarRutina,
   children,
 }) {
   var a = alumno || {};
@@ -87,6 +87,7 @@ export default function StudentCard({
             </span>
             <span style={{display:"block",fontSize:13,color:textMuted,lineHeight:1.3,marginTop:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.email}</span>
             <span style={{display:"inline-block",maxWidth:"100%",marginTop:5,fontSize:11.5,fontWeight:600,padding:"2px 9px",borderRadius:7,background:badgeCfg.bg,color:badgeCfg.color,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",verticalAlign:"top",boxSizing:"border-box"}}>{badgeCfg.t}</span>
+            <span data-qa-pago-estado style={{display:"inline-block",maxWidth:"100%",marginTop:5,marginLeft:6,fontSize:11.5,fontWeight:600,padding:"1px 8px",borderRadius:7,border:"1px solid "+P.border,color:textMuted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",verticalAlign:"top",boxSizing:"border-box"}}>{estadoPagoAlumno(a.ultimo_pago_confirmado, msg("es","en")==="es").texto}</span>
           </span>
         </button>
         <div style={{display:"flex",alignItems:"center",gap:0,flexShrink:0}}>

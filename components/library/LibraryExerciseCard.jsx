@@ -89,6 +89,7 @@ export default function LibraryExerciseCard({
               <button
                 type="button"
                 onClick={onEdit}
+                aria-label={msg("Editar ejercicio ", "Edit exercise ") + nombre}
                 className="coach-tap"
                 style={{ ...btnStyle, fontSize: 18 }}
               >⋮</button>
@@ -116,6 +117,7 @@ export default function LibraryExerciseCard({
                 <button
                   type="button"
                   onClick={onDelete}
+                  aria-label={msg("Eliminar ejercicio ", "Delete exercise ") + nombre}
                   className="coach-tap"
                   style={btnStyle}
                 >
@@ -160,6 +162,7 @@ export default function LibraryExerciseCard({
           <button
             onClick={() => setShowVideo(false)}
             className="coach-tap"
+            aria-label={msg("Cerrar video", "Close video")}
             style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', color: '#fff', fontSize: '14px', cursor: 'pointer', zIndex: 1 }}
           >✕</button>
         </div>

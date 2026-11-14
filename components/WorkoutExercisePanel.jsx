@@ -7,7 +7,7 @@ import { WorkoutExerciseCompletedState } from './workout/WorkoutExerciseComplete
 import { WorkoutTodaySetsList } from './workout/WorkoutTodaySetsList.jsx';
 import { getYTVideoId } from '../lib/getYTVideoId.js';
 import { setsForLoadPrefill } from '../lib/rutinaCiclo.js';
-import { createRepsSwipeHandlers } from '../lib/repsSwipe.js';
+import { createRepsSwipeHandlers, esSwipeHorizontal } from '../lib/repsSwipe.js';
 import { resolveExerciseTitle, resolveVideoUrl } from '../lib/exerciseResolve.js';
 import { generateOpId } from '../lib/pendingSyncQueue.js';
 import { resolveRestSeconds } from '../lib/restPause.js';
@@ -115,6 +115,7 @@ export function WorkoutExercisePanel(props) {
   const [swipeDelta, setSwipeDelta] = React.useState(0);
   const [swiping, setSwiping] = React.useState(false);
   const swipeStartX = React.useRef(null);
+  const swipeStartY = React.useRef(null);
   const repsSwipeStartX = React.useRef(null);
   const holdTimer = React.useRef(null);
   const holdInterval = React.useRef(null);
@@ -310,12 +311,16 @@ export function WorkoutExercisePanel(props) {
           }}
           onTouchStart={e=>{
             swipeStartX.current = e.touches[0].clientX;
+            swipeStartY.current = e.touches[0].clientY;
             setSwiping(true);
             setSwipeDelta(0);
           }}
           onTouchMove={e=>{
             if(swipeStartX.current===null) return;
             const dx = e.touches[0].clientX - swipeStartX.current;
+            const dy = e.touches[0].clientY - (swipeStartY.current==null ? e.touches[0].clientY : swipeStartY.current);
+            // Un gesto mayormente vertical es scroll, no un registro: se cancela (antes un scroll diagonal podía registrar una serie).
+            if(!esSwipeHorizontal(dx, dy)) { swipeStartX.current = null; setSwiping(false); setSwipeDelta(0); return; }
             if(dx > 0) { setSwipeDelta(0); return; } // solo swipe izquierda
             setSwipeDelta(dx);
           }}
@@ -328,7 +333,9 @@ export function WorkoutExercisePanel(props) {
             }
             setSwipeDelta(0);
             swipeStartX.current = null;
+            swipeStartY.current = null;
           }}
+          onTouchCancel={()=>{ setSwiping(false); setSwipeDelta(0); swipeStartX.current = null; swipeStartY.current = null; }}
         >
           {/* Fondo verde que aparece al swipear */}
           <div style={{
@@ -348,7 +355,7 @@ export function WorkoutExercisePanel(props) {
             </div>
             {setActualNum===1&&!swipeDelta&&(
               <div style={{fontSize:10,color:"#CBD5E1",display:"flex",alignItems:"center",gap:3}}>
-                <Ic name="arrow-left" size={10} color="#CBD5E1"/> deslizá
+                <Ic name="arrow-left" size={10} color="#CBD5E1"/> {es?"deslizá":"swipe"}
               </div>
             )}
             {isPR&&(
@@ -373,7 +380,6 @@ export function WorkoutExercisePanel(props) {
             <div style={{marginBottom:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                 <span style={{fontSize:10,fontWeight:700,color:labelCol,letterSpacing:1}}>PESO</span>
-                {parseFloat(kg)>0&&<span style={{fontSize:10,fontWeight:600,color:hintCol}}>{es?"Último":"Last"}: {kg}kg</span>}
               </div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <button type="button" className="hov"
@@ -389,7 +395,9 @@ export function WorkoutExercisePanel(props) {
                 >−</button>
                 <div style={{flex:1,position:"relative"}}>
                   <input
-                    type="number" value={kg} onChange={e=>setKg(e.target.value)}
+                    type="text" inputMode="decimal" enterKeyHint="done" autoComplete="off"
+                    onKeyDown={e=>{ if(e.key==="Enter") e.currentTarget.blur(); }}
+                    value={kg} onChange={e=>setKg(e.target.value)}
                     aria-label={es?"Peso en kg":"Weight in kg"}
                     placeholder="0"
                     style={{width:"100%",height:48,background:darkMode?"#111827":"#F0F4F8",border:"1px solid "+(darkMode?"#1E3A5F":"#CBD5E1"),borderRadius:10,

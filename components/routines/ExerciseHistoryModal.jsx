@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatWorkoutSetLabel } from '../../lib/workoutSession.js';
+import useDialogA11y from '../modals/useDialogA11y.js';
 
 export default function ExerciseHistoryModal({
   exercise,
@@ -21,11 +22,13 @@ export default function ExerciseHistoryModal({
   onLogSet,
   onAddToRoutine,
 }) {
+  const dialogRef = React.useRef(null);
+  useDialogA11y({ open: !!exercise, containerRef: dialogRef, onEscape: onClose });
   if (!exercise) return null;
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:100,display:"flex",alignItems:"flex-end"}} onClick={onClose}>
-      <div style={{background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxHeight:"80dvh",overflowY:"auto"}} onClick={function(e){ e.stopPropagation(); }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={es?exercise.name:exercise.nameEn} tabIndex={-1} style={{outline:"none",background:bgCard,borderRadius:"16px 16px 0 0",padding:"20px 16px",width:"100%",maxHeight:"80dvh",overflowY:"auto"}} onClick={function(e){ e.stopPropagation(); }}>
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <span style={{fontSize:36}}>{pattern?.icon}</span>
           <div>

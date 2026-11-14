@@ -1,6 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { Ic } from "../Ic.jsx";
+import useDialogA11y from "../modals/useDialogA11y.js";
 
 export default function AlumnoProfileModal({
   open,
@@ -15,6 +16,8 @@ export default function AlumnoProfileModal({
   onClose,
   onSave,
 }) {
+  const dialogRef = React.useRef(null);
+  useDialogA11y({ open: !!open && !!sessionData, containerRef: dialogRef, onEscape: onClose });
   if (!open || !sessionData || typeof document === "undefined") return null;
 
   return createPortal(
@@ -34,7 +37,13 @@ export default function AlumnoProfileModal({
       onClick={function () { onClose(); }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={msg("Mi perfil", "My profile")}
+        tabIndex={-1}
         style={{
+          outline: "none",
           background: "#0a1628",
           borderRadius: "20px 20px 0 0",
           width: "100%",

@@ -1,6 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { Ic } from "../Ic.jsx";
+import useDialogA11y from "../modals/useDialogA11y.js";
 
 export default function AlumnoSettingsModal({
   open,
@@ -15,6 +16,8 @@ export default function AlumnoSettingsModal({
   onLogoutSettings,
   RecordatoriosPanel,
 }) {
+  const dialogRef = React.useRef(null);
+  useDialogA11y({ open: !!open, containerRef: dialogRef, onEscape: onClose });
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
@@ -34,7 +37,13 @@ export default function AlumnoSettingsModal({
       onClick={function () { onClose(); }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={msg("Configuración", "Settings")}
+        tabIndex={-1}
         style={{
+          outline: "none",
           background: "#0a1628",
           borderRadius: "16px 16px 0 0",
           width: "100%",
