@@ -37,6 +37,9 @@ function Resumen({ r, lang, C }) {
         <Tarjeta titulo={M(lang, "Repeticiones en objetivo", "Reps on target", "Repetições no alvo")} p={r.porcentajes.reps} lang={lang} C={C} />
         <Tarjeta titulo={M(lang, "Cargas en objetivo", "Loads on target", "Cargas no alvo")} p={r.porcentajes.kg} lang={lang} C={C} />
       </div>
+      {r.sesiones_verificables === 0 ? (
+        <p style={{ ...base, fontSize: 14, color: C.m, lineHeight: 1.45 }}>{M(lang, "No hay ejercicios que contar: ninguna sesión tiene datos suficientes para comparar.", "There are no exercises to count: no session has enough data to compare.", "Não há exercícios para contar: nenhuma sessão tem dados suficientes para comparar.")}</p>
+      ) : (<>
       <p style={{ ...base, fontSize: 14, color: C.t, lineHeight: 1.45 }}>
         {M(lang, "Ejercicios: ", "Exercises: ", "Exercícios: ")}
         <strong>{ej.completos}</strong> {M(lang, "completos", "completed", "completos")} · <strong>{ej.parciales}</strong> {M(lang, "parciales", "partial", "parciais")} · <strong>{ej.omitidos}</strong> {M(lang, "omitidos", "skipped", "omitidos")}
@@ -46,6 +49,7 @@ function Resumen({ r, lang, C }) {
       <p style={{ ...base, fontSize: 13, color: C.m, lineHeight: 1.4 }}>
         {M(lang, "Series: ", "Sets: ", "Séries: ")}{r.series.ejecutadas} {M(lang, "hechas de", "done of", "feitas de")} {r.series.prescritas_minimo} {M(lang, "prescritas (mínimo) en los ejercicios comparables.", "prescribed (minimum) in comparable exercises.", "prescritas (mínimo) nos exercícios comparáveis.")}
       </p>
+      </>)}
     </div>
   );
 }
@@ -133,7 +137,7 @@ export default function PrescritoEjecutadoVista({ estado, resultado, cobertura, 
       cuerpo = (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <p style={{ ...base, fontSize: 14, color: C.m }}><strong style={{ color: C.t }}>{estadoResumen(g.estado, lang)}</strong> · {g.sesiones_verificables}/{g.sesiones_total} {M(lang, "sesiones comparables", "comparable sessions", "sessões comparáveis")}</p>
-          <Resumen r={g} lang={lang} C={C} />
+          {resultado.semanas.length > 1 ? <Resumen r={g} lang={lang} C={C} /> : null}
           {cobertura && cobertura.historial_completo === false ? <p role="note" style={{ ...base, fontSize: 13, color: C.warn }}>{M(lang, "El historial de series está incompleto: no se afirma que un ejercicio se omitió.", "The set history is incomplete: no exercise is reported as skipped.", "O histórico de séries está incompleto: nenhum exercício é dado como omitido.")}</p> : null}
           <ul style={{ margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
             {resultado.semanas.map(function (w) { return <Semana key={w.ciclo + ":" + w.semana} w={w} sesiones={porSemana[w.ciclo + ":" + w.semana] || []} lang={lang} C={C} abierto0={abiertoInicial} />; })}
