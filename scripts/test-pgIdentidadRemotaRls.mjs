@@ -17,7 +17,7 @@ const MIG = readFileSync(path.join(D, "1_migracion.sql"), "utf8");
 let n = 0; const test = async (name, fn) => { await fn(); n++; console.log("ok -", name); };
 const U = (i) => "aaaaaaaa-aaaa-4aaa-8aaa-" + String(i).padStart(12, "0");
 const OP = (i) => "bbbbbbbb-bbbb-4bbb-8bbb-" + String(i).padStart(12, "0");
-const SOLO_PROPIO = (t) => "drop policy acceso_total on public." + t + "; create policy solo_propio on public." + t + " for all to authenticated using (alumno_id = auth.uid()) with check (alumno_id = auth.uid());";
+const SOLO_PROPIO = (t) => "drop policy acceso_total on public." + t + "; create policy solo_propio on public." + t + " for all to authenticated using (alumno_id = (auth.jwt() ->> 'sub')) with check (alumno_id = (auth.jwt() ->> 'sub'));";
 
 const pg = new LocalPg().start();
 const ROLES = ESQUEMA_BASE.split("\n").find((l) => l.startsWith("create role"));

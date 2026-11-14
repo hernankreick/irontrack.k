@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { compararSesionesDelAlumno, sesionConEvidenciaDeFinalizacion, EVIDENCIA_FINALIZACION as EV } from "../lib/prescritoEjecutadoResumen.js";
 import { buildPrescripcionSnapshot } from "../lib/prescripcionSnapshot.js";
-import { ESTADO_COMPARACION as E } from "../lib/prescripcionComparacion.js";
+import { ESTADO_COMPARACION as E, compararPrescripcionEjecucion } from "../lib/prescripcionComparacion.js";
 
 let n = 0; const test = (name, fn) => { fn(); n++; console.log("ok -", name); };
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -115,5 +115,27 @@ test("entradas vacias o invalidas no lanzan; no muta las entradas; resultado ser
   const copias = [copia(0, 1, F1)]; const input = deepFreeze({ sesiones: [ses(1, 0, 1, F1)], copias, series: completaDiaA(1, 1, F1), contexto: { registroSeriesCompleto: true, planificacionMostradaHash: copias[0].prescripcion_hash } });
   const r = compararSesionesDelAlumno(input); assert.deepEqual(JSON.parse(JSON.stringify(r)), r); assert.equal(r.semanas[0].estado, "completo");
   assert.deepEqual(compararSesionesDelAlumno(clone(input)), r, "determinista");
+});
+test("rendimiento: el agrupado por fecha da EXACTAMENTE el mismo resultado que comparar cada sesion con todas las series, y 400 sesiones x 8000 series sin vinculo tardan < 1 s", () => {
+  const FEC = ["10/11/2026", "11/11/2026", "12/11/2026", "2026-11-13", "texto raro", null];
+  const copias = [copia(0, 1, F1), copia(1, 1, F2)];
+  const sesiones = [ses(1, 0, 1, F1), ses(2, 1, 1, F2), ses(3, 0, 1, "12/11/2026", { sesion_uid: null, identidad_v: null }), ses(4, 1, 2, "13/11/2026", { sesion_uid: null, identidad_v: null })];
+  const base = [...completaDiaA(1, 1, F1), ...completaDiaB(2, 1, F2)];
+  const sueltas = Array.from({ length: 300 }, (_, i) => ({ id: "x" + i, alumno_id: ALU, ejercicio_id: "sq", kg: 50, reps: 8, semana: i % 4, fecha: FEC[i % FEC.length], bloque: i % 7 === 0 ? "main" : undefined, pos: i % 7 === 0 ? 0 : undefined }));
+  const series = [...base, ...sueltas];
+  const contexto = { registroSeriesCompleto: true, planificacionMostradaHash: hashPorSesion(copias) };
+  const rapido = compararSesionesDelAlumno({ sesiones, copias, series, contexto });
+  const enlazado = (arr) => arr; void enlazado;
+  rapido.sesiones.forEach((x) => {
+    const sesRow = sesiones.find((q) => q.id === x.sesion_id); const { sesion } = sesionConEvidenciaDeFinalizacion(sesRow);
+    const propias = series.filter((q) => q.sesion_uid && sesRow.sesion_uid && q.sesion_uid === sesRow.sesion_uid).map((q) => Object.assign({}, q, { sesion_id: sesRow.id }));
+    const resto = series.filter((q) => !(q.sesion_uid && sesiones.some((w) => w.sesion_uid === q.sesion_uid)));
+    const lento = compararPrescripcionEjecucion({ sesion, copias, series: propias.concat(resto), contexto: Object.assign({}, contexto, { planificacionMostradaHash: contexto.planificacionMostradaHash(sesion) }) });
+    assert.equal(x.comparacion.estado, lento.estado, "estado " + x.sesion_id); assert.deepEqual(x.comparacion.motivos, lento.motivos, "motivos " + x.sesion_id); assert.deepEqual(x.comparacion.resumen, lento.resumen, "resumen " + x.sesion_id);
+  });
+  const grandes = Array.from({ length: 400 }, (_, i) => ({ id: "g" + i, alumno_id: ALU, rutina_id: RUT, ciclo: 1, semana: 1 + (i % 4), dia_idx: i % 3, fecha: (1 + (i % 28)) + "/" + (1 + (i % 12)) + "/2025" }));
+  const muchas = Array.from({ length: 8000 }, (_, i) => ({ id: "m" + i, alumno_id: ALU, ejercicio_id: "sq", kg: 50, reps: 8, semana: i % 4, fecha: (1 + (i % 28)) + "/" + (1 + ((i >> 2) % 12)) + "/2025" }));
+  const t0 = Date.now(); const r = compararSesionesDelAlumno({ sesiones: grandes, copias: [], series: muchas, contexto: {} }); const ms = Date.now() - t0;
+  assert.equal(r.global.sesiones_total, 400); assert.ok(ms < 1000, "tardo " + ms + " ms");
 });
 console.log("\n" + n + " pruebas OK");
