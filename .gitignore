@@ -30,3 +30,7 @@ dist
 .claude/**/*secret*
 .claude/**/*credential*
 .claude/**/*.local.*
+
+# Perfiles de navegador headless (cookies, Login Data, historial): NUNCA versionar.
+.chrome-headless/
+.chrome-*/

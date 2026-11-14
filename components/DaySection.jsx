@@ -103,7 +103,7 @@ function SortableBlock({
               key={ex.id}
               exercise={ex}
               onEdit={onEditExercise}
-              onDelete={onDeleteExercise}
+              onDelete={(exId) => onDeleteExercise(exId, blockKey)}
               lang={lang}
               isUnder768={isUnder768}
             />
