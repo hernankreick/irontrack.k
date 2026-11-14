@@ -249,7 +249,9 @@ export function WorkoutScreen(props) {
           const offline = outcome.reason === FINALIZE_FAILURE.OFFLINE;
           const text = offline
             ? (es ? "Necesitás conexión para finalizar. Tu entrenamiento sigue abierto. Intentá nuevamente cuando vuelva la conexión." : "You need a connection to finish. Your workout is still open. Try again when you are back online.")
-            : (es ? "No pudimos guardar la finalización. Tu entrenamiento sigue abierto. Intentá nuevamente." : "We could not save your workout. It is still open. Please try again.");
+            : (outcome.reason === FINALIZE_FAILURE.LOOKUP_FAILED
+              ? (es ? "No pudimos comprobar si tu sesión ya estaba guardada, así que no guardamos nada nuevo. Tu entrenamiento sigue abierto. Intentá nuevamente." : "We could not check whether your workout was already saved, so nothing new was saved. It is still open. Please try again.")
+              : (es ? "El servidor no confirmó que tu sesión se guardó. Tu entrenamiento sigue abierto. Intentá nuevamente: no se va a duplicar." : "The server did not confirm your workout was saved. It is still open. Try again: it will not be duplicated."));
           setFinalizeError(text);
           if (typeof toast2 === "function") toast2(es ? "Error al guardar la sesión" : "Error saving workout");
           return;
@@ -272,9 +274,13 @@ export function WorkoutScreen(props) {
           : null;
         if (!cicloCambiado) setCompletedDays(newCompleted);
         // Si el avance de semana fallo, el resumen lo indica de forma persistente (el toast quedaba tapado por el resumen).
+        // D-05: series aun sin sincronizar al cerrar: el resumen lo avisa y se dispara un reintento (no bloquea el cierre; offline no debe impedir terminar).
+        const pendientesSync = Math.max(0, Number(pendingSyncState && pendingSyncState.pending) || 0);
+        if (pendientesSync > 0 && typeof onPendingSyncRetry === "function") { try { onPendingSyncRetry(); } catch (eRetry) {} }
+        const resumenBase = pendientesSync > 0 ? Object.assign({}, buildSummary(), { pendientesSync: pendientesSync }) : buildSummary();
         setResumenSesion(cicloCambiado
-          ? Object.assign({}, buildSummary(), { cicloCambiadoAviso: cicloCambiadoAviso })
-          : (weekAdvanceFailed ? Object.assign({}, buildSummary(), { weekAdvanceFailed: true }) : buildSummary()));
+          ? Object.assign({}, resumenBase, { cicloCambiadoAviso: cicloCambiadoAviso })
+          : (weekAdvanceFailed ? Object.assign({}, resumenBase, { weekAdvanceFailed: true }) : resumenBase));
         setSession(null);
         if (typeof onSesionGuardada === "function") {
           const filaConfirmada = Object.assign({}, sesionPayload, { created_at: new Date().toISOString(), _confirmadaLocal: true });

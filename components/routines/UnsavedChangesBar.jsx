@@ -12,6 +12,7 @@ export function UnsavedChangesBar({
   onDiscard,
   saveBarBox,
   desktopCoachStableLayout,
+  saving = false,
 }) {
   return (
     <div
@@ -88,13 +89,16 @@ export function UnsavedChangesBar({
             type="button"
             className="it-routine-btn hov"
             onClick={onSave}
+            disabled={saving}
+            aria-busy={saving}
             style={{
               padding: '10px 18px',
               borderRadius: 12,
               ...T.control,
               fontWeight: 800,
               fontFamily: 'inherit',
-              cursor: 'pointer',
+              cursor: saving ? 'default' : 'pointer',
+              opacity: saving ? 0.7 : 1,
               border: 'none',
               background: '#22c55e',
               color: '#fff',
@@ -107,7 +111,9 @@ export function UnsavedChangesBar({
             }}
           >
             <Save size={16} />
-            {M(lang, 'Guardar cambios', 'Save changes', 'Salvar alterações')}
+            {saving
+              ? M(lang, 'Guardando…', 'Saving…', 'Salvando…')
+              : M(lang, 'Guardar cambios', 'Save changes', 'Salvar alterações')}
           </button>
         </div>
       </div>
