@@ -104,6 +104,9 @@ function SortableBlock({
       <DndContext
         sensors={sensors}
         collisionDetection={collision}
+        // Auto-scroll: el valor por defecto de dnd-kit activa el scroll cuando el dedo entra en el 20 % inferior/superior de la pantalla. En un
+        // iPhone eso es casi toda la mitad de abajo de la lista (y la barra fija «Guardar cambios»): la página se desplazaba bajo el dedo
+        // mientras se arrastraba y el soltado caía en otro lugar (o no reordenaba). Se reduce la zona a 12 % y la velocidad.
         autoScroll={{ threshold: { x: 0, y: 0.12 }, acceleration: 6 }}
         onDragCancel={() => setActiveId(null)}
         onDragStart={({ active }) => setActiveId(active.id)}

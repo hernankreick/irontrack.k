@@ -139,12 +139,16 @@ async function main() {
         const CLAVE = { Plancha: "cal:plank", "Movilidad de cadera": "cal:mob", Sentadilla: "sq", "Press de banca": "bp", "Peso muerto": "dl", "Remo con barra": "row", "Curl de bíceps": "curl" };
         const ordenServidor = () => page.evaluate(() => (document.querySelector("[data-qa-resumen-fila]") || {}).textContent || "").then((t) => [...t.matchAll(/(?:cal:)?[a-z]+(?= \d+x)/g)].map((m) => m[0]));
         const esperadoServidor = (nombres) => nombres.map((x) => CLAVE[x]);
-        const traer = async (i, yDeseada = 520) => { await page.evaluate(([k, yy]) => { const b = document.querySelectorAll('button[aria-label="Reordenar ejercicio"]')[k]; const r = b.getBoundingClientRect(); window.scrollBy(0, r.top - yy); }, [i, yDeseada]); await wait(200); return (await handles())[i]; };
-        const overlay = () => page.evaluate(() => { const els = [...document.querySelectorAll("div")].filter((d) => getComputedStyle(d).position === "fixed" && d.querySelector('button[aria-label="Reordenar ejercicio"]')); if (!els.length) return null; const r = els[els.length - 1].getBoundingClientRect(); return { cy: r.top + r.height / 2, top: r.top, left: r.left, h: r.height }; });
-        const rondas = { overlayOk: [] };
+        // Determinismo: las tarjetas animan su entrada (translateY + opacidad con retardo escalonado) y las fuentes cargan tarde en un navegador
+        // en frío: arrastrar con coordenadas leidas durante esa animación falla en WebKit (primera carga). Se espera a que terminen.
+        const quieto = async () => { await page.evaluate(() => Promise.all([(document.fonts && document.fonts.ready) || null, ...document.getAnimations().map((a) => a.finished.catch(() => null))])); await wait(150); };
+        const traer = async (i, yDeseada = 520) => { await quieto(); await page.evaluate(([k, yy]) => { const b = document.querySelectorAll('button[aria-label="Reordenar ejercicio"]')[k]; const r = b.getBoundingClientRect(); window.scrollBy(0, r.top - yy); }, [i, yDeseada]); await wait(200); return (await handles())[i]; };
+        const overlay = () => page.evaluate(() => { const els = [...document.querySelectorAll("div")].filter((d) => getComputedStyle(d).position === "fixed" && d.querySelector('button[aria-label="Reordenar ejercicio"]')); if (!els.length) return null; const r = els[els.length - 1].getBoundingClientRect(); return { cy: r.top + r.height / 2, top: r.top, left: r.left, h: r.height, dentroDeLaTarjeta: !!els[els.length - 1].closest(".it-routine-card-wrap") }; });
+        const rondas = { overlayOk: [], scrollDelta: [] };
         // Arrastre: Chromium = toque real (mantener ~0,3 s y mover); WebKit = mouse (sin CDP no hay gestos tactiles automatizables)
         const arrastrar = async (i, j, { medir, yDeseada } = {}) => {
           const a = await traer(i, yDeseada); const b = (await handles())[j]; const y1 = b.y + (j > i ? 14 : -14);
+          const scrollIni = await page.evaluate(() => window.scrollY);
           const izqTarjeta = await page.evaluate((k) => document.querySelectorAll('button[aria-label="Reordenar ejercicio"]')[k].parentElement.getBoundingClientRect().left, i);
           if (esChromium) {
             await cdp0.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: a.x, y: a.y }] });
@@ -153,7 +157,7 @@ async function main() {
             for (let k = 1; k <= pasos; k++) {
               const y = a.y + ((y1 - a.y) * k) / pasos;
               await cdp0.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: a.x, y }] }); await wait(20);
-              if (medir && k === Math.floor(pasos / 2)) { const ov = await overlay(); const ok1 = !!ov && Math.abs(ov.cy - y) <= 14 && Math.abs(ov.left - izqTarjeta) <= 8 && ov.top >= -5 && ov.top < 844; rondas.overlayOk.push(ok1); if (!ok1) console.log("detalle overlay:", JSON.stringify({ ov, dedoY: Math.round(y), izqTarjeta: Math.round(izqTarjeta) })); }
+              if (medir && k === Math.floor(pasos / 2)) { const ov = await overlay(); const ok1 = !!ov && !ov.dentroDeLaTarjeta && Math.abs(ov.cy - y) <= 14 && Math.abs(ov.left - izqTarjeta) <= 8 && ov.top >= -5 && ov.top < 844; rondas.overlayOk.push(ok1); if (!ok1) console.log("detalle overlay:", JSON.stringify({ ov, dedoY: Math.round(y), izqTarjeta: Math.round(izqTarjeta) })); }
             }
             await cdp0.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
           } else {
@@ -161,6 +165,7 @@ async function main() {
             for (let k = 1; k <= 14; k++) { await page.mouse.move(a.x, a.y + ((y1 - a.y) * k) / 14); await wait(20); }
             await page.mouse.up();
           }
+          rondas.scrollDelta.push(Math.abs((await page.evaluate(() => window.scrollY)) - scrollIni));
           await wait(450);
         };
         const igual = (x, y) => JSON.stringify(x) === JSON.stringify(y);
@@ -181,6 +186,7 @@ async function main() {
         flow.reordenMarcaCambiosPendientes = await barra0();
         if (esChromium) flow.reordenOverlaySigueAlDedo = rondas.overlayOk.length > 0 && rondas.overlayOk.every(Boolean);
         else omitidas.push(id + ": posición del overlay bajo el dedo (requiere gesto tactil; WebKit sin CDP)");
+        flow.reordenTarjetaSinTransformPermanente = await page.evaluate(() => [...document.querySelectorAll(".it-routine-card-wrap")].every((c) => getComputedStyle(c).transform === "none"));
         await shot("reorden_1");
 
         // R2 · scroll vertical normal desde el asa: NO reordena y la página se desplaza (solo toque real: Chromium)
@@ -208,6 +214,8 @@ async function main() {
         await arrastrar(2, 4);                                           // Press de banca al final del bloque
         const tras4 = await orden();
         if (!igual(tras4, ["Plancha", "Movilidad de cadera", "Peso muerto", "Sentadilla", "Press de banca", "Remo con barra"])) console.log("detalle R4 orden obtenido:", JSON.stringify(tras4));
+        flow.reordenNoDesplazaLaPaginaAlArrastrar = rondas.scrollDelta.length >= 2 && rondas.scrollDelta.every((d) => d <= 10);
+        if (!flow.reordenNoDesplazaLaPaginaAlArrastrar) console.log("detalle scroll durante el arrastre:", JSON.stringify(rondas.scrollDelta));
         flow.reordenSegundoMovimiento = igual(tras4, ["Plancha", "Movilidad de cadera", "Peso muerto", "Sentadilla", "Press de banca", "Remo con barra"]);
         const srvAntes = await ordenServidor();
         await modo0("red"); await guardar0(); await wait(800);

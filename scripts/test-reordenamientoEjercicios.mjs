@@ -1,5 +1,7 @@
 // Reordenamiento de ejercicios (RutinaView > RoutineCard > DaySection > ExerciseCard). Regresión del PR #194:
-//  - el overlay del arrastre quedaba desplazado (la tarjeta conservaba un `transform` permanente y el overlay es position:fixed);
+//  - el auto-scroll por defecto de dnd-kit (zona del 20 % de la pantalla) desplazaba la lista bajo el dedo al arrastrar en la mitad baja del
+//    teléfono: el segundo/tercer reordenamiento no quedaba donde se soltaba (causa funcional; aislada quitando solo esa configuración);
+//  - el overlay del arrastre quedaba desplazado (la tarjeta conservaba un `transform` permanente y el overlay es position:fixed): defecto visual;
 //  - el asa bloqueaba el scroll (touch-action: none) y activaba el arrastre con 5 px: deslizar el dedo por el asa movía ejercicios;
 //  - sin teclado ni alternativa sin gesto.
 // Las pruebas de comportamiento con toques reales están en scripts/qa/qa-pr194.mjs (Playwright, demo ficticia, corre en el CI).
