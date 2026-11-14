@@ -18,10 +18,13 @@ export const ALUMNOS_DEMO = [
   { id: 'demo-a2', nombre: 'Alumna Demo Dos', email: 'dos@demo.invalid' },
 ];
 export const EJERCICIOS_DEMO = [
-  { id: 'demo_sq', name: 'Sentadilla (demo)', nameEn: 'Squat (demo)' },
-  { id: 'demo_bp', name: 'Press de banca (demo)', nameEn: 'Bench press (demo)' },
-  { id: 'demo_row', name: 'Remo con barra (demo)', nameEn: 'Barbell row (demo)' },
-  { id: 'demo_plank', name: 'Plancha (demo)', nameEn: 'Plank (demo)' },
+  { id: 'demo_sq', name: 'Sentadilla (demo)', nameEn: 'Squat (demo)', pattern: 'rodilla', muscle: 'Cuádriceps' },
+  { id: 'demo_bp', name: 'Press de banca (demo)', nameEn: 'Bench press (demo)', pattern: 'empuje', muscle: 'Pecho' },
+  { id: 'demo_row', name: 'Remo con barra (demo)', nameEn: 'Barbell row (demo)', pattern: 'traccion', muscle: 'Espalda' },
+  { id: 'demo_dl', name: 'Peso muerto (demo)', nameEn: 'Deadlift (demo)', pattern: 'bisagra', muscle: 'Isquiotibiales' },
+  { id: 'demo_plank', name: 'Plancha (demo)', nameEn: 'Plank (demo)', pattern: 'core', muscle: 'Core' },
+  { id: 'demo_mob', name: 'Movilidad de cadera (demo)', nameEn: 'Hip mobility (demo)', pattern: 'core', muscle: 'Cadera' },
+  { id: 'demo_curl', name: 'Curl de bíceps (demo)', nameEn: 'Biceps curl (demo)', pattern: 'traccion', muscle: 'Bíceps' },
 ];
 export const HISTORIAL_DEMO = [
   { date: '10/11/2026', kg: 60, reps: 8, sets: 4, week: 1 },
@@ -34,9 +37,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function diasDemo(sufijo) {
   return [
-    { label: 'Día 1', warmup: [{ id: 'demo_plank', sets: '2', reps: '30s', kg: '', pause: 30 }], exercises: [
+    { label: 'Día 1', warmup: [
+      { id: 'demo_plank', sets: '2', reps: '30s', kg: '', pause: 30 },
+      { id: 'demo_mob', sets: '2', reps: '10', kg: '', pause: 30 },
+    ], exercises: [
       { id: 'demo_sq', sets: '4', reps: '8', kg: '60', pause: 90 },
       { id: 'demo_bp', sets: '4', reps: '8', kg: '40', pause: 90 },
+      { id: 'demo_dl', sets: '3', reps: '5', kg: '80', pause: 120 },
     ] },
     { label: 'Día 2', warmup: [], exercises: [{ id: 'demo_row', sets: '3', reps: '10', kg: '35', pause: 60 }] },
   ].map((d) => (sufijo ? Object.assign({}, d, { label: d.label + sufijo }) : d));
@@ -62,7 +69,8 @@ export function crearServidorRutinasDemo(opts) {
     updates: 0, updatesConfirmados: 0, creates: 0, createsConfirmados: 0, deletes: 0,
     bitacora: [],
   };
-  const anotar = (op, resultado) => { estado.bitacora.unshift({ n: estado.bitacora.length + 1, op, modo: estado.modo, resultado }); if (estado.bitacora.length > 12) estado.bitacora.pop(); };
+  const notificar = () => { if (typeof o.alCambiar === 'function') { try { o.alCambiar(); } catch (e) { /* la UI se refresca igual en el siguiente cambio */ } } };
+  const anotar = (op, resultado) => { notificar(); estado.bitacora.unshift({ n: estado.bitacora.length + 1, op, modo: estado.modo, resultado }); if (estado.bitacora.length > 12) estado.bitacora.pop(); };
 
   // Fila inicial (guardada) con estado operativo del alumno: semana_activa = 2 (se debe preservar al guardar).
   const fila0 = { id: 'demo-r1', nombre: 'Rutina A (guardada)', alumno_id: 'demo-a1', entrenador_id: ENTRENADOR_DEMO, es_plantilla: false, datos: { days: diasDemo(''), alumno: 'Alumno Demo Uno', note: '', semana_activa: 2 } };
@@ -85,7 +93,7 @@ export function crearServidorRutinasDemo(opts) {
 
   const sb = {
     updateRutina: async (id, data) => {
-      estado.updates++;
+      estado.updates++; notificar();
       const body = cleanRutinaWriteBody(data);          // lanza si no hay alumno y no es plantilla (igual que producción)
       if (estado.latenciaMs) await sleep(estado.latenciaMs);
       if (estado.modo === MODOS.RED) { anotar('update ' + id, 'lanzó TypeError (sin red)'); throw new TypeError('Failed to fetch'); }
@@ -97,7 +105,7 @@ export function crearServidorRutinasDemo(opts) {
       return res;
     },
     createRutina: async (data) => {
-      estado.creates++;
+      estado.creates++; notificar();
       const body = withInitialSemanaActiva(cleanRutinaWriteBody(data));
       if (estado.latenciaMs) await sleep(estado.latenciaMs);
       if (estado.modo === MODOS.RED) { anotar('create', 'lanzó TypeError (sin red)'); throw new TypeError('Failed to fetch'); }

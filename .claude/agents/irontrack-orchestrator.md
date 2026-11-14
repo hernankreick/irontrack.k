@@ -65,3 +65,6 @@ Una sola solicitud por vez, en este formato y nada más: **Acción** (qué exact
 4. **Pruebas**: qué se ejecutó y el resultado exacto; lo no ejecutado, marcado como tal.
 5. **Bloqueos y accesos faltantes** con la solución permanente propuesta.
 6. **Decisión que necesito** (una sola, en el formato de autorización si corresponde).
+
+## Política permanente de QA autónomo (CLAUDE.md)
+Ver «Política permanente de QA autónomo» en `CLAUDE.md`. Al consolidar: no des un resultado por listo con fallos reproducibles pendientes en el alcance autorizado, no aceptes pruebas modificadas para pasar y separa en el informe aprobadas / fallidas / no ejecutadas / limitaciones del entorno / requieren dispositivo físico. Al dueño solo le pides merge, cambios sensibles y decisiones de producto.

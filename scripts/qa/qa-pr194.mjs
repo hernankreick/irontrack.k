@@ -1,5 +1,8 @@
 // QA de la demo del PR #194 (demo/qa-pr194.html, datos ficticios, solo Preview). Opcional: no es una suite test-*.mjs.
-// Uso:  node scripts/qa/qa-pr194.mjs --out <carpeta> [--dist <dir>]
+// Uso:  node scripts/qa/qa-pr194.mjs --out <carpeta> [--dist <dir>] [--browser chromium|webkit] [--widths 375,390,430,768]
+//   Chromium: gestos tactiles reales por CDP (mantener + arrastrar, deslizar para hacer scroll). WebKit (motor de Safari): sin CDP, asi que los
+//   gestos tactiles NO se automatizan; se ejecuta con mouse/teclado y se informan como "no ejecutadas" las pruebas tactiles. Ninguna prueba
+//   de WebKit equivale a Safari en un iPhone real.
 //   Sin --dist compila como Preview simulado (VERCEL_ENV=preview, backend .invalid) y también Production para comprobar que la demo NO se genera allí.
 // Verifica (oscuro y claro, iPhone 390 px + overflow a 375/430): aislamiento (red bloqueada, almacenamiento en memoria: un canario en el
 // localStorage REAL no se lee ni se pisa, 0 pedidos externos salvo fuentes), el bundle de la demo sin Supabase, y los flujos del PR con los
@@ -18,10 +21,12 @@ const ROOT = path.resolve(HERE, "..", "..");
 const DEMO = "demo/qa-pr194.html";
 
 function parseArgs(argv) {
-  const o = {};
+  const o = { browser: "chromium", widths: [375, 390, 430, 768] };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--out") o.out = path.resolve(argv[++i]);
     else if (argv[i] === "--dist") o.dist = path.resolve(argv[++i]);
+    else if (argv[i] === "--browser") o.browser = argv[++i];
+    else if (argv[i] === "--widths") o.widths = argv[++i].split(",").map(Number);
     else throw new Error("Opcion desconocida: " + argv[i]);
   }
   if (!o.out) throw new Error("Falta --out <carpeta>");
@@ -83,13 +88,16 @@ async function main() {
   console.log("Chunks de la demo:", chunks.length, "· con Supabase:", sospechosos.length);
 
   const pw = resolvePlaywright();
-  const browser = await pw.chromium.launch({ executablePath: chromiumPath() });
+  const esChromium = o.browser === "chromium";
+  if (!pw[o.browser]) throw new Error("Navegador desconocido: " + o.browser);
+  const browser = await pw[o.browser].launch(esChromium ? { executablePath: chromiumPath() } : {});
+  const omitidas = [];                       // pruebas NO ejecutadas (con motivo): nunca se cuentan como aprobadas
   const { server, port } = await serve(dist);
   const resultados = [];
 
   for (const colorScheme of ["dark", "light"]) {
-    for (const width of [375, 390, 430]) {
-      const id = colorScheme + "@" + width;
+    for (const width of o.widths) {
+      const id = o.browser + ":" + colorScheme + "@" + width;
       const full = width === 390;
       const ctx = await browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, colorScheme });
       const externos = [];
@@ -105,7 +113,7 @@ async function main() {
       const errores = [];
       page.on("pageerror", (e) => errores.push(String(e).slice(0, 200)));
       const wait = (ms) => page.waitForTimeout(ms);
-      const shot = (n) => page.screenshot({ path: path.join(o.out, id + "_" + n + ".png"), fullPage: false });
+      const shot = (n) => page.screenshot({ path: path.join(o.out, id.replace(/[:@]/g, "_") + "_" + n + ".png"), fullPage: false });
       const click = (re) => page.evaluate((src) => { const r = new RegExp(src); const b = [...document.querySelectorAll("button")].find((e) => e.getBoundingClientRect().width > 0 && !e.disabled && r.test(((e.getAttribute("aria-label") || "") + " " + (e.innerText || "")).trim())); if (!b) return false; b.scrollIntoView({ block: "center" }); b.click(); return true; }, re.source);
       const txt = () => page.evaluate(() => document.body.innerText.replace(/ /g, " "));
       // Solo el aviso (ToastBanner): el texto de las instrucciones de la demo también menciona estos mensajes.
@@ -123,6 +131,173 @@ async function main() {
 
       const overflow0 = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
       await shot("01_inicio");
+      // ── 0 · Reordenamiento de ejercicios (componentes REALES: DaySection / ExerciseCard / RutinaView) ──
+      {
+        const cdp0 = esChromium ? await ctx.newCDPSession(page) : null;
+        const handles = () => page.evaluate(() => [...document.querySelectorAll('button[aria-label="Reordenar ejercicio"]')].map((b) => { const r = b.getBoundingClientRect(); return { n: b.parentElement.innerText.split("\n")[0].replace(/ \(demo\)/, "").trim(), x: r.left + r.width / 2, y: r.top + r.height / 2 }; }));
+        const orden = async () => (await handles()).map((h) => h.n);
+        const CLAVE = { Plancha: "cal:plank", "Movilidad de cadera": "cal:mob", Sentadilla: "sq", "Press de banca": "bp", "Peso muerto": "dl", "Remo con barra": "row", "Curl de bíceps": "curl" };
+        const ordenServidor = () => page.evaluate(() => (document.querySelector("[data-qa-resumen-fila]") || {}).textContent || "").then((t) => [...t.matchAll(/(?:cal:)?[a-z]+(?= \d+x)/g)].map((m) => m[0]));
+        const esperadoServidor = (nombres) => nombres.map((x) => CLAVE[x]);
+        const traer = async (i, yDeseada = 520) => { await page.evaluate(([k, yy]) => { const b = document.querySelectorAll('button[aria-label="Reordenar ejercicio"]')[k]; const r = b.getBoundingClientRect(); window.scrollBy(0, r.top - yy); }, [i, yDeseada]); await wait(200); return (await handles())[i]; };
+        const overlay = () => page.evaluate(() => { const els = [...document.querySelectorAll("div")].filter((d) => getComputedStyle(d).position === "fixed" && d.querySelector('button[aria-label="Reordenar ejercicio"]')); if (!els.length) return null; const r = els[els.length - 1].getBoundingClientRect(); return { cy: r.top + r.height / 2, top: r.top, left: r.left, h: r.height }; });
+        const rondas = { overlayOk: [] };
+        // Arrastre: Chromium = toque real (mantener ~0,3 s y mover); WebKit = mouse (sin CDP no hay gestos tactiles automatizables)
+        const arrastrar = async (i, j, { medir, yDeseada } = {}) => {
+          const a = await traer(i, yDeseada); const b = (await handles())[j]; const y1 = b.y + (j > i ? 14 : -14);
+          const izqTarjeta = await page.evaluate((k) => document.querySelectorAll('button[aria-label="Reordenar ejercicio"]')[k].parentElement.getBoundingClientRect().left, i);
+          if (esChromium) {
+            await cdp0.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: a.x, y: a.y }] });
+            await wait(330);                                          // pulsación sostenida: activa el arrastre sin interferir con el scroll
+            const pasos = 14;
+            for (let k = 1; k <= pasos; k++) {
+              const y = a.y + ((y1 - a.y) * k) / pasos;
+              await cdp0.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: a.x, y }] }); await wait(20);
+              if (medir && k === Math.floor(pasos / 2)) { const ov = await overlay(); const ok1 = !!ov && Math.abs(ov.cy - y) <= 14 && Math.abs(ov.left - izqTarjeta) <= 8 && ov.top >= -5 && ov.top < 844; rondas.overlayOk.push(ok1); if (!ok1) console.log("detalle overlay:", JSON.stringify({ ov, dedoY: Math.round(y), izqTarjeta: Math.round(izqTarjeta) })); }
+            }
+            await cdp0.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+          } else {
+            await page.mouse.move(a.x, a.y); await page.mouse.down();
+            for (let k = 1; k <= 14; k++) { await page.mouse.move(a.x, a.y + ((y1 - a.y) * k) / 14); await wait(20); }
+            await page.mouse.up();
+          }
+          await wait(450);
+        };
+        const igual = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+        const sinRepetidos = (arr) => new Set(arr).size === arr.length;
+        const barra0 = () => page.evaluate(() => !!document.querySelector(".it-routines-unsaved.is-visible"));
+        const guardar0 = () => click(/Guardar cambios|Save changes/);
+        const modo0 = (m) => page.locator('[data-qa-modo="' + m + '"]').click();
+        await page.evaluate(() => document.querySelector("#rutinas").scrollIntoView());
+        const inicial = ["Plancha", "Movilidad de cadera", "Sentadilla", "Press de banca", "Peso muerto", "Remo con barra"];
+        flow.reordenInicial = igual(await orden(), inicial);
+
+        // R1 · mismo bloque: Sentadilla pasa detrás de Peso muerto. Sin escritura oculta; el overlay del arrastre sigue al dedo.
+        const upd0 = await num("[data-qa-updates]");
+        await arrastrar(2, 4, { medir: true, yDeseada: 400 });
+        const tras1 = await orden();
+        flow.reordenMismoBloque = igual(tras1, ["Plancha", "Movilidad de cadera", "Press de banca", "Peso muerto", "Sentadilla", "Remo con barra"]);
+        flow.reordenSinEscrituraOculta = (await num("[data-qa-updates]")) === upd0 && (await num("[data-qa-creates]")) === 0;
+        flow.reordenMarcaCambiosPendientes = await barra0();
+        if (esChromium) flow.reordenOverlaySigueAlDedo = rondas.overlayOk.length > 0 && rondas.overlayOk.every(Boolean);
+        else omitidas.push(id + ": posición del overlay bajo el dedo (requiere gesto tactil; WebKit sin CDP)");
+        await shot("reorden_1");
+
+        // R2 · scroll vertical normal desde el asa: NO reordena y la página se desplaza (solo toque real: Chromium)
+        if (esChromium) {
+          const ordenAntes = await orden();
+          const a = await traer(3);
+          const sy0 = await page.evaluate(() => window.scrollY);
+          await cdp0.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: a.x, y: a.y }] });
+          for (let k = 1; k <= 10; k++) { await cdp0.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: a.x, y: a.y - 18 * k }] }); await wait(12); }
+          await cdp0.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+          await wait(500);
+          flow.scrollDesdeElAsaNoReordena = igual(await orden(), ordenAntes);
+          flow.scrollDesdeElAsaDesplazaLaPagina = Math.abs((await page.evaluate(() => window.scrollY)) - sy0) > 30;
+        } else omitidas.push(id + ": scroll tactil desde el asa (WebKit sin CDP: no hay gesto tactil automatizable)");
+
+        // R3 · guardar y recargar: el orden persiste y no hay duplicados ni pérdidas
+        const base0 = await num("[data-qa-updates-ok]");
+        await guardar0(); await wait(900);
+        flow.reordenGuardaYPersiste = igual(await ordenServidor(), esperadoServidor(tras1)) && (await num("[data-qa-updates-ok]")) === base0 + 1 && !(await barra0());
+        await page.locator("[data-qa-recargar]").click(); await wait(500);
+        flow.reordenPersisteTrasRecargar = igual(await orden(), tras1);
+        flow.reordenSinDuplicados = sinRepetidos(await orden()) && (await orden()).length === 6 && (await num("[data-qa-filas]")) === 1;
+
+        // R4 · fallo de red: el orden NO se guarda, no hay mensaje de éxito y el cambio sigue pendiente; luego se guarda bien
+        await arrastrar(2, 4);                                           // Press de banca al final del bloque
+        const tras4 = await orden();
+        if (!igual(tras4, ["Plancha", "Movilidad de cadera", "Peso muerto", "Sentadilla", "Press de banca", "Remo con barra"])) console.log("detalle R4 orden obtenido:", JSON.stringify(tras4));
+        flow.reordenSegundoMovimiento = igual(tras4, ["Plancha", "Movilidad de cadera", "Peso muerto", "Sentadilla", "Press de banca", "Remo con barra"]);
+        const srvAntes = await ordenServidor();
+        await modo0("red"); await guardar0(); await wait(800);
+        flow.reordenFalloDeRedNoGuarda = igual(await ordenServidor(), srvAntes) && !/Cambios guardados ✓/.test(await toast()) && (await barra0()) && igual(await orden(), tras4);
+        await modo0("nulo"); await guardar0(); await wait(800);
+        flow.reordenRespuestaNulaNoGuarda = igual(await ordenServidor(), srvAntes) && !/Cambios guardados ✓/.test(await toast()) && (await barra0());
+        await modo0("vacio"); await guardar0(); await wait(800);
+        flow.reordenRespuestaVaciaNoGuarda = igual(await ordenServidor(), srvAntes) && !/Cambios guardados ✓/.test(await toast()) && (await barra0());
+        await modo0("ok"); await guardar0(); await wait(900);
+        flow.reordenGuardaTrasElFallo = igual(await ordenServidor(), esperadoServidor(tras4)) && /Cambios guardados ✓/.test(await toast()) && !(await barra0()) && sinRepetidos(await orden());
+
+        // R5 · latencia: "Guardando…" visible, un solo UPDATE confirmado, orden persistido
+        await page.locator("[data-qa-latencia]").click();
+        await arrastrar(2, 3);
+        const tras5 = await orden();
+        const okAntes5 = await num("[data-qa-updates-ok]");
+        await guardar0(); await wait(300);
+        flow.reordenLatenciaMuestraGuardando = await page.evaluate(() => [...document.querySelectorAll("button")].some((b) => /Guardando/.test(b.textContent || "") && b.disabled));
+        for (let k = 0; k < 40 && (await barra0()); k++) await wait(250);
+        await wait(300);
+        flow.reordenLatenciaPersiste = igual(await ordenServidor(), esperadoServidor(tras5)) && (await num("[data-qa-updates-ok]")) === okAntes5 + 1 && sinRepetidos(await orden());
+        await page.locator("[data-qa-latencia]").click();
+
+        // R6 · calentamiento y bloque principal son independientes: soltar sobre el otro bloque no mueve ni duplica nada
+        const ordenAntes6 = await orden();
+        await arrastrar(0, 2);                                           // Plancha (calentamiento) sobre un ejercicio del bloque principal
+        flow.reordenNoMezclaBloques = igual(await orden(), ordenAntes6) && sinRepetidos(await orden());
+
+        try {
+        // R7 · agregar y eliminar DESPUÉS de reordenar, y guardar: lo que se ve es lo que persiste
+        await arrastrar(2, 4);
+        await page.evaluate(() => { const b = [...document.querySelectorAll("button")].filter((e) => /^\s*Agregar ejercicios\s*$/i.test(e.textContent || "") && e.getBoundingClientRect().width > 0)[1]; b.scrollIntoView({ block: "center" }); b.click(); });
+        await wait(300);
+        await page.evaluate(() => { const c = [...document.querySelectorAll('[role="dialog"] [role="button"]')].find((e) => /Curl de bíceps/.test(e.textContent || "")); c.click(); });
+        await wait(150);
+        await page.evaluate(() => { const b = [...document.querySelectorAll('[role="dialog"] button')].find((e) => /^\s*(A[ÑN]ADIR|AGREGAR|ADD)\b/i.test((e.textContent || "").trim()) && !/Cerrar|Close/.test(e.getAttribute("aria-label") || "")); b.click(); });
+        await wait(400);
+        const tras7a = await orden();
+        flow.reordenAgregaEjercicio = tras7a.length === 7 && tras7a.includes("Curl de bíceps") && sinRepetidos(tras7a);
+        await page.evaluate(() => { const b = document.querySelectorAll('button[aria-label="Más acciones del ejercicio"]')[0]; b.scrollIntoView({ block: "center" }); b.click(); });
+        await wait(250); await click(/^Eliminar$/); await wait(300);
+        await page.evaluate(() => { const b = [...document.querySelectorAll('[role="dialog"] button, [role="alertdialog"] button')].find((e) => /^\s*Eliminar\s*$/i.test(e.textContent || "")); if (b) b.click(); });
+        await wait(400);
+        const tras7 = await orden();
+        if (!(tras7.length === 6 && !tras7.includes("Plancha"))) console.log("detalle R7 eliminar:", JSON.stringify({ tras7a, tras7 }));
+        flow.reordenEliminaEjercicio = tras7.length === 6 && !tras7.includes("Plancha") && sinRepetidos(tras7);
+        flow.reordenCambiosPendientesTrasAgregarYEliminar = await barra0();
+        await guardar0(); await wait(900);
+        flow.reordenAgregarEliminarPersisten = igual(await ordenServidor(), esperadoServidor(tras7)) && !(await barra0());
+
+        // R8 · teclado (accesibilidad): Espacio, flecha, Espacio mueve un lugar dentro del bloque
+        const antes8 = await orden();
+        const idx8 = antes8.indexOf("Sentadilla");
+        const nombreMovido = antes8[idx8];
+        await page.evaluate((k) => document.querySelectorAll('button[aria-label="Reordenar ejercicio"]')[k].focus(), idx8);
+        await page.keyboard.press("Space"); await wait(150); await page.keyboard.press("ArrowDown"); await wait(150); await page.keyboard.press("Space"); await wait(400);
+        const despues8 = await orden();
+        flow.reordenPorTeclado = despues8.indexOf(nombreMovido) === idx8 + 1 && sinRepetidos(despues8) && despues8.length === antes8.length;
+        await shot("reorden_2");
+
+        // R9 · "Subir / Bajar" en el menú ⋮ (sin gesto): mueve un lugar, marca pendiente y se guarda
+        const antes9 = await orden();
+        const ENTRADA = ["Plancha", "Movilidad de cadera"];
+        // un ejercicio que NO sea el primero de su bloque (el menú solo ofrece "Subir" si hay uno arriba)
+        const nombre9 = antes9.find((n, k) => k > 0 && !ENTRADA.includes(n) && !ENTRADA.includes(antes9[k - 1]) && n !== "Remo con barra");
+        const idx9 = antes9.indexOf(nombre9);
+        await page.evaluate((k) => { const b = document.querySelectorAll('button[aria-label="Más acciones del ejercicio"]')[k]; b.scrollIntoView({ block: "center" }); b.click(); }, idx9);
+        await wait(250); await click(/^Subir$/); await wait(400);
+        const despues9 = await orden();
+        if (despues9.indexOf(nombre9) !== idx9 - 1) console.log("detalle R9:", JSON.stringify({ antes9, despues9, nombre9 }));
+        flow.reordenSubirDesdeElMenu = despues9.indexOf(nombre9) === idx9 - 1 && sinRepetidos(despues9) && despues9.length === antes9.length && (await barra0());
+        await guardar0(); await wait(900);
+        flow.reordenSubirBajarPersiste = igual(await ordenServidor(), esperadoServidor(despues9));
+
+        // R10 · arrastre con el asa en la zona baja de la pantalla (cerca de la barra fija y del borde): el resultado es el esperado
+        const antes10 = await orden();
+        const principal10 = antes10.filter((n) => !ENTRADA.includes(n) && n !== "Remo con barra");
+        const i10 = antes10.indexOf(principal10[0]), j10 = i10 + 1;      // un lugar hacia abajo, con el asa a ~2/3 de la pantalla
+        const nombre10 = antes10[i10];
+        await arrastrar(i10, j10, { yDeseada: 560 });
+        const despues10 = await orden();
+        flow.reordenZonaBaja = igual(despues10, antes10) === false && sinRepetidos(despues10) && despues10.length === antes10.length && despues10.indexOf(nombre10) === j10;
+        if (!flow.reordenZonaBaja) console.log("detalle R10:", JSON.stringify({ antes10, despues10, i10, j10 }));
+
+        } catch (e) { flow.reordenExcepcionEnPasoFinal = false; console.log("excepcion en R7/R8:", String(e).split("\n")[0]); }
+
+        await page.reload({ waitUntil: "load" }); await wait(800);          // estado limpio para los flujos siguientes
+        await page.evaluate(() => { try { localStorage.setItem("it_escritura_demo", "x"); sessionStorage.setItem("it_escritura_demo", "x"); } catch (e) {} });
+      }
+
       if (full) {
         // ── 1 · Registro: 82,5 y gestos ──
         await page.evaluate(() => document.querySelector("#registro").scrollIntoView());
@@ -134,6 +309,7 @@ async function main() {
         flow.kg82_5 = (await page.evaluate(() => (document.querySelector("[data-qa-kg]") || {}).textContent)) === "82.5" && (await num("[data-qa-total-series]")) === 1;
         for (let i = 0; i < 40 && !(await regOk()); i++) await wait(150);
         await shot("02_registro");
+        if (esChromium) {
         const cdp = await ctx.newCDPSession(page);
         const swipe = async (x0, y0, x1, y1) => {
           await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: x0, y: y0 }] });
@@ -150,6 +326,7 @@ async function main() {
         p = await origen();
         await swipe(p.x + 150, p.y, p.x - 40, p.y); await wait(500);                  // horizontal izquierda
         flow.swipeHorizontalRegistra = (await num("[data-qa-total-series]")) === antes + 1;
+        } else omitidas.push(id + ": gestos tactiles del panel de registro (scroll vertical / swipe horizontal): WebKit sin CDP");
 
         // ── 2 · Modales ──
         for (const nombre of ["ajustes", "perfil", "historial"]) {
@@ -243,8 +420,9 @@ async function main() {
     }
   }
   await browser.close(); server.close();
-  fs.writeFileSync(path.join(o.out, "summary.json"), JSON.stringify({ resultados, failures }, null, 2));
+  fs.writeFileSync(path.join(o.out, "summary.json"), JSON.stringify({ navegador: o.browser, resultados, failures, omitidas }, null, 2));
   for (const r of resultados) console.log(r.id, Object.entries(r.flow).map(([k, v]) => (v ? "ok " : "FALLA ") + k).join(" | "), "| externos(fuentes):", r.externos.length, "| red demo:", r.intentosDeRedDeLaDemo);
+  if (omitidas.length) console.log("\nNO EJECUTADAS (limitaciones del entorno, no cuentan como aprobadas):\n- " + [...new Set(omitidas)].join("\n- "));
   if (failures.length) { console.error("\nQA PR194 FALLA:\n- " + failures.join("\n- ")); process.exit(1); }
   console.log("\nQA PR194 OK · salida:", o.out);
 }

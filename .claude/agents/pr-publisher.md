@@ -27,3 +27,6 @@ Ejecuta comandos git simples desde el directorio del proyecto: sin `git -C`, sin
 - merge de cualquier tipo, auto-merge, aprobar PRs, push a main/master, force-push, borrar ramas remotas.
 - Desplegar a Production (`vercel --prod`, promote), tocar variables de Vercel, secretos, `.env`, Supabase, Auth, RLS o datos reales.
 - Si el CI falla: devuelve al coordinador el log del fallo y el paso que fallo; no lo re-ejecutes a ciegas ni desactives pruebas.
+
+## Política permanente de QA autónomo (CLAUDE.md)
+Ver «Política permanente de QA autónomo» en `CLAUDE.md`. Publicas **un único PR** y solo avisas de una Preview «lista para revisar» cuando el CI (incluido el job `qa-demo`) está en verde sobre el último commit y la Preview está READY; con un fallo reproducible pendiente dentro del alcance, lo devuelves al coordinador en lugar de entregarlo. No ocultes pruebas fallidas ni no ejecutadas en el cuerpo del PR.

@@ -7,6 +7,7 @@ import { RutinaView } from '../RutinaView.jsx';
 import AlumnoSettingsModal from '../student/AlumnoSettingsModal.jsx';
 import AlumnoProfileModal from '../student/AlumnoProfileModal.jsx';
 import ExerciseHistoryModal from '../routines/ExerciseHistoryModal.jsx';
+import AddExerciseModal from '../modals/AddExerciseModal.jsx';
 import AppGlobalStyles from '../layout/AppGlobalStyles.jsx';
 import ToastBanner from '../ui/ToastBanner.jsx';
 import { getWorkoutExerciseStatus } from '../../lib/workoutSession.js';
@@ -164,10 +165,16 @@ function SeccionModales({ darkMode, colores, toast2 }) {
 // ── Sección 3: editor de rutinas con RutinaView REAL y servidor ficticio ──────────────────────────
 function SeccionRutinas({ darkMode, colores, toast2 }) {
   const srv = useRef(null);
-  if (!srv.current) srv.current = crearServidorRutinasDemo({});
-  const server = srv.current;
   const [, setV] = useState(0);
-  const tick = () => setV((v) => v + 1);
+  // El servidor avisa cada cambio (sin temporizadores: un re-render periódico durante un arrastre no representa a la app real).
+  if (!srv.current) srv.current = crearServidorRutinasDemo({ alCambiar: () => setV((v) => v + 1) });
+  const server = srv.current;
+  // Modal REAL de agregar ejercicios; su onConfirm aplica la misma transformación de estado que App.jsx (solo local).
+  const [addExModal, setAddExModal] = useState(null);
+  const [addExSearch, setAddExSearch] = useState('');
+  const [addExPat, setAddExPat] = useState(null);
+  const [addExMuscle, setAddExMuscle] = useState(null);
+  const [addExSelectedIds, setAddExSelectedIds] = useState([]);
   const [routines, setRoutines] = useState(() => server.filas().map(filaARutinaLocal));
   const [vista, setVista] = useState(0);
   const [contadorNuevas, setContadorNuevas] = useState(0);
@@ -178,8 +185,6 @@ function SeccionRutinas({ darkMode, colores, toast2 }) {
   const setLatencia = (ms) => { server.setLatencia(ms); setLat(ms); };
   const recargar = () => { setRoutines(server.filas().map(filaARutinaLocal)); setVista((n) => n + 1); toast2('Vista recargada desde el servidor ficticio'); };
   const agregarNueva = () => { const n = contadorNuevas + 1; setContadorNuevas(n); setRoutines((p) => p.concat([rutinaLocalNueva(n)])); };
-  // El servidor cambia fuera de React: se refresca el panel tras cada operación.
-  useEffect(() => { const id = setInterval(tick, 400); return () => clearInterval(id); }, []);
   const r = server.resumen();
   const filas = server.filas();
   const etiquetas = { ok: 'Éxito', red: 'Fallo de red (lanza)', nulo: 'Respuesta nula', vacio: 'Respuesta vacía []' };
@@ -192,7 +197,9 @@ function SeccionRutinas({ darkMode, colores, toast2 }) {
         <li><b>Fallo:</b> elegí «Fallo de red», «Respuesta nula» o «Respuesta vacía» y tocá Guardar cambios. NO debe aparecer "Cambios guardados ✓", la barra debe seguir y el servidor no debe cambiar.</li>
         <li><b>Éxito:</b> elegí «Éxito», guardá y tocá «Recargar vista desde el servidor»: los cambios persisten.</li>
         <li><b>Doble toque:</b> poné latencia 1500 ms, tocá Guardar cambios dos veces seguidas con una rutina nueva sin guardar (botón «Agregar rutina nueva sin guardar», editala y guardá): «create confirmados» debe subir de a 1.</li>
-        <li>Reordenar ejercicios arrastrando NO escribe solo: «updates» no cambia hasta que guardás.</li>
+        <li><b>Reordenar:</b> mantené apretada el asa ⠿ de un ejercicio ~0,3 s y arrastralo a otra posición del mismo bloque. Aparece «Guardar cambios» y «updates» no cambia hasta que guardás. Pasar el dedo rápido sobre el asa solo hace scroll.</li>
+        <li>Guardá y tocá «Recargar vista desde el servidor»: el orden persiste. Con fallo de red el orden NO se guarda y no hay mensaje de éxito.</li>
+        <li>Calentamiento y bloque principal son independientes: no se pueden mezclar ejercicios entre ellos.</li>
       </ol>
       <h3>Simulador de respuesta del servidor</h3>
       <div className="qa-grid" role="group" aria-label="Modo del servidor ficticio">
@@ -209,11 +216,33 @@ function SeccionRutinas({ darkMode, colores, toast2 }) {
           setTab={noop} border={colores.border} textMuted={colores.textMuted} bgCard={colores.bgCard} textMain={colores.textMain}
           darkMode={darkMode} bgSub={colores.bgSub} es={true} lang="es" card={{}}
           setNewR={noop} routines={routines} setRoutines={setRoutines} allEx={EJERCICIOS_DEMO}
-          toast2={toast2} setAddExModal={noop} setAddExSearch={noop} setAddExPat={noop} setAddExMuscle={noop} setAddExSelectedIds={noop}
+          toast2={toast2} setAddExModal={setAddExModal} setAddExSearch={setAddExSearch} setAddExPat={setAddExPat} setAddExMuscle={setAddExMuscle} setAddExSelectedIds={setAddExSelectedIds}
           setDupDayModal={noop} alumnos={ALUMNOS_DEMO} sb={server.sb} setAssignRoutineId={noop}
           rutinasSBEntrenador={[]} setRutinasSBEntrenador={noop}
         />
       </div>
+      <AddExerciseModal
+        addExModal={addExModal} addExSearch={addExSearch} setAddExSearch={setAddExSearch} addExPat={addExPat} setAddExPat={setAddExPat}
+        addExMuscle={addExMuscle} setAddExMuscle={setAddExMuscle} addExSelectedIds={addExSelectedIds} setAddExSelectedIds={setAddExSelectedIds}
+        allEx={EJERCICIOS_DEMO} coachDesktopNavHidden={true} darkMode={darkMode} es={true} lang="es" msg={(a) => a}
+        btn={(bg) => ({ background: bg || (darkMode ? '#162234' : '#E2E8F0'), color: colores.textMain, border: 'none', borderRadius: 10, padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 })}
+        inp={{ background: darkMode ? '#111827' : '#F0F4F8', color: colores.textMain, border: '1px solid ' + colores.border, borderRadius: 10, padding: '8px 12px', fontSize: 16, fontFamily: 'inherit' }}
+        bgCard={colores.bgCard} border={colores.border} textMuted={colores.textMuted} videoOverrides={{}}
+        onClose={() => { setAddExModal(null); setAddExSelectedIds([]); }}
+        onConfirm={() => {
+          if (!addExModal || addExSelectedIds.length === 0) return;
+          const blk = addExModal.bloque || 'exercises';
+          const r = routines.find((rr) => rr.id === addExModal.rId);
+          const day = r && r.days ? r.days[addExModal.dIdx] : null;
+          const existing = new Set((day && day[blk] ? day[blk] : []).map((e) => e.id));
+          const ids = addExSelectedIds.filter((id) => !existing.has(id));
+          if (ids.length === 0) { toast2('Ya están en ese bloque'); return; }
+          const nuevos = ids.map((id) => { const ex = EJERCICIOS_DEMO.find((e) => e.id === id); return ex ? { id: ex.id, name: ex.name, nameEn: ex.nameEn, sets: '3', reps: '8-10', kg: '', pause: 0, note: '', weeks: [] } : null; }).filter(Boolean);
+          setRoutines((p) => p.map((rr) => (rr.id !== addExModal.rId ? rr : { ...rr, days: rr.days.map((dd, i) => (i !== addExModal.dIdx ? dd : { ...dd, [blk]: [...(dd[blk] || []), ...nuevos] })) })));
+          toast2('Agregados ' + nuevos.length + ' ejercicios');
+          setAddExModal(null); setAddExSelectedIds([]);
+        }}
+      />
       <h3>Servidor ficticio</h3>
       <dl data-qa-estado-servidor>
         <dt>Modo</dt><dd data-qa-modo-actual>{etiquetas[modo]}</dd>

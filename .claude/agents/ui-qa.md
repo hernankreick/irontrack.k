@@ -22,3 +22,6 @@ Ejecuta cada comando por separado y SIN encadenar (`&&`, `;`, `|`, `echo`): el e
 - `PASS` solo si TODO lo anterior pasa. Si no: `FAIL` con una lista corta y accionable (archivo/seccion@ancho, valor medido, valor esperado) para que `ui-implementer` corrija.
 - Informa siempre lo NO validado (dispositivo real, safe area, VoiceOver, anchos omitidos por el arnes) en lugar de darlo por bueno.
 - Capturas: ruta de salida de `qa:ui`; si el usuario las necesita, copialas al directorio de trabajo permitido.
+
+## Política permanente de QA autónomo (CLAUDE.md)
+Ver «Política permanente de QA autónomo» en `CLAUDE.md`. Además de lo anterior, ejecuta el QA de flujos críticos con datos ficticios: `node scripts/qa/qa-pr194.mjs --out <carpeta>` (Chromium, 375/390/430/768 px, claro y oscuro; `--browser webkit` si WebKit está instalado). Comprueba que cada prueba nueva **falla contra el código anterior**. Tu informe separa siempre: pruebas aprobadas, fallidas, **no ejecutadas** (con motivo), limitaciones del entorno y lo que **requiere dispositivo físico**; no presentes una simulación como Safari real ni marques como aprobada una prueba omitida.

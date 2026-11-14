@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 import { createPortal } from 'react-dom';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, MoreVertical, Pencil, Play, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, MoreVertical, Pencil, Play, Trash2 } from 'lucide-react';
 import { pickVideoUrl } from '../lib/exerciseResolve.js';
 import { irontrackMsg as M } from '../lib/irontrackMsg.js';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
@@ -40,6 +40,7 @@ const iconBtn = {
 
 export function ExerciseCard({
   exercise, onEdit, onDelete,
+  onMove, canMoveUp = false, canMoveDown = false,
   lang = 'es',
   isUnder768 = false,
 }) {
@@ -63,7 +64,7 @@ export function ExerciseCard({
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const w = 180;
-    const approxH = 100;
+    const approxH = 190;
     const pad = 8;
     let left = rect.right - w;
     if (left < pad) left = pad;
@@ -147,7 +148,8 @@ export function ExerciseCard({
         {...attributes}
         {...listeners}
         aria-label={M(lang, 'Reordenar ejercicio', 'Reorder exercise', 'Reordenar exercício')}
-        style={{ ...iconBtn, cursor: 'grab', touchAction: 'none' }}
+        // touch-action: manipulation (no none): un deslizamiento rápido sobre el asa hace scroll; el arrastre táctil exige mantener pulsado.
+        style={{ ...iconBtn, cursor: 'grab', touchAction: 'manipulation', WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
       >
         <GripVertical size={18} aria-hidden="true" />
       </button>
@@ -225,6 +227,28 @@ export function ExerciseCard({
               <Pencil size={14} aria-hidden="true" />
               {M(lang, 'Editar', 'Edit', 'Editar')}
             </button>
+            {onMove && canMoveUp && (
+              <button
+                type="button"
+                className="it-routine-menu-item"
+                style={menuItem}
+                onClick={() => { setMenuOpen(false); onMove(exercise.id, -1); }}
+              >
+                <ArrowUp size={14} aria-hidden="true" />
+                {M(lang, 'Subir', 'Move up', 'Subir')}
+              </button>
+            )}
+            {onMove && canMoveDown && (
+              <button
+                type="button"
+                className="it-routine-menu-item"
+                style={menuItem}
+                onClick={() => { setMenuOpen(false); onMove(exercise.id, 1); }}
+              >
+                <ArrowDown size={14} aria-hidden="true" />
+                {M(lang, 'Bajar', 'Move down', 'Descer')}
+              </button>
+            )}
             <button
               type="button"
               className="it-routine-menu-item it-routine-menu-item--danger"

@@ -98,3 +98,28 @@ Claude Code aplica `.claude/settings.json` y el hook `.claude/hooks/guard.mjs` (
 ### Límites conocidos
 * `qa:ui` mide en Chromium con datos ficticios: no reemplaza probar en un iPhone real (safe area, teclado, VoiceOver). A 768 px las secciones se omiten (no hay menú del coach en ese ancho).
 * Si `node_modules` es de Windows, ejecutar suites, builds y `qa:ui` en una copia Linux.
+
+## 🧪 Política permanente de QA autónomo (vigente para TODO PR)
+
+**Principio:** los agentes asumen por completo las pruebas que se pueden automatizar. El dueño **no es el tester habitual**: decide qué funcionalidades quiere, autoriza merges y aprueba cambios sensibles (seguridad, producción, decisiones de producto); solo valida lo que la automatización no puede comprobar de forma confiable (ver «Safari físico»). No se le pide repetir pruebas que ya cubre un agente. Objetivo operativo: una intervención inicial y una entrega final (máximo dos interacciones por etapa). Esta política **no relaja** los criterios de parada, los bloqueos ni el alcance de la sección anterior.
+
+### Qué hace el agente, en orden (no se saltea ninguno)
+1. Analiza el código existente y 2. consulta el historial de PR (`git log -S`, PR fusionados) para no repetir correcciones ni reabrir lo resuelto.
+3. **Reproduce el problema antes de tocarlo** (prueba automatizada, script o medición) cuando sea técnicamente posible; si no lo es, lo dice. No presupone la causa: la mide.
+4. Implementa la corrección mínima y 5. crea pruebas de **regresión** (deben fallar sin la corrección: se comprueba contra el código anterior).
+6. Ejecuta pruebas funcionales y de interfaz; 7. simula toques reales y tamaños de pantalla (375/390/430/768 px, tema claro y oscuro); 8. simula fallos de red, latencia y respuestas inesperadas (`null`, `[]`, excepciones).
+9. Corrige lo que encuentre, 10. repite hasta que pase, 11. valida la integración con el resto de la app (`npm run test:all`, `npm run qa:ui`, `npm run qa:builds`, CI) y 12. publica **un único PR** con una Preview lista.
+
+### Regla de entrega
+No se entrega una Preview como «lista para validar» mientras exista un fallo reproducible pendiente dentro del alcance autorizado. **Nunca** se modifica una prueba, un umbral o el `baseline` para que pase: si una prueba falla, se corrige el producto (o se demuestra, con evidencia, que la prueba estaba mal y se explica).
+
+### Informe final: separar siempre
+Pruebas **aprobadas** · pruebas **fallidas** · pruebas **no ejecutadas** (con motivo) · **limitaciones del entorno** · comportamientos que **requieren dispositivo físico**. Una simulación (Chromium emulando un iPhone, WebKit de escritorio) **no se presenta como prueba en Safari real**.
+
+### Herramientas que ya existen (se amplían, no se duplican)
+* `npm run test:all` (CI: job `test-and-build`), `npm run qa:ui`, `npm run qa:builds`, `npm run check:scope`.
+* **QA de flujos críticos con datos ficticios** (`demo/qa-pr194.html`, solo en Preview): `node scripts/qa/qa-pr194.mjs --out <carpeta> [--browser chromium|webkit] [--widths 375,390,430,768]`. Usa los componentes reales sobre un servidor ficticio en memoria con los contratos reales (éxito / red / nulo / vacío / latencia), sin Supabase ni almacenamiento real. Cubre reordenamiento, guardado, doble toque, decimales, modales y aislamiento. Corre en el CI (job `qa-demo`, Chromium y WebKit). Todo flujo crítico nuevo se agrega a este mismo script, no a uno paralelo.
+* Playwright no es dependencia del proyecto: se resuelve del entorno (`PLAYWRIGHT_MODULE`, `PLAYWRIGHT_BROWSERS_PATH`) y el CI lo instala fuera del repo.
+
+### Safari físico: qué NO se puede automatizar (y por qué)
+Playwright-WebKit es el motor de Safari de escritorio sin iOS: **no tiene gestos táctiles multitouch ni CDP** (los toques sostenidos/arrastres táctiles solo se automatizan en Chromium), y no reproduce teclado virtual, safe areas reales, barra de direcciones dinámica, háptica ni VoiceOver. Eso se informa como «requiere dispositivo físico» y se valida con el dueño solo si el cambio lo toca. Hasta contar con un servicio de dispositivos reales no se puede afirmar compatibilidad verificada con Safari de iPhone.
