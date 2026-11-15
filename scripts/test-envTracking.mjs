@@ -4,8 +4,7 @@
 //
 // Igual que los otros scripts/test-*.mjs: sin dependencias nuevas, node:assert, sale con codigo != 0 en el primer fallo.
 // Solo lee rutas (git ls-files) y archivos de texto; detecta valores sin imprimirlos jamas.
-// Deuda conocida y declarada: `.env` sigue versionado hasta que el dueño confirme las variables de Production en Vercel
-// (ver KNOWN_DEBT). Cualquier OTRO archivo .env* versionado hace fallar la prueba.
+// S-1: `.env` dejo de versionarse. CUALQUIER archivo .env* versionado (salvo la plantilla) hace fallar la prueba.
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -26,17 +25,18 @@ if (!files) {
   console.log("sin repositorio Git: pruebas de seguimiento omitidas (0 pruebas)");
   process.exit(0);
 }
-const app = files.filter((f) => !f.startsWith("node_modules/") && !f.startsWith(".chrome-headless/"));
+const app = files.filter((f) => !f.startsWith("node_modules/") && !/^\.chrom(e|ium)[-_]/.test(f));
 
 const ENV_FILE = /(^|\/)\.env(\..+)?$/;
 const TEMPLATE = /(^|\/)\.env\.(example|sample|template)$/;
-const KNOWN_DEBT = new Set([".env"]); // se retira en un PR aparte, tras confirmar las variables de Production en Vercel
-
-await test("solo la deuda conocida (.env) y la plantilla estan versionados entre los .env*", () => {
-  const unexpected = files.filter((f) => ENV_FILE.test(f) && !TEMPLATE.test(f) && !KNOWN_DEBT.has(f));
+await test("ningun archivo .env* esta versionado (solo la plantilla .env.example)", () => {
+  const unexpected = files.filter((f) => ENV_FILE.test(f) && !TEMPLATE.test(f));
   assert.deepEqual(unexpected, [], "archivos .env* versionados no permitidos: " + unexpected.join(", "));
-  const debt = files.filter((f) => KNOWN_DEBT.has(f));
-  if (debt.length) console.log("   ! deuda conocida: versionado " + debt.join(", ") + " (retirar en PR aparte)");
+});
+
+await test("ningun perfil de navegador esta versionado (.chrome-*/, .chromium-*/, .playwright-*/)", () => {
+  const prof = files.filter((f) => /^\.(chrome|chromium|playwright)[-_]/.test(f));
+  assert.deepEqual(prof, [], "perfil de navegador versionado: " + [...new Set(prof.map((f) => f.split("/")[0]))].join(", "));
 });
 
 await test(".gitignore ignora .env, .env.* y variantes locales, pero NO la plantilla .env.example", () => {
@@ -101,8 +101,6 @@ await test("el workflow de CI ejecuta el guard sobre un build de Preview simulad
 
 // Informativo (no falla): otras deudas de seguimiento detectadas, para que no se pierdan de vista.
 const nm = files.filter((f) => f.startsWith("node_modules/")).length;
-const ch = files.filter((f) => f.startsWith(".chrome-headless/")).length;
-if (nm) console.log("   ! deuda conocida: " + nm + " archivos de node_modules versionados");
-if (ch) console.log("   ! deuda conocida: " + ch + " archivos de .chrome-headless versionados (perfil de navegador; revisar y retirar en PR aparte)");
+if (nm) console.log("   ! deuda conocida: " + nm + " archivos de node_modules versionados (higiene, no secretos; PR aparte)");
 
 console.log("\n" + count + " pruebas OK");
