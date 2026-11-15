@@ -3,8 +3,8 @@ import { useState, useCallback, useRef } from 'react';
 import { cleanActiveCoachAlumnos } from '../lib/appHelpers.js';
 import { ALUMNOS_STATUS, createAlumnosController } from '../lib/coachAlumnosLoad.js';
 
-const ONESIGNAL_APP_ID = '8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7';
-const ONESIGNAL_KEY = 'os_v2_app_rrpcxujkzbexve7l7ud6lttu24fxxofjnc3eke5wljs2bkhvuto27d46nxt5r7pvgtnpsrxphnbgr35vfdsiesntivkncl75aq4gyuy';
+// Notificaciones push (OneSignal) DESACTIVADAS (S-1): la clave REST estaba en el frontend (expuesta). Nunca funcionaron (el SDK no
+// se cargaba). Pospuestas: si se retoman, el envio va en el servidor y la clave en sus secretos, nunca en el bundle.
 
 export function useAlumnos({ sb }) {
 
@@ -43,27 +43,8 @@ export function useAlumnos({ sb }) {
 
   // ── Funciones ─────────────────────────────────────────────────────────
 
-  const notifyAlumno = useCallback(async (alumnoId, mensaje) => {
-    try {
-      const alumno = alumnos.find(a => a.id === alumnoId);
-      if (!alumno?.onesignal_id) return;
-      await fetch('https://onesignal.com/api/v1/notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Basic ' + ONESIGNAL_KEY,
-        },
-        body: JSON.stringify({
-          app_id:            ONESIGNAL_APP_ID,
-          include_player_ids: [alumno.onesignal_id],
-          headings:  { en: 'IRON TRACK 💪', es: 'IRON TRACK 💪' },
-          contents:  { en: mensaje, es: mensaje },
-        }),
-      });
-    } catch (e) {
-      console.log('Push error:', e);
-    }
-  }, [alumnos]);
+  // Se conserva la firma (App.jsx la desestructura) para no romper a nadie: no envia nada ni hace red.
+  const notifyAlumno = useCallback(async (_alumnoId, _mensaje) => false, []);
 
   return {
     // Estados

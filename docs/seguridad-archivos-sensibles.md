@@ -7,16 +7,23 @@ variables, tipos, conteos y dominios. Ningún secreto se envió a servicios exte
 > Corrección respecto de la versión anterior de este documento: aquella se basó en un clon superficial y atribuía todo a
 > `fef68a9` (31/10). Las fechas reales están abajo.
 
-## ⚠️ Urgente: dos credenciales REALES expuestas (repositorio PÚBLICO)
+## Credenciales REALES expuestas (repositorio PÚBLICO) y su estado
 
 | # | Credencial | Dónde | Desde | Estado | Riesgo |
 |---|---|---|---|---|---|
-| 1 | **Clave REST API de OneSignal** (`os_v2_app_…`, 113 caracteres) | `hooks/useAlumnos.js:7` en **`main` hoy**, 146/147 ramas, 9 versiones del archivo y 21 bundles `dist/` del historial; casi seguro también en el JavaScript de producción (se envía como `Authorization: Basic` desde el navegador) | `0747946` · 2026-03-21 | **ACTIVA** (no hay evidencia de rotación) | **CRÍTICO**: cualquiera puede enviar notificaciones push a todos los suscriptores de la app y usar la API de esa app de OneSignal |
-| 2 | **Contraseña por defecto de la cuenta del entrenador** (13 caracteres, junto a su email; además se mostraba en la pantalla de login) | `App.jsx` (quitada de `main` en `caae90d`, 2026-10-20, IT-001) · sigue en 58/147 ramas y 29 commits; también en `scripts/e2e-phase1.mjs`, `tests/rls/README.md` y `docs/despliegue-rls-p0.md` de ramas RLS | `0747946` · 2026-03-21 | **Vigencia desconocida**: el `signUp` automático creaba la cuenta de Auth con esa contraseña; no hay registro de que se haya cambiado (no se verificó usándola: prohibido) | **CRÍTICO si sigue vigente**: acceso completo como entrenador a los datos de todos los alumnos |
+| 1 | **Clave REST API de OneSignal** (`os_v2_app_…`, 113 caracteres) | Estuvo en `hooks/useAlumnos.js:7` de `main` (y en el JavaScript de producción) desde `0747946` (2026-03-21). **S-1 la quita del código y desactiva la integración**; sigue en el historial público, 146/147 ramas y bundles `dist/` viejos | `0747946` · 2026-03-21 | **Quitada del código; sigue válida hasta revocarla en OneSignal** | **CRÍTICO hasta la revocación**: con la clave se pueden enviar notificaciones a los suscriptores de esa app de OneSignal. Las push nunca funcionaron (el SDK no se cargaba), así que revocarla no afecta a nadie |
+| 2 | **Contraseña por defecto de la cuenta del entrenador** (13 caracteres, junto a su email; además se mostraba en la pantalla de login) | `App.jsx` (quitada de `main` en `caae90d`, 2026-10-20, IT-001) · sigue en 58/147 ramas y 29 commits; también en `scripts/e2e-phase1.mjs`, `tests/rls/README.md` y `docs/despliegue-rls-p0.md` de ramas RLS | `0747946` · 2026-03-21 | **Cambiada**, según confirmó el dueño. Evidencia no invasiva en el repo: desde IT-001 la app solo autentica contra Supabase Auth (sin valor por defecto ni alta automática; `scripts/test-coachLoginNoDefault.mjs`). El estado real de Auth no se verifica desde el repo (requeriría consultar Supabase o probar la credencial: prohibido) | Mitigado si la contraseña de Auth ya es otra |
 
-No hay evidencia de uso indebido de ninguna de las dos. El control nuevo detecta ambas formas (`onesignal-rest-key`,
-`code-password`); la clave de OneSignal figura en `scripts/security/known-findings.json` como **conocida pendiente**
-(se informa en cada corrida y no bloquea el CI; cualquier otro secreto sí).
+No hay evidencia de uso indebido de ninguna de las dos. El control detecta ambas formas (`onesignal-rest-key`,
+`code-password`). `scripts/security/known-findings.json` quedó **vacío**: la clave de OneSignal ya no es una excepción y,
+si volviera a aparecer en el árbol o en un PR, el CI falla.
+
+### OneSignal desactivado (S-1)
+- `hooks/useAlumnos.js`: sin clave ni `fetch` a la API; `notifyAlumno` se conserva como función sin efecto (no la llamaba nadie).
+- `App.jsx`: sin `OneSignal.init` ni el registro al iniciar sesión (escribía `onesignal_id`). Nunca se ejecutaban: el SDK no se cargaba.
+- La columna `alumnos.onesignal_id` y las reglas RLS que la mencionan quedan como están (sin cambios en Supabase).
+- El chat interno no dependía de OneSignal (`scripts/test-onesignalDesactivado.mjs`, `scripts/test-chatMensajes.mjs`).
+- Si las push se retoman: envío desde el servidor con la clave en sus secretos; nunca en el bundle.
 
 ## Diagnóstico de los archivos del hallazgo S-1 original
 
@@ -64,12 +71,13 @@ Al traer este cambio, Git **borra el `.env` local** de cada clon (deja de estar 
   - Límite conocido: una contraseña escondida tras una variable (`x = guardado || "literal"`) no siempre se detecta; la
     regla `code-password` cubre `password: "…"`, `pass === "…"` y similares en el código de la app.
 
-## Antes de fusionar S-1 (dueño)
+## Antes de fusionar S-1 (dueño) — no verificable desde aquí
 `lib/envTargetGuard.js` tomaba el `.env` versionado como valor efectivo de **Production** si el panel de Vercel no
 definía las variables. Confirmá en Vercel → Project → Settings → Environment Variables (ámbito **Production**) que existen
 `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`. Si faltan, el build de Production **falla** (reglas P1/P3) y Vercel
 mantiene el despliegue anterior: no hay caída, pero tampoco se publica. Las Preview ya usan variables del panel
-(la regla R1 bloquea Preview con `.env` y las Preview pasan).
+(la regla R1 bloquea Preview con `.env` y las Preview pasan). Production no se puede comprobar desde este entorno: no hay
+acceso de lectura al panel de Vercel y el flujo de agentes tiene su CLI bloqueado.
 
 ## Historial
 Todos los archivos de la tabla siguen accesibles en commits anteriores (y en clones/forks hechos desde 2026-03-24).
@@ -87,14 +95,9 @@ quisiera por higiene/tamaño (~11 MB de perfil + `node_modules`), procedimiento 
    soporte de GitHub los purgue.
 
 ## Rotación (orden)
-1. **OneSignal (hoy):** OneSignal → la app → Settings → Keys & IDs → generar una REST API key nueva y revocar la anterior.
-   Consecuencia: el envío de push desde el navegador **deja de funcionar** hasta mover el envío al servidor. La rama
-   `claude/onesignal-security-fix-t3ij3x` (sin fusionar, 2026-10-10) ya lo hace con la Edge Function `notify-alumno`
-   (la clave nueva vive en los secretos de la función, nunca en el bundle). Orden recomendado: desplegar la función con la
-   clave nueva → fusionar el cambio del cliente → revocar la clave vieja (o revocar ya y aceptar push caídas un tiempo).
-2. **Contraseña del entrenador (hoy):** iniciar sesión y cambiarla (o desde Supabase → Authentication → Users → la cuenta
-   → reset), cerrar las demás sesiones y revisar `last_sign_in_at` en busca de accesos no reconocidos. Consecuencia:
-   ninguna para la app (la contraseña ya no está en el código desde IT-001).
+1. **OneSignal (pendiente del dueño):** revocar la clave REST en el panel de OneSignal (Settings → Keys & IDs). No hace
+   falta crear otra: la integración quedó desactivada y las push nunca funcionaron, así que no afecta a ningún usuario.
+2. **Contraseña del entrenador:** ya cambiada según el dueño; no se vuelve a cambiar.
 3. Nada más requiere rotación: la clave `sb_publishable_`/anon es pública por diseño; no se halló ninguna clave privilegiada.
 
 Si en el futuro el escáner reporta un CRÍTICO: rotar primero, después retirar el archivo y recién entonces evaluar el historial.

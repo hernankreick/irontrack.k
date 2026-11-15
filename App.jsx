@@ -1422,8 +1422,6 @@ function GymApp() {
     setAuthLoading(false);
   }, [sharedParam]);
 
-  // OneSignal Web Push
-
   // ── Escuchar cambios de tema del SO ─────────────────────────────────────
   useEffect(()=>{
     const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
@@ -1614,18 +1612,6 @@ function GymApp() {
         })
         .catch(function (err) { console.error("Cache cleanup error:", err); });
     }
-  }, []);
-
-  useEffect(() => {
-    if(typeof window === "undefined") return;
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({
-        appId: "8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7",
-        allowLocalhostAsSecureOrigin: true,
-        notifyButton: { enable: false },
-      });
-    });
   }, []);
 
   useEffect(() => {
@@ -3216,15 +3202,6 @@ function GymApp() {
                 localStorage.setItem("it_session",JSON.stringify(s));
                 localStorage.setItem("it_show_welcome","1");
                 if(ruts&&ruts[0]){const rutLocal={id:ruts[0].id,name:ruts[0].nombre||"Rutina",days:ruts[0].datos?.days||[],datos:ruts[0].datos||{},alumno:ruts[0].datos?.alumno||alumno.nombre||"",note:ruts[0].datos?.note||"",alumno_id:alumno.id,saved:true};localStorage.setItem("it_rt",JSON.stringify([rutLocal]));}
-                // Registrar OneSignal
-                try {
-                  window.OneSignalDeferred = window.OneSignalDeferred || [];
-                  window.OneSignalDeferred.push(async function(OS) {
-                    await OS.init({ appId: "8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7", allowLocalhostAsSecureOrigin: true });
-                    const pid = OS.User?.PushSubscription?.id;
-                    if(pid) await sbFetch("alumnos?id=eq."+alumno.id,"PATCH",{onesignal_id:pid});
-                  });
-                } catch(e) {}
                 syncStateWithLocalStorage();
                 setLoginEmail("");
                 setLoginPass("");
