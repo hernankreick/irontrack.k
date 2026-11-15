@@ -141,7 +141,16 @@ async function main() {
         const esperadoServidor = (nombres) => nombres.map((x) => CLAVE[x]);
         // Determinismo: las tarjetas animan su entrada (translateY + opacidad con retardo escalonado) y las fuentes cargan tarde en un navegador
         // en frío: arrastrar con coordenadas leidas durante esa animación falla en WebKit (primera carga). Se espera a que terminen.
-        const quieto = async () => { await page.evaluate(() => Promise.all([(document.fonts && document.fonts.ready) || null, ...document.getAnimations().map((a) => a.finished.catch(() => null))])); await wait(150); };
+        const quieto = async () => {
+          await page.evaluate(() => Promise.all([(document.fonts && document.fonts.ready) || null, ...document.getAnimations().map((a) => a.finished.catch(() => null))]));
+          // layout estable: las posiciones de las asas no cambian entre dos lecturas separadas (fuentes que cargan tarde, imagenes, scroll anclado)
+          let previo = "";
+          for (let k = 0; k < 25; k++) {
+            const ahora = JSON.stringify(await page.evaluate(() => [window.scrollY, document.documentElement.scrollHeight, ...[...document.querySelectorAll('button[aria-label="Reordenar ejercicio"]')].map((b) => Math.round(b.getBoundingClientRect().top * 10) / 10)]));
+            if (ahora === previo) return;
+            previo = ahora; await wait(120);
+          }
+        };
         const traer = async (i, yDeseada = 520) => { await quieto(); await page.evaluate(([k, yy]) => { const b = document.querySelectorAll('button[aria-label="Reordenar ejercicio"]')[k]; const r = b.getBoundingClientRect(); window.scrollBy(0, r.top - yy); }, [i, yDeseada]); await wait(200); return (await handles())[i]; };
         const overlay = () => page.evaluate(() => { const els = [...document.querySelectorAll("div")].filter((d) => getComputedStyle(d).position === "fixed" && d.querySelector('button[aria-label="Reordenar ejercicio"]')); if (!els.length) return null; const r = els[els.length - 1].getBoundingClientRect(); return { cy: r.top + r.height / 2, top: r.top, left: r.left, h: r.height, dentroDeLaTarjeta: !!els[els.length - 1].closest(".it-routine-card-wrap") }; });
         const rondas = { overlayOk: [], scrollDelta: [] };
@@ -162,7 +171,11 @@ async function main() {
             await cdp0.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
           } else {
             await page.mouse.move(a.x, a.y); await page.mouse.down();
-            for (let k = 1; k <= 14; k++) { await page.mouse.move(a.x, a.y + ((y1 - a.y) * k) / 14); await wait(20); }
+            for (let k = 1; k <= 14; k++) {
+              const y = a.y + ((y1 - a.y) * k) / 14;
+              await page.mouse.move(a.x, y); await wait(20);
+              if (medir && k === 7) { const ov = await overlay(); const ok1 = !!ov && !ov.dentroDeLaTarjeta && Math.abs(ov.cy - y) <= 14 && Math.abs(ov.left - izqTarjeta) <= 8 && ov.top >= -5 && ov.top < 844; rondas.overlayMouseOk = (rondas.overlayMouseOk || []).concat([ok1]); if (!ok1) console.log("detalle overlay (mouse):", JSON.stringify({ ov, y: Math.round(y), izqTarjeta: Math.round(izqTarjeta) })); }
+            }
             await page.mouse.up();
           }
           rondas.scrollDelta.push(Math.abs((await page.evaluate(() => window.scrollY)) - scrollIni));
@@ -181,11 +194,18 @@ async function main() {
         const upd0 = await num("[data-qa-updates]");
         await arrastrar(2, 4, { medir: true, yDeseada: 400 });
         const tras1 = await orden();
+        if (!igual(tras1, ["Plancha", "Movilidad de cadera", "Press de banca", "Peso muerto", "Sentadilla", "Remo con barra"])) console.log("detalle R1 (" + id + ") orden obtenido:", JSON.stringify(tras1), "scrollY:", await page.evaluate(() => window.scrollY));
         flow.reordenMismoBloque = igual(tras1, ["Plancha", "Movilidad de cadera", "Press de banca", "Peso muerto", "Sentadilla", "Remo con barra"]);
         flow.reordenSinEscrituraOculta = (await num("[data-qa-updates]")) === upd0 && (await num("[data-qa-creates]")) === 0;
         flow.reordenMarcaCambiosPendientes = await barra0();
         if (esChromium) flow.reordenOverlaySigueAlDedo = rondas.overlayOk.length > 0 && rondas.overlayOk.every(Boolean);
-        else omitidas.push(id + ": posición del overlay bajo el dedo (requiere gesto tactil; WebKit sin CDP)");
+        else {
+          flow.reordenOverlaySigueAlPunteroMouse = (rondas.overlayMouseOk || []).length > 0 && rondas.overlayMouseOk.every(Boolean);
+          omitidas.push(id + ": posición del overlay bajo el DEDO (requiere gesto tactil; WebKit sin CDP). Con mouse sí se midió (reordenOverlaySigueAlPunteroMouse)");
+        }
+        // :hover aplica translateY(-2px) a proposito (y en iOS queda "pegado" tras un toque): por eso el overlay va en un portal. Aqui se comprueba
+        // el estado en reposo, sin puntero sobre la tarjeta.
+        await page.mouse.move(1, 1); await wait(350);
         flow.reordenTarjetaSinTransformPermanente = await page.evaluate(() => [...document.querySelectorAll(".it-routine-card-wrap")].every((c) => getComputedStyle(c).transform === "none"));
         await shot("reorden_1");
 
