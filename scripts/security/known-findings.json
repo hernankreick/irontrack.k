@@ -1,0 +1,4 @@
+{
+  "_comment": "Secretos REALES ya expuestos cuya correccion depende del dueno. Cada entrada reconoce UN hallazgo exacto (ruta + regla + huella sha256 truncada del valor; nunca el valor): se informa en cada corrida como CONOCIDO PENDIENTE y no hace fallar el CI. Quitar la entrada en cuanto se resuelva. Historial: S1-ONESIGNAL (clave REST de OneSignal en hooks/useAlumnos.js) se quito del codigo en S-1; su revocacion en OneSignal queda a cargo del dueno (docs/seguridad-archivos-sensibles.md).",
+  "findings": []
+}

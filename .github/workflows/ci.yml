@@ -28,6 +28,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Historial completo: el escaneo de secretos revisa TODOS los commits del PR, no solo el arbol final.
+          fetch-depth: 0
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -39,6 +42,16 @@ jobs:
       # npm ci lo reemplaza por completo desde package-lock.json.
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+
+      # S-1: falla si el arbol versionado incluye .env*, perfiles de navegador, llaves o secretos (service_role, sb_secret_,
+      # tokens de GitHub, etc.). Nunca imprime valores: solo archivo, linea, tipo y que hacer. Sin red ni servicios externos.
+      - name: Secret scan (archivos versionados)
+        run: node scripts/security/secret-scan.mjs
+
+      # S-1: los blobs NUEVOS de todos los commits del PR (un secreto agregado y quitado dentro del PR tambien falla).
+      - name: Secret scan (commits del PR)
+        if: github.event_name == 'pull_request'
+        run: node scripts/security/secret-scan.mjs --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
 
       - name: Run test suites
         run: |
@@ -95,7 +108,7 @@ jobs:
           node scripts/check-bundle-target.mjs dist-prod/assets --target production
           rm -rf dist-prod
 
-      # El build de Production DEBE fallar si falta la configuracion: las variables vacias pisan al .env versionado.
+      # El build de Production DEBE fallar si falta la configuracion (desde S-1 no hay .env versionado del que tomarla).
       - name: Env guard - Production sin configuracion debe fallar
         env:
           VERCEL: "1"

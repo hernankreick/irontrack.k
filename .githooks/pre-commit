@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# IronTrack · S-1: bloquea el commit si lo preparado incluye archivos sensibles (.env, perfiles de navegador, llaves) o secretos.
+# Activacion (una vez por clon):  git config core.hooksPath .githooks
+# Nunca imprime valores. Para datos FICTICIOS de prueba: comentario "secret-scan: allow" en la misma linea.
+exec node scripts/security/secret-scan.mjs --staged

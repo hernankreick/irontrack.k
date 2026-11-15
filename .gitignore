@@ -34,3 +34,27 @@ dist
 # Perfiles de navegador headless (cookies, Login Data, historial): NUNCA versionar.
 .chrome-headless/
 .chrome-*/
+.chromium-*/
+.playwright-*/
+# Volcados de memoria de navegadores (Crashpad): pueden contener fragmentos de memoria con sesiones.
+*.dmp
+Crashpad/
+
+# S-1: llaves, certificados y credenciales locales en cualquier carpeta (el control scripts/security/secret-scan.mjs lo verifica en CI).
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+id_ecdsa*
+.npmrc
+.supabase/
+supabase/.temp/
+supabase/.branches/
+*.env
+!*.env.example
+.envrc
+.dev.vars

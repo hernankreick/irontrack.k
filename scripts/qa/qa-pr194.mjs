@@ -180,6 +180,12 @@ async function main() {
           }
           rondas.scrollDelta.push(Math.abs((await page.evaluate(() => window.scrollY)) - scrollIni));
           await wait(450);
+          // El overlay del arrastre (portal position:fixed) tiene su propia asa "Reordenar ejercicio": mientras dura la animacion de
+          // soltar, orden() lo contaria como un ejercicio mas (WebKit en frio superaba los 450 ms fijos). Se espera a que se desmonte;
+          // si no se desmonta en 3 s es un defecto REAL y lo marca reordenOverlaySeDesmonta.
+          const t0 = Date.now();
+          while ((await overlay()) && Date.now() - t0 < 3000) await wait(50);
+          if (await overlay()) rondas.overlayPersistente = true;
         };
         const igual = (x, y) => JSON.stringify(x) === JSON.stringify(y);
         const sinRepetidos = (arr) => new Set(arr).size === arr.length;
@@ -319,6 +325,7 @@ async function main() {
         const despues10 = await orden();
         flow.reordenZonaBaja = igual(despues10, antes10) === false && sinRepetidos(despues10) && despues10.length === antes10.length && despues10.indexOf(nombre10) === j10;
         if (!flow.reordenZonaBaja) console.log("detalle R10:", JSON.stringify({ antes10, despues10, i10, j10 }));
+        flow.reordenOverlaySeDesmonta = !rondas.overlayPersistente;   // tras TODOS los arrastres: el overlay siempre se desmonta
 
         } catch (e) { flow.reordenExcepcionEnPasoFinal = false; console.log("excepcion en R7/R8:", String(e).split("\n")[0]); }
 

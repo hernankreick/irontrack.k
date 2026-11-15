@@ -80,6 +80,7 @@ El dueño aprueba **objetivos y resultados**; los ciclos intermedios (implementa
 ### Comandos
 * `npm run qa:ui`: QA visual con datos ficticios (host simulado, sin Supabase ni red) a 375/390/430/768/1280 px; falla si hay overflow horizontal, errores de página o más controles <44 px que `scripts/qa/baseline.json` (`-- --update-baseline` solo tras una mejora real). Playwright no es dependencia: se resuelve del entorno (`PLAYWRIGHT_MODULE`, `PLAYWRIGHT_BROWSERS_PATH`).
 * `npm run test:all`: todas las suites `scripts/test-*.mjs` (igual que el CI). `npm run qa:builds`: los 4 builds del CI con variables ficticias (el de Production sin variables debe fallar).
+* `node scripts/security/secret-scan.mjs`: control S-1 (también en el CI). Falla si se versiona `.env*`, un perfil de navegador, una llave o un secreto (`service_role`, `sb_secret_`, tokens). Nunca imprime valores. `--staged` para el commit (hook opcional: `git config core.hooksPath .githooks`), `--history` para auditar el historial. Ver `docs/seguridad-archivos-sensibles.md`.
 * `npm run check:scope`: falla si el diff sale del alcance UI (lib/, App.jsx, Supabase, SQL, `.env`, CI, dependencias) o agrega líneas que parecen lógica de datos.
 
 ### Qué está bloqueado de verdad (no es solo una instrucción)
