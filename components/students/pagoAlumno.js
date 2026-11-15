@@ -33,3 +33,15 @@ export async function registrarPagoAlumno(sb, alumno, ahora) {
     return { ok: false, motivo: "red" };
   }
 }
+
+/**
+ * C-01: texto de estado de pago para la tarjeta del alumno (vista del entrenador). Solo hechos: la fecha del ultimo pago
+ * confirmado o "sin pago registrado" (no hay regla de vencimiento definida, asi que no se inventa un "vencido").
+ * Devuelve { texto, registrado }.
+ */
+export function estadoPagoAlumno(ultimoPagoConfirmado, es) {
+  var d = ultimoPagoConfirmado ? new Date(ultimoPagoConfirmado) : null;
+  if (!d || isNaN(d.getTime())) return { texto: es ? "Sin pago registrado" : "No payment recorded", registrado: false };
+  var dd = String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+  return { texto: (es ? "Pagó el " : "Paid on ") + dd, registrado: true };
+}

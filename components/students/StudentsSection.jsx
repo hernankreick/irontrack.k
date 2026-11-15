@@ -497,7 +497,6 @@ export default function StudentsSection(props) {
                   setCoachCardMenuId(null);
                   setPagoDialog({ id: a.id, nombre: nombreAlumno(a), busy: false, error: "" });
                 }}
-                onAsignarRutina={function () {}}
               >
                 {isAlumnoActive&&fichaError===String(a.id)&&!loadingSB&&(
                   <div role="alert" data-qa="ficha-error" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap",margin:"8px 0",padding:"10px 12px",borderRadius:12,border:"1px solid "+coachAluBorderSoft,background:coachAluSubtle,color:textMain,fontSize:13}}>

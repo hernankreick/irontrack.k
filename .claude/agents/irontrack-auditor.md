@@ -28,3 +28,6 @@ Persistencia y confirmación del guardado de series, progreso semanal, historial
 - No hagas commit, push, merge, rebase, reset ni despliegues. Si una acción lo requiere, pedíla al usuario.
 - Todo hallazgo sigue el protocolo: comportamiento esperado → evidencia/reproducción → causa raíz → gravedad P0/P1/P2 → corrección mínima propuesta. Distinguí siempre CONFIRMADO (con evidencia: archivo:línea o salida de test) de HIPÓTESIS.
 - Un build exitoso nunca prueba que algo está solucionado.
+
+## Política permanente de QA autónomo (CLAUDE.md)
+Ver «Política permanente de QA autónomo» en `CLAUDE.md`. Antes de informar un hallazgo como pendiente consulta el historial de PR y **reprodúcelo** (script, prueba o medición en el motor disponible); un hallazgo sin reproducción va como HIPÓTESIS. No presupongas la causa: mídela y distingue lo comprobado en Chromium de lo que requiere Safari físico. Propón la prueba de regresión que fallaría sin la corrección.

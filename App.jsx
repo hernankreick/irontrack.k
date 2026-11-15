@@ -141,7 +141,9 @@ import {
   resolveAlumnoId,
   resolveEntrenadorId,
   selectCurrentRoutine,
+  rutinaGuardada,
 } from './lib/routineStore.js';
+import { pagoGuardado } from './components/students/pagoAlumno.js';
 import { getActiveStudentRoutinePosition } from './lib/studentWeeklyProgress.js';
 import { updateRutinaSemanaActiva as updateRutinaSemanaActivaLib } from './lib/updateRutinaSemanaActiva.js';
 import { updateRutinaPreservingOperational, withInitialSemanaActiva } from './lib/rutinaOperationalState.js';
@@ -169,8 +171,7 @@ import {
   hydrateProgressFromRows,
   isUuid,
   mergeProgressEntries,
-  updateExerciseKgInRoutines,
-} from './lib/workoutSession.js';
+  updateExerciseKgInRoutines, historialPermiteCelebrarPR } from './lib/workoutSession.js';
 import { postProgressIdempotent } from './lib/progressInsert.js';
 import { serieRegistrable } from './lib/cargaSerie.js';
 import { nuevaCargaFicha, observarCargaFicha, sincronizarVistaFicha, capturarVistaFicha, filasDelAlumno } from './lib/studentFicha.js';
@@ -1725,6 +1726,8 @@ function GymApp() {
       }, 8000);
       (async () => {
         try {
+          // D-04: hasta confirmar un historial completo no se celebran PRs (si la lectura falla, el flag queda en false).
+          historialAlumnoCompletoRef.current = false;
           // FIX A: fetch rutinas and sesiones in parallel
           const [rutsRaw, alumnoRows, progresoRows] = await Promise.all([
             sb.getRutinas(sessionData.alumnoId),
@@ -1732,6 +1735,7 @@ function GymApp() {
             // D7.5: historial completo (forzado: al iniciar sesion siempre se lee de nuevo); queda en cache para Progreso
             // Si no se puede leer, el login sigue igual que antes (rutina, semana, sesiones y pago se cargan; progreso vacio).
             sb.getHistorialProgreso(sessionData.alumnoId, { forzar: true }).then(function (h) {
+              historialAlumnoCompletoRef.current = historialPermiteCelebrarPR(h);
               if (!h || !h.rows) { console.warn("[historial alumno] no se pudo leer el progreso"); return []; }
               if (!h.complete) console.warn("[historial alumno] historial incompleto", h.reason);
               return h.rows;
@@ -2075,6 +2079,8 @@ function GymApp() {
   };
   const syncToastRef = React.useRef(null); syncToastRef.current = toast2;
   const [pendingSyncState, setPendingSyncState] = useState(null);
+  // D-04: false si el historial del alumno no se leyó completo; en ese caso no se celebran PRs (el récord previo sería falso).
+  const historialAlumnoCompletoRef = useRef(true);
   const pendingSyncCtlRef = React.useRef(null);
   if (!pendingSyncCtlRef.current && typeof window !== "undefined") {
     pendingSyncCtlRef.current = createPendingSyncController({
@@ -2198,7 +2204,7 @@ function GymApp() {
     // Detectar PR y celebrar (fuera del setter para tener acceso al scope)
     const exPrevData = progress[exId]||{sets:[],max:0};
     const newPR = calculateNewWeightPR(exPrevData, kg);
-    if(newPR) {
+    if(newPR && historialAlumnoCompletoRef.current !== false) {
       const inf = [...EX,...(customEx||[])].find(e=>e.id===exId);
       const exR = routines.flatMap(r=>r.days||[]).flatMap(d=>[...(d.warmup||[]),...(d.exercises||[])]).find(e=>e.id===exId);
       const nombreEj = resolveExerciseTitle(inf || null, exR || null, es);
@@ -2456,6 +2462,13 @@ function GymApp() {
           if (capCopia && capCopia.ok && isOnline && sincronizarCopiasRef.current) sincronizarCopiasRef.current();
         }
       } catch (eCopia) {}
+      if (inicioPrep.recuperada && nextSession && typeof toast2 === "function") {
+        try {
+          var hRet = new Date(nextSession.startTime);
+          var hhmm = isNaN(hRet.getTime()) ? "" : (" " + (es ? "de las " : "from ") + String(hRet.getHours()).padStart(2, "0") + ":" + String(hRet.getMinutes()).padStart(2, "0"));
+          toast2(es ? "Retomamos tu entrenamiento" + hhmm + ". Lo ya registrado sigue guardado." : "Resumed your workout" + hhmm + ". Everything you logged is still saved.");
+        } catch (eRet) {}
+      }
       setSession(nextSession);
     };
     var check = checkCicloAlumnoRef.current;
@@ -4366,7 +4379,7 @@ function GymApp() {
                 const updatedDays = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rActual.days));
                 updateRutinaRowsLocal(rActual.id, updatedDays);
                 const payload={nombre:rActual.name,alumno_id:rActual.alumno_id||null,datos:{days:updatedDays,alumno:rActual.alumno||"",note:rActual.note||""},entrenador_id:rActual.entrenador_id,es_plantilla:!!rActual.es_plantilla};
-                if(rActual.saved){ await sb.updateRutina(rActual.id,payload); }
+                if(rActual.saved){ if(!rutinaGuardada(await sb.updateRutina(rActual.id,payload))) throw new Error("updateRutina sin confirmar"); }
                 else { const res = await sb.createRutina(payload); if(res&&res[0]){setRoutines(p=>p.map(r=>r.id===rActual.id?{...r,id:res[0].id,saved:true}:r));} }
               } else {
                 // Buscar en rutinasSB (edición desde vista alumno)
@@ -4375,10 +4388,10 @@ function GymApp() {
                   const diasActualizados = sanitizeRoutineDaysForWrite(replaceExerciseInDays(rSB.datos?.days||[]));
                   const payloadSB = {nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasActualizados},entrenador_id:rSB.entrenador_id,es_plantilla:!!rSB.es_plantilla};
                   updateRutinaRowsLocal(rSB.id, diasActualizados);
-                  await sb.updateRutina(rSB.id, payloadSB);
+                  if(!rutinaGuardada(await sb.updateRutina(rSB.id, payloadSB))) throw new Error("updateRutina sin confirmar");
                 }
               }
-              setEditEx(null);toast2("Guardado âœ“");
+              setEditEx(null);toast2(msg("Guardado ✓","Saved ✓"));
             } catch(e){ console.error("Auto-save error:",e); toast2(msg("Error al guardar", "Could not save")); }
           },
           onClose: ()=>setEditEx(null),
@@ -4502,11 +4515,12 @@ function GymApp() {
           green={green}
           msg={msg}
           onClose={()=>setAliasModal(false)}
-          onSave={() => { sb.saveConfig(aliasForm).then(()=>{
+          onSave={() => { sb.saveConfig(aliasForm).then((res)=>{
+            if(!pagoGuardado(res)) throw new Error("saveConfig sin confirmar");
             setAliasData(aliasForm);
             setAliasModal(false);
             toast2(msg("Datos de pago guardados ✓", "Payment info saved ✓"));
-          }).catch(()=>toast2("Error al guardar")); }}
+          }).catch(()=>toast2(msg("Error al guardar", "Could not save"))); }}
         />
       )}
       <AddExerciseModal
@@ -4564,17 +4578,19 @@ function GymApp() {
             })};
           });});
           var rSB=rutinasSB.find(function(x){return x.id===rId;});
+          var addBatchFailed=false;
           if(rSB){
             try{
               var diasAct=sanitizeRoutineDaysForWrite((rSB.datos&&rSB.datos.days?rSB.datos.days:[]).map(function(d,i){
                 if(i!==dIdx) return d;
                 return {...d,[blk]:[...(d[blk]||[]),...newExs]};
               }));
-              await sb.updateRutina(rSB.id,{nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:rSB.entrenador_id});
+              var addRes=await sb.updateRutina(rSB.id,{nombre:rSB.nombre,alumno_id:rSB.alumno_id,datos:{...rSB.datos,days:diasAct},entrenador_id:rSB.entrenador_id,es_plantilla:!!rSB.es_plantilla});
+              if(!rutinaGuardada(addRes)) throw new Error("updateRutina sin confirmar");
               setRutinasSB(function(prev){return prev.map(function(rw){return rw.id===rSB.id?{...rw,datos:{...rw.datos,days:diasAct}}:rw;});});
-            }catch(e){console.error("Add batch save error:",e);}
+            }catch(e){console.error("Add batch save error:",e);addBatchFailed=true;}
           }
-          toast2((msg("Agregados ", "Added "))+newExs.length+(msg(" ejercicios", " exercises")));
+          toast2(addBatchFailed?msg("Se agregaron en pantalla, pero no se pudo guardar. Reintentá guardar la rutina.","Added on screen, but could not be saved. Try saving the routine again."):(msg("Agregados ", "Added "))+newExs.length+(msg(" ejercicios", " exercises")));
           setAddExModal(null);
           setAddExSelectedIds([]);
         }}

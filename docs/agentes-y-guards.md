@@ -39,3 +39,6 @@ Existe `.claude/authorization/fix.json` local con `approved_by_user: true`, id `
 
 ## Orquestador
 Ver `.claude/ORQUESTADOR.md`. Se invoca con `claude --agent irontrack-orchestrator`.
+
+## Política permanente de QA autónomo
+Vive en `CLAUDE.md` (sección «Política permanente de QA autónomo», la que cargan todos los agentes); cada agente la referencia con un bloque corto en su archivo de `.claude/agents/`. No añade permisos ni agentes y no relaja ningún bloqueo: define qué debe probar el agente antes de entregar (reproducir, regresión que falla sin la corrección, toques reales a 375/390/430/768 px, fallos de red/latencia/`null`/`[]`), el informe obligatorio (aprobadas / fallidas / no ejecutadas / limitaciones / requiere dispositivo físico) y qué decide el dueño. `scripts/test-politicaQaAutonomo.mjs` impide que se pierda de `CLAUDE.md`, de los agentes o del CI.

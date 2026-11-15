@@ -108,3 +108,53 @@ jobs:
             exit 1
           fi
           rm -rf dist-prod-neg
+
+  # QA de flujos criticos con datos ficticios (demo/qa-pr194.html): reordenamiento de ejercicios, guardado (exito / red / nulo / vacio /
+  # latencia / doble toque), decimales, modales y aislamiento (sin red, sin almacenamiento real). Job aparte: no alarga test-and-build.
+  # Chromium: gestos tactiles reales (CDP). WebKit (motor de Safari de escritorio): sin CDP, asi que las pruebas tactiles se informan como
+  # "no ejecutadas"; NO equivale a Safari en un iPhone real. Playwright no es dependencia del proyecto: se instala fuera del repo.
+  qa-demo:
+    name: qa-demo (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    env:
+      # Valores ficticios: nunca se conecta a servicios reales.
+      VITE_SUPABASE_URL: https://example.invalid
+      VITE_SUPABASE_ANON_KEY: ci-dummy-anon-key
+      PLAYWRIGHT_VERSION: "1.63.0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Instalar Playwright fuera del proyecto
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw"
+          npm install --prefix "$RUNNER_TEMP/pw" --no-save --no-audit --no-fund "playwright@${PLAYWRIGHT_VERSION}"
+          node "$RUNNER_TEMP/pw/node_modules/playwright/cli.js" install --with-deps ${{ matrix.browser }}
+
+      - name: QA de flujos criticos (${{ matrix.browser }})
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/pw/node_modules/playwright
+        run: node scripts/qa/qa-pr194.mjs --out qa-out --browser ${{ matrix.browser }}
+
+      - name: Capturas y resumen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-demo-${{ matrix.browser }}
+          path: qa-out
+          if-no-files-found: ignore
+          retention-days: 7

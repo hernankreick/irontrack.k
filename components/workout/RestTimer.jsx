@@ -64,7 +64,7 @@ export default function RestTimer({
         className="hov"
         onClick={onSkip}
         style={{
-          padding:"10px 28px", borderRadius:12,
+          padding:"10px 28px", minHeight:44, borderRadius:12,
           background:"transparent", border:`1px solid ${border2}`,
           color:textMain, fontSize:13, fontWeight:700,
           fontFamily:"inherit", cursor:"pointer",

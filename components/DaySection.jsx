@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
-  DndContext, PointerSensor, useSensor, useSensors, DragOverlay, pointerWithin,
+  DndContext, MouseSensor, TouchSensor, KeyboardSensor, useSensor, useSensors, DragOverlay, pointerWithin, closestCenter,
 } from '@dnd-kit/core';
 import {
-  SortableContext, verticalListSortingStrategy, arrayMove,
+  SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import { Copy, Trash2, Plus, Pencil } from 'lucide-react';
 import { ExerciseCard } from './ExerciseCard.jsx';
@@ -37,15 +38,33 @@ function SortableBlock({
   const T = isUnder768 ? coachTypeMobile : coachType;
   const S = isUnder768 ? coachSpaceMobile : coachSpace;
   const [activeId, setActiveId] = useState(null);
+  const blockRef = useRef(null);
 
+  // Mouse: arrastre inmediato tras 5 px. Táctil: pulsación sostenida (250 ms, tolerancia 8 px) para que deslizar el dedo sobre el asa sea
+  // SCROLL y no mueva ejercicios por accidente (antes el asa bloqueaba el scroll y un roce de 5 px ya arrastraba). Teclado: Espacio + flechas.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  // pointerWithin necesita coordenadas del puntero: con el teclado no existen, así que se usa el centro más cercano.
+  const collision = (args) => (args.pointerCoordinates ? pointerWithin(args) : closestCenter(args));
+  const moveBy = (exId, dir) => {
+    const i = exercises.findIndex((e) => e.id === exId);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= exercises.length) return;
+    onReorderBlock(arrayMove(exercises, i, j));
+  };
+  // El overlay del arrastre es position:fixed: se monta dentro de .it-routines-root (conserva las variables de tema) y fuera de la tarjeta.
+  const [overlayHost, setOverlayHost] = useState(null);
+  useLayoutEffect(() => {
+    if (blockRef.current) setOverlayHost(blockRef.current.closest('.it-routines-root') || document.body);
+  }, []);
 
   const activeExercise = activeId ? exercises.find(e => e.id === activeId) : null;
 
   return (
-    <div style={{
+    <div ref={blockRef} style={{
       background: 'var(--block-bg)',
       border: '1px solid var(--card-border)',
       borderRadius: 'var(--radius-card)',
@@ -84,7 +103,12 @@ function SortableBlock({
       {/* Sortable exercises */}
       <DndContext
         sensors={sensors}
-        collisionDetection={pointerWithin}
+        collisionDetection={collision}
+        // Auto-scroll: el valor por defecto de dnd-kit activa el scroll cuando el dedo entra en el 20 % inferior/superior de la pantalla. En un
+        // iPhone eso es casi toda la mitad de abajo de la lista (y la barra fija «Guardar cambios»): la página se desplazaba bajo el dedo
+        // mientras se arrastraba y el soltado caía en otro lugar (o no reordenaba). Se reduce la zona a 12 % y la velocidad.
+        autoScroll={{ threshold: { x: 0, y: 0.12 }, acceleration: 6 }}
+        onDragCancel={() => setActiveId(null)}
         onDragStart={({ active }) => setActiveId(active.id)}
         onDragEnd={({ active, over }) => {
           setActiveId(null);
@@ -103,24 +127,32 @@ function SortableBlock({
               key={ex.id}
               exercise={ex}
               onEdit={onEditExercise}
-              onDelete={onDeleteExercise}
+              onDelete={(exId) => onDeleteExercise(exId, blockKey)}
+              onMove={moveBy}
+              canMoveUp={exercises.indexOf(ex) > 0}
+              canMoveDown={exercises.indexOf(ex) < exercises.length - 1}
               lang={lang}
               isUnder768={isUnder768}
             />
           ))}
         </SortableContext>
 
-        <DragOverlay>
-          {activeExercise ? (
-            <ExerciseCard
-              exercise={activeExercise}
-              onEdit={() => {}}
-              onDelete={() => {}}
-              lang={lang}
-              isUnder768={isUnder768}
-            />
-          ) : null}
-        </DragOverlay>
+        {(() => {
+          const overlay = (
+            <DragOverlay>
+              {activeExercise ? (
+                <ExerciseCard
+                  exercise={activeExercise}
+                  onEdit={() => {}}
+                  onDelete={() => {}}
+                  lang={lang}
+                  isUnder768={isUnder768}
+                />
+              ) : null}
+            </DragOverlay>
+          );
+          return overlayHost ? createPortal(overlay, overlayHost) : null;
+        })()}
       </DndContext>
 
       {/* Add button */}

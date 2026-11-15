@@ -98,7 +98,9 @@
 }
 
 .routines-card-enter {
-  animation: it-routine-card-enter var(--it-r-enter-dur) var(--it-r-ease) both;
+  /* backwards (no both): tras la entrada la tarjeta NO conserva `transform` (translateY(0) permanente la volvia el bloque contenedor de todo
+     position:fixed descendiente: el overlay del arrastre de ejercicios aparecia desplazado respecto del dedo). */
+  animation: it-routine-card-enter var(--it-r-enter-dur) var(--it-r-ease) backwards;
   animation-delay: var(--stagger-delay, 0ms);
 }
 

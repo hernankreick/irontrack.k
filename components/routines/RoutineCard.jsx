@@ -6,6 +6,7 @@ import { DaySection } from '../DaySection.jsx';
 import { resolveExerciseTitle, pickVideoUrl, sanitizeRoutineDaysForWrite } from '../../lib/exerciseResolve.js';
 import { coachType, coachSpace, coachTypeMobile, coachSpaceMobile } from '../coachUiScale.js';
 import { irontrackMsg as M } from '../../lib/irontrackMsg.js';
+import { rutinaGuardada } from '../../lib/routineStore.js';
 import { toTitleCase, initialsOf } from '../../lib/textFormat.js';
 import RoutineCardActionMenu from './RoutineCardActionMenu.jsx';
 import RoutineDeleteConfirmModals from './RoutineDeleteConfirmModals.jsx';
@@ -358,7 +359,8 @@ export function RoutineCard({
       };
 
       if (isSaved) {
-        await sb.updateRutina(currentId, primaryPayload);
+        var upd = await sb.updateRutina(currentId, primaryPayload);
+        if (!rutinaGuardada(upd)) throw new Error('updateRutina sin confirmar');
         setRoutines(function (p) {
           return p.map(function (rr) {
             return String(rr.id) === String(currentId)
@@ -937,7 +939,10 @@ export function RoutineCard({
                     exercise,
                   });
                 }}
-                onDeleteExercise={(exerciseId) => {
+                onDeleteExercise={(exerciseId, blockKey) => {
+                  // Solo el bloque indicado: el mismo ejercicio puede estar en calentamiento y en el principal.
+                  const delWarmup = blockKey !== 'exercises';
+                  const delMain = blockKey !== 'warmup';
                   setRoutines((p) =>
                     p.map((rr) =>
                       rr.id !== r.id
@@ -949,8 +954,8 @@ export function RoutineCard({
                                 ? dd
                                 : {
                                     ...dd,
-                                    warmup: (dd.warmup || []).filter((ex) => ex.id !== exerciseId),
-                                    exercises: (dd.exercises || []).filter((ex) => ex.id !== exerciseId),
+                                    warmup: delWarmup ? (dd.warmup || []).filter((ex) => ex.id !== exerciseId) : dd.warmup,
+                                    exercises: delMain ? (dd.exercises || []).filter((ex) => ex.id !== exerciseId) : dd.exercises,
                                   }
                             ),
                           }
@@ -958,53 +963,41 @@ export function RoutineCard({
                   );
                   setHasUnsaved(true);
                 }}
-                onReorderWarmup={async (newList) => {
-                  let savedDays;
+                onReorderWarmup={(newList) => {
+                  // Solo estado local + "sin guardar". La escritura la hace Guardar (barra o tarjeta):
+                  // antes se escribía al instante con `days` calculado dentro del updater de setState
+                  // (podía ser undefined y borrar `days` de la fila) y sin confirmar el resultado.
                   setRoutines((p) =>
-                    p.map((rr) => {
-                      if (rr.id !== r.id) return rr;
-                      savedDays = rr.days.map((dd, ddi) =>
-                        ddi !== di ? dd : { ...dd, warmup: newList }
-                      );
-                      return { ...rr, days: savedDays };
-                    })
+                    p.map((rr) =>
+                      rr.id !== r.id
+                        ? rr
+                        : {
+                            ...rr,
+                            days: rr.days.map((dd, ddi) =>
+                              ddi !== di ? dd : { ...dd, warmup: newList }
+                            ),
+                          }
+                    )
                   );
                   setHasUnsaved(true);
-                  if (r.saved && sb) {
-
-                    try {
-                      await sb.updateRutina(r.id, {
-                        nombre: r.name,
-                        alumno_id: r.alumno_id || null,
-                        datos: { days: sanitizeRoutineDaysForWrite(savedDays), alumno: r.alumno || '', note: r.note || '' },
-                        entrenador_id: 'entrenador_principal',
-                      });
-                    } catch (e) { console.error('[onReorderWarmup] persist error', e); }
-                  }
                 }}
-                onReorderExercises={async (newList) => {
-                  let savedDays;
+                onReorderExercises={(newList) => {
+                  // Solo estado local + "sin guardar". La escritura la hace Guardar (barra o tarjeta):
+                  // antes se escribía al instante con `days` calculado dentro del updater de setState
+                  // (podía ser undefined y borrar `days` de la fila) y sin confirmar el resultado.
                   setRoutines((p) =>
-                    p.map((rr) => {
-                      if (rr.id !== r.id) return rr;
-                      savedDays = rr.days.map((dd, ddi) =>
-                        ddi !== di ? dd : { ...dd, exercises: newList }
-                      );
-                      return { ...rr, days: savedDays };
-                    })
+                    p.map((rr) =>
+                      rr.id !== r.id
+                        ? rr
+                        : {
+                            ...rr,
+                            days: rr.days.map((dd, ddi) =>
+                              ddi !== di ? dd : { ...dd, exercises: newList }
+                            ),
+                          }
+                    )
                   );
                   setHasUnsaved(true);
-                  if (r.saved && sb) {
-
-                    try {
-                      await sb.updateRutina(r.id, {
-                        nombre: r.name,
-                        alumno_id: r.alumno_id || null,
-                        datos: { days: sanitizeRoutineDaysForWrite(savedDays), alumno: r.alumno || '', note: r.note || '' },
-                        entrenador_id: 'entrenador_principal',
-                      });
-                    } catch (e) { console.error('[onReorderExercises] persist error', e); }
-                  }
                 }}
               />
             );

@@ -48,6 +48,12 @@ export default function WorkoutSessionSummary({
         </div>
       ) : null}
 
+      {resumenSesion.pendientesSync > 0 ? (
+        <div role="status" style={{marginTop:14,padding:"10px 12px",borderRadius:12,border:"1px solid rgba(245,158,11,0.35)",background:"rgba(245,158,11,0.10)",color:"#F59E0B",fontSize:13,fontWeight:650,lineHeight:1.4}}>
+          {msg("Sesión guardada. Quedan " + resumenSesion.pendientesSync + " series por sincronizar: se envían solas cuando haya conexión.", "Workout saved. " + resumenSesion.pendientesSync + " sets are still syncing: they will be sent automatically when you are online.")}
+        </div>
+      ) : null}
+
       {resumenSesion.weekAdvanceFailed ? (
         <div role="status" style={{marginTop:14,padding:"10px 12px",borderRadius:12,border:"1px solid rgba(245,158,11,0.35)",background:"rgba(245,158,11,0.10)",color:"#F59E0B",fontSize:13,fontWeight:650,lineHeight:1.4}}>
           {msg("Sesión guardada. No se pudo avanzar de semana.", "Workout saved. Could not advance to the next week.")}

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useMemo, useCallback } from 'react';
 import { EditExerciseModal } from './EditExerciseModal.jsx';
 import { emptyDays } from '../lib/routineTemplates.js';
+import { rutinaGuardada } from '../lib/routineStore.js';
 import { sanitizeExerciseSnapshotForWrite, sanitizeRoutineDaysForWrite } from '../lib/exerciseResolve.js';
 import { coachType as T, coachSpace as S } from './coachUiScale.js';
 import { irontrackMsg as M } from '../lib/irontrackMsg.js';
@@ -47,6 +48,8 @@ export function RutinaView(props) {
   const [editingExercise, setEditingExercise] = useState(null);
   const contentRef = useRef(null);
   const baselineRef = useRef(null);
+  const savingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
   /** Alinea la barra fija al ancho real de la columna (shell coach desktop). */
   const [saveBarBox, setSaveBarBox] = useState({ left: 0, width: null });
 
@@ -166,7 +169,20 @@ export function RutinaView(props) {
     setAddExSelectedIds([]);
   };
 
+  // Candado síncrono: un segundo toque durante el guardado no debe repetir createRutina (duplicaba rutinas).
   const handleSaveAll = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await handleSaveAllInner();
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAllInner = async () => {
     if (!hasUnsaved) return;
     if (!sb) {
       toast2(M(lang, 'Error al guardar', 'Could not save', 'Erro ao salvar'));
@@ -185,7 +201,8 @@ export function RutinaView(props) {
           es_plantilla: !!r.es_plantilla,
         };
         if (r.saved) {
-          await sb.updateRutina(r.id, payload);
+          const upd = await sb.updateRutina(r.id, payload);
+          if (!rutinaGuardada(upd)) throw new Error('updateRutina sin confirmar');
         } else {
           const res = await sb.createRutina(
             Object.assign({}, payload, { fecha_inicio: fechaInicio })
@@ -456,6 +473,7 @@ export function RutinaView(props) {
         onDiscard={requestDiscardUnsaved}
         saveBarBox={saveBarBox}
         desktopCoachStableLayout={desktopCoachStableLayout}
+        saving={saving}
       />
 
       <DeleteConfirmModal
