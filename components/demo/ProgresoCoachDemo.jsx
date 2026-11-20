@@ -5,6 +5,7 @@ import { IronTrackI18nProvider } from '../../contexts/IronTrackI18nContext.jsx';
 import { getAppThemeTokens } from '../../lib/appThemeTokens.js';
 import { alumnosPaleta } from '../students/alumnosPaleta.js';
 import { buildProgresoDemoData, compararVolumenDemo, VOL_ALUMNO_ID } from './progresoCoachDemoData.js';
+import { buildVolumenPatronDemoData } from './volumenPatronDemoData.js';
 
 /**
  * Demostración de Progreso del entrenador con el componente REAL (ProgresoView y sus tarjetas, hojas y gráficos) y datos
@@ -26,10 +27,15 @@ export default function ProgresoCoachDemo() {
   const volumen = React.useMemo(function () {
     try { return new URLSearchParams(window.location.search).get('volumen') === 'comparar'; } catch (e) { return false; }
   }, []);
+  // ?patron=historial: dos alumnos con rutinas anteriores y ciclos para probar «Volumen por patrón» por rutina y semana (solo lectura de la URL).
+  const patron = React.useMemo(function () {
+    try { return new URLSearchParams(window.location.search).get('patron') === 'historial'; } catch (e) { return false; }
+  }, []);
   const data = React.useMemo(function () {
+    if (patron) return buildVolumenPatronDemoData();
     const d = buildProgresoDemoData({ incompleto: incompleto, volumen: volumen });
     return vacio ? Object.assign({}, d, { sesionesGlobales: [], progresoGlobal: {} }) : d;
-  }, [incompleto, vacio, volumen]);
+  }, [incompleto, vacio, volumen, patron]);
   const comparacion = React.useMemo(function () {
     return volumen ? { hoy: compararVolumenDemo(data, 0), previa: compararVolumenDemo(data, 7) } : null;
   }, [volumen, data]);
@@ -74,7 +80,7 @@ export default function ProgresoCoachDemo() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 12px 6px 16px', minHeight: 56, boxSizing: 'border-box' }}>
             <span style={{ flex: 'none', fontSize: 12, fontWeight: 800, letterSpacing: 0.6, color: '#0f172a', background: '#f59e0b', borderRadius: 6, padding: '2px 8px' }}>DEMO</span>
             <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: bannerText, lineHeight: 1.3 }}>
-              Progreso del entrenador · datos ficticios · no se guarda nada{incompleto ? ' · historial incompleto simulado' : ''}{vacio ? ' · sin sesiones simulado' : ''}
+              Progreso del entrenador · datos ficticios · no se guarda nada{incompleto ? ' · historial incompleto simulado' : ''}{vacio ? ' · sin sesiones simulado' : ''}{patron ? ' · volumen por patrón por rutina y semana' : ''}
             </span>
             <button
               type="button"
