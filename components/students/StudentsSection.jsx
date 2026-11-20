@@ -3,6 +3,7 @@ import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
 import { getActiveStudentRoutinePosition } from '../../lib/studentWeeklyProgress.js';
+import { semanaSubtitulo } from './semanaSubtitulo.js';
 import { CICLO_CARGAS, readCicloBase, readCicloCargas, rowCiclo } from '../../lib/rutinaCiclo.js';
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
@@ -395,12 +396,8 @@ export default function StudentsSection(props) {
               const semanaCiclo = weeklyProgress ? weeklyProgress.weekNumber : 1;
               const semanaIdx = weeklyProgress ? weeklyProgress.weekIndex : 0;
               const diasCompletados = weeklyProgress ? weeklyProgress.completedDays : 0;
-              const hoyDate = new Date();
-              const inicioSemana = new Date(hoyDate);
-              inicioSemana.setDate(hoyDate.getDate() - ((hoyDate.getDay()+6)%7));
-              const finSemana = new Date(inicioSemana);
-              finSemana.setDate(inicioSemana.getDate() + 6);
-              const semCalLabel = inicioSemana.getDate() + "/" + (inicioSemana.getMonth()+1) + " — " + finSemana.getDate() + "/" + (finSemana.getMonth()+1);
+              // Subtitulo de "Semana N de 4": la semana avanza por progreso (semana_activa), no por calendario (ver semanaSubtitulo.js).
+              const semCalLabel = semanaSubtitulo(weeklyProgress, msg);
               const pctBar = weeklyProgress ? weeklyProgress.pct : 0;
               const diSel = dias.length ? Math.min(coachRoutineDiaIdx, Math.max(0, dias.length - 1)) : 0;
               const dSel = dias[diSel] || { warmup: [], exercises: [], label: "" };
