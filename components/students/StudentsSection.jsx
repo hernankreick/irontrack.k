@@ -2,7 +2,8 @@ import { loadAlumnoFicha, nuevaCargaFicha, filasDelAlumno } from "../../lib/stud
 import React from 'react';
 import { Ic } from '../Ic.jsx';
 import { resolveExerciseTitle } from '../../lib/exerciseResolve.js';
-import { getActiveStudentRoutinePosition, parseLocalDateMs } from '../../lib/studentWeeklyProgress.js';
+import { getActiveStudentRoutinePosition } from '../../lib/studentWeeklyProgress.js';
+import { semanaSubtitulo } from './semanaSubtitulo.js';
 import { CICLO_CARGAS, readCicloBase, readCicloCargas, rowCiclo } from '../../lib/rutinaCiclo.js';
 import StudentCard from './StudentCard.jsx';
 import StudentDetailPanel from './StudentDetailPanel.jsx';
@@ -395,17 +396,8 @@ export default function StudentsSection(props) {
               const semanaCiclo = weeklyProgress ? weeklyProgress.weekNumber : 1;
               const semanaIdx = weeklyProgress ? weeklyProgress.weekIndex : 0;
               const diasCompletados = weeklyProgress ? weeklyProgress.completedDays : 0;
-              // Subtitulo de "Semana N de 4": la semana avanza por PROGRESO (semana_activa), no por calendario, asi que no lleva un rango de
-              // fechas fijo. Muestra cuando se inicio esa semana (primera sesion registrada) o "Sin iniciar" si todavia no hay ninguna.
-              const semInicioMs = (function () {
-                const used = weeklyProgress && Array.isArray(weeklyProgress.sessionsUsed) ? weeklyProgress.sessionsUsed : [];
-                const times = used.map(function (x) { return parseLocalDateMs(x && (x.created_at || x.fecha)); }).filter(function (t) { return t != null; });
-                return times.length ? Math.min.apply(null, times) : null;
-              })();
-              const semCalLabel = !weeklyProgress ? ""
-                : semInicioMs != null ? msg("Iniciada el ", "Started ") + new Date(semInicioMs).getDate() + "/" + (new Date(semInicioMs).getMonth() + 1)
-                : diasCompletados === 0 ? msg("Sin iniciar", "Not started")
-                : "";
+              // Subtitulo de "Semana N de 4": la semana avanza por progreso (semana_activa), no por calendario (ver semanaSubtitulo.js).
+              const semCalLabel = semanaSubtitulo(weeklyProgress, msg);
               const pctBar = weeklyProgress ? weeklyProgress.pct : 0;
               const diSel = dias.length ? Math.min(coachRoutineDiaIdx, Math.max(0, dias.length - 1)) : 0;
               const dSel = dias[diSel] || { warmup: [], exercises: [], label: "" };
