@@ -591,6 +591,14 @@ function GymApp() {
   const [loginPass, setLoginPass] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [showLoginPass, setShowLoginPass] = useState(false);
+  const [loginShake, setLoginShake] = useState(false);
+  useEffect(()=>{
+    if(!loginError) return;
+    setLoginShake(true);
+    const t=setTimeout(()=>setLoginShake(false),320);
+    return ()=>clearTimeout(t);
+  },[loginError]);
   /** Evita mostrar onboarding/login hasta leer `it_session` / flags en localStorage (post-login, refresh). */
   const [authLoading, setAuthLoading] = useState(function () { return !sharedParam; });
   /** Splash de marca: una vez por pestaña (sessionStorage), no en enlaces ?r= */
@@ -2726,6 +2734,122 @@ function GymApp() {
     </>
   );
 
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true); setLoginError("");
+    try {
+      const sp = typeof window!=="undefined"?(localStorage.getItem("it_tpass")||"irontrack2024"):"irontrack2024";
+      const loginEmailNorm = loginEmail.trim().toLowerCase();
+      const isEntrenador = loginEmailNorm==="entrenador@irontrack.app";
+      if(isEntrenador){
+        if(loginEmailNorm==="entrenador@irontrack.app"&&loginPass===sp){
+          if (!supabase) {
+            console.error("[AUTH] Supabase client no inicializado");
+            setLoginError("No se pudo iniciar sesión con Supabase");
+            return;
+          }
+          var authLogin = await supabase.auth.signInWithPassword({
+            email: loginEmailNorm,
+            password: loginPass,
+          });
+          if (authLogin.error || !authLogin.data || !authLogin.data.session) {
+            console.error("[AUTH] signInWithPassword fallo; intentando migracion segura", authLogin.error || authLogin);
+            var authSignup = await supabase.auth.signUp({
+              email: loginEmailNorm,
+              password: loginPass,
+              options: {
+                data: { nombre: "Entrenador", role: "entrenador" },
+              },
+            });
+            if (authSignup.error) {
+              console.error("[AUTH] signUp migracion fallo", authSignup.error);
+              setLoginError("No se pudo crear tu usuario en Supabase Auth. Revisá la consola para ver el error real.");
+              return;
+            }
+            if (authSignup.data && authSignup.data.session) {
+              authLogin = authSignup;
+            } else if (authSignup.data && authSignup.data.user && !authSignup.data.session) {
+              console.error("[AUTH] Usuario creado sin sesión activa; Supabase requiere confirmar email", authSignup.data.user);
+              setLoginError("El usuario fue creado, pero Supabase requiere confirmar email. Desactivá Confirm email en Supabase Auth o confirmá el usuario manualmente.");
+              return;
+            } else {
+              console.error("[AUTH] signUp no devolvio usuario ni sesion", authSignup);
+              setLoginError("No se pudo crear una sesión de Supabase Auth. Revisá la consola para ver el error real.");
+              return;
+            }
+          }
+          if (!authLogin.data || !authLogin.data.session || !authLogin.data.session.access_token || !authLogin.data.user || !authLogin.data.user.id) {
+            console.error("[AUTH] No hay sesión activa", authLogin.error || authLogin);
+            setLoginError("No se pudo iniciar sesión con Supabase Auth. Revisá la consola para ver el error real.");
+            return;
+          }
+          clearIronTrackStorageForNewLogin();
+          var demoName = "Entrenador";
+          var hasCoachRowName = false;
+          try {
+            var coachRow = await supabase
+              .from('entrenadores')
+              .select('nombre')
+              .eq('id', String(authLogin.data.user.id))
+              .maybeSingle();
+            if (!coachRow.error && coachRow.data && typeof coachRow.data.nombre === "string" && coachRow.data.nombre.trim()) {
+              demoName = coachRow.data.nombre.trim();
+              hasCoachRowName = true;
+            }
+          } catch (eCoachName) {
+            console.error("[AUTH] entrenadores nombre select exception", eCoachName);
+          }
+          try {
+            var cpl = localStorage.getItem("it_coach_profile_local");
+            if (cpl) {
+              var cpj = JSON.parse(cpl);
+              if (!hasCoachRowName && cpj && typeof cpj.name === "string" && cpj.name.trim()) demoName = cpj.name.trim();
+            }
+          } catch (e) {}
+          try {
+            var upCoach = await supabase
+              .from('entrenadores')
+              .upsert({ id: String(authLogin.data.user.id), email: authLogin.data.user.email || loginEmailNorm }, { onConflict: 'id' });
+            if (upCoach.error) console.error("[AUTH] entrenadores upsert migracion fallo", upCoach.error);
+          } catch (eUpCoach) {
+            console.error("[AUTH] entrenadores upsert migracion exception", eUpCoach);
+          }
+          const s={role:"entrenador",name: demoName,email:authLogin.data.user.email||loginEmailNorm,entrenadorId:String(authLogin.data.user.id)};
+          localStorage.setItem("it_session",JSON.stringify(s));
+          syncStateWithLocalStorage();
+          setLoginEmail("");
+          setLoginPass("");
+        } else setLoginError("Email o contraseña incorrectos");
+      } else {
+        const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmail)+"&password=eq."+encodeURIComponent(loginPass)+"&select=*");
+        if(res&&res.length>0){
+          const alumno=res[0];
+          const rutsRaw=await sb.getRutinas(alumno.id);
+          const ruts=(rutsRaw || []).slice().sort(function(a,b){return new Date(b.created_at||0)-new Date(a.created_at||0);}).slice(0,1);
+          clearIronTrackStorageForNewLogin();
+          const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id,entrenadorId:alumno.entrenador_id};
+          localStorage.setItem("it_session",JSON.stringify(s));
+          localStorage.setItem("it_show_welcome","1");
+          if(ruts&&ruts[0]) localStorage.setItem("it_rt",JSON.stringify([{...ruts[0].datos,alumnoId:alumno.id}]));
+          // Registrar OneSignal
+          try {
+            window.OneSignalDeferred = window.OneSignalDeferred || [];
+            window.OneSignalDeferred.push(async function(OS) {
+              await OS.init({ appId: "8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7", allowLocalhostAsSecureOrigin: true });
+              const pid = OS.User?.PushSubscription?.id;
+              if(pid) await sbFetch("alumnos?id=eq."+alumno.id,"PATCH",{onesignal_id:pid});
+            });
+          } catch(e) {}
+          syncStateWithLocalStorage();
+          setLoginEmail("");
+          setLoginPass("");
+        } else setLoginError("Email o contraseña incorrectos");
+      }
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
   if (!sharedParam && !hasAppSession && loginScreen) return (
     <>
       {brandSplashEl}
@@ -2744,131 +2868,29 @@ function GymApp() {
       </div>
       <div style={{maxWidth:420,width:"100%",background:"rgba(255,255,255,0.04)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:16,padding:"24px",border:"1px solid rgba(255,255,255,0.08)",boxSizing:"border-box"}}>
 
+        <style>{`
+          @keyframes itLoginShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 50%{transform:translateX(5px)} 75%{transform:translateX(-3px)} }
+          .it-login-form.login-shake { animation: itLoginShake .32s ease; }
+          .it-login-form input:focus-visible { outline: 2px solid rgba(37,99,235,.7); outline-offset: 1px; }
+          .it-login-form button:focus-visible { outline: 2px solid rgba(37,99,235,.7); outline-offset: 2px; }
+        `}</style>
+        <form className={"it-login-form"+(loginShake?" login-shake":"")} onSubmit={handleLoginSubmit} noValidate>
         <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4}}>EMAIL</div>
-          <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder="tu@email.com" type="email"/>
+          <label htmlFor="login-email" style={{display:"block",fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4}}>EMAIL</label>
+          <input id="login-email" style={{background:bgSub,color:textMain,border:"1px solid "+(loginError?"#EF4444":border),borderRadius:8,padding:"8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder="tu@email.com" type="email" autoComplete="username" aria-invalid={!!loginError} aria-describedby={loginError?"login-error":undefined}/>
         </div>
         <div style={{marginBottom:loginError?12:20}}>
-          <div style={{fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4}}>CONTRASEÑA</div>
-          <input style={{background:bgSub,color:textMain,border:"1px solid "+border,borderRadius:8,padding:"8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginPass} onChange={e=>setLoginPass(e.target.value)} placeholder="••••••••" type="password"/>
+          <label htmlFor="login-pass" style={{display:"block",fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4}}>{msg("CONTRASEÑA","PASSWORD")}</label>
+          <div style={{position:"relative"}}>
+            <input id="login-pass" style={{background:bgSub,color:textMain,border:"1px solid "+(loginError?"#EF4444":border),borderRadius:8,padding:"8px 36px 8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginPass} onChange={e=>setLoginPass(e.target.value)} placeholder="••••••••" type={showLoginPass?"text":"password"} autoComplete="current-password" aria-invalid={!!loginError} aria-describedby={loginError?"login-error":undefined}/>
+            <button type="button" onClick={()=>setShowLoginPass(s=>!s)} aria-label={showLoginPass?msg("Ocultar contraseña","Hide password"):msg("Mostrar contraseña","Show password")} style={{position:"absolute",right:4,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,padding:6,lineHeight:1,color:textMuted}}>{showLoginPass?"🙈":"👁"}</button>
+          </div>
         </div>
-        {loginError&&<div style={{color:"#2563EB",fontSize:13,marginBottom:12,textAlign:"center"}}>{loginError}</div>}
-        <button style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:"pointer",letterSpacing:1}} onClick={async ()=>{
-          setLoginLoading(true); setLoginError("");
-          try {
-            const sp = typeof window!=="undefined"?(localStorage.getItem("it_tpass")||"irontrack2024"):"irontrack2024";
-            const loginEmailNorm = loginEmail.trim().toLowerCase();
-            const isEntrenador = loginEmailNorm==="entrenador@irontrack.app";
-            if(isEntrenador){
-              if(loginEmailNorm==="entrenador@irontrack.app"&&loginPass===sp){
-                if (!supabase) {
-                  console.error("[AUTH] Supabase client no inicializado");
-                  setLoginError("No se pudo iniciar sesión con Supabase");
-                  return;
-                }
-                var authLogin = await supabase.auth.signInWithPassword({
-                  email: loginEmailNorm,
-                  password: loginPass,
-                });
-                if (authLogin.error || !authLogin.data || !authLogin.data.session) {
-                  console.error("[AUTH] signInWithPassword fallo; intentando migracion segura", authLogin.error || authLogin);
-                  var authSignup = await supabase.auth.signUp({
-                    email: loginEmailNorm,
-                    password: loginPass,
-                    options: {
-                      data: { nombre: "Entrenador", role: "entrenador" },
-                    },
-                  });
-                  if (authSignup.error) {
-                    console.error("[AUTH] signUp migracion fallo", authSignup.error);
-                    setLoginError("No se pudo crear tu usuario en Supabase Auth. Revisá la consola para ver el error real.");
-                    return;
-                  }
-                  if (authSignup.data && authSignup.data.session) {
-                    authLogin = authSignup;
-                  } else if (authSignup.data && authSignup.data.user && !authSignup.data.session) {
-                    console.error("[AUTH] Usuario creado sin sesión activa; Supabase requiere confirmar email", authSignup.data.user);
-                    setLoginError("El usuario fue creado, pero Supabase requiere confirmar email. Desactivá Confirm email en Supabase Auth o confirmá el usuario manualmente.");
-                    return;
-                  } else {
-                    console.error("[AUTH] signUp no devolvio usuario ni sesion", authSignup);
-                    setLoginError("No se pudo crear una sesión de Supabase Auth. Revisá la consola para ver el error real.");
-                    return;
-                  }
-                }
-                if (!authLogin.data || !authLogin.data.session || !authLogin.data.session.access_token || !authLogin.data.user || !authLogin.data.user.id) {
-                  console.error("[AUTH] No hay sesión activa", authLogin.error || authLogin);
-                  setLoginError("No se pudo iniciar sesión con Supabase Auth. Revisá la consola para ver el error real.");
-                  return;
-                }
-                clearIronTrackStorageForNewLogin();
-                var demoName = "Entrenador";
-                var hasCoachRowName = false;
-                try {
-                  var coachRow = await supabase
-                    .from('entrenadores')
-                    .select('nombre')
-                    .eq('id', String(authLogin.data.user.id))
-                    .maybeSingle();
-                  if (!coachRow.error && coachRow.data && typeof coachRow.data.nombre === "string" && coachRow.data.nombre.trim()) {
-                    demoName = coachRow.data.nombre.trim();
-                    hasCoachRowName = true;
-                  }
-                } catch (eCoachName) {
-                  console.error("[AUTH] entrenadores nombre select exception", eCoachName);
-                }
-                try {
-                  var cpl = localStorage.getItem("it_coach_profile_local");
-                  if (cpl) {
-                    var cpj = JSON.parse(cpl);
-                    if (!hasCoachRowName && cpj && typeof cpj.name === "string" && cpj.name.trim()) demoName = cpj.name.trim();
-                  }
-                } catch (e) {}
-                try {
-                  var upCoach = await supabase
-                    .from('entrenadores')
-                    .upsert({ id: String(authLogin.data.user.id), email: authLogin.data.user.email || loginEmailNorm }, { onConflict: 'id' });
-                  if (upCoach.error) console.error("[AUTH] entrenadores upsert migracion fallo", upCoach.error);
-                } catch (eUpCoach) {
-                  console.error("[AUTH] entrenadores upsert migracion exception", eUpCoach);
-                }
-                const s={role:"entrenador",name: demoName,email:authLogin.data.user.email||loginEmailNorm,entrenadorId:String(authLogin.data.user.id)};
-                localStorage.setItem("it_session",JSON.stringify(s));
-                syncStateWithLocalStorage();
-                setLoginEmail("");
-                setLoginPass("");
-              } else setLoginError("Email o contraseña incorrectos");
-            } else {
-              const res=await sbFetch("alumnos?email=eq."+encodeURIComponent(loginEmail)+"&password=eq."+encodeURIComponent(loginPass)+"&select=*");
-              if(res&&res.length>0){
-                const alumno=res[0];
-                const rutsRaw=await sb.getRutinas(alumno.id);
-                const ruts=(rutsRaw || []).slice().sort(function(a,b){return new Date(b.created_at||0)-new Date(a.created_at||0);}).slice(0,1);
-                clearIronTrackStorageForNewLogin();
-                const s={role:"alumno",name:alumno.nombre,alumnoId:alumno.id,entrenadorId:alumno.entrenador_id};
-                localStorage.setItem("it_session",JSON.stringify(s));
-                localStorage.setItem("it_show_welcome","1");
-                if(ruts&&ruts[0]) localStorage.setItem("it_rt",JSON.stringify([{...ruts[0].datos,alumnoId:alumno.id}]));
-                // Registrar OneSignal
-                try {
-                  window.OneSignalDeferred = window.OneSignalDeferred || [];
-                  window.OneSignalDeferred.push(async function(OS) {
-                    await OS.init({ appId: "8c5e2bd1-2ac8-497a-93eb-fd07e5ce74d7", allowLocalhostAsSecureOrigin: true });
-                    const pid = OS.User?.PushSubscription?.id;
-                    if(pid) await sbFetch("alumnos?id=eq."+alumno.id,"PATCH",{onesignal_id:pid});
-                  });
-                } catch(e) {}
-                syncStateWithLocalStorage();
-                setLoginEmail("");
-                setLoginPass("");
-              } else setLoginError("Email o contraseña incorrectos");
-            }
-          } finally {
-            setLoginLoading(false);
-          }
-        }}>
-          {loginLoading?"INGRESANDO...":"INGRESAR"}
+        {loginError&&<div id="login-error" role="alert" style={{color:"#EF4444",fontSize:13,marginBottom:12,textAlign:"center"}}>{loginError}</div>}
+        <button type="submit" disabled={loginLoading} style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:loginLoading?"not-allowed":"pointer",letterSpacing:1,opacity:loginLoading?0.75:1}}>
+          {loginLoading?msg("INGRESANDO...","SIGNING IN..."):msg("INGRESAR","LOG IN")}
         </button>
+        </form>
         {webAuthnAvail&&savedCredential&&(
           <button className="hov" style={{...btn("#2D4057"),width:"100%",padding:"12px",fontSize:15,marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
             onClick={async()=>{
