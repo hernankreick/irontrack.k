@@ -2854,43 +2854,64 @@ function GymApp() {
     <>
       {brandSplashEl}
       <div style={{minHeight:"100dvh",width:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"radial-gradient(circle at 50% 25%, rgba(37, 99, 235, 0.18), transparent 32%), radial-gradient(circle at 50% 55%, rgba(34, 211, 238, 0.10), transparent 38%), linear-gradient(180deg, #0A0F1A 0%, #020617 100%)",color:textMain,fontFamily:"Inter,sans-serif",padding:"32px 24px",boxSizing:"border-box"}}>
-      <div style={{textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center"}}>
+      <style>{`
+        @keyframes itLoginShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 50%{transform:translateX(5px)} 75%{transform:translateX(-3px)} }
+        @keyframes itLoginIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+        .it-login-brand{animation:itLoginIn .5s cubic-bezier(.16,1,.3,1) both}
+        .it-login-card{animation:itLoginIn .5s cubic-bezier(.16,1,.3,1) .08s both;position:relative;overflow:hidden}
+        .it-login-card::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:64px;height:3px;border-radius:0 0 4px 4px;background:linear-gradient(90deg,#2563EB,#22D3EE)}
+        .it-login-form.login-shake{animation:itLoginShake .32s ease}
+        .it-login-form input:focus-visible{outline:2px solid rgba(37,99,235,.7);outline-offset:1px}
+        .it-login-form button:focus-visible{outline:2px solid rgba(37,99,235,.7);outline-offset:2px}
+        .it-login-submit{transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}
+        .it-login-submit:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}
+        .it-login-submit:active:not(:disabled){transform:translateY(0)}
+        .it-login-eye{transition:color .15s ease}
+        .it-login-eye:hover{color:#fff}
+      `}</style>
+      <div className="it-login-brand" style={{textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center"}}>
         <IronTrackAppIcon
           size="clamp(90px, 18vw, 120px)"
           animated={false}
           aria-label={msg("IronTrack", "IronTrack")}
           style={{ margin: "0 auto 16px", background: "transparent", border: "none", boxShadow: "none" }}
         />
-        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:"clamp(24px, 4vw, 32px)",lineHeight:1,textAlign:"center",marginBottom:32,letterSpacing:1.2,fontWeight:800,fontFamily:"Barlow Condensed, Arial Black, sans-serif",textTransform:"uppercase"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:"clamp(24px, 4vw, 32px)",lineHeight:1,textAlign:"center",marginBottom:8,letterSpacing:1.2,fontWeight:800,fontFamily:"Barlow Condensed, Arial Black, sans-serif",textTransform:"uppercase"}}>
           <span style={{color:"#fff"}}>IRON</span>
           <span style={{color:"#2563EB"}}>TRACK</span>
         </div>
+        <div style={{fontSize:13,color:textMuted,marginBottom:32,letterSpacing:0.2}}>{msg("Entrená con datos, no con suposiciones","Train on data, not guesswork")}</div>
       </div>
-      <div style={{maxWidth:420,width:"100%",background:"rgba(255,255,255,0.04)",backdropFilter:"blur(12px)",WebkitBackdropFilter:"blur(12px)",borderRadius:16,padding:"24px",border:"1px solid rgba(255,255,255,0.08)",boxSizing:"border-box"}}>
+      <div className="it-login-card" style={{maxWidth:420,width:"100%",background:"linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",borderRadius:20,padding:"30px 26px 26px",border:"1px solid rgba(255,255,255,0.10)",boxShadow:"0 24px 60px -24px rgba(0,0,0,0.65)",boxSizing:"border-box"}}>
 
-        <style>{`
-          @keyframes itLoginShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 50%{transform:translateX(5px)} 75%{transform:translateX(-3px)} }
-          .it-login-form.login-shake { animation: itLoginShake .32s ease; }
-          .it-login-form input:focus-visible { outline: 2px solid rgba(37,99,235,.7); outline-offset: 1px; }
-          .it-login-form button:focus-visible { outline: 2px solid rgba(37,99,235,.7); outline-offset: 2px; }
-        `}</style>
         <form className={"it-login-form"+(loginShake?" login-shake":"")} onSubmit={handleLoginSubmit} noValidate>
-        <div style={{marginBottom:12}}>
-          <label htmlFor="login-email" style={{display:"block",fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4}}>EMAIL</label>
-          <input id="login-email" style={{background:bgSub,color:textMain,border:"1px solid "+(loginError?"#EF4444":border),borderRadius:8,padding:"8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder="tu@email.com" type="email" autoComplete="username" aria-invalid={!!loginError} aria-describedby={loginError?"login-error":undefined}/>
-        </div>
-        <div style={{marginBottom:loginError?12:20}}>
-          <label htmlFor="login-pass" style={{display:"block",fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:4}}>{msg("CONTRASEÑA","PASSWORD")}</label>
+        <div style={{marginBottom:14}}>
+          <label htmlFor="login-email" style={{display:"block",fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:5}}>EMAIL</label>
           <div style={{position:"relative"}}>
-            <input id="login-pass" style={{background:bgSub,color:textMain,border:"1px solid "+(loginError?"#EF4444":border),borderRadius:8,padding:"8px 36px 8px 12px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginPass} onChange={e=>setLoginPass(e.target.value)} placeholder="••••••••" type={showLoginPass?"text":"password"} autoComplete="current-password" aria-invalid={!!loginError} aria-describedby={loginError?"login-error":undefined}/>
-            <button type="button" onClick={()=>setShowLoginPass(s=>!s)} aria-label={showLoginPass?msg("Ocultar contraseña","Hide password"):msg("Mostrar contraseña","Show password")} style={{position:"absolute",right:4,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,padding:6,lineHeight:1,color:textMuted}}>{showLoginPass?"🙈":"👁"}</button>
+            <Ic name="mail" size={16} color={textMuted} style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}/>
+            <input id="login-email" style={{background:"rgba(255,255,255,0.03)",color:textMain,border:"1px solid "+(loginError?"#EF4444":"rgba(255,255,255,0.12)"),borderRadius:10,padding:"10px 12px 10px 36px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} placeholder="tu@email.com" type="email" autoComplete="username" aria-invalid={!!loginError} aria-describedby={loginError?"login-error":undefined}/>
           </div>
         </div>
-        {loginError&&<div id="login-error" role="alert" style={{color:"#EF4444",fontSize:13,marginBottom:12,textAlign:"center"}}>{loginError}</div>}
-        <button type="submit" disabled={loginLoading} style={{width:"100%",padding:"12px",background:"#2563EB",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:loginLoading?"not-allowed":"pointer",letterSpacing:1,opacity:loginLoading?0.75:1}}>
+        <div style={{marginBottom:loginError?14:22}}>
+          <label htmlFor="login-pass" style={{display:"block",fontSize:11,fontWeight:700,letterSpacing:0.3,color:textMuted,marginBottom:5}}>{msg("CONTRASEÑA","PASSWORD")}</label>
+          <div style={{position:"relative"}}>
+            <Ic name="lock" size={16} color={textMuted} style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}/>
+            <input id="login-pass" style={{background:"rgba(255,255,255,0.03)",color:textMain,border:"1px solid "+(loginError?"#EF4444":"rgba(255,255,255,0.12)"),borderRadius:10,padding:"10px 36px 10px 36px",width:"100%",fontFamily:"Inter,sans-serif",fontSize:15,boxSizing:"border-box"}} value={loginPass} onChange={e=>setLoginPass(e.target.value)} placeholder="••••••••" type={showLoginPass?"text":"password"} autoComplete="current-password" aria-invalid={!!loginError} aria-describedby={loginError?"login-error":undefined}/>
+            <button type="button" className="it-login-eye" onClick={()=>setShowLoginPass(s=>!s)} aria-label={showLoginPass?msg("Ocultar contraseña","Hide password"):msg("Mostrar contraseña","Show password")} style={{position:"absolute",right:6,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",padding:6,lineHeight:1,color:textMuted,display:"flex"}}><Ic name={showLoginPass?"eye-off":"eye"} size={17}/></button>
+          </div>
+        </div>
+        {loginError&&<div id="login-error" role="alert" style={{color:"#EF4444",fontSize:13,marginBottom:14,textAlign:"center"}}>{loginError}</div>}
+        <button type="submit" disabled={loginLoading} className="it-login-submit" style={{width:"100%",padding:"13px",background:"linear-gradient(135deg,#2563EB,#1D4ED8)",boxShadow:"0 10px 26px -10px rgba(37,99,235,0.65)",color:"#fff",border:"none",borderRadius:12,fontFamily:"Barlow Condensed,sans-serif",fontSize:18,fontWeight:700,cursor:loginLoading?"not-allowed":"pointer",letterSpacing:1,opacity:loginLoading?0.75:1}}>
           {loginLoading?msg("INGRESANDO...","SIGNING IN..."):msg("INGRESAR","LOG IN")}
         </button>
         </form>
+        {webAuthnAvail&&savedCredential&&(
+          <div style={{display:"flex",alignItems:"center",gap:10,margin:"18px 0 4px"}}>
+            <div style={{flex:1,height:1,background:"rgba(255,255,255,0.08)"}}/>
+            <span style={{fontSize:11,color:textMuted,letterSpacing:0.5}}>{msg("O","OR")}</span>
+            <div style={{flex:1,height:1,background:"rgba(255,255,255,0.08)"}}/>
+          </div>
+        )}
         {webAuthnAvail&&savedCredential&&(
           <button className="hov" style={{...btn("#2D4057"),width:"100%",padding:"12px",fontSize:15,marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
             onClick={async()=>{
