@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  GLOW,
   LANDING_CTA_GRAD,
   LANDING_GYM_URL,
   LANDING_MAX_W,
@@ -15,15 +16,19 @@ import {
 import IronTrackAppIcon from '../IronTrackAppIcon.jsx';
 
 const Step0 = ({es, onNext, onYaTengoCuenta}) => {
-  const [vis,setVis] = React.useState(false);
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
+  const [vis,setVis] = React.useState(prefersReducedMotion);
   React.useEffect(() => {
+    if (prefersReducedMotion) return;
     const t = setTimeout(() => setVis(true), 100);
     return () => clearTimeout(t);
-  }, []);
+  }, [prefersReducedMotion]);
   const a = (d = 0) => ({
     opacity: vis ? 1 : 0,
     transform: vis ? "translateY(0)" : "translateY(14px)",
-    transition: `all .6s cubic-bezier(.16,1,.3,1) ${d}ms`,
+    transition: prefersReducedMotion ? "none" : `all .6s cubic-bezier(.16,1,.3,1) ${d}ms`,
   });
   const trackTitlePx = 54;
   const trackBarH = Math.round(trackTitlePx * 0.9);
@@ -297,11 +302,21 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
             transform: "translateY(-4%)",
           }}
         >
+          <style>{`
+            .it-step0-cta{transition:transform 150ms ease,box-shadow 150ms ease,filter 150ms ease}
+            .it-step0-cta:hover{transform:translateY(-2px);filter:brightness(1.08)}
+            .it-step0-cta:active{transform:translateY(0) scale(0.97)}
+            .it-step0-cta:focus-visible{outline:2px solid rgba(96,165,250,.85);outline-offset:3px}
+            .it-step0-link:focus-visible{outline:2px solid rgba(96,165,250,.85);outline-offset:3px;border-radius:6px}
+            @media (prefers-reduced-motion: reduce){
+              .it-step0-cta,.it-step0-cta:hover,.it-step0-cta:active{transition:none;transform:none}
+            }
+          `}</style>
           <div style={{ ...ONBOARD_CONTENT_WRAP, padding: "12px 0 8px" }}>
             <button
               type="button"
               onClick={onNext}
-              className="active:scale-[0.97]"
+              className="it-step0-cta"
               style={{
                 width: "100%",
                 maxWidth: "100%",
@@ -320,8 +335,7 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 10,
-                boxShadow: "0 12px 32px rgba(0,0,0,0.28)",
-                transition: "transform 120ms ease",
+                boxShadow: GLOW,
                 boxSizing: "border-box",
               }}
             >
@@ -344,7 +358,7 @@ const Step0 = ({es, onNext, onYaTengoCuenta}) => {
             <button
               type="button"
               onClick={onYaTengoCuenta}
-              className="mt-3 w-full cursor-pointer border-0 bg-transparent p-0 text-center"
+              className="it-step0-link mt-3 w-full cursor-pointer border-0 bg-transparent p-0 text-center"
               style={{
                 fontFamily: "system-ui,sans-serif",
                 fontSize: 15,
