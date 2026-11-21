@@ -23,7 +23,10 @@ import {
 const Step2Name = ({onNext,onBack,role,name,setName}) => {
   const isCoach = role==="entrenador";
   const inputRef = React.useRef(null);
-  const [vis,setVis] = React.useState(false);
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
+  const [vis,setVis] = React.useState(prefersReducedMotion);
   const [inputFocus, setInputFocus] = React.useState(false);
   const nm = typeof name === "string" ? name.trim() : "";
   const initial = nm ? nm.charAt(0).toUpperCase() : "?";
@@ -31,10 +34,10 @@ const Step2Name = ({onNext,onBack,role,name,setName}) => {
   const inputH = "clamp(58px, 4.5vw, 72px)";
 
   React.useEffect(()=>{
-    const t1=setTimeout(()=>setVis(true),60);
+    const t1=prefersReducedMotion?null:setTimeout(()=>setVis(true),60);
     const t2=setTimeout(()=>inputRef.current?.focus(),300);
-    return()=>{clearTimeout(t1);clearTimeout(t2);};
-  },[]);
+    return()=>{t1&&clearTimeout(t1);clearTimeout(t2);};
+  },[prefersReducedMotion]);
 
   return (
     <div
@@ -48,7 +51,7 @@ const Step2Name = ({onNext,onBack,role,name,setName}) => {
         boxSizing: "border-box",
         opacity: vis ? 1 : 0,
         transform: vis ? "translateY(0)" : "translateY(18px)",
-        transition: "all .5s cubic-bezier(.16,1,.3,1)",
+        transition: prefersReducedMotion ? "none" : "all .5s cubic-bezier(.16,1,.3,1)",
       }}
     >
       <div
@@ -355,6 +358,7 @@ const Step2Name = ({onNext,onBack,role,name,setName}) => {
           type="button"
           onClick={onNext}
           disabled={!nm}
+          className="ob-btn-primary"
           style={{
             flex: 1,
             minWidth: 0,

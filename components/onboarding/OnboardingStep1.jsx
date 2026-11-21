@@ -27,6 +27,15 @@ import {
    PASO 1 — ROL
 ═══════════════════════════════════════════ */
 const Step1 = ({onNext,onBack,role: activeRole,setRole}) => {
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
+  const [vis,setVis] = React.useState(prefersReducedMotion);
+  React.useEffect(() => {
+    if (prefersReducedMotion) return;
+    const t = setTimeout(() => setVis(true), 60);
+    return () => clearTimeout(t);
+  }, [prefersReducedMotion]);
   const cardPad = "clamp(20px, 2.2vw, 34px)";
   const roles = [
     {
@@ -65,6 +74,9 @@ const Step1 = ({onNext,onBack,role: activeRole,setRole}) => {
         background: ONBOARD_PREMIUM_BG,
         boxSizing: "border-box",
         overflow: "hidden",
+        opacity: vis ? 1 : 0,
+        transform: vis ? "translateY(0)" : "translateY(18px)",
+        transition: prefersReducedMotion ? "none" : "all .5s cubic-bezier(.16,1,.3,1)",
       }}
     >
       <div
@@ -151,6 +163,7 @@ const Step1 = ({onNext,onBack,role: activeRole,setRole}) => {
                     tabIndex={0}
                     onClick={() => setRole(r.id)}
                     onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setRole(r.id))}
+                    className="ob-card-select"
                     style={{
                       background: ONBOARD_PREMIUM_CARD,
                       border: "2px solid " + (sel ? "#2563EB" : "rgba(255,255,255,0.1)"),
@@ -318,6 +331,7 @@ const Step1 = ({onNext,onBack,role: activeRole,setRole}) => {
               type="button"
               onClick={onNext}
               disabled={!activeRole}
+              className="ob-btn-primary"
               style={{
                 flex: 1,
                 minWidth: 0,

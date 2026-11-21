@@ -139,7 +139,7 @@ export const Tag = ({children,color}) => (
 );
 
 export const BtnPrimary = ({children,onClick,done=false,disabled=false}) => (
-  <button onClick={onClick} disabled={disabled} style={{
+  <button onClick={onClick} disabled={disabled} className="ob-btn-primary" style={{
     flex:1,                       /* ocupa el espacio restante */
     height:BTN_H,
     minWidth:0,                   /* permite shrink si hace falta */
@@ -161,7 +161,7 @@ export const BtnPrimary = ({children,onClick,done=false,disabled=false}) => (
 );
 
 export const BtnBack = ({onClick}) => (
-  <button onClick={onClick} style={{
+  <button onClick={onClick} className="ob-btn-back" style={{
     flexShrink:0,                 /* nunca se achica */
     height:BTN_H,                 /* idéntico al BtnPrimary */
     width:100,                    /* ancho fijo */

@@ -48,6 +48,21 @@ function OnboardingScreen({es, darkMode, onDone}) {
         boxSizing: "border-box",
       }}
     >
+      <style>{`
+        .ob-btn-primary,.ob-btn-back{transition:transform 150ms ease,box-shadow 150ms ease,filter 150ms ease}
+        .ob-btn-primary:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}
+        .ob-btn-primary:active:not(:disabled){transform:translateY(0) scale(0.98)}
+        .ob-btn-back:hover{background:rgba(255,255,255,0.05) !important;border-color:rgba(255,255,255,0.22) !important}
+        .ob-btn-back:active{transform:scale(0.98)}
+        .ob-btn-primary:focus-visible,.ob-btn-back:focus-visible,.ob-link-btn:focus-visible{outline:2px solid rgba(96,165,250,.85);outline-offset:2px}
+        .ob-card-select{transition:transform 150ms ease,border-color 150ms ease,box-shadow 150ms ease}
+        .ob-card-select:hover{transform:translateY(-2px) !important}
+        .ob-card-select:focus-visible{outline:2px solid rgba(96,165,250,.85);outline-offset:2px}
+        @media (prefers-reduced-motion: reduce){
+          .ob-btn-primary,.ob-btn-back,.ob-card-select{transition:none !important}
+          .ob-btn-primary:hover:not(:disabled),.ob-card-select:hover{transform:none !important}
+        }
+      `}</style>
       {screens[step]}
     </div>
   );

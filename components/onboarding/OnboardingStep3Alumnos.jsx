@@ -19,8 +19,15 @@ import {
    PASO 3 — ALUMNOS (solo entrenadores)
 ═══════════════════════════════════════════ */
 const Step3Alumnos = ({onNext,onBack,alumnosRange,setAlumnosRange}) => {
-  const [vis,setVis] = React.useState(false);
-  React.useEffect(()=>{const t=setTimeout(()=>setVis(true),60);return()=>clearTimeout(t);},[]);
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
+  const [vis,setVis] = React.useState(prefersReducedMotion);
+  React.useEffect(()=>{
+    if (prefersReducedMotion) return;
+    const t=setTimeout(()=>setVis(true),60);
+    return()=>clearTimeout(t);
+  },[prefersReducedMotion]);
 
   const options = [
     {id:"1-5",  label:"1 — 5 alumnos",     desc:"Trabajo personalizado o estás empezando",  tag:"Personalizado",  icon:(s)=><UserOneSVG  color={s?"#3B82F6":"#64748B"} size={32}/>},
@@ -37,7 +44,7 @@ const Step3Alumnos = ({onNext,onBack,alumnosRange,setAlumnosRange}) => {
       background:C.bg,
       boxSizing:"border-box",
       opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(20px)",
-      transition:"all .5s cubic-bezier(.16,1,.3,1)",
+      transition:prefersReducedMotion?"none":"all .5s cubic-bezier(.16,1,.3,1)",
     }}>
       <div style={{...ONBOARD_CONTENT_WRAP,padding:"20px 24px 0",flex:"0 1 auto",display:"flex",flexDirection:"column",minHeight:0}}>
       <Tag>Tu situación actual</Tag>
@@ -54,16 +61,20 @@ const Step3Alumnos = ({onNext,onBack,alumnosRange,setAlumnosRange}) => {
           return (
             <div
               key={opt.id}
+              role="button"
+              tabIndex={0}
               onClick={()=>setAlumnosRange(opt.id)}
+              onKeyDown={(e)=>(e.key==="Enter"||e.key===" ")&&(e.preventDefault(),setAlumnosRange(opt.id))}
+              className="ob-card-select"
               style={{
                 background:sel?"rgba(37,99,235,0.1)":C.bg2,
                 border:`2px solid ${sel?C.blue:C.borderSub}`,
                 borderRadius:20,padding:"18px 20px",cursor:"pointer",
-                transition:"all .25s cubic-bezier(.16,1,.3,1)",
+                transition:prefersReducedMotion?"none":"all .25s cubic-bezier(.16,1,.3,1)",
                 boxShadow:sel?"0 0 0 1px rgba(37,99,235,0.3),0 0 28px rgba(37,99,235,0.22),0 0 52px rgba(37,99,235,0.08)":"none",
                 position:"relative",overflow:"hidden",
                 opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(10px)",
-                transitionDelay:`${60+i*55}ms`,
+                transitionDelay:prefersReducedMotion?"0ms":`${60+i*55}ms`,
               }}
             >
               {/* Línea acento izquierda */}

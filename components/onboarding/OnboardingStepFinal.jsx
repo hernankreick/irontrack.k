@@ -25,6 +25,15 @@ const StepFinal = ({onDone,onBack,role,name,alumnosRange}) => {
   const isCoach = role==="entrenador";
   const [done,setDone] = React.useState(false);
   const finish = ()=>{ setDone(true); setTimeout(onDone,950); };
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
+  const [vis,setVis] = React.useState(prefersReducedMotion);
+  React.useEffect(() => {
+    if (prefersReducedMotion) return;
+    const t = setTimeout(() => setVis(true), 60);
+    return () => clearTimeout(t);
+  }, [prefersReducedMotion]);
 
   const rangeLabel = alumnosRange==="1-5"?"1 a 5":alumnosRange==="5-10"?"5 a 10":"más de 10";
   const totalDots  = isCoach ? 5 : 4;
@@ -43,7 +52,7 @@ const StepFinal = ({onDone,onBack,role,name,alumnosRange}) => {
       ];
 
   return (
-    <div style={{flex:1,minHeight:0,width:"100%",display:"flex",flexDirection:"column",background:C.bg,boxSizing:"border-box",position:"relative",overflow:"hidden"}}>
+    <div style={{flex:1,minHeight:0,width:"100%",display:"flex",flexDirection:"column",background:C.bg,boxSizing:"border-box",position:"relative",overflow:"hidden",opacity:vis?1:0,transform:vis?"translateY(0)":"translateY(18px)",transition:prefersReducedMotion?"none":"all .5s cubic-bezier(.16,1,.3,1)"}}>
       <div style={{position:"absolute",top:-80,left:"50%",transform:"translateX(-50%)",width:420,height:420,borderRadius:"50%",background:done?"radial-gradient(circle,rgba(34,197,94,0.14) 0%,transparent 65%)":"radial-gradient(circle,rgba(37,99,235,0.12) 0%,transparent 65%)",pointerEvents:"none",transition:"background .6s"}}/>
 
       <div style={{position:"relative",zIndex:5,flex:1,display:"flex",flexDirection:"column",minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
@@ -105,7 +114,7 @@ const StepFinal = ({onDone,onBack,role,name,alumnosRange}) => {
           {done?"Redirigiendo...":"Ir a mi panel"}
         </BtnPrimary>
         {!done&&(
-          <button onClick={onBack} style={{display:"block",width:"100%",marginTop:10,background:"none",border:"none",color:C.muted,fontSize:12,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",cursor:"pointer",fontFamily:"system-ui,sans-serif",height:32}}>
+          <button onClick={onBack} className="ob-link-btn" style={{display:"block",width:"100%",marginTop:10,background:"none",border:"none",color:C.muted,fontSize:12,fontWeight:600,letterSpacing:"1px",textTransform:"uppercase",cursor:"pointer",fontFamily:"system-ui,sans-serif",height:32,borderRadius:8}}>
             Atrás
           </button>
         )}
