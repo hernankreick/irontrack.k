@@ -43,12 +43,38 @@ export function patternEmptyForSelection(lang, sesiones, series) {
   return M(lang, "Esta semana no tiene volumen registrado para estos patrones.", "This week has no volume logged for these patterns.", "Esta semana não tem volume registrado para estes padrões.");
 }
 
-/** Aviso cuando hay series del alumno que no se pueden atribuir a una rutina con evidencia (no se incluyen ni se reconstruyen). */
-export function patternUnassignedNote(lang, n) {
-  return M(
-    lang,
-    n + (n === 1 ? " serie del alumno no se pudo asignar a una rutina (sin sesión que la respalde) y no está incluida." : " series del alumno no se pudieron asignar a una rutina (sin sesión que las respalde) y no están incluidas."),
-    n + (n === 1 ? " logged set could not be matched to a routine (no supporting session) and is not included." : " logged sets could not be matched to a routine (no supporting session) and are not included."),
-    n + (n === 1 ? " série não pôde ser associada a uma rotina (sem sessão que a respalde) e não está incluída." : " séries não puderam ser associadas a uma rotina (sem sessão que as respalde) e não estão incluídas.")
-  );
+/** Título del aviso de volumen no confirmado (semana con series sin asignar, series sin semana o historial incompleto). */
+export function patternPartialTitle(lang) {
+  return M(lang, "Volumen no confirmado", "Unconfirmed volume", "Volume não confirmado");
+}
+
+/** Líneas del aviso; cada una explica una causa distinta y dice qué pasa con esas series (no se suman, el real puede ser mayor). */
+export function patternPartialLines(lang, p) {
+  var out = [];
+  var n = (p && p.semana) || 0;
+  if (n > 0) {
+    out.push(
+      M(
+        lang,
+        n + (n === 1 ? " serie de esta semana no tiene" : " series de esta semana no tienen") + " una sesión guardada que permita saber con certeza de qué rutina " + (n === 1 ? "es" : "son") + ". No se " + (n === 1 ? "suma" : "suman") + ": el volumen real puede ser mayor.",
+        n + (n === 1 ? " set from this week has" : " sets from this week have") + " no saved session that shows for sure which routine " + (n === 1 ? "it belongs" : "they belong") + " to. " + (n === 1 ? "It is" : "They are") + " not added: the real volume may be higher.",
+        n + (n === 1 ? " série desta semana não tem" : " séries desta semana não têm") + " uma sessão salva que mostre com certeza de qual rotina " + (n === 1 ? "é" : "são") + ". Não " + (n === 1 ? "é somada" : "são somadas") + ": o volume real pode ser maior."
+      )
+    );
+  }
+  var m = (p && p.sinSemana) || 0;
+  if (m > 0) {
+    out.push(
+      M(
+        lang,
+        "Además, " + m + (m === 1 ? " serie del alumno no tiene" : " series del alumno no tienen") + " una semana válida y no se asigna a ninguna rutina.",
+        "Also, " + m + (m === 1 ? " set of this athlete has" : " sets of this athlete have") + " no valid week and " + (m === 1 ? "is" : "are") + " not assigned to any routine.",
+        "Além disso, " + m + (m === 1 ? " série do aluno não tem" : " séries do aluno não têm") + " semana válida e não é atribuída a nenhuma rotina."
+      )
+    );
+  }
+  if (p && p.historialIncompleto) {
+    out.push(M(lang, "El historial del alumno no se cargó completo: pueden faltar datos y el volumen real puede ser mayor.", "The athlete's history did not load completely: data may be missing and the real volume may be higher.", "O histórico do aluno não carregou por completo: podem faltar dados e o volume real pode ser maior."));
+  }
+  return out;
 }

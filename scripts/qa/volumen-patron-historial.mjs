@@ -66,7 +66,7 @@ const LEER = `(() => {
   const w = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
   for (let t; (t = w.nextNode());) { if (!t.textContent.trim()) continue; const e = t.parentElement, a = lum(rgb(getComputedStyle(e).color)), b = lum(bgDe(e)), cr = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); if (cr < peor) { peor = cr; peorTxt = t.textContent.trim().slice(0, 40); } }
   return { vol, rutina: sel('patron-rutina'), ciclo: sel('patron-ciclo'), semana: sel('patron-semana'), left: r.left, right: r.right, vw: innerWidth, sw: document.documentElement.scrollWidth,
-    chicos, contraste: peor, peorTxt, texto: card.innerText.replace(/\\s+/g, ' '), sinAsignar: !!card.querySelector('[data-qa="patron-sin-asignar"]') };
+    chicos, contraste: peor, peorTxt, texto: card.innerText.replace(/\\s+/g, ' '), parcial: (() => { const e = card.querySelector('[data-qa="patron-parcial"]'); return e ? e.innerText.replace(/\\s+/g, ' ').trim() : null; })() };
 })()`;
 
 const igual = (v, e) => KEYS.every((k) => Math.abs((v[k] || 0) - e[k]) < 0.01);
@@ -110,6 +110,7 @@ for (const tema of ["oscuro", "claro"]) {
       m = await leer();
       const e = esperado(HP_ANA, "hp-r-hiper", 1, s);
       check(igual(m.vol, e), tag + " Hipertrofia S" + s + " = " + fmt(e) + " (obtuvo " + fmt(m.vol) + ")");
+      check((m.parcial !== null) === (s === 2), tag + " Hipertrofia S" + s + (s === 2 ? " avisa la serie ambigua" : " sin aviso") + " (" + m.parcial + ")");
       previos.add(fmt(m.vol));
     }
     check(previos.size === 4, tag + " las 4 semanas muestran graficos distintos");
@@ -121,7 +122,8 @@ for (const tema of ["oscuro", "claro"]) {
     check(m.ciclo !== null && m.ciclo.opciones.length === 2, tag + " aparece el selector de ciclo (rutina reiniciada)");
     check(m.ciclo && /Ciclo 2/.test(m.ciclo.texto) && /Semana 1/.test(m.semana.texto), tag + " abre en el ultimo ciclo con datos (" + (m.ciclo && m.ciclo.texto) + ", " + m.semana.texto + ")");
     check(igual(m.vol, esperado(HP_ANA, "hp-r-fuerza", 2, 1)), tag + " Fuerza base ciclo 2 S1 (" + fmt(m.vol) + ")");
-    check(m.sinAsignar, tag + " aviso de serie sin sesion en la vista historica");
+    check(m.parcial && /Volumen no confirmado/.test(m.parcial) && /1 serie de esta semana no tiene una sesión guardada/.test(m.parcial) && /No se suma: el volumen real puede ser mayor/.test(m.parcial), tag + " aviso comprensible de serie sin sesion (" + m.parcial + ")");
+    check(/Semana 1 · 1 sesión · no confirmada/.test(m.semana.texto), tag + " la semana afectada dice «no confirmada» (" + m.semana.texto + ")");
 
     // 4) Ciclo 1: 4 semanas (S2 sin la serie ambigua, S3 incompleta, S4 sin sesiones)
     await elegir("patron-ciclo", 1);
@@ -130,6 +132,7 @@ for (const tema of ["oscuro", "claro"]) {
       m = await leer();
       const e = esperado(HP_ANA, "hp-r-fuerza", 1, s);
       check(igual(m.vol, e), tag + " Fuerza base c1 S" + s + " = " + fmt(e) + " (obtuvo " + fmt(m.vol) + ")");
+      check((m.parcial !== null) === (s === 2), tag + " Fuerza base c1 S" + s + (s === 2 ? " avisa la serie ambigua" : " sin aviso") + " (" + m.parcial + ")");
     }
     check(/Sin sesiones registradas/.test(m.texto), tag + " S4 dice que no hay sesiones (sin inventar volumen)");
     check(KEYS.every((k) => m.vol[k] === 0), tag + " S4 en cero");
@@ -145,6 +148,24 @@ for (const tema of ["oscuro", "claro"]) {
     check(m.chicos === 0, tag + " controles de la tarjeta >= 44 px");
     check(m.contraste >= 4.5, tag + " contraste >= 4.5 (" + m.contraste.toFixed(2) + " en «" + m.peorTxt + "»)");
     if (o.out) { await page.locator('[data-qa="patron-card"]').scrollIntoViewIfNeeded(); await page.screenshot({ path: path.join(o.out, "patron_" + tema + "_" + width + ".png") }); }
+
+    // 6b) Historial incompleto simulado: toda semana avisa que el total no esta confirmado
+    await page.goto("http://127.0.0.1:" + port + "/" + DEMO + "?patron=historial&incompleto=1", { waitUntil: "load" });
+    await page.waitForSelector('[data-qa="patron-card"]', { timeout: 15000 });
+    if (tema === "claro") await page.click('[data-qa="demo-tema"]');
+    await page.waitForTimeout(500);
+    m = await leer();
+    check(m.parcial && /Volumen no confirmado/.test(m.parcial) && /no se cargó completo/.test(m.parcial), tag + " historial incompleto: aviso en la semana actual (" + m.parcial + ")");
+    await elegir("patron-rutina", "hp-r-fuerza"); await elegir("patron-ciclo", 1); await elegir("patron-semana", 2);
+    m = await leer();
+    check(m.parcial && /no se cargó completo/.test(m.parcial) && !/series? de esta semana/.test(m.parcial), tag + " historial incompleto: tambien en una semana sin series sueltas");
+    check(m.right <= m.vw + 0.5 && m.sw <= m.vw + 1, tag + " el aviso no genera overflow");
+    check(m.contraste >= 4.5, tag + " contraste con aviso >= 4.5 (" + m.contraste.toFixed(2) + " en «" + m.peorTxt + "»)");
+    if (o.out) { await page.locator('[data-qa="patron-card"]').scrollIntoViewIfNeeded(); await page.screenshot({ path: path.join(o.out, "patron_parcial_" + tema + "_" + width + ".png") }); }
+    await page.goto("http://127.0.0.1:" + port + "/" + DEMO + "?patron=historial", { waitUntil: "load" });
+    await page.waitForSelector('[data-qa="patron-card"]', { timeout: 15000 });
+    if (tema === "claro") await page.click('[data-qa="demo-tema"]');
+    await page.waitForTimeout(400);
 
     // 7) Otro alumno: Beto ve solo lo suyo y el estado de Ana no se arrastra
     await elegir("patron-rutina", "hp-r-fuerza");

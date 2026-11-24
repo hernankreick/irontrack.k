@@ -28,6 +28,7 @@ import {
 import { isCompletedSession } from "../lib/studentWeeklyProgress.js";
 import {
   atribuirSeriesARutinas,
+  contarNoAsignadas,
   contarSesiones,
   listarRutinasConHistorial,
   seriesDeRutinaCicloSemana,
@@ -869,7 +870,7 @@ export function buildCoachProgresoModel(params) {
   function resolvePatternHistorial() {
     var sel = params.patronSel || {};
     var rutinasAlumno = alumnoSel ? rutinasDeAlumno(rutinasSBEntrenador, alumnoSel) : [];
-    var atrib = alumnoSel ? atribuirSeriesARutinas(alumnoAllRows, sesionesGlobales, alumnoSel) : { series: [], sinSesion: 0, ambiguas: 0, sinSemana: 0, ambiguasFilas: [] };
+    var atrib = alumnoSel ? atribuirSeriesARutinas(alumnoAllRows, sesionesGlobales, alumnoSel) : { series: [], sinSesion: 0, ambiguas: 0, sinSemana: 0, ambiguasFilas: [], noAsignadas: [] };
     var lista = alumnoSel
       ? listarRutinasConHistorial({ rutinas: rutinasAlumno, sesiones: sesionesGlobales, series: atrib.series, alumnoId: alumnoSel, rutinaActualId: routineForSelectedId })
       : [];
@@ -901,6 +902,8 @@ export function buildCoachProgresoModel(params) {
     var ajenas = new Set(atrib.ambiguasFilas);
     atrib.series.forEach(function (a) { if (a.rutinaId !== routineForSelectedId) ajenas.add(a.row); });
     var bloqueRows = blockRows.filter(function (r) { return !ajenas.has(r); });
+    var ambiguasSet = new Set(atrib.ambiguasFilas);
+    var bloqueRowsAmbiguas = blockRows.filter(function (r) { return ambiguasSet.has(r); });
 
     // Semanas 1..4: cantidad de sesiones y de series con volumen de cada una (cero = «sin sesiones» / «sin registros»).
     var semanas = [];
@@ -919,7 +922,11 @@ export function buildCoachProgresoModel(params) {
         nSeries = 0;
       }
       if (nSes > 0 || nSeries > 0) ultimaConDatos = wk;
-      semanas.push({ value: wk, sesiones: nSes, series: nSeries });
+      // Series sin respaldo (vista historica) o excluidas por ambiguas (bloque actual) de esa semana: su total NO esta confirmado.
+      var nParcial = bloqueActual
+        ? bloqueRowsAmbiguas.filter(function (r) { return semanaRutinaDeFila(r) === wk; }).length
+        : entry ? contarNoAsignadas(atrib.noAsignadas, cicloValue, wk) : 0;
+      semanas.push({ value: wk, sesiones: nSes, series: nSeries, parcial: nParcial });
     }
     var semanaValue = null;
     if (entry) {
@@ -935,7 +942,7 @@ export function buildCoachProgresoModel(params) {
         rows = seriesDeRutinaCicloSemana(atrib.series, rutinaId, cicloValue, semanaValue).map(function (a) { return a.row; });
       }
     }
-    var info = semanas[semanaValue == null ? 0 : semanaValue] || { sesiones: 0, series: 0 };
+    var info = semanas[semanaValue == null ? 0 : semanaValue] || { sesiones: 0, series: 0, parcial: 0 };
     return {
       rows: rows,
       view: {
@@ -951,8 +958,14 @@ export function buildCoachProgresoModel(params) {
         semana: semanaValue,
         sesionesSemana: info.sesiones,
         seriesSemana: info.series,
-        // Series del alumno que no se pudieron asignar a ninguna rutina: solo se informan en las vistas que dependen de la evidencia.
-        sinAsignar: bloqueActual ? { sinSesion: 0, ambiguas: 0, sinSemana: 0 } : { sinSesion: atrib.sinSesion, ambiguas: atrib.ambiguas, sinSemana: atrib.sinSemana },
+        // Volumen NO confirmado: series de esta semana sin sesión que las respalde (o ambiguas) que quedaron afuera, series sin semana
+        // válida del alumno, o historial del alumno cargado a medias. Solo se informa; nunca se suman ni se reparten por fecha.
+        parcial: {
+          semana: info.parcial || 0,
+          sinSemana: bloqueActual ? 0 : atrib.sinSemana,
+          historialIncompleto: sesionesIncompletas || progresoIncompleto,
+          total: (info.parcial || 0) > 0 || (!bloqueActual && atrib.sinSemana > 0) || sesionesIncompletas || progresoIncompleto,
+        },
       },
     };
   }

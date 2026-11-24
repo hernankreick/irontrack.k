@@ -1,5 +1,5 @@
 // Datos FICTICIOS para «Volumen por patrón» por rutina, ciclo y semana (demo/progreso-coach.html?patron=historial, solo Preview).
-// Nada sale de Supabase ni se guarda. Forma de las filas = la de los datos REALES: `progreso` SIN rutina_id (solo alumno_id,
+// Nada sale de un servidor real ni se guarda. Forma de las filas = la de los datos REALES: `progreso` SIN rutina_id (solo alumno_id,
 // ejercicio_id, kg, reps, fecha d/m/yyyy, semana 0-based y ciclo); `sesiones` con rutina_id, ciclo, semana 1-based, dia_idx y `ejercicios`.
 //
 // Ana Historial
@@ -64,7 +64,7 @@ export const HP_SESIONES = [
 /** Series de Ana sin ninguna sesión que las respalde (no se asignan a rutina alguna). */
 export const HP_HUERFANAS = [{ alumno: HP_ANA, n: 118, ciclo: 2, semana: 1, ejercicio: "hp-sq", kg: 100, reps: 5 }];
 
-export function buildVolumenPatronDemoData() {
+export function buildVolumenPatronDemoData(opts) {
   const ex = (...ids) => ids.map((id) => ({ id }));
   const dias = (...listas) => listas.map((l, i) => ({ label: "Día " + (i + 1), warmup: [], exercises: ex(...l) }));
   const rutinas = [
@@ -105,6 +105,7 @@ export function buildVolumenPatronDemoData() {
     sesionesGlobales: sesiones,
     progresoGlobal,
     allEx: HP_CATALOGO,
-    historiaCompleta: { sesiones: true, progreso: true },
+    // `incompleto`: simula que el historial no se pudo cargar completo (solo demo; no cambia los datos).
+    historiaCompleta: opts && opts.incompleto ? { sesiones: true, progreso: false } : { sesiones: true, progreso: true },
   };
 }

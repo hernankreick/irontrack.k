@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildCoachProgresoModel } from "../components/coachProgresoMetrics.js";
 import { atribuirSeriesARutinas, listarRutinasConHistorial, semanaIndiceDeSerie } from "../lib/metricas/volumenPatronHistorial.js";
+import { patternPartialLines } from "../components/progreso/progressCopy.js";
 import { buildVolumenPatronDemoData, HP_ANA, HP_BETO, HP_CATALOGO, HP_SESIONES, HP_HUERFANAS } from "../components/demo/volumenPatronDemoData.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -118,9 +119,50 @@ test("serie sin sesion que la respalde: no se asigna a una rutina historica y se
   assert.equal(at.sinSesion, 1);
   const m = modelo(HP_ANA, sel("hp-r-fuerza", 2, 0));
   assert.equal(m.patronPatterns.find((p) => p.key === "rodilla").vol, 3 * 5 * 85); // sin la serie huerfana de 500 kg
-  assert.deepEqual(m.patronHistorial.sinAsignar, { sinSesion: 1, ambiguas: 1, sinSemana: 0 });
-  // en el bloque actual no se muestra el aviso
-  assert.deepEqual(modelo(HP_ANA, null).patronHistorial.sinAsignar, { sinSesion: 0, ambiguas: 0, sinSemana: 0 });
+  // la semana afectada se marca como NO confirmada (el contador es de ESA semana, no del historial completo)
+  assert.equal(m.patronHistorial.parcial.semana, 1);
+  assert.equal(m.patronHistorial.parcial.total, true);
+  assert.equal(m.patronHistorial.semanas[0].parcial, 1);
+  assert.deepEqual(m.patronHistorial.semanas.map((w) => w.parcial), [1, 0, 0, 0]);
+  // otra semana del mismo ciclo sin series sueltas: confirmada
+  const c1 = modelo(HP_ANA, sel("hp-r-fuerza", 1, 2));
+  assert.equal(c1.patronHistorial.parcial.semana, 0);
+  assert.equal(c1.patronHistorial.parcial.total, false);
+  // en el bloque actual la serie sin respaldo sigue sumando como siempre y no se avisa
+  assert.equal(modelo(HP_ANA, null).patronHistorial.parcial.total, false);
+});
+
+test("serie ambigua: la semana afectada queda NO confirmada, tambien en el bloque actual", () => {
+  const f = modelo(HP_ANA, sel("hp-r-fuerza", 1, 1));
+  assert.equal(f.patronHistorial.parcial.semana, 1);
+  assert.deepEqual(f.patronHistorial.semanas.map((w) => w.parcial), [0, 1, 0, 0]);
+  const h = modelo(HP_ANA, sel("hp-r-hiper", 0, 1));
+  assert.equal(h.patronHistorial.parcial.semana, 1);
+  assert.equal(h.patronHistorial.parcial.total, true);
+  assert.equal(modelo(HP_ANA, sel("hp-r-hiper", 0, 0)).patronHistorial.parcial.total, false);
+});
+
+test("historial incompleto: toda semana queda NO confirmada aunque no haya series sueltas", () => {
+  for (const s of [null, sel("hp-r-fuerza", 1, 2), sel("hp-r-hiper", 0, 0)]) {
+    const m = modelo(HP_ANA, s, { historiaCompleta: { sesiones: true, progreso: false } });
+    assert.equal(m.patronHistorial.parcial.historialIncompleto, true);
+    assert.equal(m.patronHistorial.parcial.total, true);
+    const m2 = modelo(HP_ANA, s, { historiaCompleta: { sesiones: false, progreso: true } });
+    assert.equal(m2.patronHistorial.parcial.total, true);
+  }
+  assert.equal(modelo(HP_ANA, null).patronHistorial.parcial.historialIncompleto, false);
+});
+
+test("los avisos son comprensibles: dicen cuantas series, por que y que pasa con ellas (es/en/pt)", () => {
+  const es = patternPartialLines("es", { semana: 2, sinSemana: 1, historialIncompleto: true });
+  assert.equal(es.length, 3);
+  assert.match(es[0], /^2 series de esta semana no tienen una sesión guardada.*No se suman: el volumen real puede ser mayor\.$/);
+  assert.match(patternPartialLines("es", { semana: 1 })[0], /^1 serie de esta semana no tiene .* es\. No se suma/);
+  assert.match(es[1], /1 serie del alumno no tiene una semana válida/);
+  assert.match(es[2], /no se cargó completo/);
+  for (const l of ["en", "pt"]) assert.equal(patternPartialLines(l, { semana: 2, sinSemana: 1, historialIncompleto: true }).length, 3);
+  assert.deepEqual(patternPartialLines("es", { semana: 0, sinSemana: 0, historialIncompleto: false }), []);
+  assert.doesNotMatch(es.join(" "), /huérfan|orphan|NaN|undefined/i);
 });
 
 test("no se mezclan alumnos: Beto tiene mismas fechas, ejercicios, ciclo y semana y otras cifras", () => {

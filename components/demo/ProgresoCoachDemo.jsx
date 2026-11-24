@@ -32,7 +32,7 @@ export default function ProgresoCoachDemo() {
     try { return new URLSearchParams(window.location.search).get('patron') === 'historial'; } catch (e) { return false; }
   }, []);
   const data = React.useMemo(function () {
-    if (patron) return buildVolumenPatronDemoData();
+    if (patron) return buildVolumenPatronDemoData({ incompleto: incompleto });
     const d = buildProgresoDemoData({ incompleto: incompleto, volumen: volumen });
     return vacio ? Object.assign({}, d, { sesionesGlobales: [], progresoGlobal: {} }) : d;
   }, [incompleto, vacio, volumen, patron]);

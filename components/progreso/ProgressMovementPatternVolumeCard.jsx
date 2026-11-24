@@ -2,7 +2,7 @@ import React from "react";
 import { PieChart } from "lucide-react";
 import { coachType as T, coachSpace as S } from "../coachUiScale.js";
 import { irontrackMsg as M } from "../../lib/irontrackMsg.js";
-import { patternWindowLabel, patternEmptyLabel, patternSelectionLabel, patternEmptyForSelection, patternUnassignedNote } from "./progressCopy.js";
+import { patternWindowLabel, patternEmptyLabel, patternSelectionLabel, patternEmptyForSelection, patternPartialTitle, patternPartialLines } from "./progressCopy.js";
 import ProgressMovementPatternRow from "./ProgressMovementPatternRow.jsx";
 
 export default function ProgressMovementPatternVolumeCard({
@@ -33,15 +33,16 @@ export default function ProgressMovementPatternVolumeCard({
   };
   var semanaLabel = function (w) {
     var base = M(lang, "Semana " + (w.value + 1), "Week " + (w.value + 1), "Semana " + (w.value + 1));
-    if (w.sesiones > 0) return base + " · " + w.sesiones + (w.sesiones === 1 ? M(lang, " sesión", " session", " sessão") : M(lang, " sesiones", " sessions", " sessões"));
-    return base + " · " + (w.series > 0 ? M(lang, "sin sesión guardada", "no saved session", "sem sessão salva") : M(lang, "sin sesiones", "no sessions", "sem sessões"));
+    var parcial = w.parcial > 0 ? " · " + M(lang, "no confirmada", "unconfirmed", "não confirmada") : "";
+    if (w.sesiones > 0) return base + " · " + w.sesiones + (w.sesiones === 1 ? M(lang, " sesión", " session", " sessão") : M(lang, " sesiones", " sessions", " sessões")) + parcial;
+    return base + " · " + (w.series > 0 ? M(lang, "sin sesión guardada", "no saved session", "sem sessão salva") : M(lang, "sin sesiones", "no sessions", "sem sessões")) + parcial;
   };
   var ctrl = Object.assign({}, selectStyle || {}, { minHeight: 44, fontSize: 16, minWidth: 0, textOverflow: "ellipsis" });
   var lbl = Object.assign({ display: "block", marginBottom: 4 }, T.labelMd, { color: C.t2 });
   var subtitle;
   if (!h || (h.esActual && h.bloqueActual && h.semana + 1 === weekNumber)) subtitle = patternWindowLabel(lang, h ? h.semana + 1 : weekNumber);
   else subtitle = patternSelectionLabel(lang, rutinaSel ? rutinaSel.nombre : "", h.ciclos.length > 1 ? cicloLabel(h.ciclos.filter(function (c) { return c.value === h.ciclo; })[0] || { value: h.ciclo }) : "", h.semana + 1);
-  var unassigned = h ? (h.sinAsignar.sinSesion || 0) + (h.sinAsignar.ambiguas || 0) + (h.sinAsignar.sinSemana || 0) : 0;
+  var partialLines = h && h.parcial && h.parcial.total ? patternPartialLines(lang, h.parcial) : [];
 
   return (
     <div
@@ -96,6 +97,14 @@ export default function ProgressMovementPatternVolumeCard({
           </div>
         </div>
       ) : null}
+      {partialLines.length ? (
+        <div role="status" data-qa="patron-parcial" style={{ marginBottom: S.blockGapLoose, padding: "10px 12px", background: C.cardDark, border: "1px solid " + C.brd, borderLeft: "4px solid #f59e0b", borderRadius: 8 }}>
+          <p style={{ ...T.bodySemibold, color: C.t, margin: "0 0 4px 0" }}>{patternPartialTitle(lang)}</p>
+          {partialLines.map(function (t, i) {
+            return <p key={i} style={{ ...T.subtitle, color: C.t2, margin: i ? "6px 0 0 0" : 0 }}>{t}</p>;
+          })}
+        </div>
+      ) : null}
       {safeTotalVol <= 0 ? (
         <p
           style={{
@@ -129,9 +138,6 @@ export default function ProgressMovementPatternVolumeCard({
           );
         })}
       </div>
-      {unassigned > 0 ? (
-        <p data-qa="patron-sin-asignar" style={{ ...T.subtitle, color: C.t2, margin: S.blockGapLoose + "px 0 0 0" }}>{patternUnassignedNote(lang, unassigned)}</p>
-      ) : null}
     </div>
   );
 }
