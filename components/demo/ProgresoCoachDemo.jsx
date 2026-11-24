@@ -27,9 +27,9 @@ export default function ProgresoCoachDemo() {
   const volumen = React.useMemo(function () {
     try { return new URLSearchParams(window.location.search).get('volumen') === 'comparar'; } catch (e) { return false; }
   }, []);
-  // ?patron=historial: dos alumnos con rutinas anteriores y ciclos para probar «Volumen por patrón» por rutina y semana (solo lectura de la URL).
+  // ?patron=historial (o window.__DEMO_PATRON__ = true en una copia estatica sin querystring): dos alumnos con rutinas anteriores y ciclos para probar «Volumen por patrón» por rutina y semana (solo lectura de la URL).
   const patron = React.useMemo(function () {
-    try { return new URLSearchParams(window.location.search).get('patron') === 'historial'; } catch (e) { return false; }
+    try { return new URLSearchParams(window.location.search).get('patron') === 'historial' || window.__DEMO_PATRON__ === true; } catch (e) { return false; }
   }, []);
   const data = React.useMemo(function () {
     if (patron) return buildVolumenPatronDemoData({ incompleto: incompleto });
