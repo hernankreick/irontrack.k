@@ -29,6 +29,11 @@ export const FORBIDDEN = [
   [/^package(-lock)?\.json$/, "dependencias"],
 ];
 
+// Excepciones APROBADAS por el dueno, por RUTA EXACTA (sin comodines ni prefijos): no amplian ALLOWED ni relajan FORBIDDEN para el resto de lib/.
+// Cada entrada solo vale para el PR indicado; al fusionarlo se evalua si se retira. Estos archivos se escanean con DATA_PATTERNS como los componentes.
+//  - PR #197 (autorizado en la conversacion el 2026-11-24): modulo puro y de solo lectura del historial de «Volumen por patron».
+export const APPROVED_EXCEPTIONS = ["lib/metricas/volumenPatronHistorial.js"];
+
 // Lineas agregadas en componentes que sugieren cambios de datos, no de UI.
 export const DATA_PATTERNS = [/\bsupabase\b/i, /\.rpc\(/, /\.from\(\s*["'`]/, /\.(insert|upsert)\(/, /\.auth\./, /localStorage\.setItem/, /\bfetch\(/];
 
@@ -36,6 +41,7 @@ export function classify(files) {
   const outside = [];
   const forbidden = [];
   for (const f of files) {
+    if (APPROVED_EXCEPTIONS.includes(f)) continue;
     const hit = FORBIDDEN.find(([re]) => re.test(f));
     if (hit) forbidden.push(f + " (" + hit[1] + ")");
     else if (!ALLOWED.some((re) => re.test(f))) outside.push(f);
@@ -48,7 +54,7 @@ export function scanAdded(diffText) {
   let file = "";
   for (const line of diffText.split("\n")) {
     if (line.startsWith("+++ b/")) file = line.slice(6);
-    else if (line.startsWith("+") && !line.startsWith("+++") && /^components\//.test(file)) {
+    else if (line.startsWith("+") && !line.startsWith("+++") && (/^components\//.test(file) || APPROVED_EXCEPTIONS.includes(file))) {
       if (DATA_PATTERNS.some((re) => re.test(line))) flagged.push(file + ": " + line.slice(1).trim().slice(0, 100));
     }
   }

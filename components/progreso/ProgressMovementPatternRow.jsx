@@ -33,7 +33,7 @@ export default function ProgressMovementPatternRow({
   }
 
   return (
-    <div key={pattern.key}>
+    <div key={pattern.key} data-qa={"patron-" + pattern.key} data-vol={Math.round((Number(pattern.vol) || 0) * 100) / 100}>
       <button
         type="button"
         className="coach-tap"

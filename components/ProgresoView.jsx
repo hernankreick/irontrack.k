@@ -182,6 +182,8 @@ export default function ProgresoView({
   const [diaIdx, setDiaIdx] = useState(0);
   const [ejercicioSelId, setEjercicioSelId] = useState(null);
   const [patronExpanded, setPatronExpanded] = useState({});
+  /** Selección de «Volumen por patrón»: { rutinaId, ciclo, semana }; null = predeterminado (rutina vigente, bloque actual, semana actual). */
+  const [patronSel, setPatronSel] = useState({ rutinaId: null, ciclo: null, semana: null });
   /** Hoja abierta: { type: "alumnos" } | { type: "ejercicios", mode } | { type: "historial", ejercicioId, nombre } | null */
   const [sheet, setSheet] = useState(null);
   /**
@@ -275,6 +277,8 @@ export default function ProgresoView({
       setDiaIdx(0);
       // Nada del alumno anterior debe quedar visible: historial y lista de ejercicios abiertos, patrones desplegados.
       setPatronExpanded({});
+      // La rutina/ciclo/semana elegidos son de un alumno: al cambiar de alumno vuelve al predeterminado (nunca se arrastra una rutina ajena).
+      setPatronSel({ rutinaId: null, ciclo: null, semana: null });
       setSheet(function (cur) {
         return cur && (cur.type === "historial" || cur.type === "ejercicios") ? null : cur;
       });
@@ -347,9 +351,10 @@ export default function ProgresoView({
         ejercicioSelId: ejercicioSelId,
         lang: lang,
         historiaCompleta: historiaCompleta,
+        patronSel: patronSel,
       });
     },
-    [alumnos, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, allEx, periodo, alumnoSel, diaIdx, ejercicioSelId, lang, historiaCompleta]
+    [alumnos, sesionesGlobales, progresoGlobal, rutinasSBEntrenador, allEx, periodo, alumnoSel, diaIdx, ejercicioSelId, lang, historiaCompleta, patronSel]
   );
 
   var exerciseOptKey = useMemo(
@@ -649,6 +654,11 @@ export default function ProgresoView({
                     patterns={model.patronPatterns}
                     totalVol={model.patronTotalVol}
                     weekNumber={(model.currentRoutineWeekIndex != null ? model.currentRoutineWeekIndex : 0) + 1}
+                    historial={model.patronHistorial}
+                    onSelectRutina={function (id) { setPatronSel({ rutinaId: id, ciclo: null, semana: null }); setPatronExpanded({}); }}
+                    onSelectCiclo={function (c) { setPatronSel(function (p) { return { rutinaId: p.rutinaId, ciclo: c, semana: null }; }); setPatronExpanded({}); }}
+                    onSelectSemana={function (w) { setPatronSel(function (p) { return { rutinaId: p.rutinaId, ciclo: p.ciclo, semana: w }; }); setPatronExpanded({}); }}
+                    selectStyle={selectBaseStyle}
                     patronExpanded={patronExpanded}
                     togglePatronRow={togglePatronRow}
                     C={Cx}

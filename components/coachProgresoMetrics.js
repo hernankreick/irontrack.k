@@ -6,7 +6,7 @@
 
 import { FALLBACK_EXERCISE_NAME } from "../lib/exerciseResolve.js";
 import { getRutinaAlumnoId, selectCurrentRoutine } from "../lib/routineStore.js";
-import { filaActivaEnBloque, readCicloActual, rowInCiclo } from "../lib/rutinaCiclo.js";
+import { filaActivaEnBloque, readCicloActual, readCicloBase, rowInCiclo } from "../lib/rutinaCiclo.js";
 import { irontrackMsg as M, pickExerciseName } from "../lib/irontrackMsg.js";
 import {
   adherencia,
@@ -26,6 +26,13 @@ import {
   volumenEnRango,
 } from "../lib/metricas/index.js";
 import { isCompletedSession } from "../lib/studentWeeklyProgress.js";
+import {
+  atribuirSeriesARutinas,
+  contarNoAsignadas,
+  contarSesiones,
+  listarRutinasConHistorial,
+  seriesDeRutinaCicloSemana,
+} from "../lib/metricas/volumenPatronHistorial.js";
 
 const DAY_MS = 86400000;
 /** Máximo de PRs en «PRs recientes». Único punto de verdad: lo usan el modelo y la vista. */
@@ -273,6 +280,49 @@ export function buildLoadSeriesDetailed(rows, opts) {
 
 export function buildLoadSeries(rows, opts) {
   return buildLoadSeriesDetailed(rows, opts).series;
+}
+
+/**
+ * Volumen por patrón de movimiento de un conjunto de filas de `progreso` (ya filtradas por rutina/ciclo/semana).
+ * Fórmula: volumenDeSerie (kg × reps, sin ejercicios por tiempo); 1 fila = 1 serie (las series por tiempo cuentan como serie, no como volumen).
+ * Clasificación: patternToMovementKey sobre `pattern` del catálogo; lo que no es uno de los 5 patrones no entra.
+ * @param {{ exMap: object, indiceTiempo: object, lang: string }} ctx
+ */
+export function buildPatternBreakdown(rows, ctx) {
+  var exMap = ctx.exMap || {};
+  var indiceTiempo = ctx.indiceTiempo;
+  var lang = ctx.lang;
+  var volByKey = { empuje: 0, traccion: 0, rodilla: 0, bisagra: 0, core: 0 };
+  /** @type {Record<string, Record<string, number>>} patternKey -> ejercicio_id -> series */
+  var seriesByPatternAndEx = { empuje: {}, traccion: {}, rodilla: {}, bisagra: {}, core: {} };
+  (rows || []).forEach(function (r) {
+    var ex = exMap[r.ejercicio_id];
+    var mk = patternToMovementKey(ex ? ex.pattern : "");
+    if (!mk) return;
+    volByKey[mk] += volumenDeSerie(r, indiceTiempo);
+    var ejId = r.ejercicio_id;
+    if (ejId == null) return;
+    var sid = String(ejId);
+    var bag = seriesByPatternAndEx[mk];
+    bag[sid] = (bag[sid] || 0) + 1;
+  });
+  var patronTotalVol = MOVEMENT_PATTERN_DEF.reduce(function (acc, def) {
+    return acc + (volByKey[def.key] || 0);
+  }, 0);
+  var patronPatterns = MOVEMENT_PATTERN_DEF.map(function (def) {
+    var v = volByKey[def.key] || 0;
+    var pct = patronTotalVol > 0 ? Math.round((100 * v) / patronTotalVol) : 0;
+    var bag = seriesByPatternAndEx[def.key] || {};
+    var exercises = Object.keys(bag)
+      .map(function (ejId) {
+        return { ejercicio_id: ejId, name: exName(exMap, ejId, lang), series: bag[ejId] };
+      })
+      .sort(function (a, b) {
+        return b.series - a.series;
+      });
+    return { key: def.key, label: M(lang, def.labelEs, def.labelEn, def.labelEn), p: pct, vol: v, color: def.color, exercises: exercises };
+  });
+  return { patronTotalVol: patronTotalVol, patronPatterns: patronPatterns };
 }
 
 export function getRoutineForAlumno(rutinasSBEntrenador, alumnoId) {
@@ -801,58 +851,124 @@ export function buildCoachProgresoModel(params) {
   });
 
   /**
-   * Volumen por patrón: semana actual de la rutina activa (la misma semana y el mismo bloque que la barra resaltada de «Volumen por
-   * semana»); 1 fila progreso = 1 serie (las series por tiempo cuentan como serie, no como volumen).
+   * Volumen por patrón de UNA (rutina, ciclo, semana). Por defecto: la semana actual de la rutina activa (la misma semana y el mismo
+   * bloque que la barra resaltada de «Volumen por semana»). El entrenador puede elegir otra rutina (también anteriores), otro ciclo y
+   * otra semana: ver patronHistorial. Clasificación y fórmula: buildPatternBreakdown (una sola definición para todas las vistas).
    */
   var semanaPatron = routineWeekContext.currentRoutineWeekIndex;
-  var volByKey = { empuje: 0, traccion: 0, rodilla: 0, bisagra: 0, core: 0 };
-  /** @type {Record<string, Record<string, number>>} patternKey -> ejercicio_id -> series */
-  var seriesByPatternAndEx = {
-    empuje: {},
-    traccion: {},
-    rodilla: {},
-    bisagra: {},
-    core: {},
-  };
-  blockRows.forEach(function (r) {
-    if (semanaRutinaDeFila(r) !== semanaPatron) return;
-    var ex = exMap[r.ejercicio_id];
-    var mk = patternToMovementKey(ex ? ex.pattern : "");
-    if (!mk) return;
-    volByKey[mk] += volumenDeSerie(r, indiceTiempo);
-    var ejId = r.ejercicio_id;
-    if (ejId == null) return;
-    var sid = String(ejId);
-    var bag = seriesByPatternAndEx[mk];
-    bag[sid] = (bag[sid] || 0) + 1;
-  });
-  var patronTotalVol = MOVEMENT_PATTERN_DEF.reduce(function (acc, def) {
-    return acc + (volByKey[def.key] || 0);
-  }, 0);
-  var patronPatterns = MOVEMENT_PATTERN_DEF.map(function (def) {
-    var v = volByKey[def.key] || 0;
-    var pct = patronTotalVol > 0 ? Math.round((100 * v) / patronTotalVol) : 0;
-    var bag = seriesByPatternAndEx[def.key] || {};
-    var exercises = Object.keys(bag)
-      .map(function (ejId) {
-        return {
-          ejercicio_id: ejId,
-          name: exName(exMap, ejId, lang),
-          series: bag[ejId],
-        };
-      })
-      .sort(function (a, b) {
-        return b.series - a.series;
-      });
+  var ph = resolvePatternHistorial();
+  var patronBreakdown = buildPatternBreakdown(ph.rows, { exMap: exMap, indiceTiempo: indiceTiempo, lang: lang });
+  var patronTotalVol = patronBreakdown.patronTotalVol;
+  var patronPatterns = patronBreakdown.patronPatterns;
+
+  /**
+   * Selección rutina/ciclo/semana de «Volumen por patrón» (params.patronSel = { rutinaId, ciclo, semana } con null = predeterminado).
+   *  - Rutina vigente, bloque actual: exactamente el cálculo de siempre (blockRows por semana de la rutina), así la tarjeta coincide con
+   *    «Volumen por semana».
+   *  - Cualquier otra rutina o ciclo anterior: SOLO series con evidencia (lib/metricas/volumenPatronHistorial.js); el resto se informa.
+   */
+  function resolvePatternHistorial() {
+    var sel = params.patronSel || {};
+    var rutinasAlumno = alumnoSel ? rutinasDeAlumno(rutinasSBEntrenador, alumnoSel) : [];
+    var atrib = alumnoSel ? atribuirSeriesARutinas(alumnoAllRows, sesionesGlobales, alumnoSel) : { series: [], sinSesion: 0, ambiguas: 0, sinSemana: 0, ambiguasFilas: [], noAsignadas: [] };
+    var lista = alumnoSel
+      ? listarRutinasConHistorial({ rutinas: rutinasAlumno, sesiones: sesionesGlobales, series: atrib.series, alumnoId: alumnoSel, rutinaActualId: routineForSelectedId })
+      : [];
+    var rutinaId = null;
+    if (sel.rutinaId != null && lista.some(function (r) { return r.id === String(sel.rutinaId); })) rutinaId = String(sel.rutinaId);
+    else if (lista.length) rutinaId = lista[0].id;
+    var entry = lista.filter(function (r) { return r.id === rutinaId; })[0] || null;
+    var esActual = !!entry && entry.esActual;
+
+    // Ciclo: la rutina vigente ofrece «bloque actual» (valor 0) y los ciclos de bloques anteriores; las demás, sus ciclos con evidencia.
+    var cicloOpts = [];
+    if (entry) {
+      if (esActual) {
+        var base = readCicloBase(routineDatos);
+        cicloOpts.push({ value: 0, actual: true });
+        entry.ciclos.filter(function (c) { return c < base; }).forEach(function (c) { cicloOpts.push({ value: c, actual: false }); });
+      } else {
+        entry.ciclos.forEach(function (c) { cicloOpts.push({ value: c, actual: false }); });
+      }
+    }
+    var cicloValue = null;
+    if (cicloOpts.length) {
+      var okC = sel.ciclo != null && cicloOpts.some(function (c) { return c.value === Number(sel.ciclo); });
+      cicloValue = okC ? Number(sel.ciclo) : esActual ? 0 : cicloOpts[cicloOpts.length - 1].value;
+    }
+    var bloqueActual = esActual && cicloValue === 0;
+    // Bloque actual: el cálculo de siempre, salvo que una sesión DEMUESTRE que la serie es de otra rutina o es ambigua (solo en esta tarjeta).
+    // Las series sin sesión que las respalde siguen entrando como antes (p. ej. un entrenamiento en curso aún no guardado).
+    var ajenas = new Set(atrib.ambiguasFilas);
+    atrib.series.forEach(function (a) { if (a.rutinaId !== routineForSelectedId) ajenas.add(a.row); });
+    var bloqueRows = blockRows.filter(function (r) { return !ajenas.has(r); });
+    var ambiguasSet = new Set(atrib.ambiguasFilas);
+    var bloqueRowsAmbiguas = blockRows.filter(function (r) { return ambiguasSet.has(r); });
+
+    // Semanas 1..4: cantidad de sesiones y de series con volumen de cada una (cero = «sin sesiones» / «sin registros»).
+    var semanas = [];
+    var ultimaConDatos = -1;
+    for (var wk = 0; wk < LOAD_BLOCK_WEEKS; wk++) {
+      var nSes;
+      var nSeries;
+      if (bloqueActual) {
+        nSes = selectedSessions.filter(function (x) { return Number(x.semana) === wk + 1; }).length;
+        nSeries = bloqueRows.filter(function (r) { return semanaRutinaDeFila(r) === wk && volumenDeSerie(r, indiceTiempo) > 0; }).length;
+      } else if (entry) {
+        nSes = contarSesiones(sesionesGlobales, alumnoSel, rutinaId, cicloValue, wk + 1);
+        nSeries = seriesDeRutinaCicloSemana(atrib.series, rutinaId, cicloValue, wk).filter(function (a) { return volumenDeSerie(a.row, indiceTiempo) > 0; }).length;
+      } else {
+        nSes = 0;
+        nSeries = 0;
+      }
+      if (nSes > 0 || nSeries > 0) ultimaConDatos = wk;
+      // Series sin respaldo (vista historica) o excluidas por ambiguas (bloque actual) de esa semana: su total NO esta confirmado.
+      var nParcial = bloqueActual
+        ? bloqueRowsAmbiguas.filter(function (r) { return semanaRutinaDeFila(r) === wk; }).length
+        : entry ? contarNoAsignadas(atrib.noAsignadas, cicloValue, wk) : 0;
+      semanas.push({ value: wk, sesiones: nSes, series: nSeries, parcial: nParcial });
+    }
+    var semanaValue = null;
+    if (entry) {
+      if (sel.semana != null && Number.isInteger(Number(sel.semana)) && Number(sel.semana) >= 0 && Number(sel.semana) < LOAD_BLOCK_WEEKS) semanaValue = Number(sel.semana);
+      else semanaValue = bloqueActual ? semanaPatron : Math.max(0, ultimaConDatos);
+    }
+
+    var rows = [];
+    if (entry && semanaValue != null) {
+      if (bloqueActual) {
+        rows = bloqueRows.filter(function (r) { return semanaRutinaDeFila(r) === semanaValue; });
+      } else {
+        rows = seriesDeRutinaCicloSemana(atrib.series, rutinaId, cicloValue, semanaValue).map(function (a) { return a.row; });
+      }
+    }
+    var info = semanas[semanaValue == null ? 0 : semanaValue] || { sesiones: 0, series: 0, parcial: 0 };
     return {
-      key: def.key,
-      label: M(lang, def.labelEs, def.labelEn, def.labelEn),
-      p: pct,
-      vol: v,
-      color: def.color,
-      exercises: exercises,
+      rows: rows,
+      view: {
+        rutinas: lista.map(function (r) {
+          return { id: r.id, nombre: r.nombre, esActual: r.esActual, existe: r.existe, ultimoDia: r.ultimoDia };
+        }),
+        rutinaId: rutinaId,
+        esActual: esActual,
+        ciclos: cicloOpts,
+        ciclo: cicloValue,
+        bloqueActual: bloqueActual,
+        semanas: semanas,
+        semana: semanaValue,
+        sesionesSemana: info.sesiones,
+        seriesSemana: info.series,
+        // Volumen NO confirmado: series de esta semana sin sesión que las respalde (o ambiguas) que quedaron afuera, series sin semana
+        // válida del alumno, o historial del alumno cargado a medias. Solo se informa; nunca se suman ni se reparten por fecha.
+        parcial: {
+          semana: info.parcial || 0,
+          sinSemana: bloqueActual ? 0 : atrib.sinSemana,
+          historialIncompleto: sesionesIncompletas || progresoIncompleto,
+          total: (info.parcial || 0) > 0 || (!bloqueActual && atrib.sinSemana > 0) || sesionesIncompletas || progresoIncompleto,
+        },
+      },
     };
-  });
+  }
 
   var noData = M(lang, "Sin datos suficientes", "Not enough data", "Dados insuficientes");
   var vsPrev = M(lang, "vs período anterior", "vs prev. period", "vs período anterior");
@@ -1051,7 +1167,7 @@ export function buildCoachProgresoModel(params) {
       semanaDetectada: routineWeekContext.semanaDetectada,
       sesionesFiltradas: selectedSessions.length,
       ejerciciosIncluidos: Object.keys(routineExerciseIds),
-      volumenPorCategoria: volByKey,
+      volumenPorCategoria: patronPatterns.reduce(function (acc, g) { acc[g.key] = g.vol; return acc; }, {}),
     });
   }
 
@@ -1065,6 +1181,7 @@ export function buildCoachProgresoModel(params) {
     maxVol: maxVol,
     patronPatterns: patronPatterns,
     patronTotalVol: patronTotalVol,
+    patronHistorial: ph.view,
     teamChips: teamChips,
     alumnoChips: alumnoChips,
     recentPrsLimit: RECENT_PRS_LIMIT,

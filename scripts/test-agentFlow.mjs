@@ -135,7 +135,7 @@ await test("guard como proceso: exit 2 con motivo en stderr al bloquear, exit 0 
   assert.equal(run("{no es json").status, 2);
 });
 
-const { classify, scanAdded } = await import(pathToFileURL(path.join(ROOT, "scripts/check-ui-scope.mjs")).href);
+const { classify, scanAdded, APPROVED_EXCEPTIONS, FORBIDDEN, ALLOWED } = await import(pathToFileURL(path.join(ROOT, "scripts/check-ui-scope.mjs")).href);
 
 await test("check:scope - acepta UI y tests, rechaza logica, datos, secretos, CI y dependencias", () => {
   assert.deepEqual(classify(["components/CoachDashboard.jsx", "components/layout/AppGlobalStyles.jsx", "scripts/test-coachMobileNav.mjs", "index.css"]), { outside: [], forbidden: [] });
@@ -144,6 +144,30 @@ await test("check:scope - acepta UI y tests, rechaza logica, datos, secretos, CI
   assert.deepEqual(r.outside, ["docs/otro.md"]);
   assert.equal(scanAdded("+++ b/components/A.jsx\n+  const x = supabase.from('rutinas').insert(y)\n+  <div className='a'/>").length, 1);
   assert.deepEqual(scanAdded("+++ b/components/A.jsx\n+  <div style={{minHeight:44}}/>"), []);
+});
+
+await test("check:scope - la excepcion aprobada (PR #197) es de UNA ruta exacta y no relaja el resto de lib/", () => {
+  assert.deepEqual(APPROVED_EXCEPTIONS, ["lib/metricas/volumenPatronHistorial.js"]);
+  assert.deepEqual(classify(["lib/metricas/volumenPatronHistorial.js"]), { outside: [], forbidden: [] });
+  // cualquier otra ruta de lib/ (incluidas parecidas, vecinas y variantes) sigue prohibida
+  for (const f of ["lib/metricas/volumen.js", "lib/metricas/volumenPatronHistorial.js.bak", "lib/metricas/volumenPatronHistorial2.js", "lib/metricas/otro/volumenPatronHistorial.js", "lib/volumenPatronHistorial.js", "lib/metricas/../progressInsert.js", "lib/metricas/volumenPatronHistorial.js/x", "LIB/metricas/volumenPatronHistorial.js"]) {
+    assert.notDeepEqual(classify([f]), { outside: [], forbidden: [] }, f);
+  }
+  // las listas generales no se tocaron: lib/, App, Supabase, SQL, .env, CI, dependencias siguen en FORBIDDEN
+  const motivos = FORBIDDEN.map(([, m]) => m);
+  for (const m of ["Supabase", "SQL / RLS", "secretos / entorno", "logica de negocio y datos", "logica central de la app", "CI", "dependencias"]) assert.ok(motivos.includes(m), m);
+  assert.equal(FORBIDDEN.length, 9);
+  assert.equal(ALLOWED.length, 7);
+  // y el archivo excepcionado se escanea con los mismos patrones de datos que los componentes
+  assert.equal(scanAdded("+++ b/lib/metricas/volumenPatronHistorial.js\n+  const r = await fetch(url)\n+  var x = 1").length, 1);
+  assert.equal(scanAdded("+++ b/lib/metricas/volumen.js\n+  const r = await fetch(url)").length, 0, "otros lib/ no se escanean aca: siguen siendo FORBIDDEN");
+});
+
+await test("el modulo de historial de volumen por patron es puro: sin red, Supabase, almacenamiento ni React", () => {
+  const src = readFileSync(path.join(ROOT, "lib/metricas/volumenPatronHistorial.js"), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+  assert.doesNotMatch(src, /supabase|\.rpc\(|\.from\(\s*["'`]|\.(insert|upsert|update|delete)\(|\bfetch\(|localStorage|sessionStorage|XMLHttpRequest|from ["']react/i);
+  const imports = [...src.matchAll(/^import .* from "([^"]+)"/gm)].map((m) => m[1]).sort();
+  assert.deepEqual(imports, ["../rutinaCiclo.js", "./fechas.js"]);
 });
 
 await test("arnes de QA: solo datos ficticios (.invalid), host simulado y gates (overflow, errores, baseline) correctos", async () => {
